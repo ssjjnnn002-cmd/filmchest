@@ -1,0 +1,1530 @@
+<!doctype html>
+<html lang="ko" translate="no">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="google" content="notranslate" />
+<meta name="theme-color" content="#0b0b0c" />
+<title>노출계 테스트</title>
+<style>
+  :root {
+    --bg: #0b0b0c; --panel: #161618; --line: #2a2a2e; --text: #f2f0ec; --sub: #8d8a85;
+    --orange: #ff6b1f; --ok: #4cd964; --warn: #ff453a; --print: #f3a256;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    -webkit-user-select: none; user-select: none; overscroll-behavior: none;
+    padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 10px);
+    height: 100dvh; box-sizing: border-box; overflow: hidden;
+  }
+  button { font-family: inherit; color: inherit; }
+  .wrap { max-width: 440px; height: 100%; margin: 0 auto; padding: 8px 16px 0; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; }
+  .wrap > * { flex: none; min-width: 0; }
+  /* 한 화면에 다 들어가게: 남는 높이만큼 파인더가 줄어든다 */
+  .wrap > .finderbox { flex: 1 1 0; min-height: 90px; display: flex; align-items: center; justify-content: center; container-type: size; }
+  .finderbox .finder { height: min(100cqh, calc(100cqw / 1.5)); width: auto; flex: none; }
+
+  /* 헤더 */
+  .head { display: flex; align-items: center; gap: 8px; }
+  .head .t { flex: 1; min-width: 0; }
+  .head h1 { margin: 0; font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .back { flex: none; width: 36px; height: 36px; margin-left: -6px; border: 0; border-radius: 50%; background: var(--panel); display: grid; place-items: center; }
+  .back svg { width: 20px; height: 20px; }
+  .back[hidden] { display: none; }
+  /* 앱 안 아이폰: 카메라 화면은 웹 화면 아래에 깔린다. 파인더 자리만 비우고, 모서리는 흐린 접안부 모양으로 덮는다 */
+  html.native, html.native body { background: transparent; }
+  html.native .finder { background: transparent; -webkit-mask: none; mask: none; }
+  html.native .finder .scene { display: none; }
+  .finder .feather { display: none; }
+  html.native .finder .feather { display: block; position: absolute; inset: -1px; pointer-events: none; background: var(--bg);
+    -webkit-mask: linear-gradient(#000 0 0), var(--eyepiece) center / 100% 100% no-repeat; -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) exclude, var(--eyepiece) center / 100% 100% no-repeat; }
+  .head .film { font-size: 12px; color: var(--sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tog { position: relative; display: grid; grid-template-columns: 1fr 1fr 1fr; width: 162px; border: 0; padding: 3px; border-radius: 99px; background: var(--panel); flex: none; }
+  .tog i { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); border-radius: 99px; background: #3a3a3e; box-shadow: 0 1px 4px rgb(0 0 0 / .4);
+    transition: transform .32s cubic-bezier(.3,1.35,.5,1); }
+  .tog.center i { transform: translateX(100%); }
+  .tog.avg i { transform: translateX(200%); }
+  .tog span { position: relative; padding: 7px 0; font-size: 13px; font-weight: 700; color: var(--sub); transition: color .25s; }
+  .tog.spot span:nth-of-type(1), .tog.center span:nth-of-type(2), .tog.avg span:nth-of-type(3) { color: var(--text); }
+
+  /* 파인더: 둥근 네모 접안부 안에 바늘·화각 다이얼·테스트 밝기까지 */
+  .finder { position: relative; aspect-ratio: 3 / 2; background: #000; touch-action: none; -webkit-mask: var(--eyepiece) center / 100% 100% no-repeat; mask: var(--eyepiece) center / 100% 100% no-repeat; }
+  .finder:not(.spot) .cross { opacity: 0; }
+  /* 중앙 중점 측광: 가운데 동그라미 쪽을 더 많이 본다 */
+  .finder .ccircle { position: absolute; left: 50%; top: 50%; width: 34%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%;
+    border: 1px solid rgb(255 238 190 / .75); pointer-events: none; opacity: 0; transition: opacity .2s; }
+  .finder.center .ccircle { opacity: 1; }
+  .finder .cammsg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 62%; text-align: center; background: rgb(0 0 0 / .6); border-radius: 14px; padding: 12px; z-index: 2; }
+  .finder .cammsg[hidden] { display: none; }
+  .finder .cammsg p { margin: 0 0 8px; font-size: 12px; line-height: 1.4; }
+  .finder .cammsg button { border: 0; background: var(--orange); color: #111; font-size: 13px; font-weight: 700; padding: 8px 14px; border-radius: 99px; }
+  .finder .cammsg button[hidden] { display: none; }
+  .finder .evflash { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: #fff; background: rgb(0 0 0 / .45); padding: 4px 8px; border-radius: 99px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .finder .evflash.on { opacity: 1; transition: none; }
+  .finder .scene { position: absolute; inset: 0; }
+  .finder video, .finder canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: filter .25s; }
+  .finder .vignette { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 75% 78% at 50% 50%, transparent 52%, rgb(0 0 0 / .32) 74%, rgb(0 0 0 / .78) 100%); }
+  .finder .bright { position: absolute; left: 50%; top: 50%; width: 64%; height: 70%; transform: translate(-50%, -50%); pointer-events: none;
+    border: 1.5px solid rgb(255 226 140 / .9); border-radius: 3px; box-shadow: 0 0 6px rgb(255 220 140 / .35); }
+  .finder .bright::before { content: ""; position: absolute; left: -1px; top: 8%; width: 10%; border-top: 1px dashed rgb(255 226 140 / .55); }
+  .finder .cross { position: absolute; width: 22px; height: 22px; transform: translate(-50%, -50%); pointer-events: none; transition: left .25s cubic-bezier(.2,.8,.2,1), top .25s cubic-bezier(.2,.8,.2,1), opacity .2s; }
+  .finder .cross.drag { transition: none; }
+  .finder .cross::before, .finder .cross::after { content: ""; position: absolute; background: rgb(255 238 190 / .95); box-shadow: 0 0 3px rgb(0 0 0 / .5); }
+  .finder .cross::before { left: 50%; top: 0; bottom: 0; width: 1.5px; margin-left: -.75px; }
+  .finder .cross::after { top: 50%; left: 0; right: 0; height: 1.5px; margin-top: -.75px; }
+  .finder .gauge { position: absolute; left: 4%; top: 6%; bottom: 6%; width: 12%; pointer-events: none; opacity: .92; }
+  .finder .gauge svg { width: 100%; height: 100%; display: block; }
+  .finder .zoomdial { position: absolute; right: 0; top: 0; bottom: 0; width: 18%; opacity: .82; touch-action: none; cursor: ns-resize; z-index: 3; background: rgb(0 0 0 / .02); }
+  .finder .zoomdial svg { position: absolute; right: 8%; top: 6%; width: 78%; height: 88%; display: block; }
+  .finder .led { position: absolute; left: 19%; bottom: 12%; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 10px var(--ok); transition: background .2s, box-shadow .2s; }
+  .finder .led.red { background: var(--warn); box-shadow: 0 0 10px var(--warn); }
+  .finder .focal { position: absolute; right: calc(18% + 7px); top: calc(15% + 6px); font-size: 12px; font-weight: 700; color: rgb(255 238 190 / .95); text-shadow: 0 1px 3px rgb(0 0 0 / .6); font-variant-numeric: tabular-nums; pointer-events: none; }
+  .finder .simbar { position: absolute; left: 50%; bottom: 4%; width: 46%; transform: translateX(-50%); display: flex; align-items: center; gap: 6px;
+    font-size: 10px; font-weight: 700; color: rgb(255 255 255 / .7); text-shadow: 0 1px 2px rgb(0 0 0 / .7); font-variant-numeric: tabular-nums; }
+  .finder .simbar input { flex: 1; min-width: 0; height: 14px; margin: 0; accent-color: #d8d3cb; opacity: .8; }
+  .finder .fire { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+  .finder .fire.go { animation: fire .16s ease-out; }
+  @keyframes fire { 30% { opacity: .55 } 100% { opacity: 0 } }
+
+  .info { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
+  .info .state { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+  .state.over { color: #ffb340; } .state.under { color: #64b5ff; } .state.ok { color: var(--ok); }
+  .info .ev { font-size: 12px; color: var(--sub); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .hold { border: 1px solid var(--line); background: var(--panel); font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 99px; flex: none; }
+  .hold.on { background: var(--orange); border-color: var(--orange); color: #111; }
+  .infobtns { display: flex; gap: 6px; flex: none; }
+  .flash { display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--sub); font-size: 13px; font-weight: 600; padding: 0 10px; border-radius: 99px; transition: background .2s, color .2s, border-color .2s; }
+  .flash svg { width: 15px; height: 15px; }
+  .flash.on { background: #ffd23f; border-color: #ffd23f; color: #111; }
+  .filt.on { background: #9ec9ff; border-color: #9ec9ff; color: #111; }
+  .chips button small { font-size: 10px; font-weight: 700; opacity: .7; margin-left: 3px; }
+  .chips button.rec { box-shadow: inset 0 0 0 1.5px var(--orange); }
+  .chips.wrap { flex-wrap: wrap; overflow: visible; }
+  .sheet .memo { width: 100%; margin-top: 8px; border: 0; border-radius: 10px; background: #2a2a2e; color: var(--text); font: 15px/1.4 inherit; font-family: inherit; padding: 10px 12px; }
+  .cell .fl { position: absolute; right: 4px; top: 3px; width: 11px; height: 11px; color: #ffd23f; }
+  .cell .fl svg { width: 100%; height: 100%; display: block; }
+
+  /* 링 */
+  .rings { display: grid; gap: 6px; }
+  .ringrow { display: grid; grid-template-columns: 66px minmax(0, 1fr); gap: 6px; }
+  .mbtn { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 0 2px; display: grid; place-content: center; gap: 3px; text-align: center; transition: background .2s, border-color .2s; }
+  .mbtn span { font-size: 13px; font-weight: 700; }
+  .mbtn small { font-size: 10px; font-weight: 700; color: var(--sub); min-height: 12px; white-space: nowrap; }
+  .mbtn.on { background: rgb(255 107 31 / .16); border-color: var(--orange); }
+  .mbtn.on span { color: var(--orange); }
+  .ring { position: relative; height: 50px; border-radius: 10px; overflow: hidden; background: #101011; touch-action: none; cursor: grab; }
+  .ring.short { height: 44px; }
+  .ring .ridges, .ring .labels { position: absolute; left: 0; right: 0; }
+  .ring .ridges { top: 0; height: 16px; background: #1c1c1e; }
+  .ring.short .ridges { height: 12px; }
+  .ring .labels { top: 16px; bottom: 0; background: linear-gradient(#141415, #0d0d0e); }
+  .ring.short .labels { top: 12px; }
+  .ring .ridge { position: absolute; top: 2px; bottom: 2px; width: 3px; margin-left: -1.5px; border-radius: 1px; background: #3d3d41; }
+  .ring .lab { position: absolute; top: 50%; font: 700 16px/1 -apple-system, sans-serif; color: #e9e6e0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ring .shade { position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(90deg, rgb(0 0 0 / .92), rgb(0 0 0 / .1) 28%, rgb(255 255 255 / .04) 50%, rgb(0 0 0 / .1) 72%, rgb(0 0 0 / .92)),
+                linear-gradient(rgb(255 255 255 / .06), transparent 30%, transparent 75%, rgb(0 0 0 / .4)); }
+  .ring .mark { position: absolute; left: 50%; top: 16px; margin-left: -5px; border: 5px solid transparent; border-top-color: var(--orange); }
+  .ring.short .mark { top: 12px; }
+  .ringrow.auto .ring { cursor: default; }
+  .ringrow.auto .lab { color: #8f8b84; }
+  .ringrow.auto .ring .mark { border-top-color: #666; }
+
+  /* 조작부: 되감기 노브 · 카운터 · 셔터+레버 */
+  .controls { position: relative; z-index: 3; }
+  .controls svg { display: block; width: 100%; height: auto; max-height: 92px; overflow: visible; }
+  #shutterBtn { cursor: pointer; }
+  #shutterBtn .disc { transition: transform .09s ease-out, filter .09s; transform-box: fill-box; transform-origin: center; }
+  #shutterBtn.down .disc { transform: scale(.88); filter: brightness(.8); }
+  #lever { transform-box: view-box; transform-origin: 290px 52px; transition: transform .34s cubic-bezier(.35,0,.25,1); }
+  #lever.out { transform: rotate(-125deg); transition-timing-function: cubic-bezier(.4,.1,.3,1); }
+  #rewind { transform-box: view-box; transform-origin: 70px 52px; transition: transform .6s cubic-bezier(.35,0,.25,1); }
+
+  /* 필름 */
+  .stripwrap { position: relative; margin: 0 -16px; }
+  .canister { position: absolute; left: -34px; top: -10px; width: 72px; height: 132px; pointer-events: none; z-index: 2; filter: drop-shadow(4px 0 6px rgb(0 0 0 / .55)); }
+  .canister svg { width: 100%; height: 100%; display: block; }
+  .strip { position: relative; height: 112px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch; touch-action: pan-x; }
+  .strip::-webkit-scrollbar { display: none; }
+  .track { display: flex; height: 100%; width: max-content; padding: 0 calc(50% - 52px) 0 0; }
+  .cell { position: relative; flex: 0 0 104px; height: 100%; background: #2a1a0f; scroll-snap-align: center; }
+  .cell::before, .cell::after { content: ""; position: absolute; left: 0; right: 0; height: 8px;
+    background: repeating-linear-gradient(90deg, #2a1a0f 0 6px, var(--bg) 6px 13px, #2a1a0f 13px 17.33px); }
+  .cell::before { top: 4px; } .cell::after { bottom: 4px; }
+  .cell .num { position: absolute; top: 14px; left: 8px; font: 700 9px/1 ui-monospace, "SF Mono", Menlo, monospace; color: var(--print); opacity: .85; }
+  .cell .frame { position: absolute; left: 6px; right: 6px; top: 26px; height: 60px; border-radius: 4px; background: #1a100a;
+    display: grid; place-content: center; gap: 2px; text-align: center; border: 1.5px solid transparent; transition: border-color .2s, background .2s; }
+  .cell .frame b { font: 800 17px/1.1 -apple-system, sans-serif; color: #f6e6d4; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .cell .frame i { font-style: normal; font: 700 13px/1.1 -apple-system, sans-serif; color: #f6e6d4; opacity: .85; font-variant-numeric: tabular-nums; }
+  .cell .frame em { font-style: normal; font: 800 11px/1.2 -apple-system, sans-serif; color: var(--print); }
+  .cell .frame .auto { font: 800 13px/1 -apple-system, sans-serif; color: #f6e6d4; opacity: .5; letter-spacing: .08em; }
+  .cell.shot .frame { background: #3a2414; }
+  .cell.next .frame { border-color: rgb(255 255 255 / .55); border-style: dashed; }
+  .cell.next .frame::after { content: "다음"; font: 700 11px/1 -apple-system, sans-serif; color: rgb(255 255 255 / .55); }
+  .cell.leader:not(.shot) .frame { background: #4a2810; }
+  .cell.leader:not(.shot) .num { opacity: .5; }
+  .tongue { flex: none; height: 100%; }
+  .tail { background: #2a1a0f !important; }
+  .leadfog, .tail { flex: none; width: 30px; height: 100%; background: #3b2210;
+    -webkit-mask: linear-gradient(#000 0 0) top / 100% 4px no-repeat, linear-gradient(#000 0 0) bottom / 100% 4px no-repeat, linear-gradient(#000 0 0) center / 100% 88px no-repeat,
+      repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 13px, #000 13px 17.33px) top 4px left 0 / 100% 8px no-repeat, repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 13px, #000 13px 17.33px) bottom 4px left 0 / 100% 8px no-repeat;
+    mask: linear-gradient(#000 0 0) top / 100% 4px no-repeat, linear-gradient(#000 0 0) bottom / 100% 4px no-repeat, linear-gradient(#000 0 0) center / 100% 88px no-repeat,
+      repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 13px, #000 13px 17.33px) top 4px left 0 / 100% 8px no-repeat, repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 13px, #000 13px 17.33px) bottom 4px left 0 / 100% 8px no-repeat; }
+  .tongue svg { display: block; height: 100%; width: auto; }
+  .cell .pen { position: absolute; right: 9px; top: 12px; font-size: 9px; color: var(--print); opacity: .8; }
+  /* 키가 작은 폰(아이폰 SE 등): 링·버튼을 조금 줄여 파인더 자리를 남긴다 */
+  @media (max-height: 760px) {
+    .wrap { gap: 6px; }
+    .ring { height: 42px; }
+    .ring.short { height: 38px; }
+    .rings { gap: 4px; }
+    .info .state { font-size: 17px; }
+    .controls svg { max-height: 74px; }
+    .endbtn { padding: 11px 0 !important; }
+  }
+  .endbtn { border: 0; border-radius: 14px; padding: 15px 0; font-size: 16px; font-weight: 700; background: var(--panel); color: var(--text); margin-top: 4px; }
+  .endbtn:disabled { color: var(--sub); }
+  .striphint { text-align: center; font-size: 11px; color: var(--sub); margin-top: -4px; }
+
+  .src { font-size: 11px; color: var(--sub); text-align: center; }
+
+  /* 시트 */
+  .dim { position: fixed; inset: 0; background: rgb(0 0 0 / .5); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 20; }
+  .dim.on { opacity: 1; pointer-events: auto; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; background: #1c1c1e; border-radius: 18px 18px 0 0; padding: 10px 16px calc(env(safe-area-inset-bottom) + 16px);
+    transform: translateY(105%); transition: transform .32s cubic-bezier(.2,.8,.2,1); max-width: 480px; margin: 0 auto; }
+  .sheet.on { transform: none; }
+  .sheet .grab { width: 36px; height: 5px; border-radius: 3px; background: #48484c; margin: 0 auto 12px; }
+  .sheet.down { max-height: 92dvh; overflow-y: auto; top: 0; bottom: auto; border-radius: 0 0 18px 18px; padding: calc(env(safe-area-inset-top) + 16px) 16px 10px; transform: translateY(-105%); }
+  .sheet.down.on { transform: none; }
+  .sheet.down .grab { margin: 14px auto 0; }
+  .sheet h2 { margin: 0 0 2px; font-size: 18px; }
+  .sheet .meta { font-size: 12px; color: var(--sub); margin-bottom: 4px; }
+  .sheet .lbl { font-size: 12px; color: var(--sub); font-weight: 600; margin: 12px 0 6px; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: #2a2a2e; border-radius: 10px; padding: 2px; }
+  .seg button { border: 0; background: none; color: var(--sub); font-size: 13px; font-weight: 600; padding: 9px 0; border-radius: 8px; line-height: 1.25; }
+  .seg button small { display: block; font-size: 10px; font-weight: 600; opacity: .8; }
+  .seg button.on { background: #48484c; color: var(--text); }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips button { flex: none; border: 0; background: #2a2a2e; font-size: 14px; font-weight: 600; padding: 9px 12px; border-radius: 10px; font-variant-numeric: tabular-nums; }
+  .chips button.on { background: var(--orange); color: #111; }
+  .sheet .note { font-size: 12px; color: var(--sub); padding: 8px 0 0; }
+  .sheet .actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 18px; }
+  .sheet .actions.one { grid-template-columns: 1fr; }
+  .modal { position: fixed; left: 50%; top: 50%; z-index: 21; width: min(340px, calc(100% - 40px)); background: #1c1c1e; border-radius: 20px; padding: 18px 16px 16px;
+    transform: translate(-50%, -46%) scale(.94); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.2,.9,.3,1.15), opacity .2s; box-shadow: 0 20px 60px rgb(0 0 0 / .5); }
+  .modal.on { transform: translate(-50%, -50%); opacity: 1; pointer-events: auto; }
+  .modal .pair { display: grid; gap: 6px; }
+  .modal .pcam { background: #2a2a2e; border-radius: 14px; padding: 10px 12px; }
+  .modal .pcam small { display: block; font-size: 11px; color: var(--sub); }
+  .modal .pcam b { font-size: 15px; }
+  .modal .roll { margin-top: 0; }
+  .modal h3 { margin: 18px 0 6px; font-size: 17px; text-align: center; }
+  .modal .hint { margin: 0 0 14px; font-size: 12px; line-height: 1.45; color: var(--sub); text-align: center; }
+  .modal .yn { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .modal .yn button { border: 1.5px solid var(--line); background: #2a2a2e; border-radius: 12px; padding: 12px 0; font-size: 15px; font-weight: 700; transition: border-color .2s, background .2s, color .2s; }
+  .modal .yn button.on { border-color: var(--orange); background: rgb(255 107 31 / .16); color: var(--orange); }
+  .modal .known { margin: 14px 0 0; font-size: 12px; color: var(--sub); text-align: center; }
+  .modal .go { width: 100%; margin-top: 12px; border: 0; border-radius: 12px; padding: 14px 0; font-size: 15px; font-weight: 700; background: var(--orange); color: #111; transition: opacity .2s; }
+  .modal .go:disabled { opacity: .35; }
+  .roll { display: flex; align-items: center; gap: 12px; background: #2a2a2e; border-radius: 14px; padding: 12px; margin-top: 10px; }
+  .roll .can { width: 34px; height: 46px; border-radius: 6px; background: linear-gradient(90deg, #c9c4ba, #f6f3ec 45%, #bdb8ae); position: relative; flex: none; }
+  .roll .can::before, .roll .can::after { content: ""; position: absolute; left: -2px; right: -2px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #333, #777 45%, #222); }
+  .roll .can::before { top: -2px; } .roll .can::after { bottom: -2px; }
+  .roll .can i { position: absolute; left: 0; right: 0; top: 17px; height: 12px; background: linear-gradient(90deg, #c9861c, #f2b33d 45%, #b97a17); }
+  .roll b { display: block; font-size: 16px; }
+  .roll span { font-size: 12px; color: var(--sub); }
+  .sheet .actions button { border: 0; border-radius: 12px; padding: 14px 0; font-size: 15px; font-weight: 700; background: #2a2a2e; }
+  .sheet .actions .save { background: var(--orange); color: #111; }
+
+  .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translate(-50%, 20px); opacity: 0; max-width: calc(100% - 32px);
+    background: rgb(40 40 44 / .96); color: var(--text); font-size: 13px; padding: 10px 14px; border-radius: 12px; transition: .25s; pointer-events: none; z-index: 30; text-align: center; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <button class="back" id="backBtn" hidden aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="t">
+      <h1 id="camTitle">테스트용 카메라</h1>
+      <div class="film" id="filmLine"></div>
+    </div>
+    <button class="tog spot" id="meterMode" aria-label="측광 방식"><i></i><span>스팟</span><span>중앙</span><span>평균</span></button>
+  </div>
+
+  <div class="finderbox">
+    <div class="finder spot" id="finder">
+      <div class="scene" id="scene">
+        <video id="video" playsinline muted autoplay></video>
+        <canvas id="simCanvas" width="600" height="400"></canvas>
+      </div>
+      <div class="vignette"></div>
+      <div class="feather"></div>
+      <div class="bright"></div>
+      <div class="ccircle"></div>
+      <div class="cross" id="spot" style="left:50%;top:50%"></div>
+      <div class="gauge">
+        <svg viewBox="0 0 50 200" preserveAspectRatio="xMinYMid meet">
+          <defs>
+            <linearGradient id="zone" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffb340"/><stop offset=".42" stop-color="#4cd964"/><stop offset=".58" stop-color="#4cd964"/><stop offset="1" stop-color="#64b5ff"/></linearGradient>
+          </defs>
+          <path d="M 17 35.3 A 80 80 0 0 1 17 164.7" fill="none" stroke="rgb(255 255 255 / .55)" stroke-width="1.5" stroke-linecap="round"/>
+          <g id="ticks"></g>
+          <g id="needle" style="transform-origin:-30px 100px"><line x1="-30" y1="100" x2="46" y2="100" stroke="#fff" stroke-width="2" stroke-linecap="round"/></g>
+        </svg>
+      </div>
+      <div class="zoomdial" id="zoomDial">
+        <svg viewBox="0 0 50 200" preserveAspectRatio="xMaxYMid meet">
+          <g id="zoomTicks"></g>
+          <line x1="1" y1="100" x2="20" y2="100" stroke="#ff6b1f" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="led" id="led"></div>
+      <div class="focal" id="focal">26mm</div>
+      <div class="evflash" id="evFlash"></div>
+      <div class="cammsg" id="camMsg" hidden><p></p><button>카메라 켜기</button></div>
+      <div class="fire" id="fire"></div>
+    </div>
+  </div>
+
+  <div class="ringrow" id="rowC"><button class="mbtn" id="btnC"><span id="btnCText">보정 없음</span><small id="tagC"></small></button><div class="ring short" id="ringC"></div></div>
+
+  <div class="info">
+    <div>
+      <div class="state ok" id="state">적정</div>
+      <div class="ev" id="ev">EV —</div>
+    </div>
+    <div class="infobtns"><button class="flash" id="flashBtn" aria-pressed="false" aria-label="플래시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9 22l10-12.5h-6.6L13.5 2Z" fill="currentColor"/></svg><span>끔</span></button><button class="flash filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button><button class="hold" id="hold">측광 고정</button></div>
+  </div>
+
+  <div class="rings">
+    <div class="ringrow" id="rowA"><button class="mbtn" id="btnA"><span>조리개</span><small id="tagA"></small></button><div class="ring" id="ringA"></div></div>
+    <div class="ringrow" id="rowS"><button class="mbtn" id="btnS"><span>셔터</span><small id="tagS"></small></button><div class="ring" id="ringS"></div></div>
+  </div>
+
+  <div class="controls">
+    <svg viewBox="0 0 360 104" aria-label="셔터와 카운터">
+      <defs>
+        <linearGradient id="chrome" x1="0" x2="1"><stop offset="0" stop-color="#8c8c8f"/><stop offset=".35" stop-color="#f0f0f0"/><stop offset=".6" stop-color="#a9a9ac"/><stop offset="1" stop-color="#6d6d70"/></linearGradient>
+        <radialGradient id="chromeR" cx=".38" cy=".35" r=".8"><stop offset="0" stop-color="#fafafa"/><stop offset=".6" stop-color="#a5a5a8"/><stop offset="1" stop-color="#5d5d60"/></radialGradient>
+        <radialGradient id="orange" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ff9a55"/><stop offset=".55" stop-color="#ff6b1f"/><stop offset="1" stop-color="#d4480a"/></radialGradient>
+      </defs>
+      <!-- 되감기 노브 (손잡이 접힌 상태) -->
+      <g id="rewind">
+        <circle cx="70" cy="52" r="30" fill="url(#chromeR)"/>
+        <circle cx="70" cy="52" r="25" fill="#1d1d1f"/>
+        <circle cx="70" cy="52" r="22" fill="none" stroke="#2c2c30" stroke-width="1" stroke-dasharray="2 2.5"/>
+        <rect x="52" y="47" width="36" height="10" rx="5" fill="#2f2f33" stroke="#444" stroke-width=".8"/>
+        <circle cx="84" cy="52" r="4.5" fill="#4a4a4e"/>
+        <circle cx="70" cy="52" r="3" fill="#555"/>
+      </g>
+      <!-- 카운터 -->
+      <rect x="132" y="14" width="96" height="62" rx="14" fill="#151517" stroke="#2c2c30"/>
+      <text id="counterText" x="180" y="57" text-anchor="middle" font-size="32" font-weight="800" fill="#f2f0ec" font-family="-apple-system, Helvetica, Arial">1</text>
+      <text id="counterSub" x="180" y="96" text-anchor="middle" font-size="10" fill="#77736d" font-family="-apple-system, sans-serif"></text>
+      <!-- 와인딩 레버: 셔터와 같은 축, 쉼표 모양 -->
+      <g id="lever">
+        <path d="M 270 64 Q 262 86 242 94 Q 233 97 233 90 Q 234 85 240 82 Q 254 74 258 58 Z" fill="url(#chrome)" stroke="#5d5d60" stroke-width=".6"/>
+        <circle cx="290" cy="52" r="29" fill="url(#chrome)"/>
+      </g>
+      <!-- 셔터 -->
+      <g id="shutterBtn">
+        <circle cx="290" cy="52" r="34" fill="transparent"/>
+        <circle cx="290" cy="52" r="25" fill="#2a2a2c"/>
+        <circle class="disc" cx="290" cy="52" r="22" fill="url(#orange)"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="stripwrap">
+    <div class="strip" id="strip"><div class="track" id="track"></div></div>
+    <!-- 장착한 필름 통: 카메라 뒤에서 보면 왼쪽. 필름이 여기서 나오고(정순) 여기로 들어간다(프리와인딩) -->
+    <div class="canister" aria-hidden="true">
+      <svg viewBox="0 0 72 132">
+        <defs>
+          <linearGradient id="cMetal" x1="0" x2="1"><stop offset="0" stop-color="#1b1b1c"/><stop offset=".55" stop-color="#8a8a8d"/><stop offset=".7" stop-color="#d9d9db"/><stop offset="1" stop-color="#2a2a2c"/></linearGradient>
+          <linearGradient id="cBody" x1="0" x2="1"><stop offset="0" stop-color="#9c9790"/><stop offset=".55" stop-color="#f6f3ec"/><stop offset=".72" stop-color="#ffffff"/><stop offset="1" stop-color="#a9a49c"/></linearGradient>
+          <linearGradient id="cBand" x1="0" x2="1"><stop offset="0" stop-color="#000" stop-opacity=".38"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset=".72" stop-color="#fff" stop-opacity=".25"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></linearGradient>
+          <linearGradient id="cLip" x1="0" x2="1"><stop offset="0" stop-color="#151515"/><stop offset="1" stop-color="#2c2524"/></linearGradient>
+        </defs>
+        <rect x="28" y="0" width="18" height="10" rx="2" fill="url(#cMetal)"/>
+        <rect x="4" y="8" width="64" height="12" rx="3" fill="url(#cMetal)"/>
+        <rect x="6" y="18" width="60" height="96" fill="url(#cBody)"/>
+        <rect x="6" y="46" width="60" height="30" id="canBand" fill="#f0b43a"/><rect x="6" y="46" width="60" height="30" fill="url(#cBand)"/>
+        <text x="51" y="66" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Helvetica, Arial" letter-spacing=".5" id="canIso">400</text>
+        <text x="51" y="38" text-anchor="middle" font-size="6.5" font-weight="800" fill="#4a3a28" font-family="Helvetica, Arial" letter-spacing=".6" id="canName">PORTRA</text>
+        <text x="51" y="92" text-anchor="middle" font-size="5" font-weight="700" fill="#7a6f62" font-family="Helvetica, Arial" id="canSub">135·36</text>
+        <rect x="62" y="26" width="8" height="80" rx="2" fill="url(#cLip)"/>
+        <rect x="4" y="112" width="64" height="12" rx="3" fill="url(#cMetal)"/>
+      </svg>
+    </div>
+  </div>
+  <button class="endbtn" id="endBtn">촬영 끝내기</button>
+  <div class="src" id="src" hidden></div>
+</div>
+
+<div class="dim" id="dim"></div>
+
+<div class="modal" id="startSheet" role="dialog" aria-modal="true">
+  <div class="pair">
+    <div class="pcam"><small>카메라</small><b id="stCam">테스트용 카메라</b></div>
+    <div class="roll"><div class="can"><i id="stCanBand"></i></div><div><b id="stFilm">Kodak Portra 400</b><span id="stFilmSub">ISO 400 · 135 · 36컷</span></div></div>
+  </div>
+  <div id="stAsk">
+    <h3>프리와인딩 지원 기종인가요?</h3>
+    <p class="hint" id="stHint">카운트가 36부터 거꾸로 줄어드는 카메라</p>
+    <div class="yn" id="stCount"><button data-v="0">아니오</button><button data-v="1">예</button></div>
+  </div>
+  <p class="known" id="stKnown"></p>
+  <button class="go" id="stGo" disabled>시작</button>
+</div>
+</div>
+
+<div class="sheet" id="filterSheet">
+  <div class="grab"></div>
+  <h2>필터</h2>
+  <div class="meta">끼운 필터만큼 노출계가 맞춰져요. 겹쳐 끼우면 여러 개 고르세요.</div>
+  <div class="chips wrap" id="fChips"></div>
+  <div class="actions one"><button class="save" id="fDone">완료</button></div>
+</div>
+
+<div class="sheet" id="endSheet">
+  <div class="grab"></div>
+  <h2>촬영을 끝낼까요?</h2>
+  <div class="meta" id="endMeta"></div>
+  <div class="actions"><button id="endCancel">계속 찍기</button><button class="save" id="endGo">촬영 끝내기</button></div>
+</div>
+
+<div class="sheet down" id="sheet">
+  <h2 id="shTitle"></h2>
+  <div class="meta" id="shMeta"></div>
+  <div class="lbl">촬영 모드</div>
+  <div class="seg" id="shModes">
+    <button data-m="P">자동</button><button data-m="A">조리개 우선</button><button data-m="S">셔터 우선</button><button data-m="M">수동</button>
+  </div>
+  <div id="shA"><div class="lbl">조리개</div><div class="chips" id="shAChips"></div></div>
+  <div id="shS"><div class="lbl">셔터</div><div class="chips" id="shSChips"></div></div>
+  <div class="lbl">노출 보정</div><div class="chips" id="shCChips"></div>
+  <div class="lbl">플래시</div>
+  <div class="seg" id="shFlash"><button data-v="0">안 씀</button><button data-v="1">씀</button></div>
+  <div class="lbl">필터</div><div class="chips" id="shFChips"></div>
+  <div class="lbl">메모</div><div class="chips wrap" id="shTags"></div>
+  <input class="memo" id="shMemo" placeholder="메모 (선택)" maxlength="200" />
+  <div class="actions"><button id="shCancel">취소</button><button class="save" id="shSave">저장</button></div>
+  <div class="grab"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ───────── 테스트 카메라 ─────────
+const stops = (from, to) => [1/8000, 1/4000, 1/2000, 1/1000, 1/500, 1/250, 1/125, 1/60, 1/30, 1/15, 1/8, 1/4, 1/2, 1, 2, 4, 8, 15].filter((t) => t >= from - 1e-9 && t <= to + 1e-9)
+const aps = (from, to) => [1.4, 2, 2.8, 4, 5.6, 8, 11, 16, 22].filter((n) => n >= from && n <= to)
+// ───────── 앱 연결 ─────────
+// 앱(아이폰·갤럭시·웹)에서 열면 카메라·필름·지금까지의 기록을 넘겨받고, 바뀐 기록을 돌려보낸다.
+// 그냥 열면(INIT 없음) 테스트 페이지로 동작한다.
+const INIT = window.FILMCHEST_METER_INIT || (() => {
+  try { const m = location.hash.match(/init=([^&]+)/); return m ? JSON.parse(decodeURIComponent(m[1])) : null } catch { return null }
+})()
+const HOSTED = !!INIT
+const NATIVE_CAM = !!INIT?.nativeCamera
+window.meterBias = Number(INIT?.bias) || 0
+function meterBias() {
+  const n = Number(window.meterBias)
+  return Number.isFinite(n) ? n : 0
+}
+function applyMeterBias(v) {
+  if (v == null || !Number.isFinite(v)) return v
+  return clamp(v + meterBias(), -4, 22)
+}
+function post(msg) {
+  if (!HOSTED) return
+  try {
+    if (window.webkit?.messageHandlers?.meter) window.webkit.messageHandlers.meter.postMessage(msg)
+    else if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(msg))
+    else if (window.parent !== window) window.parent.postMessage({ source: 'filmchest-meter', ...msg }, '*')
+  } catch {}
+}
+if (NATIVE_CAM) document.documentElement.classList.add('native')
+const CAM_ID = INIT?.camera?.id || 'test-camera'
+const cam = {
+  modes: ['P', 'A', 'S', 'M'], ap: aps(1.4, 22), sh: stops(1/4000, 8), pLock: 0,
+  name: INIT?.camera?.name || '테스트용 카메라',
+  iso: INIT?.film?.iso || 400, frames: INIT?.film?.frames || 36,
+  film: INIT?.film?.name || 'Kodak Portra 400', filmShort: INIT?.film?.short || 'PORTRA',
+  format: INIT?.film?.format || '135', color: INIT?.film?.color || '#f0b43a',
+}
+const COMPS = Array.from({ length: 13 }, (_, i) => (i - 6) / 3)  // −2 … +2, 1/3스톱
+const ISOS = [25, 32, 40, 50, 64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400]
+const MODE_NAME = { P: '자동', A: '조리개 우선', S: '셔터 우선', M: '수동' }
+const PHONE_F = 1.8, PHONE_MM = 26
+
+const fmtA = (n) => 'f/' + n
+const fmtS = (t) => t >= 1 ? t + '"' : '1/' + Math.round(1 / t)
+function fmtC(c) {
+  const k = Math.round(c * 3)
+  if (!k) return '0'
+  const w = Math.floor(Math.abs(k) / 3), r = Math.abs(k) % 3
+  return (k > 0 ? '+' : '−') + (w || '') + (r === 1 ? '⅓' : r === 2 ? '⅔' : '')
+}
+const log2 = Math.log2, clamp = (v, a, b) => Math.min(b, Math.max(a, v))
+const $ = (id) => document.getElementById(id)
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const nearest = (list, v) => list.reduce((b, x, i) => Math.abs(log2(x / v)) < Math.abs(log2(list[b] / v)) ? i : b, 0)
+const effIso = (c) => ISOS[nearest(ISOS, cam.iso / 2 ** c)]
+const store = {
+  get(k) { try { return localStorage.getItem(k) } catch { return null } },
+  set(k, v) { try { localStorage.setItem(k, v) } catch {} },
+}
+
+let mode = 'A'
+let meterEV = 12, held = false
+let spot = { x: .5, y: .5 }
+let shots = {}             // 필름 칸 번호 → 기록
+let shotCount = 0
+let prewind = false
+let busy = false, ended = false, flash = false
+let hw = null
+let zoom = { z: 1, min: 1, max: 4.6, hw: false } // 폰 배율
+
+// ───────── 소리 ─────────
+let ac = null
+const audio = () => (ac ||= new (window.AudioContext || window.webkitAudioContext)())
+function noise(at, dur, freq, gain) {
+  const a = audio(), len = Math.ceil(a.sampleRate * dur)
+  const buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0)
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3)
+  const s = a.createBufferSource(); s.buffer = buf
+  const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 1.4
+  const g = a.createGain(); g.gain.value = gain
+  s.connect(f).connect(g).connect(a.destination); s.start(a.currentTime + at)
+}
+const sound = (fn) => { try { fn() } catch {} }
+const shutterSound = () => { noise(0, .03, 3200, 1.1); noise(.045, .025, 2400, .8) }
+const ratchetSound = () => { for (let i = 0; i < 7; i++) noise(i * .045, .012, 5200, .35) }
+const detent = () => { sound(() => noise(0, .008, 6000, .12)); navigator.vibrate?.(4) }
+
+// ───────── 링 (원통 투영) ─────────
+class Ring {
+  constructor(el, fmt, step) {
+    Object.assign(this, { el, fmt, step, pos: 0, target: 0, vel: 0, auto: false, dragging: false, values: [], labEls: [] })
+    el.innerHTML = '<div class="ridges"></div><div class="labels"></div><div class="mark"></div><div class="shade"></div>'
+    const ridges = el.querySelector('.ridges')
+    this.labels = el.querySelector('.labels')
+    this.ridgeEls = Array.from({ length: 90 }, () => ridges.appendChild(Object.assign(document.createElement('div'), { className: 'ridge' })))
+    this.bind()
+    const loop = () => { this.tick(); requestAnimationFrame(loop) }
+    requestAnimationFrame(loop)
+  }
+  setValues(values, start) {
+    this.values = values
+    this.labels.innerHTML = ''
+    this.labEls = values.map((v) => this.labels.appendChild(Object.assign(document.createElement('div'), { className: 'lab', textContent: this.fmt(v) })))
+    this.pos = this.target = clamp(start, 0, values.length - 1)
+    this.lastIdx = undefined
+  }
+  get index() { return Math.round(clamp(this.pos, 0, this.values.length - 1)) }
+  get value() { return this.values[this.index] }
+  set(i) { this.target = clamp(i, 0, this.values.length - 1) }
+  bind() {
+    let x0 = 0, p0 = 0, lastX = 0, lastT = 0, moved = 0
+    this.el.addEventListener('pointerdown', (e) => {
+      if (this.auto) { this.onLocked?.(); return }
+      this.dragging = true; this.el.setPointerCapture(e.pointerId)
+      x0 = lastX = e.clientX; p0 = this.pos; lastT = performance.now(); moved = 0; this.vel = 0
+    })
+    this.el.addEventListener('pointermove', (e) => {
+      if (!this.dragging) return
+      const R = this.el.clientWidth / 2
+      moved = Math.max(moved, Math.abs(e.clientX - x0))
+      this.pos = clamp(p0 - (e.clientX - x0) / (R * this.step), -.4, this.values.length - .6)
+      const now = performance.now()
+      this.vel = -(e.clientX - lastX) / (R * this.step) / Math.max(1, now - lastT) * 16
+      lastX = e.clientX; lastT = now
+    })
+    const up = (e) => {
+      if (!this.dragging) return
+      this.dragging = false
+      if (moved < 5) {
+        const R = this.el.clientWidth / 2, rect = this.el.getBoundingClientRect()
+        const s = clamp((e.clientX - rect.left - R) / (R * .96), -.99, .99)
+        this.target = clamp(Math.round(this.pos + Math.asin(s) / this.step), 0, this.values.length - 1)
+      } else {
+        this.target = clamp(Math.round(this.pos + this.vel * 6), 0, this.values.length - 1)
+      }
+    }
+    this.el.addEventListener('pointerup', up)
+    this.el.addEventListener('pointercancel', up)
+  }
+  tick() {
+    if (!this.values.length) return
+    if (!this.dragging) this.pos += (this.target - this.pos) * (this.auto ? .12 : .22)
+    const idx = this.index
+    if (idx !== this.lastIdx) { if (this.lastIdx !== undefined && !this.auto) detent(); this.lastIdx = idx; this.onChange?.() }
+    const R = this.el.clientWidth / 2 * .96, c = this.el.clientWidth / 2
+    this.labEls.forEach((el, i) => {
+      const th = (i - this.pos) * this.step
+      if (Math.abs(th) > 1.5) { el.style.visibility = 'hidden'; return }
+      el.style.visibility = 'visible'
+      const k = Math.cos(th)
+      el.style.transform = `translate(${c + R * Math.sin(th)}px, -50%) translateX(-50%) scaleX(${k.toFixed(3)})`
+      el.style.opacity = (k * k).toFixed(3)
+      el.style.color = i === idx && !this.auto ? '#fff' : ''
+    })
+    const rs = this.step / 3
+    this.ridgeEls.forEach((el, i) => {
+      const th = ((i * rs - this.pos * this.step) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI
+      if (Math.abs(th) > 1.52) { el.style.visibility = 'hidden'; return }
+      el.style.visibility = 'visible'
+      el.style.transform = `translateX(${c + R * Math.sin(th)}px) scaleX(${Math.cos(th).toFixed(3)})`
+    })
+  }
+}
+const ringA = new Ring($('ringA'), fmtA, .36)
+const ringS = new Ring($('ringS'), fmtS, .44)
+const ringC = new Ring($('ringC'), fmtC, .3)
+ringA.setValues(cam.ap, nearest(cam.ap, 8))
+ringS.setValues(cam.sh, nearest(cam.sh, 1 / 125))
+ringC.setValues(COMPS, 6)
+
+// ───────── 노출 계산 ─────────
+const comp = () => ringC.value
+// 필터: 끼우면 그만큼 빛이 줄어 노출계가 더 열어 준다 (스톱)
+const FILTERS = [
+  { id: 'UV', stops: 0 }, { id: '노랑', stops: 1 }, { id: '주황', stops: 2 }, { id: '빨강', stops: 3 }, { id: '녹색', stops: 2 },
+  { id: '편광', stops: 1.5 }, { id: 'ND2', stops: 1 }, { id: 'ND4', stops: 2 }, { id: 'ND8', stops: 3 }, { id: 'ND16', stops: 4 },
+  { id: 'ND64', stops: 6 }, { id: 'ND1000', stops: 10 }, { id: '80A 블루', stops: 2 }, { id: '85B 앰버', stops: .67 },
+]
+let filters = []
+const filterStops = (list) => list.reduce((n, id) => n + (FILTERS.find((f) => f.id === id)?.stops || 0), 0)
+const fmtStops = (n) => n ? `−${Math.round(n * 10) / 10}` : '0'
+function solve() {
+  const E = meterEV + log2(effIso(comp()) / 100) - filterStops(filters)
+  const nMin = cam.ap[0], nMax = cam.ap[cam.ap.length - 1], tMin = cam.sh[0], tMax = cam.sh[cam.sh.length - 1]
+  let N, t
+  if (mode === 'A') {
+    N = ringA.value; t = clamp(N * N / 2 ** E, tMin, tMax); ringS.set(nearest(cam.sh, t))
+  } else if (mode === 'S') {
+    t = ringS.value; N = clamp(Math.sqrt(t * 2 ** E), nMin, nMax); ringA.set(nearest(cam.ap, N))
+  } else if (mode === 'M') {
+    N = ringA.value; t = ringS.value
+  } else {
+    const av = clamp(E / 2 - 1.5, log2(nMin ** 2), log2(nMax ** 2))
+    const tv = clamp(E - av, -log2(tMax), log2(1 / tMin))
+    N = Math.sqrt(2 ** av); t = 2 ** -tv
+    ringA.set(cam.pLock ? cam.ap.indexOf(cam.pLock) : nearest(cam.ap, N))
+    ringS.set(nearest(cam.sh, t))
+  }
+  return { N, t, diff: E - log2(N * N / t) } // +면 오버
+}
+
+// ───────── 모드 버튼: 누른 쪽이 '우선', 둘 다 누르면 자동, 둘 다 풀면 수동 ─────────
+const modeOf = (a, s) => a && s ? 'P' : a ? 'A' : s ? 'S' : 'M'
+const flagsOf = (m) => ({ a: m === 'A' || m === 'P', s: m === 'S' || m === 'P' })
+function toggle(which) {
+  const f = flagsOf(mode)
+  f[which] = !f[which]
+  const next = modeOf(f.a, f.s)
+  if (!cam.modes.includes(next)) { toast(`이 카메라는 ${MODE_NAME[next]}이 없어요`); return }
+  setMode(next)
+}
+function setMode(m) {
+  mode = m
+  const f = flagsOf(m)
+  ringA.auto = m === 'S' || m === 'P'
+  ringS.auto = m === 'A' || m === 'P'
+  $('btnA').classList.toggle('on', f.a); $('btnS').classList.toggle('on', f.s)
+  $('rowA').classList.toggle('auto', ringA.auto); $('rowS').classList.toggle('auto', ringS.auto)
+  $('tagA').textContent = m === 'P' ? (cam.pLock ? `P · ${cam.pLock} 고정` : '자동') : m === 'A' ? '우선' : m === 'S' ? '자동' : '수동'
+  $('tagS').textContent = m === 'P' ? '자동' : m === 'S' ? '우선' : m === 'A' ? '자동' : '수동'
+}
+ringA.onLocked = ringS.onLocked = () => toast(mode === 'P' && cam.pLock ? `P모드에선 조리개를 f/${cam.pLock}에 두고 카메라가 정해요` : '이 링은 카메라가 맞춰요')
+$('btnA').addEventListener('click', () => toggle('a'))
+$('btnS').addEventListener('click', () => toggle('s'))
+// 보정: 버튼을 누르면 0으로
+ringC.onChange = () => {
+  const c = comp()
+  $('tagC').textContent = `ISO ${effIso(c)}`
+  $('btnCText').textContent = c ? '보정 됨' : '보정 없음'
+  $('btnC').classList.toggle('on', !!c)
+}
+$('btnC').addEventListener('click', () => { if (comp()) { ringC.set(6); toast('보정을 껐어요') } else toast('링을 돌려서 보정해요') })
+
+// ───────── 장면 / 측광 ─────────
+const video = $('video'), sim = $('simCanvas'), sctx = sim.getContext('2d')
+const sampler = document.createElement('canvas'); sampler.width = 60; sampler.height = 40
+const smp = sampler.getContext('2d', { willReadFrequently: true })
+const live = () => video.readyState >= 2 && video.videoWidth > 0
+const source = () => live() ? [video, video.videoWidth, video.videoHeight] : [sim, sim.width, sim.height]
+const cssZoom = () => zoom.hw || zoom.native ? 1 : zoom.z
+function drawCrop(ctx, frac, dw, dh) {
+  const [src, sw, sh] = source()
+  const bw = sw / sh > 1.5 ? sh * 1.5 : sw
+  const w = bw * frac, h = w * dh / dw
+  ctx.drawImage(src, (sw - w) / 2, (sh - h) / 2, w, h, 0, 0, dw, dh)
+}
+const lin = (c) => { c /= 255; return c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4 }
+let nativeEV = null
+// 브라우저 카메라가 알려 주는 장면 밝기. 셔터·감도가 없으면 null
+let camEV = null
+// 1보다 작으면 초, 아니면 100µs 단위 (사파리·크롬이 단위를 다르게 준다)
+function exposureSeconds(raw) {
+  if (!(raw > 0) || !Number.isFinite(raw)) return 0
+  return raw < 1 ? raw : raw / 10000
+}
+function evFromExposure(rawTime, iso, aperture) {
+  const t = exposureSeconds(rawTime)
+  if (!t) return null
+  const s = iso > 0 ? iso : 100
+  const n = aperture > 0 ? aperture : PHONE_F
+  const ev = log2(n * n / t) - log2(s / 100)
+  return Number.isFinite(ev) ? ev : null
+}
+function liveTrack() {
+  const stream = video.srcObject
+  return (stream && stream.getVideoTracks && stream.getVideoTracks()[0]) || hw?.track || null
+}
+let photoWatch = 0
+function watchCameraExposure(track) {
+  clearInterval(photoWatch)
+  const read = () => {
+    const st = track.getSettings?.() || {}
+    const ev = evFromExposure(st.exposureTime, st.iso, st.aperture)
+    if (ev != null) camEV = ev
+  }
+  read()
+  let ic = null
+  try { if (typeof ImageCapture === 'function') ic = new ImageCapture(track) } catch {}
+  photoWatch = setInterval(async () => {
+    read()
+    if (!ic) return
+    try {
+      const s = await ic.getPhotoSettings()
+      const ev = evFromExposure(s.exposureTime, s.iso, s.aperture)
+      if (ev != null) camEV = ev
+    } catch {}
+  }, 200)
+}
+function measure() {
+  if (NATIVE_CAM) return applyMeterBias(nativeEV ?? meterEV)
+  if (!live()) {
+    if (HOSTED) return applyMeterBias(meterEV)
+    drawCrop(smp, 1, 60, 40)
+  } else drawCrop(smp, 1 / cssZoom(), 60, 40)
+  const d = smp.getImageData(0, 0, 60, 40).data
+  let sum = 0, sp = 0, spN = 0, cw = 0, cwN = 0
+  const cx = spot.x * 60, cy = spot.y * 40
+  for (let y = 0; y < 40; y++) for (let x = 0; x < 60; x++) {
+    const i = (y * 60 + x) * 4
+    const L = .2126 * lin(d[i]) + .7152 * lin(d[i + 1]) + .0722 * lin(d[i + 2])
+    sum += L
+    if ((x - cx) ** 2 + (y - cy) ** 2 < 25) { sp += L; spN++ }
+    // 중앙 중점: 가운데로 갈수록 무겁게 (가장자리도 조금은 본다)
+    const w = .15 + Math.exp(-(((x - 30) / 14) ** 2 + ((y - 20) / 11) ** 2))
+    cw += L * w; cwN += w
+  }
+  const avg = Math.max(1e-4, sum / 2400), sl = Math.max(1e-4, sp / Math.max(1, spN)), cen = Math.max(1e-4, cw / cwN)
+  const use = metering === 'spot' ? sl : metering === 'center' ? cen : avg
+  if (!live()) return applyMeterBias(clamp(simEV + sceneEv + log2(use / avg), -2, 20))
+  // 자동 노출이 화면을 중간 밝기로 맞춰도, 그때의 셔터·감도가 실제 밝기다
+  const st = liveTrack()?.getSettings?.() || {}
+  const base = evFromExposure(st.exposureTime, st.iso, st.aperture) ?? camEV
+  // 셔터·감도를 모르는 카메라도, 화면에 보이는 밝기와 스팟 자리는 그대로 반영한다
+  const seen = log2(use / .18)
+  return applyMeterBias(clamp((base ?? 12) + seen, -2, 20))
+}
+
+// 테스트용 가상 장면 4개: 10초마다 바뀐다. evOffset = 기준 밝기(EV 12) 대비 장면 밝기
+let simT = 0, sceneEv = 0
+const SCENES = [
+  { evOffset: 0, draw(c, w, h, t) { // 한낮 시골집
+    const g = c.createLinearGradient(0, 0, 0, h * .62); g.addColorStop(0, '#5f8fc9'); g.addColorStop(1, '#cfe0ee'); c.fillStyle = g; c.fillRect(0, 0, w, h)
+    c.fillStyle = '#fff6d8'; c.beginPath(); c.arc(w * .78, h * .2, 26, 0, 7); c.fill()
+    c.fillStyle = 'rgba(255,255,255,.75)'
+    for (let i = 0; i < 3; i++) { const x = ((t * 60 + i * 230) % (w + 200)) - 100; c.beginPath(); c.ellipse(x, h * (.18 + i * .07), 70, 16, 0, 0, 7); c.fill() }
+    c.fillStyle = '#5b7a3d'; c.beginPath(); c.moveTo(0, h * .62); c.quadraticCurveTo(w * .35, h * .5, w * .7, h * .62); c.quadraticCurveTo(w * .85, h * .66, w, h * .6); c.lineTo(w, h); c.lineTo(0, h); c.fill()
+    c.fillStyle = '#2f3d22'; c.fillRect(0, h * .78, w, h * .22)
+    c.fillStyle = '#1a1712'; c.fillRect(w * .18, h * .3, 18, h * .5)
+    c.fillStyle = '#20301a'; c.beginPath(); c.arc(w * .18 + 9, h * .3, 60, 0, 7); c.fill()
+    c.fillStyle = '#c9b89a'; c.fillRect(w * .48, h * .44, 120, 90); c.fillStyle = '#7a3b2a'; c.beginPath(); c.moveTo(w * .46, h * .45); c.lineTo(w * .48 + 60, h * .3); c.lineTo(w * .48 + 132, h * .45); c.fill()
+    c.fillStyle = '#2b2622'; c.fillRect(w * .48 + 46, h * .44 + 40, 28, 50)
+  } },
+  { evOffset: 2, draw(c, w, h, t) { // 해 질 녘 바다, 역광 인물
+    const g = c.createLinearGradient(0, 0, 0, h * .6); g.addColorStop(0, '#5a6fa8'); g.addColorStop(.55, '#f19a6b'); g.addColorStop(1, '#ffd79a'); c.fillStyle = g; c.fillRect(0, 0, w, h)
+    const sun = c.createRadialGradient(w * .62, h * .55, 4, w * .62, h * .55, 120); sun.addColorStop(0, '#fffbe8'); sun.addColorStop(.25, 'rgba(255,240,190,.9)'); sun.addColorStop(1, 'rgba(255,200,140,0)')
+    c.fillStyle = sun; c.fillRect(0, 0, w, h)
+    const sea = c.createLinearGradient(0, h * .6, 0, h); sea.addColorStop(0, '#d98a5e'); sea.addColorStop(.3, '#3d4f7a'); sea.addColorStop(1, '#1d2440'); c.fillStyle = sea; c.fillRect(0, h * .6, w, h * .4)
+    c.fillStyle = 'rgba(255,230,180,.7)'; for (let i = 0; i < 9; i++) c.fillRect(w * .62 - 40 + Math.sin(t * 3 + i) * 20, h * (.63 + i * .035), 80 - i * 6, 2)
+    c.fillStyle = '#16120f'; c.beginPath(); c.ellipse(w * .32, h * .5, 16, 19, 0, 0, 7); c.fill(); c.beginPath(); c.moveTo(w * .32 - 34, h); c.quadraticCurveTo(w * .32 - 30, h * .6, w * .32, h * .58); c.quadraticCurveTo(w * .32 + 30, h * .6, w * .32 + 34, h); c.fill()
+  } },
+  { evOffset: -6, draw(c, w, h, t) { // 밤거리
+    c.fillStyle = '#0b1020'; c.fillRect(0, 0, w, h)
+    const bs = [[0, .25, .2], [.18, .12, .16], [.36, .3, .14], [.52, .08, .2], [.74, .2, .26]]
+    bs.forEach(([x, y, bw], k) => {
+      c.fillStyle = '#151a28'; c.fillRect(w * x, h * y, w * bw, h * (.75 - y))
+      for (let yy = h * y + 12; yy < h * .7; yy += 22) for (let xx = w * x + 10; xx < w * (x + bw) - 12; xx += 20) {
+        if (((xx * 7 + yy * 13 + k) | 0) % 5 < 2) { c.fillStyle = (xx + yy) % 3 < 1 ? '#ffd27a' : '#f7b955'; c.fillRect(xx, yy, 9, 11) }
+      }
+    })
+    c.fillStyle = '#1b1b22'; c.fillRect(0, h * .75, w, h * .25)
+    for (const x of [.15, .5, .85]) {
+      const lg = c.createRadialGradient(w * x, h * .42, 2, w * x, h * .42, 70); lg.addColorStop(0, '#fff3cf'); lg.addColorStop(.3, 'rgba(255,200,110,.55)'); lg.addColorStop(1, 'rgba(255,180,90,0)')
+      c.fillStyle = lg; c.fillRect(0, 0, w, h); c.fillStyle = '#2a2a30'; c.fillRect(w * x - 2, h * .42, 4, h * .35)
+      c.fillStyle = 'rgba(255,200,120,.25)'; c.beginPath(); c.ellipse(w * x, h * .82, 50, 8, 0, 0, 7); c.fill()
+    }
+    c.fillStyle = 'rgba(255,60,60,.8)'; c.fillRect(((t * 90) % (w + 80)) - 40, h * .86, 6, 3)
+  } },
+  { evOffset: 3, draw(c, w, h, t) { // 눈 덮인 산
+    const g = c.createLinearGradient(0, 0, 0, h * .55); g.addColorStop(0, '#8fb5e3'); g.addColorStop(1, '#e8f1fa'); c.fillStyle = g; c.fillRect(0, 0, w, h)
+    c.fillStyle = '#c9d6e6'; c.beginPath(); c.moveTo(0, h * .6); c.lineTo(w * .22, h * .22); c.lineTo(w * .4, h * .5); c.lineTo(w * .62, h * .15); c.lineTo(w * .88, h * .52); c.lineTo(w, h * .4); c.lineTo(w, h * .7); c.lineTo(0, h * .7); c.fill()
+    c.fillStyle = '#ffffff'; c.beginPath(); c.moveTo(w * .62, h * .15); c.lineTo(w * .7, h * .27); c.lineTo(w * .62, h * .25); c.lineTo(w * .55, h * .28); c.fill()
+    c.beginPath(); c.moveTo(w * .22, h * .22); c.lineTo(w * .28, h * .32); c.lineTo(w * .2, h * .3); c.lineTo(w * .16, h * .33); c.fill()
+    c.fillStyle = '#f7f9fc'; c.fillRect(0, h * .66, w, h * .34)
+    c.fillStyle = '#1f3326'
+    for (const [x, s] of [[.1, 1], [.17, .8], [.8, 1.1], [.88, .85], [.45, .7]]) { c.beginPath(); c.moveTo(w * x, h * (.82 - .3 * s)); c.lineTo(w * x + 24 * s, h * .84); c.lineTo(w * x - 24 * s, h * .84); c.fill() }
+    c.fillStyle = 'rgba(255,255,255,.9)'; for (let i = 0; i < 40; i++) { c.fillRect((i * 97 + t * 30) % w, (i * 53 + t * 80) % h, 2, 2) }
+  } },
+]
+let sceneBuf = null
+function drawSim() {
+  simT += .004
+  const w = sim.width, h = sim.height, now = performance.now() / 1000
+  const PERIOD = 10, FADE = 1.2
+  const k = Math.floor(now / PERIOD), cur = SCENES[k % SCENES.length], prev = SCENES[(k + SCENES.length - 1) % SCENES.length]
+  const f = clamp((now - k * PERIOD) / FADE, 0, 1), e = f * f * (3 - 2 * f)
+  if (e < 1) {
+    prev.draw(sctx, w, h, simT)
+    sceneBuf ||= Object.assign(document.createElement('canvas'), { width: w, height: h })
+    cur.draw(sceneBuf.getContext('2d'), w, h, simT)
+    sctx.globalAlpha = e; sctx.drawImage(sceneBuf, 0, 0); sctx.globalAlpha = 1
+  } else cur.draw(sctx, w, h, simT)
+  sceneEv = prev.evOffset + (cur.evOffset - prev.evOffset) * e
+}
+function applySimLook() {
+  const ev = simEV
+  const b = clamp(2 ** ((ev - 12) * .42), .05, 2.6)
+  const c = ev < 8 ? 1 - (8 - ev) * .04 : 1
+  sim.style.filter = `brightness(${b.toFixed(3)}) contrast(${c.toFixed(2)}) saturate(${ev < 7 ? .6 : 1})`
+}
+// 테스트용: 파인더 위에서 마우스 휠로 장면 밝기 바꾸기
+let simEV = 12, flashT
+$('finder').addEventListener('wheel', (e) => {
+  if (HOSTED) return
+  e.preventDefault()
+  simEV = clamp(Math.round((simEV - e.deltaY * .01) * 4) / 4, 3, 16)
+  applySimLook()
+  const f = $('evFlash'); f.textContent = `장면 밝기 EV ${simEV.toFixed(1)}`; f.classList.add('on')
+  clearTimeout(flashT); flashT = setTimeout(() => f.classList.remove('on'), 700)
+}, { passive: false })
+
+let camStarting = false
+let camMsgT
+function camMessage(text, button) {
+  const m = $('camMsg')
+  clearTimeout(camMsgT)
+  if (text) camMsgT = setTimeout(() => { m.hidden = true }, 4000)
+  m.hidden = !text
+  m.querySelector('p').textContent = text || ''
+  m.querySelector('button').hidden = !button
+}
+async function startCamera() {
+  if (NATIVE_CAM) { post({ type: 'camera', action: 'start' }); sendFinder(); sendSpot(); return }
+  if (live() || camStarting) return
+  if (!navigator.mediaDevices?.getUserMedia) {
+    camMessage('이 화면에선 카메라를 쓸 수 없어요. 사파리나 크롬에서 열어 주세요.', false)
+    return
+  }
+  camStarting = true
+  try {
+    let stream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } }, audio: false })
+    } catch (e) {
+      if (e.name !== 'OverconstrainedError') throw e
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    }
+    video.srcObject = stream
+    await video.play()
+    sim.style.display = 'none'
+    camMessage('')
+    const track = stream.getVideoTracks()[0]
+    const st = track.getSettings?.() || {}, caps = track.getCapabilities?.() || {}
+    if (caps.zoom && caps.zoom.max > caps.zoom.min && typeof st.zoom === 'number' && st.zoom > 0) {
+      // 실제 폰 배율. 시작 화면(st.zoom)을 1배로 보고 상대값으로 다룬다
+      // (아이폰은 초광각이 묶여 있어 시작 값이 2인 경우가 있어서, 1을 넣으면 초광각으로 넓어진다)
+      const base = st.zoom
+      zoom = { z: 1, min: caps.zoom.min / base, max: Math.min(caps.zoom.max / base, 10), hw: true, track, base }
+      setZoom(1, true)
+    }
+    hw = { track }
+    watchCameraExposure(track)
+  } catch (e) {
+    sim.style.display = HOSTED ? 'none' : ''
+    if (e.name === 'NotAllowedError') camMessage('카메라 권한이 꺼져 있어요. 허용한 뒤 다시 눌러 주세요.', true)
+    else camMessage('카메라를 열지 못했어요.', true)
+  } finally {
+    camStarting = false
+  }
+}
+
+// ───────── 노출 바늘 (왼쪽, 위가 오버) ─────────
+{
+  const ticks = $('ticks')
+  for (let s = -2; s <= 2.001; s += 1 / 3) {
+    const a = s * 24 * Math.PI / 180, major = Math.abs(s - Math.round(s)) < .01
+    const p = (r) => [-30 + r * Math.cos(a), 100 - r * Math.sin(a)]
+    const [x1, y1] = p(major ? 62 : 68), [x2, y2] = p(76)
+    ticks.insertAdjacentHTML('beforeend', `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${major ? '#f2eee8' : '#b5b0a8'}" stroke-width="${major ? 1.6 : 1}"/>`)
+    if (major) {
+      const [tx, ty] = p(55), r = Math.round(s)
+      ticks.insertAdjacentHTML('beforeend', `<text x="${tx}" y="${ty + 3}" text-anchor="middle" font-size="9" font-weight="700" fill="#e6e1d9" font-family="-apple-system, sans-serif">${r > 0 ? '+' + r : r === 0 ? '0' : '−' + -r}</text>`)
+    }
+  }
+}
+let needleA = 0, needleV = 0
+
+// ───────── 화각 다이얼 (오른쪽, 위아래로 돌림) ─────────
+const FOCALS = [13, 18, 24, 28, 35, 40, 50, 60, 75, 85, 105, 135, 200, 260]
+const DEG_PER_STOP = 46 // 화각이 두 배 될 때 돌아가는 각도
+let zoomTimer = 0
+let zoomTarget = 1, zoomVel = 0
+function setZoom(z, instant) {
+  zoomTarget = clamp(z, zoom.min, zoom.max)
+  if (instant) { zoomVel = 0; applyZoom(zoomTarget) }
+}
+// 임계 감쇠 스프링: 출발은 천천히, 중간은 빠르게, 도착은 천천히
+function stepZoom(dt) {
+  const cur = log2(zoom.z), tgt = log2(zoomTarget)
+  if (Math.abs(cur - tgt) < 1e-4 && Math.abs(zoomVel) < 1e-4) return
+  const T = .22, w = 2 / T, x = w * dt, k = 1 / (1 + x + .48 * x * x + .235 * x * x * x)
+  const ch = cur - tgt, tmp = (zoomVel + w * ch) * dt
+  zoomVel = (zoomVel - w * tmp) * k
+  applyZoom(2 ** (tgt + (ch + tmp) * k))
+}
+function applyZoom(z) {
+  zoom.z = clamp(z, zoom.min, zoom.max)
+  const mm = Math.round(PHONE_MM * zoom.z)
+  $('focal').textContent = `${mm}mm`
+  $('scene').style.transform = `scale(${cssZoom().toFixed(3)})`
+  if (zoom.hw && !zoomTimer) {
+    zoomTimer = setTimeout(() => {
+      zoomTimer = 0
+      const want = zoom.z * zoom.base
+      zoom.track.applyConstraints({ advanced: [{ zoom: want }] }).then(() => {
+        const got = zoom.track.getSettings?.().zoom
+        if (typeof got === 'number' && Math.abs(Math.log(got / want)) > 0.2) {
+          zoom.hw = false
+          applyZoom(zoom.z)
+        }
+      }).catch(() => { zoom.hw = false; applyZoom(zoom.z) })
+    }, 60)
+  }
+  if (zoom.native && !zoomTimer) zoomTimer = setTimeout(() => { zoomTimer = 0; post({ type: 'zoom', z: zoom.z }) }, 33)
+  drawZoomDial()
+}
+function drawZoomDial() {
+  const cur = log2(PHONE_MM * zoom.z)
+  const lo = PHONE_MM * zoom.min, hi = PHONE_MM * zoom.max
+  let html = ''
+  // 1/6스톱 간격 눈금
+  for (let s = Math.floor(log2(lo) * 6); s <= Math.ceil(log2(hi) * 6); s++) {
+    const f = 2 ** (s / 6)
+    if (f < lo - .5 || f > hi + .5) continue
+    const a = (log2(f) - cur) * DEG_PER_STOP * Math.PI / 180
+    if (Math.abs(a) > .85) continue
+    const p = (r) => [76 - r * Math.cos(a), 100 - r * Math.sin(a)]
+    const [x1, y1] = p(66), [x2, y2] = p(74)
+    html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#b5b0a8" stroke-width="1"/>`
+  }
+  for (const f of FOCALS) {
+    if (f < lo - .5 || f > hi + .5) continue
+    const a = (log2(f) - cur) * DEG_PER_STOP * Math.PI / 180
+    if (Math.abs(a) > .85) continue
+    const p = (r) => [76 - r * Math.cos(a), 100 - r * Math.sin(a)]
+    const [x1, y1] = p(60), [x2, y2] = p(74), [tx, ty] = p(46)
+    const near = Math.abs(a) < .06
+    html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${near ? '#ff8a3d' : '#f2eee8'}" stroke-width="1.6"/>`
+    html += `<text x="${tx}" y="${ty + 3}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${near ? '#ff8a3d' : '#e6e1d9'}" font-family="-apple-system, sans-serif">${f}</text>`
+  }
+  html += `<path d="M ${76 - 76 * Math.cos(.85)} ${100 - 76 * Math.sin(.85)} A 76 76 0 0 0 ${76 - 76 * Math.cos(.85)} ${100 + 76 * Math.sin(.85)}" fill="none" stroke="rgb(255 255 255 / .35)" stroke-width="1.5"/>`
+  $('zoomTicks').innerHTML = html
+}
+{
+  const dialEl = $('zoomDial')
+  const dialSvg = dialEl.querySelector('svg')
+  let y0 = 0, z0 = 1, drag = false, moved = 0, lastStop = 0
+  // 다이얼 높이의 약 1/3을 밀면 한 스톱. 손가락과 눈금이 같이 움직인다
+  const pxPerStop = () => Math.max(36, dialEl.getBoundingClientRect().height / 3.2)
+  const zoomAt = (e) => {
+    const pt = dialSvg.createSVGPoint()
+    pt.x = e.clientX; pt.y = e.clientY
+    const m = dialSvg.getScreenCTM()
+    if (!m) return zoom.z
+    const p = pt.matrixTransform(m.inverse())
+    const a = Math.atan2(100 - p.y, 76 - p.x)
+    const f = 2 ** (log2(PHONE_MM * zoom.z) + a / (DEG_PER_STOP * Math.PI / 180))
+    const lo = PHONE_MM * zoom.min, hi = PHONE_MM * zoom.max
+    const near = FOCALS.filter((n) => n >= lo - .5 && n <= hi + .5)
+      .reduce((best, n) => Math.abs(log2(n / f)) < Math.abs(log2(best / f)) ? n : best, f)
+    const pick = Math.abs(log2(near / f)) < .35 ? near : f
+    return clamp(pick / PHONE_MM, zoom.min, zoom.max)
+  }
+  const dragTo = (y) => {
+    moved = Math.max(moved, Math.abs(y - y0))
+    setZoom(z0 * 2 ** ((y - y0) / pxPerStop()), true)
+    const s = Math.round(log2(zoomTarget) * 6)
+    if (s !== lastStop) { lastStop = s; detent() }
+  }
+  const endDrag = (e) => {
+    if (!drag) return
+    drag = false
+    document.removeEventListener('pointermove', onPointerMove)
+    document.removeEventListener('pointerup', onPointerUp)
+    document.removeEventListener('pointercancel', onPointerUp)
+    document.removeEventListener('touchmove', onTouchMove)
+    document.removeEventListener('touchend', onTouchEnd)
+    document.removeEventListener('touchcancel', onTouchEnd)
+    if (moved < 8 && e) {
+      const src = e.changedTouches ? e.changedTouches[0] : e
+      setZoom(zoomAt(src), true); detent()
+    }
+  }
+  const onPointerMove = (e) => { if (!drag) return; if (e.cancelable) e.preventDefault(); dragTo(e.clientY) }
+  const onPointerUp = (e) => endDrag(e)
+  const onTouchMove = (e) => { if (!drag) return; if (e.cancelable) e.preventDefault(); dragTo(e.touches[0].clientY) }
+  const onTouchEnd = (e) => endDrag(e)
+  const begin = (y) => {
+    drag = true; moved = 0; y0 = y; z0 = zoomTarget
+    lastStop = Math.round(log2(zoomTarget) * 6)
+    document.addEventListener('pointermove', onPointerMove, { passive: false })
+    document.addEventListener('pointerup', onPointerUp)
+    document.addEventListener('pointercancel', onPointerUp)
+    document.addEventListener('touchmove', onTouchMove, { passive: false })
+    document.addEventListener('touchend', onTouchEnd)
+    document.addEventListener('touchcancel', onTouchEnd)
+  }
+  dialEl.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || (e.button != null && e.button !== 0)) return
+    if (e.cancelable) e.preventDefault()
+    begin(e.clientY)
+  })
+  dialEl.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return
+    if (e.cancelable) e.preventDefault()
+    begin(e.touches[0].clientY)
+  }, { passive: false })
+}
+
+// ───────── 필름 ─────────
+const track = $('track'), strip = $('strip')
+// 필름 맨 끝 리더(텅): 아래쪽 절반이 곡선으로 잘려 나간 실제 35mm 필름 모양
+const TONGUE = `<div class="leadfog" aria-hidden="true"></div><div class="tongue" aria-hidden="true"><svg viewBox="0 0 170 112" width="170" height="112">
+  <path d="M0 0 H128 C150 0 166 10 166 28 C166 46 152 56 132 56 H76 C52 56 40 68 32 84 C25 99 14 112 0 112 Z" fill="#3b2210"/>
+  <rect x="6.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="23.3" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="40.7" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="58.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="75.3" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="92.6" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="110.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="6" y="100" width="7" height="8" rx="1.5" fill="#0b0b0c"/>
+</svg></div>`
+// 칸 번호 표기: 1 이상은 숫자, 그 앞(프리와인딩으로 더 찍은 경우)은 0, 00, E1…
+// 역순은 36컷을 넘겨 찍으면 마지막 컷이 1번이 되도록 앞 컷 번호를 하나씩 민다. 그래서 다음 칸(0)은 아직 번호가 없다
+const label = (p) => prewind && p === 0 ? '' : p >= 1 ? String(p) : p === 0 ? '0' : p === -1 ? '00' : 'E' + (-p - 1)
+const cellOf = (p) => track.querySelector(`[data-p="${p}"]`)
+// 다음에 찍힐 칸. 프리와인딩은 필름을 먼저 다 빼 두고 끝 번호부터 거꾸로 찍는다. 필름이 남으면 계속 찍을 수 있다
+const nextPos = () => prewind ? Math.max(0, cam.frames - shotCount) : shotCount + 1
+function buildStrip(noScroll) {
+  const ps = Object.keys(shots).map(Number).concat(nextPos())
+  // 36 뒤로도 두 칸쯤 필름이 더 있다. 1번 앞쪽은 장전할 때 이미 감겨 지나간 리더라 짧게만 보인다
+  // 역순은 시작할 때 36 왼쪽에 빈 칸을 두지 않는다
+  const lo = Math.min(1, ...ps), hi = Math.max(prewind ? cam.frames : cam.frames + 2, ...ps)
+  track.innerHTML = ''
+  // 필름통까지 이어지는 필름 (칸·번호 없이). 첫 칸이 가운데 올 수 있을 만큼 길게
+  track.insertAdjacentHTML('beforeend', `<div class="tail" aria-hidden="true" style="width:${Math.max(120, strip.clientWidth / 2 - 52)}px"></div>`)
+  track.style.transition = 'none'; track.style.transform = ''; strip.style.scrollSnapType = ''
+  // 카메라 뒤에서 본 방향: 왼쪽이 필름통, 오른쪽이 감는 스풀. 필름 번호는 스풀 쪽(오른쪽)이 1
+  // 정순은 통에서 빠져나와 오른쪽으로 흐르고, 프리와인딩은 통으로 되감기며 왼쪽으로 흐른다
+  for (let i = hi; i >= lo; i--) {
+    const c = document.createElement('div'); c.className = 'cell'; c.dataset.p = i
+    c.innerHTML = `<div class="num">${label(i) ? `▸${label(i)}&nbsp;&nbsp;${label(i)}A` : ''}</div><div class="frame"></div>`
+    c.addEventListener('click', () => shots[i] ? openSheet(i) : toast('아직 안 찍은 칸이에요'))
+    track.appendChild(c)
+  }
+  track.insertAdjacentHTML('beforeend', TONGUE)
+  Object.keys(shots).forEach((k) => renderCell(+k))
+  if (!noScroll) placeStrip(true)
+}
+let winding = false
+let wound = false
+function translateXOf(el) {
+  const found = /translateX\(([-\d.]+)px\)/.exec(el.style.transform || '')
+  return found ? Number(found[1]) : 0
+}
+// 되감긴 필름이 화면 크기 재계산으로 다시 삐져나오지 않게, 통 안쪽으로 더 넣어 둔다
+function parkWound() {
+  const tongue = track.querySelector('.tongue')
+  if (!tongue) return
+  const sr = strip.getBoundingClientRect(), tr = tongue.getBoundingClientRect()
+  const extra = tr.right - sr.left + 64
+  if (extra <= 8) return
+  track.style.transition = 'none'
+  track.style.transform = `translateX(${translateXOf(track) - extra}px)`
+}
+function placeStrip(instant) {
+  if (winding) return
+  if (wound) { parkWound(); return }
+  const pos = nextPos()
+  ;[...track.children].forEach((c) => c.classList.toggle('next', !ended && +c.dataset.p === pos))
+  const cell = cellOf(pos)
+  strip.scrollTo({ left: cell.offsetLeft - (strip.clientWidth - cell.clientWidth) / 2, behavior: instant ? 'instant' : 'smooth' })
+  $('counterText').textContent = prewind && pos === 0 ? '1' : label(pos)
+  $('counterSub').textContent = shotCount >= cam.frames ? '추가 컷' : prewind ? '남은 컷 · 역순' : `${cam.frames}컷 중`
+}
+// 앱에 기록 보내기 (찍거나 고칠 때마다 전체 목록)
+function sendShots() {
+  const list = Object.values(shots).sort((a, b) => a.pos - b.pos).map((f) => ({
+    pos: f.pos, order: f.order, mode: f.mode, aperture: f.aperture ?? null, shutter: f.shutter ?? null,
+    comp: f.comp || 0, flash: !!f.flash, ev: Math.round(f.ev * 10) / 10, focal: f.focal ?? null, at: f.at ?? null, edited: !!f.edited,
+    filters: f.filters || [], tags: f.tags || [], memo: f.memo || '',
+  }))
+  post({ type: 'shots', prewind, shots: list })
+}
+// 기록 규칙: 자동은 비움, 조리개 우선은 조리개만, 셔터 우선은 셔터만, 수동은 둘 다. 보정은 항상.
+function renderCell(pos) {
+  const f = shots[pos], cell = cellOf(pos)
+  if (!f || !cell) return
+  cell.classList.add('shot')
+  const parts = []
+  if (f.aperture) parts.push(`<b>${fmtA(f.aperture)}</b>`)
+  if (f.shutter) parts.push(f.aperture ? `<i>${fmtS(f.shutter)}</i>` : `<b>${fmtS(f.shutter)}</b>`)
+  if (!parts.length) parts.push('<span class="auto">AUTO</span>')
+  const extra = [f.comp ? `${fmtC(f.comp)} · ISO ${effIso(f.comp)}` : '', ...(f.filters || [])].filter(Boolean)
+  if (extra.length) parts.push(`<em>${extra.join(' · ')}</em>`)
+  cell.querySelector('.frame').innerHTML = parts.join('') + (f.flash ? `<span class="fl"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9 22l10-12.5h-6.6L13.5 2Z" fill="currentColor"/></svg></span>` : '')
+  cell.querySelector('.pen')?.remove()
+  if (f.edited) cell.insertAdjacentHTML('beforeend', '<div class="pen">✎</div>')
+}
+
+// ───────── 찍기 ─────────
+async function fire() {
+  if (busy) return
+  if (ended) { toast('촬영을 끝낸 롤이에요 · 새로고침하면 새 롤이에요'); return }
+  audio()
+  const btn = $('shutterBtn')
+  btn.classList.add('down'); setTimeout(() => btn.classList.remove('down'), 140)
+  sound(shutterSound); navigator.vibrate?.(12)
+  const f = $('fire'); f.classList.remove('go'); f.offsetWidth; f.classList.add('go')
+
+  let pos = nextPos()
+  const shift = prewind && pos === 0
+  if (shift) {
+    // 역순 추가 컷: 이번 컷이 1번, 앞서 찍은 컷들은 번호가 하나씩 올라간다
+    const moved = {}
+    for (const k in shots) moved[+k + 1] = { ...shots[k], pos: +k + 1 }
+    shots = moved; pos = 1
+  }
+  shots[pos] = {
+    pos, order: shotCount + 1, mode, ev: meterEV, comp: comp(), focal: Math.round(PHONE_MM * zoom.z),
+    flash, at: new Date().toISOString(), filters: [...filters], tags: [], memo: '',
+    aperture: mode === 'A' || mode === 'M' ? ringA.value : null,
+    shutter: mode === 'S' || mode === 'M' ? ringS.value : null,
+  }
+  shotCount++
+  if (shift) {
+    // 칸이 왼쪽에 하나 늘고 번호만 다시 붙는다. 보던 위치는 그대로 두고 다음 빈 칸으로 감는다
+    const sl = strip.scrollLeft
+    buildStrip(true)
+    strip.scrollLeft = sl
+  } else renderCell(pos)
+  if (!cellOf(nextPos())) {
+    // 정해진 컷 수를 넘겨 찍으면 칸을 늘린다 (보던 위치는 그대로)
+    const keep = cellOf(pos).offsetLeft - strip.scrollLeft
+    buildStrip(true)
+    strip.scrollLeft = cellOf(pos).offsetLeft - keep
+  }
+
+  busy = true
+  await sleep(150)
+  $('lever').classList.add('out'); sound(ratchetSound)
+  $('rewind').style.transform = `rotate(${shotCount * (prewind ? -150 : 150)}deg)`
+  placeStrip()
+  await sleep(360)
+  $('lever').classList.remove('out'); await sleep(320)
+  busy = false
+  sendShots()
+  if (shotCount === cam.frames) toast(`${cam.frames}컷 다 찍었어요 · 필름이 남았으면 더 찍어도 돼요`)
+}
+$('shutterBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); fire() })
+
+// ───────── 컷 고치기 ─────────
+let editing = null, draft = null
+function openSheet(pos) {
+  editing = pos; draft = { ...shots[pos] }
+  $('shTitle').textContent = `${label(pos)}번 컷 고치기`
+  $('shMeta').textContent = `${draft.order}번째로 찍음 · 측정 EV ${draft.ev.toFixed(1)}`
+  renderSheet()
+  showSheet('sheet')
+}
+function showSheet(id) { $('dim').classList.add('on'); $(id).classList.add('on') }
+function closeSheets() { $('dim').classList.remove('on'); document.querySelectorAll('.sheet, .modal').forEach((s) => s.classList.remove('on')); editing = null }
+function chipRow(el, list, cur, fmt, onPick) {
+  el.innerHTML = ''
+  list.forEach((v) => {
+    const b = document.createElement('button'); b.textContent = fmt(v); b.classList.toggle('on', v === cur)
+    b.addEventListener('click', () => onPick(v))
+    el.appendChild(b)
+  })
+  const on = el.querySelector('.on')
+  if (on) el.scrollLeft = on.offsetLeft - el.clientWidth / 2 + on.clientWidth / 2
+}
+const TAGS = ['인물', '풍경', '스트리트', '야간', '실내', '여행', '음식', '반려동물', '건축', '하늘', '액션', '정물']
+// 찍을 때 기록으로 짐작한 추천 태그
+function suggestTags(f) {
+  const out = new Set()
+  if (f.ev < 7) out.add('야간')
+  if (f.flash) out.add('실내')
+  if (f.focal && f.focal >= 70) out.add('인물')
+  if (f.focal && f.focal <= 30) out.add('풍경')
+  if (f.ev >= 14) out.add('하늘')
+  if (f.shutter && f.shutter <= 1 / 500) out.add('액션')
+  if ((f.filters || []).some((x) => x.startsWith('ND'))) out.add('풍경')
+  return out
+}
+function renderSheet() {
+  document.querySelectorAll('#shModes button').forEach((b) => b.classList.toggle('on', b.dataset.m === draft.mode))
+  const needA = draft.mode === 'A' || draft.mode === 'M', needS = draft.mode === 'S' || draft.mode === 'M'
+  $('shA').hidden = !needA; $('shS').hidden = !needS
+  if (needA) chipRow($('shAChips'), cam.ap, draft.aperture, fmtA, (v) => { draft.aperture = v; renderSheet() })
+  if (needS) chipRow($('shSChips'), cam.sh, draft.shutter, fmtS, (v) => { draft.shutter = v; renderSheet() })
+  document.querySelectorAll('#shFlash button').forEach((b) => b.classList.toggle('on', (b.dataset.v === '1') === !!draft.flash))
+  chipRow($('shCChips'), COMPS, draft.comp, (c) => c ? `${fmtC(c)} (ISO ${effIso(c)})` : '0', (v) => { draft.comp = v; renderSheet() })
+  filterChips($('shFChips'), draft.filters || [], (list) => { draft.filters = list; renderSheet() })
+  const rec = suggestTags(draft), tags = draft.tags || []
+  const el = $('shTags'); el.innerHTML = ''
+  ;[...TAGS.filter((t) => rec.has(t)), ...TAGS.filter((t) => !rec.has(t))].forEach((t) => {
+    const b = document.createElement('button')
+    b.innerHTML = rec.has(t) ? `${t}<small>추천</small>` : t
+    b.classList.toggle('on', tags.includes(t)); b.classList.toggle('rec', rec.has(t) && !tags.includes(t))
+    b.addEventListener('click', () => { draft.tags = tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t]; renderSheet() })
+    el.appendChild(b)
+  })
+  if (document.activeElement !== $('shMemo')) $('shMemo').value = draft.memo || ''
+}
+$('shMemo').addEventListener('input', (e) => { if (draft) draft.memo = e.target.value })
+// 필터 칩 (여러 개 고를 수 있음, '없음'은 전부 해제)
+function filterChips(el, list, onChange) {
+  el.innerHTML = ''
+  const none = document.createElement('button'); none.textContent = '없음'; none.classList.toggle('on', !list.length)
+  none.addEventListener('click', () => onChange([])); el.appendChild(none)
+  for (const f of FILTERS) {
+    const b = document.createElement('button')
+    b.innerHTML = `${f.id}<small>${fmtStops(f.stops)}</small>`
+    b.classList.toggle('on', list.includes(f.id))
+    b.addEventListener('click', () => onChange(list.includes(f.id) ? list.filter((x) => x !== f.id) : [...list, f.id]))
+    el.appendChild(b)
+  }
+}
+function setFilters(list) {
+  filters = list
+  const on = list.length > 0
+  $('filterBtn').classList.toggle('on', on)
+  $('filterBtn').querySelector('span').textContent = on ? (list.length > 1 ? `${list[0]}+${list.length - 1}` : list[0]) : '필터'
+}
+$('filterBtn').addEventListener('click', () => {
+  const render = () => filterChips($('fChips'), filters, (list) => { setFilters(list); render() })
+  render(); showSheet('filterSheet')
+})
+$('fDone').addEventListener('click', () => {
+  closeSheets()
+  if (filters.length) toast(`${filters.join(' + ')} · 노출 ${fmtStops(filterStops(filters))}스톱 반영`)
+})
+document.querySelectorAll('#shModes button').forEach((b) => b.addEventListener('click', () => {
+  const m = b.dataset.m
+  draft.mode = m
+  const E = draft.ev + log2(effIso(draft.comp) / 100)
+  if ((m === 'A' || m === 'M') && !draft.aperture) draft.aperture = cam.ap[nearest(cam.ap, 8)]
+  if ((m === 'S' || m === 'M') && !draft.shutter) draft.shutter = cam.sh[nearest(cam.sh, (draft.aperture || 8) ** 2 / 2 ** E)]
+  renderSheet()
+}))
+document.querySelectorAll('#shFlash button').forEach((b) => b.addEventListener('click', () => { draft.flash = b.dataset.v === '1'; renderSheet() }))
+$('shSave').addEventListener('click', () => {
+  const d = draft
+  if (!(d.mode === 'A' || d.mode === 'M')) d.aperture = null
+  if (!(d.mode === 'S' || d.mode === 'M')) d.shutter = null
+  shots[editing] = { ...d, edited: true }
+  renderCell(editing); sendShots(); toast(`${label(editing)}번 컷을 고쳤어요`); closeSheets()
+})
+$('shCancel').addEventListener('click', closeSheets)
+$('endBtn').addEventListener('click', () => {
+  if (!shotCount) { toast('아직 찍은 컷이 없어요'); return }
+  $('endMeta').textContent = `${shotCount}컷 기록했어요. 끝내면 이 롤은 촬영 완료로 넘어가요.`
+  showSheet('endSheet')
+})
+$('endCancel').addEventListener('click', closeSheets)
+// 되감기: 필름이 왼쪽 필름통 안으로 끝까지 빨려 들어간다. 프리와인딩은 이미 거의 다 들어가 있어서 짧게
+async function rewindFilm() {
+  busy = true
+  winding = true
+  const ease = 'cubic-bezier(.55,0,.35,1)'
+  const sr = strip.getBoundingClientRect(), tr = track.querySelector('.tongue').getBoundingClientRect()
+  const dist = Math.max(0, tr.right - (sr.left + 8)) + strip.clientWidth * 0.2
+  // 정순·역순 모두 같은 빠르기: 감을 길이에 비례 (36컷 전체 ≈ 2.6초)
+  const dur = clamp(dist / 1.45, 450, 3200)
+  strip.style.scrollSnapType = 'none'
+  track.style.transition = `transform ${dur}ms ${ease}`
+  track.style.transform = `translateX(${-dist}px)`
+  const knob = $('rewind'), from = shotCount * (prewind ? -150 : 150)
+  knob.style.transition = `transform ${dur}ms ${ease}`
+  knob.style.transform = `rotate(${from - dist * .9}deg)`
+  $('counterSub').textContent = '되감는 중'
+  // 되감기 소리: 처음엔 느리게, 중간엔 빠르게, 끝엔 다시 느리게
+  sound(() => {
+    if (prewind) return motorSound(dur / 1000)
+    const n = 46
+    for (let i = 0; i < n; i++) { const u = i / (n - 1), t = (u < .5 ? 2 * u * u : 1 - (-2 * u + 2) ** 2 / 2) * dur / 1000; noise(t, .01, 4600, .22) }
+  })
+  await sleep(dur + 40)
+  // 현상 맡기기 화면이 닫힐 때까지 통 안에 들어간 상태를 유지한다.
+  wound = true
+  winding = false
+  parkWound()
+  knob.style.transition = ''
+  busy = false
+}
+function motorSound(dur) {
+  const a = audio(), o = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter()
+  o.type = 'sawtooth'; f.type = 'lowpass'; f.frequency.value = 900
+  const t = a.currentTime
+  o.frequency.setValueAtTime(120, t); o.frequency.linearRampToValueAtTime(180, t + .1)
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.12, t + .05); g.gain.setValueAtTime(.12, t + dur - .08); g.gain.linearRampToValueAtTime(0, t + dur)
+  o.connect(f).connect(g).connect(a.destination); o.start(t); o.stop(t + dur)
+}
+$('endGo').addEventListener('click', async () => {
+  // 실제 앱에선 여기서 현상소 맡기기 화면으로 넘어간다. 테스트에선 새 롤로 다시 시작
+  ended = true; closeSheets()
+  await sleep(250)
+  await rewindFilm()
+  if (HOSTED) { sendShots(); post({ type: 'end' }); return }
+  toast(`${shotCount}컷으로 촬영을 끝냈어요 · 테스트라서 새 롤로 다시 시작해요`)
+  setTimeout(startRoll, 600)
+})
+$('dim').addEventListener('click', () => { if (!$('startSheet').classList.contains('on')) closeSheets() })
+
+// ───────── 시작: 이 카메라가 프리와인딩인지 처음 한 번만 묻고, 다음부터는 기억한 값으로 바로 시작 ─────────
+// (실제 앱에선 촬영 중 목록에서 카메라+필름을 골라 들어온다. 테스트에선 새로고침 = 새 롤, ?reset 으로 다시 묻기)
+const PREWIND_KEY = `prewind-answer:${CAM_ID}` // 예전 시안이 남긴 값(prewind:)은 답한 걸로 치지 않는다
+let stPrewind = null
+// 새 롤마다 카메라·필름을 보여주고 시작. 프리와인딩 질문은 이 장비에 처음 한 번만
+function openStart() {
+  const saved = HOSTED ? (INIT.prewind == null ? null : INIT.prewind ? '1' : '0') : store.get(PREWIND_KEY)
+  stPrewind = saved === null ? null : saved === '1'
+  $('stAsk').hidden = saved !== null
+  $('stKnown').hidden = saved === null
+  $('stKnown').textContent = saved === '1' ? '카운트 36 → 1 · 프리와인딩' : '카운트 1 → 36'
+  renderStart()
+  showSheet('startSheet')
+}
+function renderStart() {
+  document.querySelectorAll('#stCount button').forEach((b) => b.classList.toggle('on', stPrewind !== null && (b.dataset.v === '1') === stPrewind))
+  $('stGo').disabled = stPrewind === null
+}
+document.querySelectorAll('#stCount button').forEach((b) => b.addEventListener('click', () => { stPrewind = b.dataset.v === '1'; renderStart(); detent() }))
+$('camMsg').querySelector('button').addEventListener('click', startCamera)
+$('stGo').addEventListener('click', () => {
+  if (HOSTED) { if (INIT.prewind == null) post({ type: 'prewind', value: stPrewind }) }
+  else store.set(PREWIND_KEY, stPrewind ? '1' : '0')
+  closeSheets()
+  beginRoll(stPrewind)
+})
+function beginRoll(pw) {
+  wound = false
+  winding = false
+  startCamera() // 누르는 순간에 권한을 물어야 하는 브라우저 대비
+  prewind = pw
+  shots = {}; shotCount = 0; ended = false
+  $('endBtn').disabled = false; $('endBtn').textContent = '촬영 끝내기'
+  buildStrip(); setMode(mode)
+  $('filmLine').textContent = `${cam.film} · ISO ${cam.iso} · ${cam.frames}컷`
+  audio()
+  sendShots()
+}
+const startRoll = openStart
+let metering = 'spot' // 'spot' 스팟 | 'center' 중앙 중점 | 'avg' 평균
+const METERINGS = ['spot', 'center', 'avg']
+function setMetering(m) {
+  metering = m
+  for (const k of METERINGS) { $('meterMode').classList.toggle(k, k === m); $('finder').classList.toggle(k, k === m) }
+  sendSpot()
+}
+function sendSpot() { if (NATIVE_CAM) post({ type: 'spot', x: spot.x, y: spot.y, mode: metering, avg: metering !== 'spot' }) }
+// 파인더 위치를 앱에 알려 카메라 화면을 그 자리에 깐다
+let lastFinder = ''
+function sendFinder() {
+  if (!NATIVE_CAM) return
+  const r = $('finder').getBoundingClientRect()
+  const key = [r.left, r.top, r.width, r.height].map(Math.round).join(',')
+  if (key === lastFinder) return
+  lastFinder = key
+  post({ type: 'finder', x: r.left, y: r.top, w: r.width, h: r.height })
+}
+// 앱(아이폰)이 부르는 함수
+window.meterNative = {
+  ev(v) { nativeEV = v },
+  zoomRange(min, max) { zoom = { z: 1, min, max, hw: false, native: true }; setZoom(1, true) },
+  error(msg) { camMessage(msg, false) },
+}
+// 누른 칸으로 바꾼다 (토글 어디를 눌렀는지)
+$('meterMode').addEventListener('click', (e) => {
+  const r = $('meterMode').getBoundingClientRect()
+  const i = clamp(Math.floor((e.clientX - r.left) / r.width * 3), 0, 2)
+  if (METERINGS[i] !== metering) { setMetering(METERINGS[i]); detent() }
+})
+
+$('flashBtn').addEventListener('click', () => {
+  flash = !flash
+  $('flashBtn').classList.toggle('on', flash); $('flashBtn').setAttribute('aria-pressed', flash)
+  $('flashBtn').querySelector('span').textContent = flash ? '켬' : '끔'
+  detent()
+  toast(flash ? '플래시 켬 · 끌 때까지 찍는 컷에 기록돼요' : '플래시 끔')
+})
+$('hold').addEventListener('click', () => {
+  held = !held; $('hold').classList.toggle('on', held); $('hold').textContent = held ? '고정됨' : '측광 고정'
+  toast(held ? '측광값을 고정했어요 · 구도를 바꾸거나 폰을 내려도 값이 그대로예요' : '고정을 풀었어요 · 다시 실시간으로 재요')
+})
+// 노란 가이드(.bright: 가운데 64% × 70%) 안에만 스팟을 둔다
+function placeSpot(clientX, clientY) {
+  const r = $('finder').getBoundingClientRect()
+  const x = clamp((clientX - r.left) / r.width, .18, .82)
+  const y = clamp((clientY - r.top) / r.height, .15, .85)
+  spot = { x, y }
+  $('spot').style.left = x * 100 + '%'; $('spot').style.top = y * 100 + '%'
+  sendSpot()
+}
+$('finder').addEventListener('pointerdown', (e) => {
+  if (e.target.closest('#zoomDial, #camMsg')) return
+  if (metering !== 'spot') return // 중앙·평균 측광은 지점이 없다
+  if (e.pointerType === 'touch') return
+  const mark = $('spot')
+  mark.classList.add('drag')
+  placeSpot(e.clientX, e.clientY)
+  if (held) { held = false; $('hold').classList.remove('on'); $('hold').textContent = '측광 고정' }
+  const move = (ev) => { if (ev.cancelable) ev.preventDefault(); placeSpot(ev.clientX, ev.clientY) }
+  const up = () => {
+    mark.classList.remove('drag')
+    document.removeEventListener('pointermove', move)
+    document.removeEventListener('pointerup', up)
+    document.removeEventListener('pointercancel', up)
+  }
+  document.addEventListener('pointermove', move, { passive: false })
+  document.addEventListener('pointerup', up)
+  document.addEventListener('pointercancel', up)
+  audio()
+})
+$('finder').addEventListener('touchstart', (e) => {
+  if (e.target.closest('#zoomDial, #camMsg')) return
+  if (metering !== 'spot' || e.touches.length !== 1) return
+  if (e.cancelable) e.preventDefault()
+  const mark = $('spot')
+  mark.classList.add('drag')
+  placeSpot(e.touches[0].clientX, e.touches[0].clientY)
+  if (held) { held = false; $('hold').classList.remove('on'); $('hold').textContent = '측광 고정' }
+  const move = (ev) => {
+    if (!ev.touches.length) return
+    if (ev.cancelable) ev.preventDefault()
+    placeSpot(ev.touches[0].clientX, ev.touches[0].clientY)
+  }
+  const up = () => {
+    mark.classList.remove('drag')
+    document.removeEventListener('touchmove', move)
+    document.removeEventListener('touchend', up)
+    document.removeEventListener('touchcancel', up)
+  }
+  document.addEventListener('touchmove', move, { passive: false })
+  document.addEventListener('touchend', up)
+  document.addEventListener('touchcancel', up)
+  audio()
+}, { passive: false })
+
+let toastT
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200) }
+
+let lastMeasure = 0, lastFrame = 0
+function loop(now) {
+  stepZoom(Math.min(.05, (now - (lastFrame || now)) / 1000) || .016); lastFrame = now
+  if (!live() && !HOSTED) drawSim()
+  sendFinder()
+  if (now - lastMeasure > 90) {
+    lastMeasure = now
+    if (!held) meterEV += (measure() - meterEV) * .35
+  }
+  const r = solve()
+  const target = -clamp(r.diff, -2.15, 2.15) * 24
+  needleV = needleV * .78 + (target - needleA) * .09
+  needleA += needleV
+  $('needle').style.transform = `rotate(${needleA}deg)`
+  const st = $('state'), a = Math.abs(r.diff)
+  if (a < .34) { st.textContent = '적정'; st.className = 'state ok' }
+  else if (r.diff > 0) { st.textContent = `+${a.toFixed(1)} 오버`; st.className = 'state over' }
+  else { st.textContent = `−${a.toFixed(1)} 언더`; st.className = 'state under' }
+  $('led').classList.toggle('red', a >= 1)
+  const c = comp()
+  $('ev').textContent = `EV ${meterEV.toFixed(1)} · ISO ${cam.iso}${c ? ` → ${effIso(c)}` : ''}${filters.length ? ` · ${filters.join('+')}` : ''}`
+  requestAnimationFrame(loop)
+}
+
+// 진짜 접안부처럼 변이 살짝 부푼 둥근 네모, 가장자리는 흐리게
+{
+  const n = 4.2, pts = []
+  for (let i = 0; i < 180; i++) {
+    const t = i / 180 * Math.PI * 2, c = Math.cos(t), s = Math.sin(t)
+    pts.push(`${(150 + 141 * Math.sign(c) * Math.abs(c) ** (2 / n)).toFixed(1)},${(100 + 92 * Math.sign(s) * Math.abs(s) ** (2 / n)).toFixed(1)}`)
+  }
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 200' preserveAspectRatio='none'><filter id='b' x='-10%' y='-10%' width='120%' height='120%'><feGaussianBlur stdDeviation='3.2'/></filter><polygon points='${pts.join(' ')}' fill='white' filter='url(#b)'/></svg>`
+  document.documentElement.style.setProperty('--eyepiece', `url("data:image/svg+xml,${encodeURIComponent(svg)}")`)
+}
+applySimLook()
+setMode('A')
+ringC.onChange()
+setZoom(1, true)
+buildStrip()
+$('filmLine').textContent = `${cam.film} · ISO ${cam.iso} · ${cam.frames}컷`
+addEventListener('resize', () => placeStrip(true))
+// 화면 크기가 정해지는 순간(처음 그릴 때 포함) 다음 칸을 가운데로
+if (window.ResizeObserver) new ResizeObserver(() => { if (track.children.length) placeStrip(true) }).observe(strip)
+startCamera()
+// 화면에 카메라·필름 이름 넣기
+$('camTitle').textContent = cam.name
+$('stCam').textContent = cam.name
+$('stFilm').textContent = cam.film
+$('stFilmSub').textContent = `ISO ${cam.iso} · ${cam.format} · ${cam.frames}컷`
+$('stHint').textContent = `카운트가 ${cam.frames}부터 거꾸로 줄어드는 카메라`
+$('canName').textContent = cam.filmShort.toUpperCase().slice(0, 9)
+$('canIso').textContent = cam.iso
+$('canSub').textContent = `${cam.format}·${cam.frames}`
+$('canBand').setAttribute('fill', cam.color)
+$('stCanBand').style.background = cam.color
+$('filmLine').textContent = `${cam.film} · ISO ${cam.iso} · ${cam.frames}컷`
+if (HOSTED) {
+  $('backBtn').hidden = false
+  $('backBtn').addEventListener('click', () => post({ type: 'close' }))
+  $('simCanvas').style.display = 'none'
+  const saved = INIT.shots || []
+  if (saved.length || INIT.rollPrewind != null) {
+    // 찍던 롤 이어서
+    prewind = INIT.rollPrewind ?? INIT.prewind ?? false
+    shots = {}
+    for (const f of saved) shots[f.pos] = { ...f }
+    shotCount = saved.length
+    buildStrip()
+    startCamera()
+  } else openStart()
+} else {
+  const qs = new URLSearchParams(location.search)
+  if (qs.has('reset')) { try { localStorage.removeItem(PREWIND_KEY) } catch {} }
+  if (qs.has('go')) beginRoll(qs.has('pw')); else startRoll()
+}
+requestAnimationFrame(loop)
+</script>
+</body>
+</html>

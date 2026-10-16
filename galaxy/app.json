@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "필름함",
+    "slug": "filmchest",
+    "version": "1.5.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "filmchest",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "app.vercel.filmchest",
+      "versionCode": 10,
+      "adaptiveIcon": {
+        "backgroundColor": "#1C1A17",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "./plugins/withReleaseSigning",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "스캔 사진을 갤러리에 저장해요.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
+    ]
+  }
+}

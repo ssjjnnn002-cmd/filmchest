@@ -1,0 +1,6 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": { "namespace": "android_app", "package_name": "app.vercel.filmchest", "sha256_cert_fingerprints": ["75:5D:56:44:3F:D3:57:CF:63:94:A1:6D:62:BC:10:42:84:22:60:9D:B7:1D:98:06:DF:55:DA:04:78:82:84:ED"] }
+  }
+]

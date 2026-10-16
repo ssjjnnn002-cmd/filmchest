@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ko" translate="no">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="google" content="notranslate" />
+<title>가까운 현상소</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  /* 웹앱(iframe)과 갤럭시 앱(WebView)이 같이 쓰는 가까운 현상소 화면. 고르면 현상소 이름을 앱에 넘긴다. */
+  :root { --bg: #f2efe8; --card: #fff; --ink: #1a1816; --sub: #8a847b; --line: #e6e1d8; --accent: #e0552e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #121212; --card: #1e1e20; --ink: #f2eee8; --sub: #8d8a85; --line: #2c2c30; } }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  body { display: flex; flex-direction: column; padding-top: env(safe-area-inset-top); }
+  header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; }
+  header h1 { flex: 1; margin: 0; font-size: 17px; text-align: center; }
+  header button { border: 0; background: none; color: var(--accent); font: 600 16px inherit; font-family: inherit; min-width: 44px; padding: 6px 0; }
+  #map { height: 42vh; min-height: 220px; background: #ddd; }
+  .pin { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; box-shadow: 0 2px 6px rgb(0 0 0 / .35); border: 2px solid #fff; }
+  .pin svg { width: 17px; height: 17px; }
+  .pin.on { transform: scale(1.2); }
+  .me { width: 16px; height: 16px; border-radius: 50%; background: #2f8cff; border: 3px solid #fff; box-shadow: 0 0 0 6px rgb(47 140 255 / .25); }
+  .list { flex: 1; overflow-y: auto; padding: 12px 16px calc(env(safe-area-inset-bottom) + 16px); }
+  .list h2 { margin: 4px 4px 10px; font-size: 18px; }
+  .row { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: var(--card); color: var(--ink); border-radius: 16px; padding: 12px; margin-bottom: 8px; text-align: left; font-family: inherit; }
+  .row.on { box-shadow: inset 0 0 0 2px var(--accent); }
+  .row .ico { flex: none; width: 40px; height: 40px; border-radius: 12px; background: rgb(224 85 46 / .12); color: var(--accent); display: grid; place-items: center; }
+  .row .ico svg { width: 20px; height: 20px; }
+  .row b { display: block; font-size: 16px; }
+  .row span { display: block; font-size: 13px; color: var(--sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .t { flex: 1; min-width: 0; }
+  .row .pick { flex: none; border: 0; border-radius: 99px; background: var(--accent); color: #fff; font: 700 13px inherit; font-family: inherit; padding: 8px 12px; }
+  .msg { color: var(--sub); text-align: center; padding: 24px 8px; font-size: 14px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<header><button id="close">닫기</button><h1>가까운 현상소</h1><span style="min-width:44px"></span></header>
+<div id="map"></div>
+<div class="list" id="list"><div class="msg">현재 위치를 찾는 중…</div></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const CAM = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 4h6l1.5 2H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.5L9 4Zm3 4.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z"/></svg>'
+const API = location.hostname.endsWith('vercel.app') || location.hostname === 'localhost' ? '' : 'https://filmchest.vercel.app'
+const $ = (id) => document.getElementById(id)
+function post(msg) {
+  try {
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(msg))
+    else if (window.parent !== window) window.parent.postMessage({ source: 'filmchest-labs', ...msg }, '*')
+  } catch {}
+}
+$('close').onclick = () => post({ type: 'close' })
+const km = (m) => m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(1)}km`
+
+const map = L.map('map', { zoomControl: false, attributionControl: true }).setView([37.5665, 126.978], 13)
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19, attribution: '© OpenStreetMap · © CARTO',
+}).addTo(map)
+
+let markers = {}, selected = null
+function select(i, labs, pan) {
+  selected = i
+  document.querySelectorAll('.row').forEach((r, k) => r.classList.toggle('on', k === i))
+  Object.entries(markers).forEach(([k, m]) => m.getElement()?.querySelector('.pin')?.classList.toggle('on', +k === i))
+  if (pan) map.setView([labs[i].latitude, labs[i].longitude], 16, { animate: true })
+}
+function render(labs, here) {
+  const list = $('list')
+  if (!labs.length) { list.innerHTML = '<div class="msg">20km 안에서 현상소를 찾지 못했어요.</div>'; return }
+  list.innerHTML = `<h2>이 근처 현상소 ${labs.length}곳</h2>`
+  const bounds = [[here.latitude, here.longitude]]
+  labs.forEach((lab, i) => {
+    const icon = L.divIcon({ className: '', html: `<div class="pin">${CAM.replace('currentColor', '#fff')}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] })
+    markers[i] = L.marker([lab.latitude, lab.longitude], { icon }).addTo(map).on('click', () => { select(i, labs, false); document.querySelectorAll('.row')[i].scrollIntoView({ behavior: 'smooth', block: 'nearest' }) })
+    if (i < 8) bounds.push([lab.latitude, lab.longitude])
+    const row = document.createElement('div')
+    row.className = 'row'
+    row.innerHTML = `<div class="ico">${CAM}</div><div class="t"><b></b><span></span></div><button class="pick">고르기</button>`
+    row.querySelector('b').textContent = lab.name
+    row.querySelector('span').textContent = [km(lab.distance), lab.address].filter(Boolean).join(' · ')
+    row.onclick = () => select(i, labs, true)
+    row.querySelector('.pick').onclick = (e) => { e.stopPropagation(); post({ type: 'pick', name: lab.name }) }
+    list.appendChild(row)
+  })
+  map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 })
+}
+
+async function load(here) {
+  L.marker([here.latitude, here.longitude], { icon: L.divIcon({ className: '', html: '<div class="me"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }) }).addTo(map)
+  map.setView([here.latitude, here.longitude], 14)
+  try {
+    const r = await fetch(`${API}/api/labs?lat=${here.latitude}&lng=${here.longitude}`)
+    if (r.status === 501) { $('list').innerHTML = '<div class="msg">현상소 검색이 아직 켜지지 않았어요.<br>현상소 이름을 직접 적어 주세요.</div>'; return }
+    const { labs } = await r.json()
+    render(labs, here)
+  } catch {
+    $('list').innerHTML = '<div class="msg">현상소를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.</div>'
+  }
+}
+
+if (!navigator.geolocation) $('list').innerHTML = '<div class="msg">이 화면에선 위치를 쓸 수 없어요.</div>'
+else navigator.geolocation.getCurrentPosition(
+  (p) => load({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+  () => { $('list').innerHTML = '<div class="msg">현재 위치를 알 수 없어요. 위치 권한을 확인해 주세요.</div>' },
+  { enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 },
+)
+</script>
+</body>
+</html>

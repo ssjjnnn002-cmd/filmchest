@@ -1,0 +1,28 @@
+.build/
+.swiftpm/
+xcuserdata/
+DerivedData/
+*.xcuserstate
+.DS_Store
+sample/
+web/node_modules/
+web/dist/
+.vercel
+
+# 의존성·빌드 결과 (다른 컴퓨터에서는 npm install / 빌드로 다시 만든다)
+node_modules/
+build/
+.gradle/
+.cxx/
+.expo/
+*.apk
+*.aab
+
+# 비밀 값·서명 (각 컴퓨터에 따로 둔다)
+.env*
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+.claude/settings.local.json
+*.idsig

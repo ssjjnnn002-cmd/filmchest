@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- 무료 Apple ID로 설치할 때: 무료 계정은 App Group을 쓸 수 없어서 비워 둔다 -->
+<dict/>
+</plist>

@@ -1,0 +1,32 @@
+import { Text, View } from 'react-native'
+import { Sheet } from './chrome'
+import { useTheme } from './theme'
+
+const sections: { title?: string; body: string }[] = [
+  { body: '필름함은 계정 없이 쓰는 필름 기록 앱입니다. 개발자는 이용자의 카메라, 롤, 사진, 위치를 서버로 수집하지 않습니다. 광고를 하지 않고, 이용 행적을 추적하지 않습니다. 이 방침은 아이폰 앱, 갤럭시 앱, 웹 앱에 함께 적용됩니다.' },
+  { body: '시행일: 2026년 10월 16일' },
+  { title: '처리하는 정보', body: '이름, 이메일, 전화번호, 계정, 결제 정보는 받지 않습니다. 앱 분석 도구와 광고 식별자를 쓰지 않습니다.' },
+  { title: '기기에만 남는 기록', body: '카메라와 렌즈, 필름 롤, 촬영일, 장소 이름, 좌표, 메모, 현상소 이름, 스캔 사진, 장비 백업 파일은 이용자 기기의 앱 또는 브라우저 저장 공간에만 있습니다. 이 기록은 개발자에게 전송되지 않습니다. 백업 파일은 이용자가 직접 공유하기 전까지 기기 안에 있습니다.' },
+  { title: '권한', body: '사진: 아이폰 앱은 스캔을 사진 앱에 저장하고, 이용자가 복구를 요청했을 때 그 사진을 읽습니다. 웹과 갤럭시 앱은 이용자가 고른 파일만 읽습니다. 위치: 촬영 장소를 기록할 때만, 그 기기가 위치 권한을 쓰는 경우에 좌표를 받습니다. 좌표는 그 롤에 남고, 사진을 저장하면 그 사진에도 넣을 수 있습니다. 위치를 허용하지 않으면 장소 이름은 직접 적을 수 있습니다.' },
+  { title: '사진 파일', body: '사진을 기기에 저장할 때 촬영일, 카메라, 렌즈, 필름, 장소, 현상소, 그리고 같은 롤을 다시 찾기 위한 표식이 사진 파일에 들어갈 수 있습니다. 이 표식은 그 기기에서 롤을 복구할 때만 읽고, 개발자에게 보내지 않습니다.' },
+  { title: '보관과 삭제', body: '기록은 이용자가 지우기 전까지 기기에 남습니다. 롤을 삭제하면 24시간 동안 설정에서 되돌릴 수 있고, 그 뒤 앱 안의 기록은 지워집니다. 사진 앱에 이미 저장된 사진은 앱이 지우지 않습니다. 앱을 삭제하거나 브라우저 저장 공간을 지우면 기기 안의 기록도 함께 사라집니다.' },
+  { title: '제3자 제공', body: '기록을 판매하거나 광고 회사에 제공하지 않습니다. 웹 앱을 열 때 접속 주소와 시각은 웹을 열어 주는 호스팅 업체에 남을 수 있습니다. 그 접속 기록에는 카메라, 롤, 사진, 위치의 내용이 포함되지 않습니다.' },
+  { title: '아동', body: '만 14세 미만 아동을 대상으로 하지 않으며, 아동의 개인정보를 수집하지 않습니다.' },
+  { title: '문의', body: '방침이 바뀌면 이 화면의 내용도 함께 바꿉니다.\n필름함 · https://filmchest.vercel.app' },
+]
+
+export function PrivacyPolicy({ onClose }: { onClose: () => void }) {
+  const c = useTheme()
+  return (
+    <Sheet title="개인정보 처리방침" onClose={onClose} tall>
+      <View style={{ gap: 18 }}>
+        {sections.map((section) => (
+          <View key={section.title ?? section.body.slice(0, 12)} style={{ gap: 6 }}>
+            {section.title ? <Text style={{ color: c.ink, fontSize: 17, fontWeight: '700' }}>{section.title}</Text> : null}
+            <Text style={{ color: c.ink, fontSize: 16, lineHeight: 24 }}>{section.body}</Text>
+          </View>
+        ))}
+      </View>
+    </Sheet>
+  )
+}

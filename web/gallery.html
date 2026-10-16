@@ -1,0 +1,9 @@
+<!doctype html><meta charset="utf-8"><title>3D gallery</title>
+<style>body{margin:0;background:#f2efe8;font:12px system-ui}#g{display:grid;grid-template-columns:repeat(var(--n,4),1fr);gap:4px;padding:4px}figure{margin:0;background:#fff;border-radius:8px;text-align:center}img{width:100%}</style>
+<div id="g"></div>
+<script type="module">
+import { profileFor } from '/src/core/profiles.ts'
+import { snapshot } from '/src/core/model3d.ts'
+document.body.style.setProperty('--n', new URLSearchParams(location.search).get('n') ?? 4); const color = '#' + (new URLSearchParams(location.search).get('c') ?? '1c1c1c'); const list = (new URLSearchParams(location.search).get('m') ?? 'Nikon,FM2,slr;Canon,AE-1,slr;Olympus,OM-1,slr;Nikon,F3,slr;Canon,EOS-1V,slr;Nikon,F100,slr;Leica,M6,rangefinder;Olympus,35 RC,rangefinder;Canon,Canonet QL17 GIII,rangefinder;Contax,G2,rangefinder;Mamiya,7II,mediumFormat;Contax,T2,compact;Nikon,AF600,compact;Konica,Big Mini,compact;Olympus,mju-II,compact;Olympus,XA,compact;Ricoh,GR1,compact;Olympus,Trip 35,rangefinder;Pentax,17,compact;Olympus,Pen F,slr;Rollei,Rolleiflex 2.8F,mediumFormat;Hasselblad,500C/M,mediumFormat;Mamiya,RB67,mediumFormat;Pentax,67,mediumFormat;Pentax,645,mediumFormat;Rollei,Rollei 35,compact;Kodak,M35,compact;Holga,120N,mediumFormat').split(';')
+for (const s of list) { const [b,m,st]=s.split(','); const f=document.createElement('figure'); f.innerHTML=`<img src="${snapshot(profileFor(b,m,st),color)}"><figcaption>${b} ${m}</figcaption>`; g.append(f) }
+</script>
