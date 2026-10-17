@@ -690,13 +690,55 @@ function liveTrack() {
   const stream = video.srcObject
   return (stream && stream.getVideoTracks && stream.getVideoTracks()[0]) || hw?.track || null
 }
+// 셔터·감도를 고정할 수 있는 카메라(안드로이드 크롬 등): 고정값 + 화면 밝기로 정확히 잰다.
+// 너무 밝거나 어두우면 한 스톱씩 옮겨 다시 고정한다.
+let manualExp = null
+async function lockExposure(track) {
+  manualExp = null
+  const caps = track.getCapabilities?.() || {}
+  if (!caps.exposureMode?.includes?.('manual') || !caps.exposureTime || !caps.iso) return
+  const m = {
+    track,
+    tMin: caps.exposureTime.min, tMax: Math.min(caps.exposureTime.max, 333), // 1/30초보다 길게는 안 연다 (흔들림)
+    isoMin: caps.iso.min, isoMax: Math.min(caps.iso.max, 3200),
+    t: 0, iso: 0, settle: 0, busy: false,
+  }
+  m.t = clamp(40, m.tMin, m.tMax) // 1/250초 (단위 100µs)
+  m.iso = clamp(100, m.isoMin, m.isoMax)
+  try {
+    await track.applyConstraints({ advanced: [{ exposureMode: 'manual', exposureTime: m.t, iso: m.iso }] })
+    m.settle = performance.now() + 400
+    manualExp = m
+  } catch {}
+}
+async function stepExposure(dir) {
+  const m = manualExp
+  if (!m || m.busy) return
+  let { t, iso } = m
+  if (dir > 0) { if (t * 2 <= m.tMax) t *= 2; else if (iso * 2 <= m.isoMax) iso *= 2; else return }
+  else { if (iso / 2 >= m.isoMin) iso /= 2; else if (t / 2 >= m.tMin) t /= 2; else return }
+  m.busy = true
+  try {
+    await m.track.applyConstraints({ advanced: [{ exposureMode: 'manual', exposureTime: t, iso, ...(zoom.hw ? { zoom: zoom.base * zoom.z } : {}) }] })
+    m.t = t; m.iso = iso
+  } catch { manualExp = null }
+  m.settle = performance.now() + 350
+  m.busy = false
+}
+// 크롬은 자동 노출 중에 처음 값만 계속 알려 주는 경우가 있다. 값이 한 번이라도 바뀌어야 믿는다.
+let camEVSeen = null, camEVLive = false
+function noteCamEV(ev) {
+  if (camEVSeen != null && Math.abs(ev - camEVSeen) > .05) camEVLive = true
+  camEVSeen = ev
+  if (camEVLive) camEV = ev
+}
 let photoWatch = 0
 function watchCameraExposure(track) {
   clearInterval(photoWatch)
   const read = () => {
     const st = track.getSettings?.() || {}
     const ev = evFromExposure(st.exposureTime, st.iso, st.aperture)
-    if (ev != null) camEV = ev
+    if (ev != null) noteCamEV(ev)
   }
   read()
   let ic = null
@@ -707,7 +749,7 @@ function watchCameraExposure(track) {
     try {
       const s = await ic.getPhotoSettings()
       const ev = evFromExposure(s.exposureTime, s.iso, s.aperture)
-      if (ev != null) camEV = ev
+      if (ev != null) noteCamEV(ev)
     } catch {}
   }, 200)
 }
@@ -732,9 +774,22 @@ function measure() {
   const avg = Math.max(1e-4, sum / 2400), sl = Math.max(1e-4, sp / Math.max(1, spN)), cen = Math.max(1e-4, cw / cwN)
   const use = metering === 'spot' ? sl : metering === 'center' ? cen : avg
   if (!live()) return applyMeterBias(clamp(simEV + sceneEv + log2(use / avg), -2, 20))
-  // 자동 노출이 화면을 중간 밝기로 맞춰도, 그때의 셔터·감도가 실제 밝기다
   const st = liveTrack()?.getSettings?.() || {}
-  const base = evFromExposure(st.exposureTime, st.iso, st.aperture) ?? camEV
+  // 셔터·감도를 고정해 두었으면: 고정값의 EV + 화면 밝기 = 장면 밝기
+  if (manualExp) {
+    const m = manualExp
+    if (performance.now() < m.settle || m.busy) return meterEV
+    // 하이라이트가 날아가거나 너무 어두우면 범위를 옮긴다
+    // 화면 평균은 18% 근처로 두고, 재는 자리가 하얗게 날아가면 한 스톱 내린다
+    if (avg > .4 || use > .85) stepExposure(-1)
+    else if (avg < .045 && use < .4) stepExposure(1)
+    const fixed = evFromExposure(m.t, m.iso, st.aperture)
+    if (fixed != null) return applyMeterBias(clamp(fixed + log2(use / .18), -2, 20))
+  }
+  // 자동 노출이 화면을 중간 밝기로 맞춰도, 그때의 셔터·감도가 실제 밝기다 (실시간으로 바뀌는 값일 때만)
+  const now = evFromExposure(st.exposureTime, st.iso, st.aperture)
+  if (now != null) noteCamEV(now)
+  const base = camEVLive ? camEV : null
   // 셔터·감도를 모르는 카메라도, 화면에 보이는 밝기와 스팟 자리는 그대로 반영한다
   const seen = log2(use / .18)
   return applyMeterBias(clamp((base ?? 12) + seen, -2, 20))
@@ -863,7 +918,9 @@ async function startCamera() {
       setZoom(1, true)
     }
     hw = { track }
+    camEV = null; camEVSeen = null; camEVLive = false
     watchCameraExposure(track)
+    await lockExposure(track)
   } catch (e) {
     sim.style.display = HOSTED ? 'none' : ''
     if (e.name === 'NotAllowedError') camMessage('카메라 권한이 꺼져 있어요. 허용한 뒤 다시 눌러 주세요.', true)
@@ -916,7 +973,7 @@ function applyZoom(z) {
     zoomTimer = setTimeout(() => {
       zoomTimer = 0
       const want = zoom.z * zoom.base
-      zoom.track.applyConstraints({ advanced: [{ zoom: want }] }).then(() => {
+      zoom.track.applyConstraints({ advanced: [{ zoom: want, ...(manualExp ? { exposureMode: 'manual', exposureTime: manualExp.t, iso: manualExp.iso } : {}) }] }).then(() => {
         const got = zoom.track.getSettings?.().zoom
         if (typeof got === 'number' && Math.abs(Math.log(got / want)) > 0.2) {
           zoom.hw = false
