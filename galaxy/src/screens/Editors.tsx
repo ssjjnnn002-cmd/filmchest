@@ -14,6 +14,7 @@ import { Icon } from '../icons'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { currentPlace, locationAvailable, parseCoordinates, placeSearchAvailable, searchPlaces, type Place, weatherAt } from '../platform'
 import { useTheme } from '../theme'
+import { features } from '../core/features'
 
 const frameMax = (format: keyof typeof formatInfo = '135') => formatInfo[format].count + 4
 
@@ -297,7 +298,7 @@ export function LabDropOff({ roll, onClose }: { roll: Roll; onClose: () => void 
       <Section title="현상소">
         <Group>
           <LabField value={lab} onChange={setLab} />
-          <Row onPress={() => setNearby(true)}><Icon name="pin" size={20} color={c.safelight} /><RowText color={c.safelight}>가까운 현상소 찾기</RowText></Row>
+          {features.nearbyLabs ? <Row onPress={() => setNearby(true)}><Icon name="pin" size={20} color={c.safelight} /><RowText color={c.safelight}>가까운 현상소 찾기</RowText></Row> : null}
         </Group>
       </Section>
       {nearby ? <NearbyLabs onPick={(name) => { setLab(name); setNearby(false) }} onClose={() => setNearby(false)} /> : null}

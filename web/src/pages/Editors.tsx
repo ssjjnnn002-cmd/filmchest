@@ -7,6 +7,7 @@ import { formatInfo, uid } from '../core/types'
 import { Confirm, Icon, Sheet, rollCameraFormat, sortedLocations, toInputDate, toInputDateTime } from '../ui/common'
 import { currentPlace, locationAvailable, parseCoordinates, placeSearchAvailable, searchPlaces, type Place, weatherAt } from '../platform'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
+import { features } from '../core/features'
 
 const frameMax = (format: keyof typeof formatInfo = '135') => formatInfo[format].count + 4
 
@@ -299,7 +300,7 @@ export function LabDropOff({ roll, onClose }: { roll: Roll; onClose: () => void 
         <h2>현상소</h2>
         <div className="group">
           <LabField value={lab} onChange={setLab} />
-          <button className="row accent" onClick={() => setNearby(true)}><Icon name="pin" /> 가까운 현상소 찾기</button>
+          {features.nearbyLabs && <button className="row accent" onClick={() => setNearby(true)}><Icon name="pin" /> 가까운 현상소 찾기</button>}
         </div>
       </div>
       {nearby && <NearbyLabs onPick={(name) => { setLab(name); setNearby(false) }} onClose={() => setNearby(false)} />}
