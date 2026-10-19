@@ -10,6 +10,7 @@ import { Model3D } from '../ui/Viewers'
 import { Sheet, toInputDate, useObjectURL } from '../ui/common'
 import { groupPrice } from '../core/optics'
 import { PurchaseFields, rememberSeller, useUsedSellers } from './Gear'
+import { features } from '../core/features'
 
 const BODY_COLOR = '#1C1C1E'
 
@@ -290,7 +291,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
       <PurchaseFields date={purchasedAt} setDate={setPurchasedAt} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller}
         used={usedSellers} />
 
-      <div className="section">
+      {features.meter && <div className="section">
         <h2>필름 감기</h2>
         <div className="segmented" role="group" aria-label="필름 감기">
           <button type="button" className={prewind === false ? 'on' : ''} onClick={() => setPrewind(false)}>정순 · 1→끝</button>
@@ -299,7 +300,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
         <p className="footnote">{prewind == null
           ? '아직 고르지 않았어요. 노출계를 열면 한 번 묻고, 고른 쪽이 이 카메라에 저장돼요.'
           : '프리와인딩은 필름을 먼저 끝까지 감아 두고 카운트가 거꾸로 줄어드는 카메라예요.'}</p>
-      </div>
+      </div>}
 
       {showCatalog && <CatalogPicker onPick={(c) => { apply(c); setShowCatalog(false) }} onClose={() => setShowCatalog(false)} />}
     </Sheet>

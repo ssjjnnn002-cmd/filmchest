@@ -45,7 +45,7 @@ struct SettingsView: View {
                 }
 
                 statsSection
-                meterSection
+                if Features.meter { meterSection }
 
                 Section {
                     Picker("저장 방식", selection: $albumMode) {

@@ -12,6 +12,7 @@ import { GlassBtn, Page } from '../page'
 import { useTheme } from '../theme'
 import { LabDropOff, PlaceEdit } from './Editors'
 import { Meter } from './Meter'
+import { features } from '../core/features'
 
 export function Shooting() {
   const nav = useNav()
@@ -57,8 +58,8 @@ function LoadedCard({ roll }: { roll: Roll }) {
       </Pressable>
       <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 16 }}>
         {roll.locations.length === 0 ? <View style={{ flex: 1 }}><Btn label="장소 추가" icon="pin" kind="soft" block onPress={() => setPlacing(true)} /></View> : null}
-        <View style={{ flex: 1 }}><Btn label="촬영 끝내기" kind="soft" block onPress={() => setDropOff(true)} /></View>
-        <View style={{ flex: 1 }}><Btn label="노출계" kind="primary" block onPress={() => setMeter(true)} /></View>
+        <View style={{ flex: 1 }}><Btn label="촬영 끝내기" kind={features.meter ? 'soft' : 'primary'} block onPress={() => setDropOff(true)} /></View>
+        {features.meter ? <View style={{ flex: 1 }}><Btn label="노출계" kind="primary" block onPress={() => setMeter(true)} /></View> : null}
       </View>
       {placing ? <PlaceEdit roll={roll} onClose={() => setPlacing(false)} /> : null}
       {dropOff ? <LabDropOff roll={roll} onClose={() => setDropOff(false)} /> : null}

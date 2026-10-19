@@ -68,12 +68,12 @@ export interface Camera {
   seller?: string
   createdAt: number
   sortOrder: number
-  /** 렌즈를 직접 골랐으면, 같은 마운트 전체를 보여 주지 않는다. */
-  lensesChosen?: boolean
-  /** 이 카메라에 불러 둔 렌즈. */
-  lensIds?: string[]
   /** 있으면 휴지통. 24시간이 지나면 장비 목록에서만 지운다. */
   deletedAt?: number
+  /** 한 번이라도 렌즈를 불러오거나 빼면 true. 그 전엔 같은 마운트 렌즈를 모두 보여 준다. */
+  lensesChosen?: boolean
+  /** 이 카메라에 불러온 렌즈 id. 렌즈 목록의 등록은 그대로다. */
+  lensIds?: string[]
 }
 
 export interface Lens {

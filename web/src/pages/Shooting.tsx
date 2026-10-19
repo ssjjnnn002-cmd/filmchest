@@ -6,6 +6,7 @@ import type { Roll } from '../core/types'
 import { CameraCover, cameraName, Canister, Icon, PageHeader, fmtDay, rollCameraFormat, rollFilm, rollFilmName, sortedLocations } from '../ui/common'
 import { LabDropOff, PlaceEdit } from './Editors'
 import { Meter } from './Meter'
+import { features } from '../core/features'
 
 export function Shooting() {
   const nav = useNav()
@@ -53,10 +54,10 @@ function LoadedCard({ roll }: { roll: Roll }) {
       </button>
       <div className="shooting-actions">
         {roll.locations.length === 0 && <button className="btn soft" onClick={() => setPlacing(true)}><Icon name="pin" size={18} /> 장소 추가</button>}
-        <button className="btn soft" onClick={() => setDropOff(true)}>
+        <button className={`btn ${features.meter ? 'soft' : 'primary'}`} onClick={() => setDropOff(true)}>
           촬영 끝내기
         </button>
-        <button className="btn primary" onClick={() => setMeter(true)}>노출계</button>
+        {features.meter && <button className="btn primary" onClick={() => setMeter(true)}>노출계</button>}
       </div>
       {placing && <PlaceEdit roll={roll} onClose={() => setPlacing(false)} />}
       {dropOff && <LabDropOff roll={roll} onClose={() => setDropOff(false)} />}

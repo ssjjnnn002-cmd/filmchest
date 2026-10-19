@@ -18,6 +18,7 @@ import { DayEdit, LabDropOff, LensChangeEdit, PlaceEdit } from './Editors'
 import { RollProjects } from './Projects'
 import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
 import { ScanButton } from './Pending'
+import { features } from '../core/features'
 
 export function RollDetail({ id }: { id: string }) {
   const c = useTheme()
@@ -86,9 +87,11 @@ export function RollDetail({ id }: { id: string }) {
         </View>
       </View>
 
-      <View style={{ marginTop: 8, marginBottom: 4 }}>
-        <Segmented value={view} options={[['log', '기록'], ['meter', '노출']]} onChange={setTab} />
-      </View>
+      {features.meter ? (
+        <View style={{ marginTop: 8, marginBottom: 4 }}>
+          <Segmented value={view} options={[['log', '기록'], ['meter', '노출']]} onChange={setTab} />
+        </View>
+      ) : null}
 
       {view === 'meter' ? <MeterPanel roll={roll} format={rollCameraFormat(camera, roll)} /> : null}
 

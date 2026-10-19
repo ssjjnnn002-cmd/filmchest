@@ -93,19 +93,29 @@ struct RollQuickActions: View {
                     .fixedSize(horizontal: true, vertical: false)
             }
             #if os(iOS)
-            Button {
-                showDropOff = true
-            } label: {
-                Text("촬영 끝내기").frame(maxWidth: .infinity)
+            if Features.meter {
+                Button {
+                    showDropOff = true
+                } label: {
+                    Text("촬영 끝내기").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                Button {
+                    showMeter = true
+                } label: {
+                    Text("노출계").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.safelight)
+            } else {
+                Button {
+                    showDropOff = true
+                } label: {
+                    Text("촬영 끝내기").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.safelight)
             }
-            .buttonStyle(.bordered)
-            Button {
-                showMeter = true
-            } label: {
-                Text("노출계").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Theme.safelight)
             #else
             Button {
                 showDropOff = true

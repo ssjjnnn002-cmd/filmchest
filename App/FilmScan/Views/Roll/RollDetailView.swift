@@ -57,6 +57,7 @@ struct RollDetailView: View {
         List {
             header
 
+            if Features.meter {
             Section {
                 Picker("보기", selection: $detailTab) {
                     ForEach(DetailTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -65,8 +66,9 @@ struct RollDetailView: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
             }
+            }
 
-            if detailTab == .meter {
+            if Features.meter && detailTab == .meter {
                 meterSummary
                 meterShots
             } else if roll.status == .imported, !(roll.frames ?? []).isEmpty {
@@ -102,7 +104,7 @@ struct RollDetailView: View {
                 }
             }
 
-            if detailTab == .log {
+            if !Features.meter || detailTab == .log {
             Section {
                 ForEach(roll.sortedDays) { day in
                     Button { editingDay = day } label: {

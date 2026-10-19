@@ -10,7 +10,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const from = join(root, 'web/src/core'), to = join(root, 'galaxy/src/core')
 mkdirSync(to, { recursive: true })
 // 브라우저 기능을 쓰지 않는 파일만 (그 밖의 파일은 갤럭시 쪽에서 같은 동작으로 따로 맞춘다)
-const files = ['films', 'cameras', 'cameraData', 'lenses', 'lensData', 'timeline', 'profiles', 'exif', 'meter']
+const files = ['features', 'films', 'cameras', 'cameraData', 'lenses', 'lensData', 'timeline', 'profiles', 'exif', 'meter']
 for (const f of files) {
   const src = readFileSync(join(from, `${f}.ts`), 'utf8')
   writeFileSync(join(to, `${f}.ts`), `// 자동 복사: web/src/core/${f}.ts (node scripts/sync-galaxy-core.mjs). 여기서 고치지 말 것.\n${src}`)

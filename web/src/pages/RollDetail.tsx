@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll } from '../db'
 import { useNav } from '../App'
 import { weatherText, type FilmFormat, type LocationSegment, type Roll, type ShootingDay } from '../core/types'
+import { features } from '../core/features'
 import { exposureText, meterProgress, meterShotMeta, meterShotsByOrder } from '../core/meter'
 import { RollGalleryButton } from '../ui/GallerySave'
 import { Canister, cameraName, Confirm, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollTitle, sortedDays, sortedLocations } from '../ui/common'
@@ -70,10 +71,10 @@ export function RollDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      <div className="segmented" role="tablist" aria-label="롤 내용" style={{ margin: '8px 0 4px' }}>
+      {features.meter && <div className="segmented" role="tablist" aria-label="롤 내용" style={{ margin: '8px 0 4px' }}>
         <button role="tab" aria-selected={view === 'log'} className={view === 'log' ? 'on' : ''} onClick={() => setTab('log')}>기록</button>
         <button role="tab" aria-selected={view === 'meter'} className={view === 'meter' ? 'on' : ''} onClick={() => setTab('meter')}>노출</button>
-      </div>
+      </div>}
 
       {view === 'meter' ? <MeterPanel roll={roll} format={rollCameraFormat(camera, roll)} /> : null}
 
