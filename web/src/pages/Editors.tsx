@@ -294,7 +294,7 @@ export function LabDropOff({ roll, onClose }: { roll: Roll; onClose: () => void 
   }
 
   return (
-    <Sheet title="현상 맡기기" onClose={close} right={<button className="btn ghost" onClick={save}><b>저장</b></button>}>
+    <Sheet page title="현상 맡기기" onClose={close} right={<button className="btn ghost" onClick={save}><b>저장</b></button>}>
       <div className="section">
         <h2>현상소</h2>
         <div className="group">
