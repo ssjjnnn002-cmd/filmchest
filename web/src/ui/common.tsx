@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Camera, Roll, RollStatus } from '../core/types'
 import { statusName } from '../core/types'
@@ -299,15 +300,17 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       onClick={(e) => { e.preventDefault(); e.stopPropagation() }} />
   ) : null
   if (page) {
-    return (
+    return createPortal(
       <div ref={rootRef} className="fullscreen sheet-root" role="dialog" aria-label={title}>
         {head}
         <div className="sheet-page">{children}</div>
         {guard}
-      </div>
+      </div>,
+      document.body,
     )
   }
-  return (
+  // 움직이는(transform) 카드 안에서 열려도 화면 기준으로 뜨게 body에 둔다
+  return createPortal(
     <div ref={rootRef} className="sheet-backdrop sheet-root"
       onPointerDown={(e) => { backdropDown.current = e.target === e.currentTarget }}
       onPointerUp={(e) => {
@@ -321,7 +324,8 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
         {children}
         {guard}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -329,7 +333,7 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
 export function Confirm({ message, action = '삭제', onConfirm, onCancel }: {
   message: string; action?: string; onConfirm: () => void; onCancel: () => void
 }) {
-  return (
+  return createPortal(
     <div className="alert-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}>
       <div className="alert" role="alertdialog" aria-label={message}>
         <p>{message}</p>
@@ -338,7 +342,8 @@ export function Confirm({ message, action = '삭제', onConfirm, onCancel }: {
           <button className="btn" style={{ color: 'var(--danger)' }} onClick={onConfirm}>{action}</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

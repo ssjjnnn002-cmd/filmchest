@@ -293,7 +293,7 @@ export function LabDropOff({ roll, onClose }: { roll: Roll; onClose: () => void 
   }
 
   return (
-    <Sheet page title="현상 맡기기" onClose={close} right={<SheetBtn label="저장" accent onPress={save} />}>
+    <Sheet page title="현상 맡기기" onClose={close} left={<SheetBtn label="취소" onPress={close} />} right={<SheetBtn label="저장" accent onPress={save} />}>
       <Section title="현상소">
         <Group>
           <LabField value={lab} onChange={setLab} />
