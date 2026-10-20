@@ -81,6 +81,7 @@ struct IncomingImportView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+        .tint(.primary)
     }
 
     private func loadSamples() async {

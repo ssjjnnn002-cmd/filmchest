@@ -12,18 +12,24 @@ struct ArchiveImportView: View {
     var sourceName: String?
     var stepTitle: String?
     var onFinished: (() -> Void)?
+    /// 다 넣은 뒤 그 롤을 보여 줄 때 (앱에서만)
+    var onSaved: ((RollItem) -> Void)?
+    /// 공유로 받은 사진 묶음 (사진 앱에서 여러 장 공유)
+    var presetFiles: [URL] = []
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Environment(Router.self) private var router
     @Query(sort: \CameraItem.sortOrder) private var cameras: [CameraItem]
 
-    init(presetFileURL: URL? = nil, sourceName: String? = nil, stepTitle: String? = nil, onFinished: (() -> Void)? = nil) {
+    init(presetFileURL: URL? = nil, presetFiles: [URL] = [], sourceName: String? = nil, stepTitle: String? = nil,
+         onFinished: (() -> Void)? = nil, onSaved: ((RollItem) -> Void)? = nil) {
         self.presetFileURL = presetFileURL
+        self.presetFiles = presetFiles
         self.sourceName = sourceName
         self.stepTitle = stepTitle
         self.onFinished = onFinished
-        _fileURLs = State(initialValue: presetFileURL.map { [$0] } ?? [])
+        self.onSaved = onSaved
+        _fileURLs = State(initialValue: presetFileURL.map { [$0] } ?? presetFiles)
     }
 
     // 사진
@@ -55,6 +61,8 @@ struct ArchiveImportView: View {
                 Section {
                     if presetFileURL != nil {
                         Label(sourceName ?? presetFileURL?.lastPathComponent ?? "zip", systemImage: "doc.zipper")
+                    } else if !presetFiles.isEmpty {
+                        Label("공유한 사진 \(presetFiles.count)장", systemImage: "photo.on.rectangle")
                     } else {
                         PhotosPicker(selection: $photoItems, selectionBehavior: .ordered, matching: .images,
                                      photoLibrary: .shared()) {
@@ -263,9 +271,11 @@ struct ArchiveImportView: View {
                 onFinished()
             } else {
                 dismiss()
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(350))
-                    router.showRoll(saved)
+                if let onSaved {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(350))
+                        onSaved(saved)
+                    }
                 }
             }
         } catch {

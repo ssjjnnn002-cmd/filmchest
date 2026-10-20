@@ -23,6 +23,9 @@ import { LoadFilm } from './screens/LoadFilm'
 import { ImportFlow } from './screens/ImportFlow'
 import { ArchiveImport } from './screens/ArchiveImport'
 import { IncomingImport } from './screens/IncomingImport'
+import { PhotoImportFlow } from './screens/PhotoSplit'
+import { useShareIntent } from 'expo-share-intent'
+import { isZipFile } from './core/zip'
 import { takeIncoming, onIncoming } from './incoming'
 import { Intro } from './Intro'
 import { WebToolsHost } from './webTools'
@@ -81,6 +84,21 @@ export function App() {
   const zipQueueRef = useRef<ZipJob[]>([])
   const [toastNode, toast] = useToast()
   const [incoming, setIncoming] = useState<PickedFile[] | null>(null)
+  const [incomingPhotos, setIncomingPhotos] = useState<PickedFile[] | null>(null)
+  // 다른 앱(사진·파일·카톡)의 '공유'로 받은 파일: zip이면 어디로 넣을지, 사진이면 롤마다 나누기
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent()
+  useEffect(() => {
+    if (!hasShareIntent) return
+    const files: PickedFile[] = (shareIntent.files ?? []).map((f) => ({
+      uri: /^[a-z]+:/.test(f.path) ? f.path : `file://${f.path}`, name: f.fileName || 'file', mimeType: f.mimeType,
+    }))
+    resetShareIntent()
+    const zips = files.filter((f) => isZipFile({ name: f.name, type: f.mimeType }))
+    const photos = files.filter((f) => !zips.includes(f) && ((f.mimeType ?? '').startsWith('image/') || /\.(jpe?g|png|heic|heif|tiff?)$/i.test(f.name)))
+    if (zips.length) setIncoming(zips)
+    else if (photos.length) setIncomingPhotos(photos)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasShareIntent])
   // 파일 앱 '다음으로 열기'로 받은 zip
   useEffect(() => {
     const first = takeIncoming()
@@ -233,6 +251,7 @@ export function App() {
           if (loadedRoll) { setTabState('shooting'); toast('필름을 장착했어요') }
         }} />
       )}
+      {incomingPhotos && <PhotoImportFlow photos={incomingPhotos} onClose={() => setIncomingPhotos(null)} />}
       {incoming && <IncomingImport files={incoming} onClose={() => setIncoming(null)} />}
       {importReq && <ImportFlow files={importReq.files} rollId={importReq.rollId} onClose={() => setImportReq(null)} />}
       {activeZip && (

@@ -31,7 +31,8 @@
             "application/zip",
             ".zip",
             "application/x-zip-compressed",
-            "application/octet-stream"
+            "application/octet-stream",
+            "image/*"
           ]
         }
       ]
@@ -43,6 +44,13 @@
       "accept": {
         "application/zip": [
           ".zip"
+        ],
+        "image/jpeg": [
+          ".jpg",
+          ".jpeg"
+        ],
+        "image/png": [
+          ".png"
         ]
       }
     }

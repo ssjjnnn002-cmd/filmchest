@@ -248,7 +248,7 @@ struct PendingView: View {
         }
         .navigationDestination(for: RollItem.self) { RollDetailView(roll: $0) }
         .sheet(item: $dropOff) { LabDropOffView(roll: $0) }
-        .sheet(isPresented: $showArchive) { ArchiveImportView() }
+        .sheet(isPresented: $showArchive) { ArchiveImportView(onSaved: { router.showRoll($0) }) }
         .sheet(item: $presented, onDismiss: openFollowUp) { job in
             ArchiveImportView(presetFileURL: ImportQueueStore.fileURL(job), sourceName: job.displayName, stepTitle: "\(job.index) / \(job.total)") {
                 handOff(job)

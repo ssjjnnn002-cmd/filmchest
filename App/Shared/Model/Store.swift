@@ -110,3 +110,47 @@ enum Store {
         }
     }
 }
+
+#if canImport(UIKit)
+import UIKit
+
+/// 무료 Apple ID 설치처럼 앱과 확장이 저장 공간을 나눌 수 없을 때: 같은 팀 앱끼리만 보이는
+/// 이름 붙은 붙여넣기 판으로 받은 파일을 한 장씩 넘긴다 (메모리에 한꺼번에 올리지 않게).
+enum Handoff {
+    private static let board = UIPasteboard.Name("kr.filmchest.handoff")
+    private static let nameType = "kr.filmchest.filename"
+    private static let dataType = "public.data"
+
+    static func put(_ files: [URL]) -> Bool {
+        guard let pb = UIPasteboard(name: board, create: true) else { return false }
+        pb.items = []
+        var count = 0
+        for file in files {
+            autoreleasepool {
+                guard let data = try? Data(contentsOf: file, options: .mappedIfSafe) else { return }
+                pb.addItems([[nameType: file.lastPathComponent, dataType: data]])
+                count += 1
+            }
+        }
+        return count > 0
+    }
+
+    static func take() -> [URL] {
+        guard let pb = UIPasteboard(name: board, create: false), pb.numberOfItems > 0 else { return [] }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        var out: [URL] = []
+        for i in 0..<pb.numberOfItems {
+            autoreleasepool {
+                let set = IndexSet(integer: i)
+                guard let data = pb.data(forPasteboardType: dataType, inItemSet: set)?.first else { return }
+                let name = (pb.values(forPasteboardType: nameType, inItemSet: set)?.first as? String) ?? "file-\(i)"
+                let dest = dir.appendingPathComponent(String(format: "%03d-", i) + name)
+                if (try? data.write(to: dest)) != nil { out.append(dest) }
+            }
+        }
+        pb.items = []
+        return out
+    }
+}
+#endif

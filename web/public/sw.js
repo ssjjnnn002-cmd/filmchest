@@ -11,7 +11,7 @@ self.addEventListener('fetch', (e) => {
     for (const k of await cache.keys()) await cache.delete(k)
     let i = 0
     for (const f of files) {
-      await cache.put(`./shared/${i++}`, new Response(f, { headers: { 'x-name': encodeURIComponent(f.name || 'scan.zip') } }))
+      await cache.put(`./shared/${i++}`, new Response(f, { headers: { 'x-name': encodeURIComponent(f.name || 'scan.zip'), 'content-type': f.type || 'application/octet-stream' } }))
     }
     return Response.redirect('./?shared=1', 303)
   })())

@@ -16,16 +16,18 @@ import { importScans, readFiles } from '../scan'
 import { useTheme } from '../theme'
 import { LabField, MemoInput, PlacePicker, rememberLab } from './Editors'
 
-export function ArchiveImport({ onClose, presetFile, stepLabel, onSaved }: {
+export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onSaved }: {
   onClose: () => void
   presetFile?: PickedFile
+  /** 공유로 받은 사진 묶음 (한 롤) */
+  presetFiles?: PickedFile[]
   stepLabel?: string
   onSaved?: () => void
 }) {
   const c = useTheme()
   const nav = useNav()
   const cameras = useLiveQuery(() => db.cameras.orderBy('sortOrder').filter((x) => !x.deletedAt).toArray(), []) ?? []
-  const [files, setFiles] = useState<PickedFile[]>(presetFile ? [presetFile] : [])
+  const [files, setFiles] = useState<PickedFile[]>(presetFile ? [presetFile] : presetFiles ?? [])
   const [cameraId, setCameraId] = useState('')
   const [filmId, setFilmId] = useState('')
   const [dateKnown, setDateKnown] = useState(false)
@@ -91,8 +93,8 @@ export function ArchiveImport({ onClose, presetFile, stepLabel, onSaved }: {
         <>
           <Section title="사진" foot={presetFile ? '사진을 보고 카메라와 필름을 채워 주세요. 폴더 이름에 필름이 있으면 미리 넣어 둬요. 닫아도 대기열에 남아요.' : '파일명 순서대로 컷 번호가 붙어요.'}>
             <Group>
-              {presetFile ? (
-                <Row static><RowText>{presetFile.name}</RowText></Row>
+              {presetFile || presetFiles?.length ? (
+                <Row static><RowText>{presetFile ? presetFile.name : `공유한 사진 ${presetFiles!.length}장`}</RowText></Row>
               ) : [
                 <Row key="files" onPress={async () => { const f = await pickFiles(['image/*', 'application/zip', 'application/x-zip-compressed', 'application/octet-stream']); if (f.length) setFiles(f) }}>
                   <RowText color={c.safelight}>사진 또는 zip 고르기</RowText>

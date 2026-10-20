@@ -13,6 +13,7 @@ import { LoadFilm } from './pages/LoadFilm'
 import { ImportFlow } from './pages/ImportFlow'
 import { ArchiveImport } from './pages/ArchiveImport'
 import { IncomingImport } from './pages/IncomingImport'
+import { PhotoImportFlow } from './pages/PhotoSplit'
 import { isZipFile } from './core/zip'
 import { uid } from './core/types'
 import { Intro } from './ui/Intro'
@@ -70,11 +71,17 @@ export function App() {
   const zipQueueRef = useRef<ZipJob[]>([])
   const [toastNode, toast] = useToast()
   const [incoming, setIncoming] = useState<File[] | null>(null)
+  const [incomingPhotos, setIncomingPhotos] = useState<File[] | null>(null)
 
   // 안드로이드 크롬 '공유'(share_target)·컴퓨터 크롬 '다음으로 열기'(file_handlers)로 받은 zip
   useEffect(() => {
     if ('serviceWorker' in navigator) void navigator.serviceWorker.register('./sw.js').catch(() => {})
-    const take = (files: File[]) => { const zips = files.filter(isZipFile); if (zips.length) setIncoming(zips) }
+    const take = (files: File[]) => {
+      const zips = files.filter(isZipFile)
+      const photos = files.filter((f) => !isZipFile(f) && (f.type.startsWith('image/') || /\.(jpe?g|png|heic|heif|tiff?)$/i.test(f.name)))
+      if (zips.length) setIncoming(zips)
+      else if (photos.length) setIncomingPhotos(photos)
+    }
     if (new URLSearchParams(location.search).has('shared')) {
       history.replaceState(null, '', location.pathname)
       void caches.open('filmchest-share').then(async (cache) => {
@@ -82,7 +89,7 @@ export function App() {
         const files = await Promise.all(keys.map(async (k) => {
           const r = await cache.match(k)
           const name = decodeURIComponent(r?.headers.get('x-name') ?? 'scan.zip')
-          return r ? new File([await r.blob()], name, { type: 'application/zip' }) : undefined
+          return r ? new File([await r.blob()], name, { type: r.headers.get('content-type') || (/\.zip$/i.test(name) ? 'application/zip' : '') }) : undefined
         }))
         await Promise.all(keys.map((k) => cache.delete(k)))
         take(files.filter((f): f is File => !!f))
@@ -270,6 +277,7 @@ export function App() {
           if (loadedRoll) { setTabState('shooting'); toast('필름을 장착했어요') }
         }} />
       )}
+      {incomingPhotos && <PhotoImportFlow photos={incomingPhotos} onClose={() => setIncomingPhotos(null)} />}
       {incoming && <IncomingImport files={incoming} onClose={() => setIncoming(null)} />}
       {importReq && <ImportFlow files={importReq.files} rollId={importReq.rollId} onClose={() => setImportReq(null)} />}
       {activeZip && (

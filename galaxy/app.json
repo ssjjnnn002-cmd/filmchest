@@ -55,6 +55,18 @@
           "savePhotosPermission": "스캔 사진을 갤러리에 저장해요.",
           "isAccessMediaLocationEnabled": false
         }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "disableIOS": true,
+          "androidIntentFilters": [
+            "*/*"
+          ],
+          "androidMultiIntentFilters": [
+            "*/*"
+          ]
+        }
       ]
     ]
   }

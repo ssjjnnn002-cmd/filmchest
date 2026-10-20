@@ -314,7 +314,7 @@
 				INFOPLIST_FILE = "App/Config/FilmScan-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "필름함";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
-				"INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace[sdk=iphone*]" = NO;
+				"INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace[sdk=iphone*]" = YES;
 				"INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace[sdk=macosx*]" = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "카메라 사진을 찍고, 노출계로 빛을 재요.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "촬영한 장소를 기록해 스캔 사진에 위치를 넣어요.";
@@ -364,7 +364,7 @@
 				INFOPLIST_FILE = "App/Config/FilmScan-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "필름함";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
-				"INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace[sdk=iphone*]" = NO;
+				"INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace[sdk=iphone*]" = YES;
 				"INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace[sdk=macosx*]" = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "카메라 사진을 찍고, 노출계로 빛을 재요.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "촬영한 장소를 기록해 스캔 사진에 위치를 넣어요.";

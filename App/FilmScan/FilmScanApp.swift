@@ -60,6 +60,8 @@ final class Router {
     var incoming: IncomingZips?
     /// 기존 롤 대기열에 새로 넣었음 (현상 스캔 화면이 다시 읽고 첫 파일을 연다)
     var queueAdded: UUID?
+    /// 사진 앱에서 공유받은 사진들: 롤마다 나눠 기존 롤 가져오기로
+    var incomingPhotos: IncomingZips?
     /// 위치를 찾는 중인 롤 (카드에 진행 표시)
     var locatingRollIDs: Set<UUID> = []
     var rollsPath = NavigationPath()
@@ -119,6 +121,17 @@ final class Router {
         }
         guard !copies.isEmpty else { return }
         incoming = IncomingZips(urls: copies)
+    }
+
+    /// 받은 파일을 zip과 사진으로 나눠 알맞은 창을 띄운다
+    func receiveFiles(_ urls: [URL]) {
+        #if os(iOS)
+        let urls = urls + Handoff.take()
+        #endif
+        let zips = urls.filter { $0.pathExtension.lowercased() == "zip" }
+        let photos = urls.filter { $0.pathExtension.lowercased() != "zip" }
+        if !zips.isEmpty { incoming = IncomingZips(urls: zips) }
+        else if !photos.isEmpty { incomingPhotos = IncomingZips(urls: photos) }
     }
 
     /// 여러 zip을 기존 롤 대기열에 넣고 현상 스캔으로 간다

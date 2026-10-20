@@ -10,13 +10,11 @@
 		<key>NSExtensionAttributes</key>
 		<dict>
 			<key>NSExtensionActivationRule</key>
-			<string>SUBQUERY (extensionItems, $item, SUBQUERY ($item.attachments, $att, ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.zip-archive" || ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "com.pkware.zip-archive").@count &gt;= 1).@count &gt;= 1</string>
-			<key>NSExtensionServiceRoleType</key>
-			<string>NSExtensionServiceRoleTypeViewer</string>
+			<string>SUBQUERY (extensionItems, $item, SUBQUERY ($item.attachments, $att, ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.zip-archive" || ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "com.pkware.zip-archive" || ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.image").@count &gt;= 1).@count &gt;= 1</string>
 		</dict>
-		<!-- 공유 시트 아래 '동작' 목록에 '필름함으로 가져오기'로 나온다 -->
+		<!-- 공유 시트 위쪽 앱 줄에 '필름함'으로 나온다 -->
 		<key>NSExtensionPointIdentifier</key>
-		<string>com.apple.ui-services</string>
+		<string>com.apple.share-services</string>
 		<key>NSExtensionPrincipalClass</key>
 		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
 	</dict>

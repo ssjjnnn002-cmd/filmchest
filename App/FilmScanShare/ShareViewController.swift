@@ -22,46 +22,30 @@ final class ShareViewController: UIViewController {
     }
 
     private func receive() async {
+        // zip이 있으면 zip만, 없으면 사진들 (사진 앱에서 여러 장 공유)
         let zips = await loadZips()
-        guard let received = zips.first else {
-            show(AnyView(
-                ContentUnavailableView("zip 파일을 찾지 못했어요", systemImage: "doc.zipper",
-                                       description: Text("현상소에서 받은 zip 파일을 공유해 주세요."))
-                    .overlay(alignment: .topTrailing) {
-                        Button("닫기") { self.finish() }.padding()
-                    }
-            ))
+        let files = zips.isEmpty ? await loadImages() : zips
+        guard !files.isEmpty else {
+            show(message("가져올 파일이 없어요", "doc.zipper", "현상소에서 받은 zip이나 스캔 사진을 공유해 주세요."))
             return
         }
-        // 앱과 같은 저장 공간을 쓸 수 있으면 앱으로 넘긴다
-        // 무료 Apple ID로 설치하면 앱과 저장 공간을 나눌 수 없다: 앱 줄의 '필름함'으로 안내
-        guard Store.groupDirectory != nil else {
-            show(AnyView(
-                ContentUnavailableView("필름함 앱으로 열어 주세요", systemImage: "square.and.arrow.up",
-                                       description: Text("공유 화면 위쪽 앱 목록에서 '필름함'을 누르면 앱에서 바로 이어서 가져와요."))
-                    .overlay(alignment: .topTrailing) {
-                        Button("닫기") { self.finish() }.padding()
-                    }
-            ))
+        // 앱으로 넘긴다: 같은 저장 공간이 있으면 대기함, 없으면(무료 Apple ID 설치) 붙여넣기 판으로
+        let handed = Store.groupDirectory != nil
+            ? files.allSatisfy { Store.putInInbox($0) != nil }
+            : Handoff.put(files)
+        guard handed else {
+            show(message("파일을 넘기지 못했어요", "exclamationmark.triangle", "다시 공유해 주세요."))
             return
         }
-        var zip = received
-        // 여러 개를 공유했으면 모두 대기함에 넣고 앱에서 어디로 넣을지 고른다
-        if zips.allSatisfy({ Store.putInInbox($0) != nil }) {
-            if openApp(URL(string: "filmchest://import")!) {
-                finish()
-                return
-            }
-            // 열지 못했으면 대기함에서 다시 꺼내 여기서 진행 (앱이 나중에 또 가져오지 않게)
-            guard let back = Store.takeAllFromInbox().first else { return finish() }
-            zip = back
-        }
-        show(AnyView(
-            ImportFlowView(zipURL: zip, preselectedRoll: nil) { [weak self] _ in self?.finish() }
-                .syncCustomFilms()
-                .modelContainer(container)
-                .tint(Theme.safelight)
-        ))
+        if openApp(URL(string: "filmchest://import")!) { return finish() }
+        show(message("필름함을 열어 주세요", "arrow.up.forward.app", "필름함 앱을 열면 받은 파일로 바로 이어서 가져와요."))
+    }
+
+    private func message(_ title: String, _ icon: String, _ detail: String) -> AnyView {
+        AnyView(
+            ContentUnavailableView(title, systemImage: icon, description: Text(detail))
+                .overlay(alignment: .topTrailing) { Button("닫기") { self.finish() }.padding() }
+        )
     }
 
     /// 확장에서 앱 열기: 응답 체인에서 UIApplication을 찾아 연다
@@ -118,6 +102,18 @@ final class ShareViewController: UIViewController {
                 }
             }
         }
+    }
+
+    /// 공유한 사진들 (순서대로)
+    private func loadImages() async -> [URL] {
+        let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? []).flatMap { $0.attachments ?? [] }
+        var out: [URL] = []
+        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+            let type = [UTType.jpeg.identifier, UTType.heic.identifier, UTType.png.identifier, UTType.tiff.identifier, UTType.image.identifier]
+                .first { provider.hasItemConformingToTypeIdentifier($0) } ?? UTType.image.identifier
+            if let url = await copy(from: provider, type: type) { out.append(url) }
+        }
+        return out
     }
 
     /// 확장자가 없어도 zip 시그니처(PK\x03\x04)로 확인

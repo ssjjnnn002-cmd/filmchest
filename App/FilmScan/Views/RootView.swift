@@ -59,6 +59,9 @@ struct RootView: View {
                 }
             }
         }
+        .sheet(item: $router.incomingPhotos) { incoming in
+            PhotoImportFlow(photos: incoming.urls) { router.incomingPhotos = nil }
+        }
         .fileImporter(isPresented: $router.showZipPicker, allowedContentTypes: [.zip], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result, !urls.isEmpty else { return }
             // 롤 화면에서 고른 경우는 그 롤로 바로, 아니면 어디로 넣을지 묻는다
@@ -77,15 +80,13 @@ struct RootView: View {
             if url.isFileURL {
                 router.receiveZips([url])
             } else if url.scheme == "filmchest" {
-                let zips = Store.takeAllFromInbox()
-                if !zips.isEmpty { router.incoming = .init(urls: zips) }
+                router.receiveFiles(Store.takeAllFromInbox())
             }
         }
         // 확장이 앱을 열지 못했을 때를 대비해, 앱이 앞으로 올 때 대기함을 확인한다
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active, router.importRequest == nil, router.incoming == nil {
-                let zips = Store.takeAllFromInbox()
-                if !zips.isEmpty { router.incoming = .init(urls: zips) }
+            if phase == .active, router.importRequest == nil, router.incoming == nil, router.incomingPhotos == nil {
+                router.receiveFiles(Store.takeAllFromInbox())
             }
         }
         .overlay {

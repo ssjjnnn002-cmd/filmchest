@@ -12,15 +12,17 @@ import { Progress, Sheet, toInputDate } from '../ui/common'
 import { PlacePicker } from './Editors'
 
 /** 예전에 찍어 스캔본을 받아 둔 롤을 롤 보관함에 넣는다. 모르는 정보는 '알 수 없음'. */
-export function ArchiveImport({ onClose, presetFile, stepLabel, onSaved }: {
+export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onSaved }: {
   onClose: () => void
   presetFile?: File
+  /** 공유로 받은 사진 묶음 (한 롤) */
+  presetFiles?: File[]
   stepLabel?: string
   onSaved?: () => void
 }) {
   const nav = useNav()
   const cameras = useLiveQuery(() => db.cameras.orderBy('sortOrder').filter((c) => !c.deletedAt).toArray(), []) ?? []
-  const [files, setFiles] = useState<File[]>(presetFile ? [presetFile] : [])
+  const [files, setFiles] = useState<File[]>(presetFile ? [presetFile] : presetFiles ?? [])
   const [cameraId, setCameraId] = useState('')
   const [filmId, setFilmId] = useState('')
   const [dateKnown, setDateKnown] = useState(false)
@@ -90,8 +92,8 @@ export function ArchiveImport({ onClose, presetFile, stepLabel, onSaved }: {
           <div className="section">
             <h2>사진</h2>
             <div className="group">
-              {presetFile ? (
-                <div className="row static"><span className="grow">{presetFile.name}</span></div>
+              {presetFile || presetFiles?.length ? (
+                <div className="row static"><span className="grow">{presetFile ? presetFile.name : `공유한 사진 ${presetFiles!.length}장`}</span></div>
               ) : (
                 <>
                   <label className="row" style={{ color: 'var(--safelight)' }}>
