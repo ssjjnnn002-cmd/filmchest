@@ -110,7 +110,9 @@ public enum FramePrintRenderer {
         let right = [caption.date, caption.photographer, caption.exposure].compactMap { $0 }
         let rows = max(left.count, right.count)
         let line = min(W, H) * 0.032
-        let footer = rows == 0 ? pad * 0.85 : pad * 0.42 + CGFloat(rows) * line + pad * 0.38
+        // 사진과 글자 사이는 항상 같은 여백 (사진이 가로·세로 어느 쪽으로 차든)
+        let gap = pad * 0.45
+        let footer = rows == 0 ? pad * 0.85 : pad * 0.6 + CGFloat(rows) * line + gap
         guard let ctx = Canvas.make(width: Int(W), height: Int(H)) else { return nil }
 
         let paper: CGColor = caption.dark ? .hex("#111111") : .hex("#F7F6F2")
@@ -126,9 +128,11 @@ public enum FramePrintRenderer {
             dh = box.height
             dw = dh * ia
         }
-        ctx.draw(image, in: CGRect(x: box.midX - dw / 2, y: box.midY - dh / 2, width: dw, height: dh))
+        let imageY = box.midY - dh / 2
+        ctx.draw(image, in: CGRect(x: box.midX - dw / 2, y: imageY, width: dw, height: dh))
 
-        let top = footer - pad * 0.28 - line * 0.15
+        // 첫 줄 글자 윗부분이 사진 아래에서 gap만큼 떨어지게 (글자 높이 ≈ 줄 높이의 0.8)
+        let top = imageY - gap - line * 0.8
         for (i, text) in left.enumerated() {
             let lead = i == 0 && text == caption.camera
             Canvas.text(ctx, text, at: CGPoint(x: pad, y: top - CGFloat(i) * line),

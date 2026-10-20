@@ -69,6 +69,28 @@ enum Store {
     }
 
     /// 앱: 가장 최근에 받은 파일을 임시 폴더로 꺼낸다 (나머지는 지운다)
+    /// 대기함의 zip을 모두 꺼낸다 (공유로 여러 개를 받은 경우)
+    static func takeAllFromInbox() -> [URL] {
+        var out: [URL] = []
+        while let url = takeOldestFromInbox() { out.append(url) }
+        return out
+    }
+
+    private static func takeOldestFromInbox() -> URL? {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(at: inboxDirectory, includingPropertiesForKeys: [.creationDateKey]),
+              let first = files.min(by: { ((try? $0.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast) < ((try? $1.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast) })
+        else { return nil }
+        defer { try? fm.removeItem(at: first) }
+        let name = first.lastPathComponent.split(separator: "-", maxSplits: 5).last.map(String.init) ?? "scan.zip"
+        let dest = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true).appendingPathComponent(name)
+        do {
+            try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try fm.copyItem(at: first, to: dest)
+            return dest
+        } catch { return nil }
+    }
+
     static func takeFromInbox() -> URL? {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(at: inboxDirectory, includingPropertiesForKeys: [.creationDateKey]),

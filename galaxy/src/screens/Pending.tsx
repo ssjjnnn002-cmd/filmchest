@@ -14,6 +14,7 @@ import { RollRow } from '../RollRow'
 import { useTheme } from '../theme'
 import { LabDropOff } from './Editors'
 import { ArchiveImport } from './ArchiveImport'
+import { isZipFile } from '../core/zip'
 
 const scanTypes = ['application/zip', 'application/x-zip-compressed', 'application/octet-stream', 'image/*']
 
@@ -57,7 +58,7 @@ export function Pending() {
       ) : null}
 
       <Group>
-        <Row onPress={async () => { const f = await pickFiles(scanTypes); if (f.length) nav.importScans(f) }}>
+        <Row onPress={async () => { const f = await pickFiles(scanTypes); if (!f.length) return; if (f.every((x) => isZipFile({ name: x.name, type: x.mimeType }))) nav.receiveZips(f); else nav.importScans(f) }}>
           <Icon name="zip" size={24} color={c.safelight} /><RowText color={c.safelight}>zip 파일 열기</RowText>
         </Row>
       </Group>

@@ -21,6 +21,8 @@ import { RollRow } from '../RollRow'
 import { RollGalleryButton } from '../GallerySave'
 import { useTheme } from '../theme'
 import { LabField, rememberLab } from './Editors'
+import { features } from '../core/features'
+import { ScanStrip } from './ScanStrip'
 
 type Phase = 'analyzing' | 'pick' | 'confirm' | 'saving' | 'done' | 'error'
 
@@ -158,7 +160,7 @@ function Confirmation({ roll, sets, setIndex, onSetIndex, scanner, onChangeRoll,
 }) {
   const c = useTheme()
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
-  const [offset, setOffset] = useState(roll.meterOffset ?? 0)
+  const [offset, setOffset] = useState(features.frameShift ? roll.meterOffset ?? 0 : 0)
   const count = sets[setIndex].files.length
   const unknownDate = roll.isArchive && roll.days.length === 0
   const timeline = buildTimeline(roll, count)
@@ -199,6 +201,9 @@ function Confirmation({ roll, sets, setIndex, onSetIndex, scanner, onChangeRoll,
             : ranges(timeline, (f) => fmtDay(f.date)).map((r) => line(r.label, r.frames, r.label + r.frames))}
         </Group>
       </Section>
+      <Section title={`사진 ${count}장`} foot="눌러서 크게 볼 수 있어요.">
+        <ScanStrip files={sets[setIndex].files} />
+      </Section>
       <ExposureMap roll={roll} count={count} offset={offset} onOffset={setOffset} />
       {roll.locations.length > 0 ? (
         <Section title="장소">
@@ -223,14 +228,14 @@ function ExposureMap({ roll, count, offset, onOffset }: { roll: Roll; count: num
   if (!recorded) return null
   const nudge = (d: number) => onOffset(Math.min(meterAlignLimit, Math.max(-meterAlignLimit, offset + d)))
   return (
-    <Section title="노출" foot={`${meterAlignText(offset)} 현상소 번호가 다르면 한 칸씩 옮기세요. 기록 없는 칸은 비워요.`}>
+    <Section title="노출" foot={features.frameShift ? `${meterAlignText(offset)} 현상소 번호가 다르면 한 칸씩 옮기세요. 기록 없는 칸은 비워요.` : '같은 번호의 사진에 붙어요. 기록 없는 칸은 비워요.'}>
       <Group>
-        <Row static>
+        {features.frameShift ? <Row static>
           <RowText>번호 맞추기</RowText>
           <Btn label="−" kind="soft" size="small" disabled={offset <= -meterAlignLimit} onPress={() => nudge(-1)} />
           <Text style={{ minWidth: 28, textAlign: 'center', fontVariant: ['tabular-nums'], fontSize: 17, color: c.ink }}>{offset > 0 ? `+${offset}` : offset}</Text>
           <Btn label="+" kind="soft" size="small" disabled={offset >= meterAlignLimit} onPress={() => nudge(1)} />
-        </Row>
+        </Row> : null}
         {matched.map((s) => (
           <Row key={s.pos} static value={exposureText(s)}>
             <RowText sub={`노출계 ${meterFrameTitle(s.pos, !!roll.meterPrewind)}`}>{s.pos + offset}번 사진</RowText>

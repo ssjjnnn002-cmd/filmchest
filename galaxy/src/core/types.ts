@@ -184,6 +184,8 @@ export interface Frame {
   h?: number
   bytes?: number
   name?: string
+  /** 사용자가 돌린 방향 (시계 방향 90°×n, 0…3). 밀착 인화지에는 쓰지 않는다 */
+  rotation?: number
 }
 
 /** 저장해 둔 원본(메타데이터 기록본) */

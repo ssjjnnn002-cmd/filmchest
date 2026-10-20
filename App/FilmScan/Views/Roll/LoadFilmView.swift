@@ -186,7 +186,7 @@ struct LoadFilmView: View {
                         Toggle("오늘 촬영일로 추가", isOn: $startToday)
                     } footer: {
                         VStack(alignment: .leading, spacing: 4) {
-                            if !Subscriptions.shared.isSubscribed {
+                            if Subscriptions.subscriptionEnabled, !Subscriptions.shared.isSubscribed {
                                 Text("무료 롤 \(RollQuota.used(in: context))/\(RollQuota.freeLimit)")
                             }
                             if startToday { Text("지금 시각과 현재 위치를 첫 촬영일로 기록해요.") }

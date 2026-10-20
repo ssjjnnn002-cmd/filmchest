@@ -57,6 +57,8 @@ const icons: Record<string, IconDef> = {
   photos: { d: 'M7 5.5h11a2 2 0 0 1 2 2v9 M4 8.5h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z M2.5 17.5l4-4 4 4 2.5-2.5 4 4' },
   battery: { d: 'M4.5 7.5h13a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z M21.5 10.5v3' },
   search: { d: 'M10.8 17.6a6.8 6.8 0 1 0 0-13.6 6.8 6.8 0 0 0 0 13.6z M15.8 15.8 20.4 20.4', width: 2.1 },
+  'rotate.left': { d: 'M4 8V3.8M4 8h4.2M4.6 8A8 8 0 1 1 4 12' },
+  'rotate.right': { d: 'M20 8V3.8M20 8h-4.2M19.4 8A8 8 0 1 0 20 12' },
 }
 
 export function Icon({ name, size = 20, color }: { name: string; size?: number; color: string }) {

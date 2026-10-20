@@ -1,5 +1,6 @@
 import Foundation
 import Photos
+import ImageIO
 import CoreLocation
 import FilmScanCore
 
@@ -133,6 +134,55 @@ enum PhotoLibrary {
         guard let data else { return nil }
         return await Task.detached { ImageThumbnail.make(data: data, maxPixel: maxPixel) }.value
     }
+
+    /// 사진 앱 사진을 원본에서 시계 방향 90°×turns로 돌려 둔다 (여러 장을 한 번에: 허락 창이 한 번만 뜬다).
+    /// 0이면 원본으로 되돌린다. 반영한 사진의 id 목록을 돌려준다.
+    static func setRotation(_ items: [(assetID: String, turns: Int)]) async -> [String] {
+        let ids = items.map(\.assetID)
+        let assets = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
+        var byID: [String: PHAsset] = [:]
+        assets.enumerateObjects { a, _, _ in byID[a.localIdentifier] = a }
+        var outputs: [(PHAsset, PHContentEditingOutput?)] = []
+        for item in items {
+            guard let asset = byID[item.assetID] else { continue }
+            let t = ((item.turns % 4) + 4) % 4
+            if t == 0 { outputs.append((asset, nil)); continue }
+            let options = PHContentEditingInputRequestOptions()
+            options.isNetworkAccessAllowed = true
+            // 우리 회전 기록이면 원본을 받아 다시 돌린다 (돌린 위에 또 돌리지 않게)
+            options.canHandleAdjustmentData = { $0.formatIdentifier == rotateFormat }
+            let input: PHContentEditingInput? = await withCheckedContinuation { c in
+                asset.requestContentEditingInput(with: options) { input, _ in c.resume(returning: input) }
+            }
+            guard let input, let url = input.fullSizeImageURL,
+                  let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+                  let image = CGImageSourceCreateImageAtIndex(src, 0, nil) else { continue }
+            let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] ?? [:]
+            let oriented = image.applyingOrientation(Int(input.fullSizeImageOrientation))
+            let output = PHContentEditingOutput(contentEditingInput: input)
+            output.adjustmentData = PHAdjustmentData(formatIdentifier: rotateFormat, formatVersion: "1", data: Data("\(t)".utf8))
+            guard let dest = CGImageDestinationCreateWithURL(output.renderedContentURL as CFURL, "public.jpeg" as CFString, 1, nil) else { continue }
+            var meta = props
+            meta[kCGImagePropertyOrientation] = 1
+            meta[kCGImageDestinationLossyCompressionQuality] = 0.95
+            CGImageDestinationAddImage(dest, oriented.rotated(quarterTurns: t), meta as CFDictionary)
+            guard CGImageDestinationFinalize(dest) else { continue }
+            outputs.append((asset, output))
+        }
+        guard !outputs.isEmpty else { return [] }
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                for (asset, output) in outputs {
+                    let req = PHAssetChangeRequest(for: asset)
+                    if let output { req.contentEditingOutput = output } else { req.revertAssetContentToOriginal() }
+                }
+            }
+            return outputs.map { $0.0.localIdentifier }
+        } catch {
+            return []
+        }
+    }
+    private static let rotateFormat = "kr.filmchest.rotate"
 
     /// 사진 앱의 하트(즐겨찾기)와 맞춘다
     static func setFavorite(assetID: String, _ value: Bool) async {

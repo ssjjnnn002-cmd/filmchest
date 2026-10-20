@@ -253,3 +253,18 @@ export function readFilmchestMark(data: Uint8Array): { rollId: string; frame: nu
     return undefined
   }
 }
+
+/** 사진 파일의 방향 정보만 바꿔 시계 방향 90°×turns로 보이게 한다 (다시 압축하지 않아 화질·촬영 정보가 그대로). JPEG만. */
+export function withRotation(data: Uint8Array, turns: number): Uint8Array {
+  const t = ((turns % 4) + 4) % 4
+  if (!t || !isJpeg(data)) return data
+  try {
+    const bin = bytesToBinary(data)
+    let ex: Record<string, Record<number, unknown>>
+    try { ex = piexif.load(bin) } catch { ex = { '0th': {}, Exif: {}, GPS: {}, Interop: {}, '1st': {} } }
+    ex['0th'] = { ...(ex['0th'] ?? {}), [piexif.ImageIFD.Orientation]: [1, 6, 3, 8][t] }
+    return binaryToBytes(piexif.insert(piexif.dump(ex), bin))
+  } catch {
+    return data
+  }
+}

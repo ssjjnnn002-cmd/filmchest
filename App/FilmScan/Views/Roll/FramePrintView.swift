@@ -165,7 +165,7 @@ struct FramePrintView: View {
     private func frameThumb(_ item: FrameItem) -> some View {
         Group {
             if let data = item.thumbnail, let ui = platformImage(data) {
-                ui.resizable().scaledToFill()
+                ui.resizable().scaledToFill().rotationEffect(.degrees(Double(item.turns) * 90))
             } else {
                 Color.black.opacity(0.08)
             }
@@ -177,10 +177,10 @@ struct FramePrintView: View {
         let caption = makeCaption(for: frame)
         var cg: CGImage?
         if let id = frame.assetIdentifier {
-            cg = await PhotoLibrary.image(assetID: id, maxPixel: 3200)
+            cg = await PhotoLibrary.image(assetID: id, maxPixel: 3200)?.rotated(quarterTurns: frame.turnsFromPhoto)
         }
         if cg == nil, let data = frame.thumbnail {
-            cg = await Task.detached { ImageThumbnail.make(data: data, maxPixel: 2400) }.value
+            cg = await Task.detached { ImageThumbnail.make(data: data, maxPixel: 2400) }.value?.rotated(quarterTurns: frame.turns)
         }
         guard let cg else { image = nil; return }
         let ratio = aspect.ratio

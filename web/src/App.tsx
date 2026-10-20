@@ -12,6 +12,8 @@ import { RollDetail } from './pages/RollDetail'
 import { LoadFilm } from './pages/LoadFilm'
 import { ImportFlow } from './pages/ImportFlow'
 import { ArchiveImport } from './pages/ArchiveImport'
+import { IncomingImport } from './pages/IncomingImport'
+import { isZipFile } from './core/zip'
 import { uid } from './core/types'
 import { Intro } from './ui/Intro'
 
@@ -32,6 +34,8 @@ interface Nav {
   pop: () => void
   loadFilm: (cameraId?: string) => void
   importScans: (files: File[], rollId?: string) => void
+  /** 바깥에서 받은 zip들: 어디로 넣을지 묻는 창을 띄운다 */
+  receiveZips: (files: File[]) => void
   toast: (m: string) => void
   zipQueue: ZipJob[]
   activeZipId: string | null
@@ -65,6 +69,28 @@ export function App() {
   const [activeZipId, setActiveZipId] = useState<string | null>(null)
   const zipQueueRef = useRef<ZipJob[]>([])
   const [toastNode, toast] = useToast()
+  const [incoming, setIncoming] = useState<File[] | null>(null)
+
+  // 안드로이드 크롬 '공유'(share_target)·컴퓨터 크롬 '다음으로 열기'(file_handlers)로 받은 zip
+  useEffect(() => {
+    if ('serviceWorker' in navigator) void navigator.serviceWorker.register('./sw.js').catch(() => {})
+    const take = (files: File[]) => { const zips = files.filter(isZipFile); if (zips.length) setIncoming(zips) }
+    if (new URLSearchParams(location.search).has('shared')) {
+      history.replaceState(null, '', location.pathname)
+      void caches.open('filmchest-share').then(async (cache) => {
+        const keys = await cache.keys()
+        const files = await Promise.all(keys.map(async (k) => {
+          const r = await cache.match(k)
+          const name = decodeURIComponent(r?.headers.get('x-name') ?? 'scan.zip')
+          return r ? new File([await r.blob()], name, { type: 'application/zip' }) : undefined
+        }))
+        await Promise.all(keys.map((k) => cache.delete(k)))
+        take(files.filter((f): f is File => !!f))
+      }).catch(() => {})
+    }
+    const lq = (window as unknown as { launchQueue?: { setConsumer: (fn: (p: { files: { getFile: () => Promise<File> }[] }) => void) => void } }).launchQueue
+    lq?.setConsumer(async (p) => take(await Promise.all(p.files.map((h) => h.getFile()))))
+  }, [])
   const [intro, setIntro] = useState(true)
 
   const setQueue = (next: ZipJob[], active: string | null) => {
@@ -124,6 +150,7 @@ export function App() {
     },
     loadFilm: (cameraId) => setLoadFilmFor({ cameraId }),
     importScans: (files, rollId) => setImportReq({ files, rollId }),
+    receiveZips: (files) => { if (files.length) setIncoming(files) },
     toast,
     zipQueue,
     activeZipId,
@@ -243,6 +270,7 @@ export function App() {
           if (loadedRoll) { setTabState('shooting'); toast('필름을 장착했어요') }
         }} />
       )}
+      {incoming && <IncomingImport files={incoming} onClose={() => setIncoming(null)} />}
       {importReq && <ImportFlow files={importReq.files} rollId={importReq.rollId} onClose={() => setImportReq(null)} />}
       {activeZip && (
         <ArchiveImport key={activeZip.id} presetFile={activeZip.file}

@@ -56,9 +56,18 @@ final class Router {
     var showZipPicker = false
     var zipTargetRoll: RollItem?
     var importRequest: ImportRequest?
+    /// 바깥(파일 앱·공유·zip 열기)에서 받은 zip들. 어디로 넣을지 고르는 창을 띄운다
+    var incoming: IncomingZips?
+    /// 기존 롤 대기열에 새로 넣었음 (현상 스캔 화면이 다시 읽고 첫 파일을 연다)
+    var queueAdded: UUID?
     /// 위치를 찾는 중인 롤 (카드에 진행 표시)
     var locatingRollIDs: Set<UUID> = []
     var rollsPath = NavigationPath()
+
+    struct IncomingZips: Identifiable {
+        let id = UUID()
+        let urls: [URL]
+    }
 
     struct ImportRequest: Identifiable {
         let id = UUID()
@@ -92,6 +101,31 @@ final class Router {
     func pickZip(for roll: RollItem? = nil) {
         zipTargetRoll = roll
         showZipPicker = true
+    }
+
+    /// 바깥에서 받은 zip들을 앱 임시 폴더로 복사하고, 어디로 넣을지 묻는다
+    func receiveZips(_ urls: [URL]) {
+        let copies = urls.compactMap { url -> URL? in
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+            let copy = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                .appendingPathComponent(url.lastPathComponent)
+            do {
+                try FileManager.default.createDirectory(at: copy.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try FileManager.default.copyItem(at: url, to: copy)
+                return copy
+            } catch { return nil }
+        }
+        guard !copies.isEmpty else { return }
+        incoming = IncomingZips(urls: copies)
+    }
+
+    /// 여러 zip을 기존 롤 대기열에 넣고 현상 스캔으로 간다
+    func enqueueArchive(_ urls: [URL]) {
+        guard !ImportQueueStore.add(urls).isEmpty else { return }
+        tab = .pending
+        queueAdded = UUID()
     }
 
     /// 파일 선택기/드래그로 받은 zip을 앱 임시 폴더로 복사해 가져오기를 시작한다

@@ -20,6 +20,7 @@ import { b64ToBytes, bytesToB64, readBytes, writeBytes } from '../files'
 import { saveFileNow } from '../platform'
 import { saveImagesToGallery } from '../gallery'
 import { webTool } from '../webTools'
+import { rotatedFile, rotatedForView } from '../scan'
 import { useTheme } from '../theme'
 
 /** 필름 롤을 펼친 모양. 가장자리 구멍은 바탕색으로 뚫는다. */
@@ -158,9 +159,20 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
   const live = useLiveQuery(() => (frame ? db.frames.get(frame.id) : undefined), [frame?.id])
   const roll = useLiveQuery(() => (frame ? db.rolls.get(frame.rollId) : undefined), [frame?.rollId])
   const step = (d: number) => setI((x) => Math.min(Math.max(x + d, 0), frames.length - 1))
+  const turns = ((live?.rotation ?? frame?.rotation ?? 0) % 4 + 4) % 4
+  const src = frame ? (original && !/\.tiff?$/i.test(frame.name ?? '') ? original.blob : frame.thumb) : undefined
+  const [rotatedUri, setRotatedUri] = useState<string>()
+  useEffect(() => {
+    setRotatedUri(undefined)
+    if (!src || !turns || !frame) return
+    let alive = true
+    void rotatedForView(src, turns, frame.id).then((u) => { if (alive) setRotatedUri(u) })
+    return () => { alive = false }
+  }, [src, turns, frame?.id])
+  const rotate = (d: number) => { if (frame) void db.frames.update(frame.id, { rotation: ((turns + d) % 4 + 4) % 4 }) }
   if (!frame) return null
   // 안드로이드가 그릴 수 없는 TIFF 원본은 썸네일로 본다
-  const viewable = original && !/\.tiff?$/i.test(frame.name ?? '') ? original.blob : frame.thumb
+  const viewable = turns ? rotatedUri : src
   const fav = live?.favorite ?? frame.favorite
   const shot = meterShotAt(roll?.meterShots, frame.index, roll?.meterOffset ?? 0)
   const isCover = (roll?.coverIndex ?? 1) === frame.index
@@ -177,18 +189,22 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
               <RoundBtn icon="download" label="이 사진 갤러리에 저장" onPress={async () => {
                 const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase()
                 const name = `${String(frame.index).padStart(2, '0')}.${ext}`
-                const r = await saveImagesToGallery([{ uri: original.blob, name }])
+                const r = await saveImagesToGallery([{ uri: await rotatedFile(original.blob, frame.rotation, frame.id), name }])
                 nav.toast(r.saved ? '갤러리에 저장했어요' : r.denied ? '사진 저장을 허용해 주세요' : '갤러리에 저장하지 못했어요')
               }} />
             ) : null}
           </View>
         </View>
         <View style={{ flex: 1 }}>
-          {viewable ? <ZoomView key={frame.id} uri={viewable} background="#000" onSwipe={step} /> : null}
+          {viewable ? <ZoomView key={`${frame.id}-${turns}`} uri={viewable} background="#000" onSwipe={step} /> : null}
           <View style={{ position: 'absolute', left: 8, top: '50%' }}><RoundBtn icon="left" label="이전" bg="rgba(0,0,0,0.4)" disabled={i === 0} onPress={() => step(-1)} /></View>
           <View style={{ position: 'absolute', right: 8, top: '50%' }}><RoundBtn icon="right" label="다음" bg="rgba(0,0,0,0.4)" disabled={i === frames.length - 1} onPress={() => step(1)} /></View>
         </View>
         <View style={{ alignItems: 'center', paddingTop: 10, paddingHorizontal: 16, paddingBottom: insets.bottom + 14 }}>
+          <View style={{ flexDirection: 'row', gap: 28, marginBottom: 6 }}>
+            <RoundBtn icon="rotate.left" label="왼쪽으로 돌리기" onPress={() => rotate(-1)} />
+            <RoundBtn icon="rotate.right" label="오른쪽으로 돌리기" onPress={() => rotate(1)} />
+          </View>
           {shot ? <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600', marginBottom: 2 }}>{exposureText(shot)}</Text> : null}
           <Text style={{ color: '#fff', fontSize: 13 }}>{[frame.takenAt ? fmtDayTime(frame.takenAt) : undefined, frame.locationName].filter(Boolean).join(' · ')}</Text>
           <Text style={{ color: '#fff', opacity: 0.6, fontSize: 13 }}>{[resolutionText(frame.w, frame.h), bytesText(frame.bytes)].filter(Boolean).join(' · ')}</Text>

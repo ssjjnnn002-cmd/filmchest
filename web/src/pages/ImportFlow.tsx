@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
@@ -14,6 +15,7 @@ import { Canister, cameraName, Progress, Sheet, bytesText, fmtDay, rollCameraFor
 import { RollRow } from '../ui/RollRow'
 import { RollGalleryButton } from '../ui/GallerySave'
 import { LabField, rememberLab } from './Editors'
+import { features } from '../core/features'
 
 type Phase = 'analyzing' | 'pick' | 'confirm' | 'saving' | 'done' | 'error'
 
@@ -151,7 +153,7 @@ function Confirmation({ roll, sets, setIndex, onSetIndex, scanner, onChangeRoll,
   onChangeRoll?: () => void; onSave: (meterOffset: number) => void
 }) {
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
-  const [offset, setOffset] = useState(roll.meterOffset ?? 0)
+  const [offset, setOffset] = useState(features.frameShift ? roll.meterOffset ?? 0 : 0)
   const count = sets[setIndex].files.length
   const unknownDate = roll.isArchive && roll.days.length === 0
   const timeline = buildTimeline(roll, count)
@@ -195,6 +197,11 @@ function Confirmation({ roll, sets, setIndex, onSetIndex, scanner, onChangeRoll,
             ))}
         </div>
       </div>
+      <div className="section">
+        <h2>사진 {count}장</h2>
+        <ScanStrip files={sets[setIndex].files} />
+        <p className="footnote">눌러서 크게 볼 수 있어요.</p>
+      </div>
       <ExposureMap roll={roll} count={count} offset={offset} onOffset={setOffset} />
       {roll.locations.length > 0 && (
         <div className="section">
@@ -224,12 +231,12 @@ function ExposureMap({ roll, count, offset, onOffset }: { roll: Roll; count: num
     <div className="section">
       <h2>노출</h2>
       <div className="group">
-        <div className="row static">
+        {features.frameShift && <div className="row static">
           <span className="grow">번호 맞추기</span>
           <button className="btn small" aria-label="한 칸 앞으로" disabled={offset <= -meterAlignLimit} onClick={() => nudge(-1)}>−</button>
           <span className="value" style={{ minWidth: 28, textAlign: 'center' }}>{offset > 0 ? `+${offset}` : offset}</span>
           <button className="btn small" aria-label="한 칸 뒤로" disabled={offset >= meterAlignLimit} onClick={() => nudge(1)}>+</button>
-        </div>
+        </div>}
         {matched.map((s) => (
           <div key={s.pos} className="row static">
             <span className="grow">
@@ -240,7 +247,7 @@ function ExposureMap({ roll, count, offset, onOffset }: { roll: Roll; count: num
           </div>
         ))}
       </div>
-      <p className="footnote">{meterAlignText(offset)} 현상소 번호가 다르면 한 칸씩 옮기세요. 기록 없는 칸은 비워요.</p>
+      <p className="footnote">{features.frameShift ? `${meterAlignText(offset)} 현상소 번호가 다르면 한 칸씩 옮기세요. 기록 없는 칸은 비워요.` : '같은 번호의 사진에 붙어요. 기록 없는 칸은 비워요.'}</p>
       {recorded > matched.length ? (
         <p className="footnote warn">기록 {recorded}장 중 {recorded - matched.length}장은 이 맞춤에서는 사진 밖에 있어요.</p>
       ) : null}
@@ -289,5 +296,43 @@ function QuickRoll({ onClose, onCreate }: { onClose: () => void; onCreate: (r: R
         <LabField id="q-lab" value={lab} onChange={setLab} />
       </div></div>
     </Sheet>
+  )
+}
+
+/** 가져올 사진 전체를 번호와 함께 훑어본다. 누르면 크게. */
+export function ScanStrip({ files }: { files: { name: string; data: Uint8Array; type: string }[] }) {
+  const urls = useMemo(() => files.map((f) => (/^(jpe?g|png|webp|heic|heif)$/.test(f.type) ? URL.createObjectURL(new Blob([f.data as BlobPart], { type: f.type === 'png' ? 'image/png' : 'image/jpeg' })) : '')), [files])
+  useEffect(() => () => urls.forEach((u) => u && URL.revokeObjectURL(u)), [urls])
+  const [open, setOpen] = useState<number | null>(null)
+  return (
+    <>
+      <div className="strip" style={{ padding: 6, gap: 6 }}>
+        {urls.map((u, i) => (
+          <button key={i} onClick={() => setOpen(i)} style={{ flex: '0 0 auto', border: 0, padding: 0, background: 'none', display: 'grid', gap: 3, justifyItems: 'center', color: 'var(--edge-ink)', fontSize: 11 }}>
+            {u ? <img src={u} alt="" loading="lazy" style={{ width: 96, height: 66, objectFit: 'cover', borderRadius: 6 }} />
+              : <span style={{ width: 96, height: 66, display: 'grid', placeItems: 'center', background: '#000', borderRadius: 6 }}>{files[i].type.toUpperCase()}</span>}
+            <span>{i + 1}</span>
+          </button>
+        ))}
+      </div>
+      {open !== null && createPortal(
+        <div className="fullscreen dark" role="dialog" aria-label="사진 미리보기" onClick={() => setOpen(null)}>
+          <div className="fs-bar">
+            <button className="btn ghost" onClick={() => setOpen(null)}>닫기</button>
+            <h2>{open + 1} / {urls.length}</h2>
+            <span />
+          </div>
+          <div style={{ display: 'grid', placeItems: 'center', minHeight: 0, position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+            {urls[open] ? <img src={urls[open]} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <span>미리 볼 수 없는 형식이에요</span>}
+            <button className="btn ghost icon-btn" aria-label="이전" disabled={open === 0} onClick={() => setOpen(open - 1)}
+              style={{ position: 'absolute', left: 8, top: '50%', color: '#fff', background: 'rgb(0 0 0 / 0.4)' }}>‹</button>
+            <button className="btn ghost icon-btn" aria-label="다음" disabled={open === urls.length - 1} onClick={() => setOpen(open + 1)}
+              style={{ position: 'absolute', right: 8, top: '50%', color: '#fff', background: 'rgb(0 0 0 / 0.4)' }}>›</button>
+          </div>
+          <div />
+        </div>,
+        document.body,
+      )}
+    </>
   )
 }

@@ -214,7 +214,7 @@ struct PendingView: View {
                 Button("zip 파일 열기", systemImage: "doc.zipper") { router.pickZip() }
             } footer: {
                 #if os(iOS)
-                Text("카톡이나 파일 앱에서 zip을 공유 → '필름함에 저장'을 눌러도 돼요.")
+                Text("파일 앱에서 zip을 공유 → '필름함'을 눌러도 돼요. 여러 개도 돼요.")
                 #else
                 Text("zip 파일을 창으로 끌어다 놓아도 돼요.")
                 #endif
@@ -274,6 +274,17 @@ struct PendingView: View {
         }
         .fileImporter(isPresented: $showMultiZip, allowedContentTypes: [.zip], allowsMultipleSelection: true) { result in
             if case .success(let urls) = result { enqueue(urls) }
+        }
+        // 파일 앱 등에서 받은 여러 롤을 대기열에 넣었을 때
+        .onChange(of: router.queueAdded) { _, added in
+            guard added != nil else { return }
+            let wasEmpty = presented == nil
+            queue = ImportQueueStore.load()
+            guard wasEmpty, let first = queue.first else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(600))
+                if presented == nil { presented = first }
+            }
         }
         .toolbar {
             ToolbarItem {

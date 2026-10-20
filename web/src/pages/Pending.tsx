@@ -7,6 +7,7 @@ import { Confirm, Icon, PageHeader, Sheet } from '../ui/common'
 import { RollRow } from '../ui/RollRow'
 import { LabDropOff } from './Editors'
 import { ArchiveImport } from './ArchiveImport'
+import { isZipFile } from '../core/zip'
 
 export function Pending() {
   const nav = useNav()
@@ -59,7 +60,7 @@ export function Pending() {
           <Icon name="zip" size={24} /> <span className="grow">zip 파일 열기</span>
         </button>
         <input ref={fileInput} type="file" accept=".zip,application/zip,image/*" multiple hidden
-          onChange={(e) => { const f = [...(e.target.files ?? [])]; if (f.length) nav.importScans(f); e.target.value = '' }} />
+          onChange={(e) => { const f = [...(e.target.files ?? [])]; e.target.value = ''; if (!f.length) return; if (f.every(isZipFile)) nav.receiveZips(f); else nav.importScans(f) }} />
       </div>
       <p className="footnote" style={{ marginTop: 8 }}>현상소에서 받은 zip을 고르세요. 사진 여러 장을 골라도 돼요.</p>
       {__SAMPLE_ZIP__ && (
@@ -145,7 +146,7 @@ function DropZone() {
   const [over, setOver] = useState(false)
   return (
     <div onDragOver={(e) => { e.preventDefault(); setOver(true) }} onDragLeave={() => setOver(false)}
-      onDrop={(e) => { e.preventDefault(); setOver(false); const f = [...e.dataTransfer.files]; if (f.length) nav.importScans(f) }}
+      onDrop={(e) => { e.preventDefault(); setOver(false); const f = [...e.dataTransfer.files]; if (!f.length) return; if (f.every(isZipFile)) nav.receiveZips(f); else nav.importScans(f) }}
       className="dropzone" style={{ borderColor: over ? 'var(--safelight)' : undefined, color: over ? 'var(--safelight)' : undefined }}>
       zip이나 사진을 여기에 놓으세요
     </div>

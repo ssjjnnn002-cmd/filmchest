@@ -54,6 +54,8 @@ struct FrameViewer: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             #endif
         }
+        // 돌린 사진은 닫을 때 사진 앱에도 한꺼번에 반영한다 (허락 창이 한 번만 뜨게)
+        .onDisappear { syncRotationsToPhotos() }
         .sheet(isPresented: $editShot) {
             if let frame = current { FrameShotEditView(roll: roll, pos: frame.index - roll.meterOffset) }
         }
@@ -108,6 +110,14 @@ struct FrameViewer: View {
                     .padding(.vertical, 6)
                     .background(.white.opacity(0.14), in: Capsule())
                     .padding(.top, 2)
+                HStack(spacing: 28) {
+                    Button { rotate(f, by: -1) } label: { Image(systemName: "rotate.left").font(.title3) }
+                        .accessibilityLabel("왼쪽으로 돌리기")
+                    Button { rotate(f, by: 1) } label: { Image(systemName: "rotate.right").font(.title3) }
+                        .accessibilityLabel("오른쪽으로 돌리기")
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, 4)
                 HStack(spacing: 10) {
                     if let t = f.takenAt { Text(Fmt.dayTime.string(from: t)) }
                     if let p = f.locationName, !p.isEmpty { Label(p, systemImage: "mappin") }
@@ -130,6 +140,20 @@ struct FrameViewer: View {
         index = min(max(index + d, 0), frames.count - 1)
     }
 
+    private func rotate(_ frame: FrameItem, by d: Int) {
+        frame.rotation = ((frame.turns + d) % 4 + 4) % 4
+    }
+
+    private func syncRotationsToPhotos() {
+        let changed = frames.filter { $0.assetIdentifier != nil && $0.turns != (($0.photoRotation ?? 0) % 4 + 4) % 4 }
+        guard !changed.isEmpty else { return }
+        let items = changed.map { (assetID: $0.assetIdentifier!, turns: $0.turns) }
+        Task { @MainActor in
+            let done = Set(await PhotoLibrary.setRotation(items))
+            for f in changed where done.contains(f.assetIdentifier!) { f.photoRotation = f.turns }
+        }
+    }
+
     private func toggleFavorite(_ frame: FrameItem) {
         frame.isFavorite.toggle()
         if let id = frame.assetIdentifier {
@@ -142,13 +166,15 @@ struct FrameViewer: View {
 /// 한 장: 먼저 미리보기, 이어서 사진 앱 원본을 크게 불러와 확대할 수 있게
 private struct FramePage: View {
     let frame: FrameItem
+    @State private var thumb: CGImage?
+    @State private var full: CGImage?
     @State private var image: CGImage?
     @State private var loadingFull = true
 
     var body: some View {
         ZStack {
             if let image {
-                ZoomableImage(image: image)
+                ZoomableImage(image: image).id(frame.turns)
             } else {
                 ProgressView().tint(.white)
             }
@@ -161,13 +187,22 @@ private struct FramePage: View {
         }
         .task {
             if let data = frame.thumbnail {
-                image = await Task.detached { ImageThumbnail.make(data: data, maxPixel: 1200) }.value
+                thumb = await Task.detached { ImageThumbnail.make(data: data, maxPixel: 1200) }.value
+                show()
             }
-            if let id = frame.assetIdentifier, let full = await PhotoLibrary.image(assetID: id, maxPixel: 3200) {
-                image = full
+            if let id = frame.assetIdentifier, let big = await PhotoLibrary.image(assetID: id, maxPixel: 3200) {
+                full = big
+                show()
             }
             loadingFull = false
         }
+        .onChange(of: frame.turns) { show() }
+    }
+
+    /// 돌린 방향을 바로 반영한다. 사진 앱 이미지는 이미 반영된 만큼 빼고 돌린다
+    private func show() {
+        if let full { image = full.rotated(quarterTurns: frame.turnsFromPhoto) }
+        else if let thumb { image = thumb.rotated(quarterTurns: frame.turns) }
     }
 }
 

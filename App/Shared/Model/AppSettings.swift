@@ -3,6 +3,8 @@ import SwiftUI
 /// 잠시 꺼 둔 기능. 노출계는 측광이 더 정확해지면 다시 켠다 (코드와 기록은 그대로 둔다).
 enum Features {
     static let meter = false
+    /// 스캔 가져올 때 노출계 기록을 앞뒤로 몇 칸 미루는 '번호 맞추기'
+    static let frameShift = false
 }
 
 /// 앱 설정. 공유 확장도 같은 값을 보도록 App Group 저장소를 쓴다.

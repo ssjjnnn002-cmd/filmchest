@@ -5,7 +5,9 @@ import type { Camera, Frame, Lens, Original, Roll } from './core/types'
 import { uid } from './core/types'
 import { buildTimeline } from './core/timeline'
 import { formatFamily, isScanImage, isZipFile, readZip, type ScanResult, type ScanSet } from './core/zip'
-import { readScanner, writeMeta } from './core/exif'
+import { readScanner, withRotation, writeMeta } from './core/exif'
+import { webTool } from './webTools'
+import { b64ToBytes, bytesToB64 } from './files'
 import { filmById } from './core/films'
 import { meterShotAt } from './core/meter'
 import { readBytes, removeFile, writeBytes } from './files'
@@ -125,7 +127,7 @@ export async function rollImageFiles(rollId: string): Promise<{ uri: string; nam
     const original = await db.originals.get(frame.id)
     if (!original) continue
     const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase().replace('jpeg', 'jpg')
-    out.push({ uri: original.blob, name: `${String(frame.index).padStart(2, '0')}.${ext}`.replace(/[/\\:]/g, '-') })
+    out.push({ uri: await rotatedFile(original.blob, frame.rotation, frame.id), name: `${String(frame.index).padStart(2, '0')}.${ext}`.replace(/[/\\:]/g, '-') })
   }
   return out
 }
@@ -135,4 +137,25 @@ export async function rollZip(roll: { id: string }): Promise<Uint8Array> {
   const zip = new JSZip()
   for (const f of await rollImageFiles(roll.id)) zip.file(f.name, await readBytes(f.uri))
   return zip.generateAsync({ type: 'uint8array', compression: 'STORE' })
+}
+
+/** 돌린 방향을 반영한 사진 파일 (JPEG는 방향 정보만 바꾼다. 원본 파일은 그대로) */
+export async function rotatedFile(uri: string, turns: number | undefined, id: string) {
+  const t = (((turns ?? 0) % 4) + 4) % 4
+  if (!t) return uri
+  const data = await readBytes(uri)
+  const out = withRotation(data, t)
+  return out === data ? uri : writeBytes('rotated', `${id}-${t}.jpg`, out)
+}
+
+/** 화면에 보일 돌린 사진 (픽셀을 돌린 미리보기, 한 번 만들면 다시 쓴다) */
+export async function rotatedForView(uri: string, turns: number, id: string) {
+  const name = `${id}-view-${turns}.jpg`
+  const { File } = await import('expo-file-system')
+  const { folder } = await import('./files')
+  const f = new File(folder('rotated'), name)
+  if (f.exists) return f.uri
+  const data = await readBytes(uri)
+  const out = await webTool<string>('rotate', { data: bytesToB64(data), type: 'image/jpeg', turns, max: 3200 })
+  return writeBytes('rotated', name, b64ToBytes(out))
 }

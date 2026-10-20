@@ -29,6 +29,7 @@ xcrun devicectl list devices --json-output "$JSON" >/dev/null 2>&1 || true
 DEVICE=$(node -e '
   const d = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).result?.devices ?? []
   const p = d.find((x) => x.hardwareProperties?.platform === "iOS" && x.hardwareProperties?.reality === "physical")
+    ?? d.find((x) => x.hardwareProperties?.platform === "iOS" && x.hardwareProperties?.reality !== "simulated" && !x.deviceProperties?.osBuildUpdate?.includes?.("sim"))
   if (p) console.log(p.hardwareProperties.udid + " " + (p.deviceProperties?.name ?? "iPhone"))
 ' "$JSON" 2>/dev/null)
 rm -f "$JSON"

@@ -100,7 +100,7 @@ struct ImportFlowView: View {
         if !rolls.isEmpty {
             Section(title) {
                 ForEach(rolls) { r in
-                    Button { roll = r; meterOffset = r.meterOffset } label: { RollRow(roll: r) }
+                    Button { roll = r; meterOffset = Features.frameShift ? r.meterOffset : 0 } label: { RollRow(roll: r) }
                         .buttonStyle(.plain)
                 }
             }
@@ -149,6 +149,14 @@ struct ImportFlowView: View {
                 }
                 if preselectedRoll == nil {
                     Button("다른 롤 선택") { self.roll = nil }.font(.footnote)
+                }
+            }
+
+            // 사진 앱에 저장하기 전에 zip 안의 사진을 모두 미리 본다
+            if !sets.isEmpty {
+                Section("사진 \(frames)장") {
+                    ScanFramesStrip(urls: sets[setIndex].frames.map(\.fileURL))
+                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                 }
             }
 
@@ -227,8 +235,10 @@ struct ImportFlowView: View {
         return Group {
             if recorded > 0 {
                 Section {
-                    Stepper(value: $meterOffset, in: -6...6) {
-                        Text("번호 맞추기").badge(meterOffset > 0 ? "+\(meterOffset)" : "\(meterOffset)")
+                    if Features.frameShift {
+                        Stepper(value: $meterOffset, in: -6...6) {
+                            Text("번호 맞추기").badge(meterOffset > 0 ? "+\(meterOffset)" : "\(meterOffset)")
+                        }
                     }
                     ForEach(matched, id: \.pos) { shot in
                         LabeledContent {
@@ -245,7 +255,7 @@ struct ImportFlowView: View {
                     Text("노출")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(alignText(meterOffset) + " 현상소 번호가 다르면 한 칸씩 옮기세요. 기록 없는 칸은 비워요.")
+                        Text(Features.frameShift ? alignText(meterOffset) + " 현상소 번호가 다르면 한 칸씩 옮기세요. 기록 없는 칸은 비워요." : "같은 번호의 사진에 붙어요. 기록 없는 칸은 비워요.")
                         if recorded > matched.count {
                             Text("기록 \(recorded)장 중 \(recorded - matched.count)장은 이 맞춤에서는 사진 밖에 있어요.")
                         }
@@ -278,7 +288,7 @@ struct ImportFlowView: View {
     private func analyze() async {
         if roll == nil {
             roll = preselectedRoll
-            if let preselectedRoll { meterOffset = preselectedRoll.meterOffset }
+            if let preselectedRoll, Features.frameShift { meterOffset = preselectedRoll.meterOffset }
         }
         do {
             let p = try await RollImporter.analyze(zipURL: zipURL)
@@ -450,5 +460,84 @@ struct QuickRollForm: View {
         roll.status = .atLab
         onCreate(roll)
         dismiss()
+    }
+}
+
+/// 가져올 사진 전체를 번호와 함께 가로로 훑어본다. 누르면 크게.
+struct ScanFramesStrip: View {
+    let urls: [URL]
+    @State private var thumbs: [URL: CGImage] = [:]
+    @State private var opened: Int?
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 6) {
+                ForEach(urls.indices, id: \.self) { i in
+                    let url = urls[i]
+                    Button { opened = i } label: {
+                        VStack(spacing: 3) {
+                            ZStack {
+                                Theme.filmBase
+                                if let img = thumbs[url] {
+                                    Image(decorative: img, scale: 1).resizable().scaledToFill()
+                                } else {
+                                    ProgressView().controlSize(.mini)
+                                }
+                            }
+                            .frame(width: 96, height: 66).clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            Text("\(i + 1)").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .task(id: url) {
+                        guard thumbs[url] == nil else { return }
+                        let img = await Task.detached { ImageThumbnail.make(url: url, maxPixel: 240) }.value
+                        thumbs[url] = img
+                    }
+                }
+            }
+        }
+        .frame(height: 88)
+        .sheet(item: Binding(get: { opened.map { OpenedFrame(index: $0) } }, set: { opened = $0?.index })) { item in
+            ScanFramePager(urls: urls, start: item.index)
+        }
+    }
+
+    private struct OpenedFrame: Identifiable { let index: Int; var id: Int { index } }
+}
+
+private struct ScanFramePager: View {
+    let urls: [URL]
+    @State var start: Int
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            TabView(selection: $start) {
+                ForEach(urls.indices, id: \.self) { i in
+                    ScanFrameLarge(url: urls[i]).tag(i)
+                }
+            }
+            #if os(iOS)
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .background(Color.black)
+            .navigationTitle("\(start + 1) / \(urls.count)")
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("닫기") { dismiss() } } }
+        }
+    }
+}
+
+private struct ScanFrameLarge: View {
+    let url: URL
+    @State private var image: CGImage?
+    var body: some View {
+        ZStack {
+            Color.black
+            if let image { Image(decorative: image, scale: 1).resizable().scaledToFit() } else { ProgressView().tint(.white) }
+        }
+        .task { image = await Task.detached { ImageThumbnail.make(url: url, maxPixel: 1600) }.value }
     }
 }

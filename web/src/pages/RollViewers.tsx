@@ -10,6 +10,7 @@ import { renderContactSheet } from '../core/contactSheet'
 import { ZoomView } from '../ui/Viewers'
 import { Icon, Sheet, bytesText, cameraName, dateRangeText, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollTitle, sortedLocations, useObjectURL } from '../ui/common'
 import { inClaudeHost, saveFile, saveFileNow, saveToGallery } from '../platform'
+import { rotatedBlob } from '../core/importer'
 
 /** 필름 롤을 펼친 모양 */
 export function FilmStrip({ roll, frames, onSelect }: { roll: Roll; frames: Frame[]; onSelect: (i: number) => void }) {
@@ -62,7 +63,17 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
   const frame = frames[i]
   const original = useLiveQuery(() => (frame ? db.originals.get(frame.id) : undefined), [frame?.id])
   const live = useLiveQuery(() => (frame ? db.frames.get(frame.id) : undefined), [frame?.id])
-  const url = useObjectURL(original?.blob ?? frame?.thumb)
+  const turns = ((live?.rotation ?? frame?.rotation ?? 0) % 4 + 4) % 4
+  const [shown, setShown] = useState<Blob>()
+  useEffect(() => {
+    const src = original?.blob ?? frame?.thumb
+    if (!src) { setShown(undefined); return }
+    let live = true
+    void rotatedBlob(src, turns).then((b) => { if (live) setShown(b) })
+    return () => { live = false }
+  }, [original?.blob, frame?.thumb, turns])
+  const url = useObjectURL(shown)
+  const rotate = (d: number) => { if (frame) void db.frames.update(frame.id, { rotation: ((turns + d) % 4 + 4) % 4 }) }
   const step = (d: number) => setI((x) => Math.min(Math.max(x + d, 0), frames.length - 1))
 
   useEffect(() => {
@@ -95,22 +106,30 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
               const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase()
               const name = `${String(frame.index).padStart(2, '0')}.${ext}`
               const type = original.blob.type.startsWith('image/') ? original.blob.type : 'image/jpeg'
-              const opened = saveToGallery([new File([original.blob], name, { type })], name)
+              const opened = saveToGallery([new File([shown ?? original.blob], name, { type })], name)
               if (opened.kind === 'share') nav.toast('공유 창에서 이미지 저장을 누르면 갤러리 최근 항목에 들어가요.')
               else if (opened.kind === 'file') nav.toast('갤러리에 바로 넣지 못해서 사진 파일로 저장했어요')
-              else void saveFile(name, original.blob).then((r) => nav.toast(r === 'saved' ? '사진 파일로 저장했어요' : '이 화면에서는 저장할 수 없어요'))
+              else void saveFile(name, shown ?? original.blob).then((r) => nav.toast(r === 'saved' ? '사진 파일로 저장했어요' : '이 화면에서는 저장할 수 없어요'))
             }}><Icon name="download" /></button>
           )}
         </div>
       </div>
       <div style={{ position: 'relative', minHeight: 0 }}>
-        {url && <ZoomView key={frame.id} src={url} background="#000" onSwipe={step} />}
+        {url && <ZoomView key={`${frame.id}-${turns}`} src={url} background="#000" onSwipe={step} />}
         <button className="btn ghost icon-btn" aria-label="이전" onClick={() => step(-1)} disabled={i === 0}
           style={{ position: 'absolute', left: 8, top: '50%', color: '#fff', background: 'rgb(0 0 0 / 0.4)' }}><Icon name="left" /></button>
         <button className="btn ghost icon-btn" aria-label="다음" onClick={() => step(1)} disabled={i === frames.length - 1}
           style={{ position: 'absolute', right: 8, top: '50%', color: '#fff', background: 'rgb(0 0 0 / 0.4)' }}><Icon name="right" /></button>
       </div>
       <div style={{ textAlign: 'center', padding: '10px 16px calc(14px + env(safe-area-inset-bottom, 0px))', fontSize: 13 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 28, marginBottom: 6 }}>
+          <button className="btn ghost icon-btn" aria-label="왼쪽으로 돌리기" style={{ color: '#fff' }} onClick={() => rotate(-1)}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 8V3.8M4 8h4.2M4.6 8A8 8 0 1 1 4 12" /></svg>
+          </button>
+          <button className="btn ghost icon-btn" aria-label="오른쪽으로 돌리기" style={{ color: '#fff' }} onClick={() => rotate(1)}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 8V3.8M20 8h-4.2M19.4 8A8 8 0 1 0 20 12" /></svg>
+          </button>
+        </div>
         {shot ? <div style={{ fontWeight: 600, marginBottom: 2 }}>{exposureText(shot)}</div> : null}
         <div>{[frame.takenAt ? fmtDayTime(frame.takenAt) : undefined, frame.locationName].filter(Boolean).join(' · ')}</div>
         <div style={{ opacity: 0.6 }}>{[resolutionText(frame.w, frame.h), bytesText(frame.bytes)].filter(Boolean).join(' · ')}</div>

@@ -49,8 +49,21 @@ struct RootView: View {
             .frame(minWidth: 520, minHeight: 620)
             #endif
         }
-        .fileImporter(isPresented: $router.showZipPicker, allowedContentTypes: [.zip]) { result in
-            if case .success(let url) = result { router.openZip(url, roll: router.zipTargetRoll) }
+        .sheet(item: $router.incoming) { incoming in
+            IncomingImportView(zips: incoming.urls) { saved in
+                router.incoming = nil
+                guard let saved else { return }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    router.showRoll(saved)
+                }
+            }
+        }
+        .fileImporter(isPresented: $router.showZipPicker, allowedContentTypes: [.zip], allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result, !urls.isEmpty else { return }
+            // 롤 화면에서 고른 경우는 그 롤로 바로, 아니면 어디로 넣을지 묻는다
+            if let roll = router.zipTargetRoll, let url = urls.first { router.openZip(url, roll: roll) }
+            else { router.receiveZips(urls) }
         }
         .task {
             Trash.purge(in: context)
@@ -62,15 +75,17 @@ struct RootView: View {
         // 가져오기 확장(filmchest://import) 또는 공유 시트의 '필름함' 앱으로 받은 파일
         .onOpenURL { url in
             if url.isFileURL {
-                router.openZip(url)
-            } else if url.scheme == "filmchest", let zip = Store.takeFromInbox() {
-                router.openZip(zip)
+                router.receiveZips([url])
+            } else if url.scheme == "filmchest" {
+                let zips = Store.takeAllFromInbox()
+                if !zips.isEmpty { router.incoming = .init(urls: zips) }
             }
         }
         // 확장이 앱을 열지 못했을 때를 대비해, 앱이 앞으로 올 때 대기함을 확인한다
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active, router.importRequest == nil, let zip = Store.takeFromInbox() {
-                router.openZip(zip)
+            if phase == .active, router.importRequest == nil, router.incoming == nil {
+                let zips = Store.takeAllFromInbox()
+                if !zips.isEmpty { router.incoming = .init(urls: zips) }
             }
         }
         .overlay {
@@ -81,8 +96,9 @@ struct RootView: View {
         }
         // Mac/iPad: zip을 창으로 끌어다 놓기
         .dropDestination(for: URL.self) { urls, _ in
-            guard let zip = urls.first(where: { $0.pathExtension.lowercased() == "zip" }) else { return false }
-            router.openZip(zip)
+            let zips = urls.filter { $0.pathExtension.lowercased() == "zip" }
+            guard !zips.isEmpty else { return false }
+            router.receiveZips(zips)
             return true
         }
     }

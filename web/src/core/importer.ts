@@ -5,7 +5,7 @@ import { uid } from './types'
 import { buildTimeline } from './timeline'
 import type { ScanSet } from './zip'
 import { formatFamily } from './zip'
-import { readScanner, writeMeta } from './exif'
+import { readScanner, withRotation, writeMeta } from './exif'
 import { filmById } from './films'
 import { meterShotAt } from './meter'
 
@@ -126,9 +126,16 @@ export async function rollImageFiles(rollId: string): Promise<File[]> {
     const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase().replace('jpeg', 'jpg')
     const type = original.blob.type.startsWith('image/') ? original.blob.type : ext === 'png' ? 'image/png' : 'image/jpeg'
     const name = `${String(frame.index).padStart(2, '0')}.${ext}`.replace(/[/\\:]/g, '-')
-    files.push(new File([original.blob], name, { type }))
+    files.push(new File([await rotatedBlob(original.blob, frame.rotation)], name, { type }))
   }
   return files
+}
+
+/** 돌린 방향을 반영한 사진 (JPEG는 방향 정보만 바꾼다) */
+export async function rotatedBlob(blob: Blob, turns?: number): Promise<Blob> {
+  if (!turns || turns % 4 === 0) return blob
+  const data = new Uint8Array(await blob.arrayBuffer())
+  return new Blob([withRotation(data, turns) as BlobPart], { type: blob.type || 'image/jpeg' })
 }
 
 /** 롤의 사진을 zip 하나로 (촬영 순서대로 01, 02 …) */
@@ -139,7 +146,7 @@ export async function rollZip(roll: { id: string }): Promise<Blob> {
     const o = await db.originals.get(f.id)
     if (!o) continue
     const ext = (f.name?.split('.').pop() ?? 'jpg').toLowerCase()
-    zip.file(`${String(f.index).padStart(2, '0')}.${ext}`, o.blob)
+    zip.file(`${String(f.index).padStart(2, '0')}.${ext}`, await rotatedBlob(o.blob, f.rotation))
   }
   return zip.generateAsync({ type: 'blob', compression: 'STORE' })
 }

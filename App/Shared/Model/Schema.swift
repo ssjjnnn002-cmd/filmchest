@@ -333,6 +333,10 @@ final class FrameItem {
     var pixelWidth: Int?
     var pixelHeight: Int?
     var byteSize: Int64?
+    /// 사용자가 돌린 방향 (시계 방향 90°×n, 0…3). 밀착 인화지에는 쓰지 않는다
+    var rotation: Int?
+    /// 사진 앱 사진에 이미 반영한 방향 (사진 앱에서 읽은 큰 이미지는 이만큼 돌아 있다)
+    var photoRotation: Int?
     var roll: RollItem?
 
     init(index: Int, assetIdentifier: String?, thumbnail: Data?, takenAt: Date?, locationName: String?) {
@@ -342,6 +346,12 @@ final class FrameItem {
         self.takenAt = takenAt
         self.locationName = locationName
     }
+}
+
+extension FrameItem {
+    var turns: Int { ((rotation ?? 0) % 4 + 4) % 4 }
+    /// 사진 앱에서 읽은 이미지를 화면 방향으로 맞추려면 더 돌릴 만큼
+    var turnsFromPhoto: Int { ((turns - (photoRotation ?? 0)) % 4 + 4) % 4 }
 }
 
 enum FilmCanisterLabel {

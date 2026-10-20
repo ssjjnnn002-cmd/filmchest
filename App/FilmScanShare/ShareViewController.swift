@@ -22,7 +22,8 @@ final class ShareViewController: UIViewController {
     }
 
     private func receive() async {
-        guard let received = await loadZip() else {
+        let zips = await loadZips()
+        guard let received = zips.first else {
             show(AnyView(
                 ContentUnavailableView("zip 파일을 찾지 못했어요", systemImage: "doc.zipper",
                                        description: Text("현상소에서 받은 zip 파일을 공유해 주세요."))
@@ -45,13 +46,14 @@ final class ShareViewController: UIViewController {
             return
         }
         var zip = received
-        if Store.putInInbox(zip) != nil {
+        // 여러 개를 공유했으면 모두 대기함에 넣고 앱에서 어디로 넣을지 고른다
+        if zips.allSatisfy({ Store.putInInbox($0) != nil }) {
             if openApp(URL(string: "filmchest://import")!) {
                 finish()
                 return
             }
             // 열지 못했으면 대기함에서 다시 꺼내 여기서 진행 (앱이 나중에 또 가져오지 않게)
-            guard let back = Store.takeFromInbox() else { return finish() }
+            guard let back = Store.takeAllFromInbox().first else { return finish() }
             zip = back
         }
         show(AnyView(
@@ -89,14 +91,15 @@ final class ShareViewController: UIViewController {
     }
 
     /// 첨부 중 zip을 찾아 확장 임시 폴더로 복사한다 (원본 URL은 콜백이 끝나면 사라진다)
-    private func loadZip() async -> URL? {
+    private func loadZips() async -> [URL] {
         let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? []).flatMap { $0.attachments ?? [] }
         let types = [UTType.zip.identifier, "com.pkware.zip-archive", UTType.fileURL.identifier, UTType.data.identifier]
+        var out: [URL] = []
         for provider in providers {
             guard let type = types.first(where: { provider.hasItemConformingToTypeIdentifier($0) }) else { continue }
-            if let url = await copy(from: provider, type: type), isZip(url) { return url }
+            if let url = await copy(from: provider, type: type), isZip(url) { out.append(url) }
         }
-        return nil
+        return out
     }
 
     private func copy(from provider: NSItemProvider, type: String) async -> URL? {

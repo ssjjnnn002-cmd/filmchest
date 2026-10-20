@@ -22,6 +22,8 @@ import { RollDetail } from './screens/RollDetail'
 import { LoadFilm } from './screens/LoadFilm'
 import { ImportFlow } from './screens/ImportFlow'
 import { ArchiveImport } from './screens/ArchiveImport'
+import { IncomingImport } from './screens/IncomingImport'
+import { takeIncoming, onIncoming } from './incoming'
 import { Intro } from './Intro'
 import { WebToolsHost } from './webTools'
 
@@ -42,6 +44,8 @@ interface Nav {
   pop: () => void
   loadFilm: (cameraId?: string) => void
   importScans: (files: PickedFile[], rollId?: string) => void
+  /** 바깥에서 받은 zip들: 어디로 넣을지 묻는 창을 띄운다 */
+  receiveZips: (files: PickedFile[]) => void
   toast: (m: string) => void
   zipQueue: ZipJob[]
   activeZipId: string | null
@@ -76,6 +80,13 @@ export function App() {
   const [activeZipId, setActiveZipId] = useState<string | null>(null)
   const zipQueueRef = useRef<ZipJob[]>([])
   const [toastNode, toast] = useToast()
+  const [incoming, setIncoming] = useState<PickedFile[] | null>(null)
+  // 파일 앱 '다음으로 열기'로 받은 zip
+  useEffect(() => {
+    const first = takeIncoming()
+    if (first.length) setIncoming(first)
+    return onIncoming((files) => setIncoming(files))
+  }, [])
   const [intro, setIntro] = useState(true)
 
   const setQueue = (next: ZipJob[], active: string | null) => {
@@ -132,6 +143,7 @@ export function App() {
     },
     loadFilm: (cameraId) => setLoadFilmFor({ cameraId }),
     importScans: (files, rollId) => setImportReq({ files, rollId }),
+    receiveZips: (files) => { if (files.length) setIncoming(files) },
     toast,
     zipQueue,
     activeZipId,
@@ -221,6 +233,7 @@ export function App() {
           if (loadedRoll) { setTabState('shooting'); toast('필름을 장착했어요') }
         }} />
       )}
+      {incoming && <IncomingImport files={incoming} onClose={() => setIncoming(null)} />}
       {importReq && <ImportFlow files={importReq.files} rollId={importReq.rollId} onClose={() => setImportReq(null)} />}
       {activeZip && (
         <ArchiveImport key={activeZip.id} presetFile={activeZip.file}
