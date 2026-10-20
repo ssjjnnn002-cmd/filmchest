@@ -16,6 +16,7 @@ import { RollGalleryButton } from '../GallerySave'
 import { useTheme } from '../theme'
 import { DayEdit, LabDropOff, LensChangeEdit, PlaceEdit } from './Editors'
 import { RollProjects } from './Projects'
+import { FramePrint } from './FramePrint'
 import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
 import { ScanButton } from './Pending'
 import { features } from '../core/features'
@@ -35,6 +36,7 @@ export function RollDetail({ id }: { id: string }) {
   const [dropOff, setDropOff] = useState(false)
   const [viewing, setViewing] = useState<number | null>(null)
   const [sheet, setSheet] = useState(false)
+  const [framePrint, setFramePrint] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const [tab, setTab] = useState<'log' | 'meter' | null>(null)
 
@@ -100,6 +102,7 @@ export function RollDetail({ id }: { id: string }) {
           <FilmStrip roll={roll} frames={frames} onSelect={setViewing} />
           <View style={{ gap: 10 }}>
             <Btn label="밀착 인화지로 보기" icon="sheet" kind="soft" onPress={() => setSheet(true)} />
+            <Btn label="프레임 만들기" icon="photos" kind="soft" onPress={() => setFramePrint(true)} />
             <RollGalleryButton rollId={roll.id} title={rollTitle(roll, camera)} onToast={nav.toast} block />
           </View>
         </Section>
@@ -189,6 +192,7 @@ export function RollDetail({ id }: { id: string }) {
       {place ? <PlaceEdit roll={roll} segment={place === 'new' ? undefined : place} onClose={() => setPlace(null)} /> : null}
       {dropOff ? <LabDropOff roll={roll} onClose={() => setDropOff(false)} /> : null}
       {viewing !== null ? <FrameViewer frames={frames} start={viewing} onClose={() => setViewing(null)} /> : null}
+      {framePrint ? <FramePrint roll={roll} frames={frames} onClose={() => setFramePrint(false)} /> : null}
       {sheet ? <ContactSheetView roll={roll} frames={frames} onClose={() => setSheet(false)} /> : null}
       {confirm ? (
         <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. 사진 앱에 저장한 사진은 그대로 남아요." onCancel={() => setConfirm(false)}

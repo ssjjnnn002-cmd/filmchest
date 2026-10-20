@@ -2,6 +2,7 @@
 import { prepareCameraPhoto } from '../../web/src/core/cutout'
 import { canisterURL } from '../../web/src/core/canister'
 import { renderContactSheet } from '../../web/src/core/contactSheet'
+import { renderFramePrint } from '../../web/src/core/framePrint'
 
 type RN = { ReactNativeWebView: { postMessage: (s: string) => void } }
 const post = (o: unknown) => (window as unknown as RN).ReactNativeWebView.postMessage(JSON.stringify(o))
@@ -39,6 +40,12 @@ const tools: Record<string, (a: any) => Promise<unknown>> = {
     const out = { data: await canvasToB64(c, 'image/jpeg', quality ?? 0.82), width: bmp.width, height: bmp.height }
     bmp.close()
     return out
+  },
+  /** 프레임 (웹 framePrint.ts 그대로) */
+  async framePrint({ data, type, caption, ratio }) {
+    const bmp = await createImageBitmap(b64ToBlob(data, type), { imageOrientation: 'from-image' })
+    const canvas = await renderFramePrint(bmp, caption, ratio, 2400)
+    return canvasToB64(canvas, 'image/jpeg', 0.92)
   },
   /** 화면에 보일 돌린 사진 (보기 전용, 갤러리 저장은 방향 정보만 바꾼다) */
   async rotate({ data, type, turns, max }) {

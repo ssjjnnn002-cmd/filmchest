@@ -9,6 +9,7 @@ import { RollGalleryButton } from '../ui/GallerySave'
 import { Canister, cameraName, Confirm, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollTitle, sortedDays, sortedLocations } from '../ui/common'
 import { DayEdit, LabDropOff, LensChangeEdit, PlaceEdit } from './Editors'
 import { RollProjects } from './Projects'
+import { FramePrint } from './FramePrint'
 import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
 import { ScanButton } from './Pending'
 
@@ -26,6 +27,7 @@ export function RollDetail({ id }: { id: string }) {
   const [dropOff, setDropOff] = useState(false)
   const [viewing, setViewing] = useState<number | null>(null)
   const [sheet, setSheet] = useState(false)
+  const [framePrint, setFramePrint] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const [tab, setTab] = useState<'log' | 'meter' | null>(null)
 
@@ -83,6 +85,7 @@ export function RollDetail({ id }: { id: string }) {
           <div className="bleed"><FilmStrip roll={roll} frames={frames} onSelect={setViewing} /></div>
           <div style={{ display: 'grid', gap: 10 }}>
             <button className="btn soft" onClick={() => setSheet(true)}><Icon name="sheet" size={18} /> 밀착 인화지로 보기</button>
+            <button className="btn soft" onClick={() => setFramePrint(true)}><Icon name="photos" size={18} /> 프레임 만들기</button>
             <RollGalleryButton rollId={roll.id} title={rollTitle(roll, camera)} onToast={nav.toast} className="btn primary block" />
           </div>
           <p className="footnote">공유 창에서 이미지 저장을 고르면 사진 앱 최근 항목에 들어가요.</p>
@@ -188,6 +191,7 @@ export function RollDetail({ id }: { id: string }) {
       {place && <PlaceEdit roll={roll} segment={place === 'new' ? undefined : place} onClose={() => setPlace(null)} />}
       {dropOff && <LabDropOff roll={roll} onClose={() => setDropOff(false)} />}
       {viewing !== null && <FrameViewer frames={frames} start={viewing} onClose={() => setViewing(null)} />}
+      {framePrint && <FramePrint roll={roll} frames={frames} onClose={() => setFramePrint(false)} />}
       {sheet && <ContactSheetView roll={roll} frames={frames} onClose={() => setSheet(false)} />}
       {confirm && (
         <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. 사진 앱에 저장한 사진은 그대로 남아요." onCancel={() => setConfirm(false)}
