@@ -10,7 +10,7 @@
 		<key>NSExtensionAttributes</key>
 		<dict>
 			<key>NSExtensionActivationRule</key>
-			<string>SUBQUERY (extensionItems, $item, SUBQUERY ($item.attachments, $att, ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.zip-archive" || ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "com.pkware.zip-archive" || ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.image").@count &gt;= 1).@count &gt;= 1</string>
+			<string>SUBQUERY (extensionItems, $item, SUBQUERY ($item.attachments, $att, ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.zip-archive" || ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "com.pkware.zip-archive" || ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.image" || ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.folder" || ANY $att.registeredTypeIdentifiers UTI-CONFORMS-TO "public.file-url").@count &gt;= 1).@count &gt;= 1</string>
 		</dict>
 		<!-- 공유 시트 위쪽 앱 줄에 '필름함'으로 나온다 -->
 		<key>NSExtensionPointIdentifier</key>

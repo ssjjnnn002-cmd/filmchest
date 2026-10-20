@@ -60,7 +60,9 @@ struct ImportOutcome: Sendable {
 
 enum RollImporter {
     static func analyze(zipURL: URL) async throws -> ScanPreview {
-        try await Task.detached(priority: .userInitiated) {
+        // 압축을 푼 폴더도 같은 길로
+        if ScanFolder.isFolder(zipURL) { return try await analyze(files: ScanFolder.images(in: zipURL)) }
+        return try await Task.detached(priority: .userInitiated) {
             let result = try ScanImporter.importZip(at: zipURL)
             return ScanPreview(result: result, scanner: detectScanner(result))
         }.value

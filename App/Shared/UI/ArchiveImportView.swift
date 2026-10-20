@@ -16,20 +16,28 @@ struct ArchiveImportView: View {
     var onSaved: ((RollItem) -> Void)?
     /// 공유로 받은 사진 묶음 (사진 앱에서 여러 장 공유)
     var presetFiles: [URL] = []
+    /// 사진 앱에서 공유한 사진 (찾아서 연결, 복사하지 않는다)
+    var presetAssetIDs: [String] = []
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \CameraItem.sortOrder) private var cameras: [CameraItem]
 
-    init(presetFileURL: URL? = nil, presetFiles: [URL] = [], sourceName: String? = nil, stepTitle: String? = nil,
+    init(presetFileURL: URL? = nil, presetFiles: [URL] = [], presetAssetIDs: [String] = [], sourceName: String? = nil, stepTitle: String? = nil,
          onFinished: (() -> Void)? = nil, onSaved: ((RollItem) -> Void)? = nil) {
         self.presetFileURL = presetFileURL
         self.presetFiles = presetFiles
+        self.presetAssetIDs = presetAssetIDs
         self.sourceName = sourceName
         self.stepTitle = stepTitle
         self.onFinished = onFinished
         self.onSaved = onSaved
-        _fileURLs = State(initialValue: presetFileURL.map { [$0] } ?? presetFiles)
+        // 압축을 푼 폴더면 안의 사진들로
+        if let folder = presetFileURL, ScanFolder.isFolder(folder) {
+            _fileURLs = State(initialValue: ScanFolder.images(in: folder))
+        } else {
+            _fileURLs = State(initialValue: presetFileURL.map { [$0] } ?? presetFiles)
+        }
     }
 
     // 사진
@@ -53,7 +61,7 @@ struct ArchiveImportView: View {
     @State private var progress = (done: 0, total: 0)
     @State private var errorMessage: String?
 
-    private var count: Int { photoItems.isEmpty ? fileURLs.count : photoItems.count }
+    private var count: Int { !presetAssetIDs.isEmpty ? presetAssetIDs.count : photoItems.isEmpty ? fileURLs.count : photoItems.count }
 
     var body: some View {
         NavigationStack {
@@ -61,8 +69,8 @@ struct ArchiveImportView: View {
                 Section {
                     if presetFileURL != nil {
                         Label(sourceName ?? presetFileURL?.lastPathComponent ?? "zip", systemImage: "doc.zipper")
-                    } else if !presetFiles.isEmpty {
-                        Label("공유한 사진 \(presetFiles.count)장", systemImage: "photo.on.rectangle")
+                    } else if !presetFiles.isEmpty || !presetAssetIDs.isEmpty {
+                        Label("공유한 사진 \(presetFiles.count + presetAssetIDs.count)장", systemImage: "photo.on.rectangle")
                     } else {
                         PhotosPicker(selection: $photoItems, selectionBehavior: .ordered, matching: .images,
                                      photoLibrary: .shared()) {
@@ -76,7 +84,9 @@ struct ArchiveImportView: View {
                 } header: {
                     Text("사진")
                 } footer: {
-                    Text(presetFileURL != nil
+                    Text(!presetAssetIDs.isEmpty || !presetFiles.isEmpty
+                         ? "사진을 보고 카메라와 필름을 채워 주세요. 고른 순서대로 컷 번호가 붙어요."
+                         : presetFileURL != nil
                          ? "사진을 보고 카메라와 필름을 채워 주세요. 폴더 이름에 필름이 있으면 미리 넣어 둬요. 닫아도 대기열에 남아요."
                          : (photoItems.isEmpty
                             ? "사진 파일, 폴더, zip 모두 돼요. 파일명 순서대로 컷 번호가 붙어요."
@@ -173,7 +183,7 @@ struct ArchiveImportView: View {
                     .background(Theme.filmBase)
                 }
             }
-            Text(photoItems.isEmpty ? "파일 \(fileURLs.count)개" : "사진 \(photoItems.count)장")
+            Text(!presetAssetIDs.isEmpty ? "사진 \(presetAssetIDs.count)장" : photoItems.isEmpty ? "파일 \(fileURLs.count)개" : "사진 \(photoItems.count)장")
                 .font(.subheadline).foregroundStyle(.secondary)
         }
     }
@@ -182,7 +192,13 @@ struct ArchiveImportView: View {
 
     private func loadThumbs() async {
         thumbs = []
-        if !photoItems.isEmpty {
+        if !presetAssetIDs.isEmpty {
+            var list: [CGImage] = []
+            for id in presetAssetIDs.prefix(10) {
+                if let img = await PhotoLibrary.image(assetID: id, maxPixel: 160) { list.append(img) }
+            }
+            thumbs = list
+        } else if !photoItems.isEmpty {
             var list: [CGImage] = []
             for item in photoItems.prefix(10) {
                 if let id = item.itemIdentifier, let img = await PhotoLibrary.image(assetID: id, maxPixel: 160) {
@@ -254,7 +270,10 @@ struct ArchiveImportView: View {
         do {
             let outcome: ImportOutcome
             let ids = photoItems.compactMap(\.itemIdentifier)
-            if !photoItems.isEmpty && ids.count == photoItems.count {
+            if !presetAssetIDs.isEmpty {
+                progress = (0, presetAssetIDs.count)
+                outcome = try await RollImporter.link(assetIDs: presetAssetIDs, snapshot: snapshot, progress: onProgress)
+            } else if !photoItems.isEmpty && ids.count == photoItems.count {
                 progress = (0, ids.count)
                 outcome = try await RollImporter.link(assetIDs: ids, snapshot: snapshot, progress: onProgress)
             } else {

@@ -31,11 +31,11 @@ enum ImportQueueStore {
         var jobs = load()
         var added: [Job] = []
         let start = jobs.count
-        for url in urls where url.pathExtension.lowercased() == "zip" {
+        for url in urls where url.pathExtension.lowercased() == "zip" || ScanFolder.isFolder(url) {
             let accessing = url.startAccessingSecurityScopedResource()
             defer { if accessing { url.stopAccessingSecurityScopedResource() } }
             let id = UUID()
-            let stored = "\(id.uuidString).zip"
+            let stored = ScanFolder.isFolder(url) ? id.uuidString : "\(id.uuidString).zip"
             let dest = folder.appendingPathComponent(stored)
             do {
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

@@ -60,9 +60,14 @@ struct RootView: View {
             }
         }
         .sheet(item: $router.incomingPhotos) { incoming in
-            PhotoImportFlow(photos: incoming.urls) { router.incomingPhotos = nil }
+            PhotoImportFlow(photos: incoming.photos, missing: incoming.missing) { router.incomingPhotos = nil }
         }
-        .fileImporter(isPresented: $router.showZipPicker, allowedContentTypes: [.zip], allowsMultipleSelection: true) { result in
+        .alert("사진을 찾지 못했어요", isPresented: $router.photoMissingAlert) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("사진 앱에서 같은 사진을 찾지 못했어요. 필름함 › 현상 스캔 › + › 기존 롤 가져오기 › 사진 앱에서 고르기로 가져와 주세요.")
+        }
+        .fileImporter(isPresented: $router.showZipPicker, allowedContentTypes: [.zip, .folder], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result, !urls.isEmpty else { return }
             // 롤 화면에서 고른 경우는 그 롤로 바로, 아니면 어디로 넣을지 묻는다
             if let roll = router.zipTargetRoll, let url = urls.first { router.openZip(url, roll: roll) }
@@ -79,6 +84,12 @@ struct RootView: View {
         .onOpenURL { url in
             if url.isFileURL {
                 router.receiveZips([url])
+            } else if url.scheme == "filmchest", url.host == "folders" {
+                router.receiveFolderLinks(url)
+            } else if url.scheme == "filmchest", url.host == "photos" {
+                let refs = SharedPhotoRef.decode(url)
+                let files = Store.takeAllFromInbox()
+                Task { await router.receiveSharedPhotos(refs, files: files) }
             } else if url.scheme == "filmchest" {
                 router.receiveFiles(Store.takeAllFromInbox())
             }

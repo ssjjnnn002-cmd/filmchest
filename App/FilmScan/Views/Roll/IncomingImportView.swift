@@ -87,6 +87,9 @@ struct IncomingImportView: View {
     private func loadSamples() async {
         for zip in zips where samples[zip] == nil {
             let images = await Task.detached { () -> [CGImage] in
+                if ScanFolder.isFolder(zip) {
+                    return ScanFolder.images(in: zip).prefix(6).compactMap { ImageThumbnail.make(url: $0, maxPixel: 200) }
+                }
                 guard let peek = try? ScanImporter.peek(zipURL: zip, maxFrames: 6) else { return [] }
                 return peek.samples.compactMap { ImageThumbnail.make(url: $0, maxPixel: 200) }
             }.value
@@ -102,7 +105,7 @@ struct ZipPreviewRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(name, systemImage: "doc.zipper").lineLimit(1)
+            Label(name, systemImage: name.lowercased().hasSuffix(".zip") ? "doc.zipper" : "folder").lineLimit(1)
             if let images {
                 if images.isEmpty {
                     Text("미리 볼 사진이 없어요").font(.caption).foregroundStyle(.secondary)

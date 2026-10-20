@@ -3,41 +3,54 @@ import FilmScanCore
 
 /// 사진 앱에서 여러 장을 공유받았을 때: 몇 롤인지 고르고, 사진을 롤마다 나눈 뒤
 /// 롤 하나씩 기존 롤 가져오기로 넘긴다.
+/// 나눌 사진 한 장: 사진 앱 사진(연결) 또는 파일
+struct SplitPhoto: Hashable, Identifiable {
+    var assetID: String?
+    var url: URL?
+    var id: String { assetID ?? url?.path ?? UUID().uuidString }
+}
+
 struct PhotoImportFlow: View {
-    let photos: [URL]
+    let photos: [SplitPhoto]
+    /// 사진 앱에서 찾지 못해 빠진 장 수
+    var missing = 0
     var onClose: () -> Void
     var onSaved: ((RollItem) -> Void)? = nil
 
-    @State private var sets: [[URL]]?
+    @State private var sets: [[SplitPhoto]]?
     @State private var step = 0
 
     var body: some View {
         if let sets, sets.indices.contains(step) {
-            ArchiveImportView(presetFiles: sets[step],
+            let set = sets[step]
+            ArchiveImportView(presetFiles: set.compactMap { $0.assetID == nil ? $0.url : nil },
+                              presetAssetIDs: set.compactMap(\.assetID),
                               stepTitle: sets.count > 1 ? "\(step + 1) / \(sets.count)" : nil,
                               onFinished: {
                                   if step + 1 < sets.count { step += 1 } else { onClose() }
                               })
             .id(step)
         } else {
-            PhotoSplitView(photos: photos, onCancel: onClose) { sets = $0; step = 0 }
+            PhotoSplitView(photos: photos, missing: missing, onCancel: onClose) { sets = $0; step = 0 }
         }
     }
 }
 
 /// 사진을 롤마다 나눈다. 롤 수를 정하고, 위에서 롤을 고른 뒤 사진을 누르면 그 롤로 옮긴다.
 struct PhotoSplitView: View {
-    let photos: [URL]
+    let photos: [SplitPhoto]
+    var missing = 0
     var onCancel: () -> Void
-    var onDone: ([[URL]]) -> Void
+    var onDone: ([[SplitPhoto]]) -> Void
 
     @State private var rollCount = 1
     @State private var assign: [Int]
     @State private var active = 0
-    @State private var thumbs: [URL: CGImage] = [:]
+    @State private var thumbs: [String: CGImage] = [:]
 
-    init(photos: [URL], onCancel: @escaping () -> Void, onDone: @escaping ([[URL]]) -> Void) {
+    init(photos: [SplitPhoto], missing: Int = 0, onCancel: @escaping () -> Void, onDone: @escaping ([[SplitPhoto]]) -> Void) {
         self.photos = photos
+        self.missing = missing
         self.onCancel = onCancel
         self.onDone = onDone
         _assign = State(initialValue: Array(repeating: 0, count: photos.count))
@@ -45,12 +58,16 @@ struct PhotoSplitView: View {
 
     private static let colors: [Color] = [Theme.safelight, .blue, .green, .purple, .orange, .teal, .pink, .brown, .indigo, .mint]
     private func color(_ i: Int) -> Color { Self.colors[i % Self.colors.count] }
-    private var sets: [[URL]] { (0..<rollCount).map { r in photos.indices.filter { assign[$0] == r }.map { photos[$0] } } }
+    private var sets: [[SplitPhoto]] { (0..<rollCount).map { r in photos.indices.filter { assign[$0] == r }.map { photos[$0] } } }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    if missing > 0 {
+                        Label("\(missing)장은 사진 앱에서 찾지 못해 빠졌어요", systemImage: "exclamationmark.triangle")
+                            .font(.footnote).foregroundStyle(.orange)
+                    }
                     Stepper(value: $rollCount, in: 1...max(1, min(photos.count, 20))) {
                         Text("롤 수 · \(rollCount)롤").font(.headline)
                     }
@@ -97,10 +114,13 @@ struct PhotoSplitView: View {
     }
 
     private func cell(_ i: Int) -> some View {
-        let url = photos[i]
+        let photo = photos[i]
         return ZStack(alignment: .topLeading) {
             Color.black.opacity(0.08)
-            if let img = thumbs[url] { Image(decorative: img, scale: 1).resizable().scaledToFill() }
+                .overlay {
+                    if let img = thumbs[photo.id] { Image(decorative: img, scale: 1).resizable().scaledToFill() }
+                }
+                .clipped()
             if rollCount > 1 {
                 Text("\(assign[i] + 1)")
                     .font(.caption.weight(.bold)).foregroundStyle(.white)
@@ -114,9 +134,13 @@ struct PhotoSplitView: View {
         .contentShape(Rectangle())
         .onTapGesture { if rollCount > 1 { assign[i] = active } }
         .onLongPressGesture { if rollCount > 1 { for k in i..<photos.count { assign[k] = active } } }
-        .task(id: url) {
-            guard thumbs[url] == nil else { return }
-            thumbs[url] = await Task.detached { ImageThumbnail.make(url: url, maxPixel: 240) }.value
+        .task(id: photo.id) {
+            guard thumbs[photo.id] == nil else { return }
+            if let id = photo.assetID {
+                thumbs[photo.id] = await PhotoLibrary.image(assetID: id, maxPixel: 240)
+            } else if let url = photo.url {
+                thumbs[photo.id] = await Task.detached { ImageThumbnail.make(url: url, maxPixel: 240) }.value
+            }
         }
     }
 

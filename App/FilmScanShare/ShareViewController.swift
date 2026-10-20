@@ -22,23 +22,43 @@ final class ShareViewController: UIViewController {
     }
 
     private func receive() async {
-        // zip이 있으면 zip만, 없으면 사진들 (사진 앱에서 여러 장 공유)
+        // zip·풀린 폴더가 있으면 그것만, 없으면 사진들 (사진 앱에서 여러 장 공유)
+        // 파일 앱의 zip·폴더는 원래 위치를 앱에 알려 앱이 직접 연다 (무료 설치도 된다)
+        if let link = await fileLink(), openApp(link) { return finish() }
         let zips = await loadZips()
-        let files = zips.isEmpty ? await loadImages() : zips
-        guard !files.isEmpty else {
-            show(message("가져올 파일이 없어요", "doc.zipper", "현상소에서 받은 zip이나 스캔 사진을 공유해 주세요."))
+        let folders = zips.isEmpty ? await loadFolders() : []
+        if zips.isEmpty && folders.isEmpty {
+            await receivePhotos()
             return
         }
-        // 앱으로 넘긴다: 같은 저장 공간이 있으면 대기함, 없으면(무료 Apple ID 설치) 붙여넣기 판으로
-        let handed = Store.groupDirectory != nil
-            ? files.allSatisfy { Store.putInInbox($0) != nil }
-            : Handoff.put(files)
-        guard handed else {
+        // zip·폴더는 앱과 같은 저장 공간으로 넘긴다. 무료 Apple ID 설치는 나눌 공간이 없어서 다른 길로 안내
+        guard Store.groupDirectory != nil else {
+            show(message("필름함에서 열어 주세요", "arrow.up.forward.app",
+                         zips.isEmpty
+                         ? "이 설치 방식에서는 공유로 폴더를 넘길 수 없어요. 필름함 › 현상 스캔 › zip 파일 열기에서 폴더를 골라 주세요."
+                         : "이 설치 방식에서는 공유로 zip을 넘길 수 없어요. 파일 앱에서 zip을 길게 누르고 다음으로 열기 › 필름함을 눌러 주세요."))
+            return
+        }
+        guard (zips + folders).allSatisfy({ Store.putInInbox($0) != nil }) else {
             show(message("파일을 넘기지 못했어요", "exclamationmark.triangle", "다시 공유해 주세요."))
             return
         }
         if openApp(URL(string: "filmchest://import")!) { return finish() }
         show(message("필름함을 열어 주세요", "arrow.up.forward.app", "필름함 앱을 열면 받은 파일로 바로 이어서 가져와요."))
+    }
+
+    /// 사진 앱 사진: 파일 대신 이름·시각·크기만 앱에 알려 사진 앱에서 찾아 연결한다 (복사하지 않는다)
+    private func receivePhotos() async {
+        let photos = await loadImages()
+        guard !photos.isEmpty else {
+            show(message("가져올 파일이 없어요", "doc.zipper", "현상소에서 받은 zip, 풀린 폴더, 스캔 사진을 공유해 주세요."))
+            return
+        }
+        let refs = photos.map { SharedPhotoRef(file: $0.url, name: $0.name) }
+        // 같은 저장 공간이 있으면 사진 앱에서 못 찾을 때를 대비해 파일도 넘겨 둔다
+        if Store.groupDirectory != nil { for p in photos { Store.putInInbox(p.url) } }
+        if let url = SharedPhotoRef.url(refs), openApp(url) { return finish() }
+        show(message("필름함을 열어 주세요", "arrow.up.forward.app", "앱을 열지 못했어요. 필름함 › 현상 스캔 › + › 기존 롤 가져오기 › 사진 앱에서 고르기로 가져올 수 있어요."))
     }
 
     private func message(_ title: String, _ icon: String, _ detail: String) -> AnyView {
@@ -91,7 +111,10 @@ final class ShareViewController: UIViewController {
             _ = provider.loadFileRepresentation(forTypeIdentifier: type) { url, _ in
                 guard let url else { continuation.resume(returning: nil); return }
                 let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-                let name = url.pathExtension.isEmpty ? url.lastPathComponent + ".zip" : url.lastPathComponent
+                var isDir: ObjCBool = false
+                FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
+                let name = url.pathExtension.isEmpty && !isDir.boolValue && type != UTType.folder.identifier && type != UTType.directory.identifier
+                    ? url.lastPathComponent + ".zip" : url.lastPathComponent
                 let dest = dir.appendingPathComponent(name)
                 do {
                     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -104,14 +127,66 @@ final class ShareViewController: UIViewController {
         }
     }
 
-    /// 공유한 사진들 (순서대로)
-    private func loadImages() async -> [URL] {
+    /// 공유한 사진들 (순서대로) — 원래 이름과 함께
+    private func loadImages() async -> [(url: URL, name: String)] {
         let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? []).flatMap { $0.attachments ?? [] }
-        var out: [URL] = []
+        var out: [(url: URL, name: String)] = []
         for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
             let type = [UTType.jpeg.identifier, UTType.heic.identifier, UTType.png.identifier, UTType.tiff.identifier, UTType.image.identifier]
                 .first { provider.hasItemConformingToTypeIdentifier($0) } ?? UTType.image.identifier
-            if let url = await copy(from: provider, type: type) { out.append(url) }
+            if let url = await copy(from: provider, type: type) {
+                let suggested = provider.suggestedName.map { name -> String in
+                    (name as NSString).pathExtension.isEmpty ? name + "." + url.pathExtension : name
+                }
+                out.append((url, suggested ?? url.lastPathComponent))
+            }
+        }
+        return out
+    }
+
+    /// zip·폴더의 원래 위치를 앱이 직접 열 수 있게 북마크로 넘긴다 (무료 설치도 된다)
+    private func fileLink() async -> URL? {
+        let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? []).flatMap { $0.attachments ?? [] }
+        var marks: [String] = []
+        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            let item: URL? = await withCheckedContinuation { c in
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { value, _ in
+                    c.resume(returning: (value as? URL) ?? (value as? Data).flatMap { URL(dataRepresentation: $0, relativeTo: nil) })
+                }
+            }
+            guard let src = item else { continue }
+            let ok = src.startAccessingSecurityScopedResource()
+            defer { if ok { src.stopAccessingSecurityScopedResource() } }
+            guard ScanFolder.isFolder(src) || src.pathExtension.lowercased() == "zip",
+                  let data = try? src.bookmarkData() else { continue }
+            marks.append(data.base64EncodedString())
+        }
+        guard !marks.isEmpty, let json = try? JSONEncoder().encode(marks) else { return nil }
+        let b64 = json.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+        return URL(string: "filmchest://folders?d=\(b64)")
+    }
+
+    /// 파일 앱에서 공유한 (압축을 푼) 폴더. 파일 앱은 폴더를 파일 주소(public.file-url)로만 넘긴다.
+    private func loadFolders() async -> [URL] {
+        let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? []).flatMap { $0.attachments ?? [] }
+        var out: [URL] = []
+        for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            let item: URL? = await withCheckedContinuation { c in
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { value, _ in
+                    c.resume(returning: (value as? URL) ?? (value as? Data).flatMap { URL(dataRepresentation: $0, relativeTo: nil) })
+                }
+            }
+            guard let src = item else { continue }
+            let ok = src.startAccessingSecurityScopedResource()
+            defer { if ok { src.stopAccessingSecurityScopedResource() } }
+            guard ScanFolder.isFolder(src) else { continue }
+            let dest = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+                .appendingPathComponent(src.lastPathComponent, isDirectory: true)
+            do {
+                try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try FileManager.default.copyItem(at: src, to: dest)
+                out.append(dest)
+            } catch { continue }
         }
         return out
     }
