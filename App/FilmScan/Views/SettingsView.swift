@@ -23,12 +23,6 @@ struct SettingsView: View {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.0"
     }
 
-    private var trashed: [RollItem] {
-        rolls.filter { $0.deletedAt != nil }.sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
-    }
-    private var trashedCameras: [CameraItem] {
-        cameras.filter { $0.deletedAt != nil }.sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
-    }
 
     var body: some View {
         NavigationStack {
@@ -79,52 +73,6 @@ struct SettingsView: View {
                     }
                 }
 
-                Section {
-                    if trashed.isEmpty {
-                        Text("최근 24시간 안에 지운 롤이 없어요").foregroundStyle(.secondary)
-                    }
-                    ForEach(trashed) { roll in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(roll.filmName)
-                                Text(roll.cameraName).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            // 목록 한 줄에 버튼이 둘이면 한 번 눌러도 둘 다 눌린다 → 각각 따로 눌리게
-                            Button("되돌리기") { roll.deletedAt = nil }
-                                .buttonStyle(.borderless)
-                            Button("지금 지우기", role: .destructive) { context.delete(roll) }
-                                .buttonStyle(.borderless)
-                        }
-                    }
-                } header: {
-                    Text("삭제한 롤")
-                } footer: {
-                    Text("지운 롤은 24시간 동안 여기 남아요. 그 뒤에는 기록만 지워지고, 사진 앱의 사진은 그대로예요.")
-                }
-
-                Section {
-                    if trashedCameras.isEmpty {
-                        Text("최근 24시간 안에 지운 카메라가 없어요").foregroundStyle(.secondary)
-                    }
-                    ForEach(trashedCameras) { camera in
-                        HStack {
-                            Text(camera.displayName)
-                            Spacer()
-                            Button("되돌리기") { camera.deletedAt = nil }
-                                .buttonStyle(.borderless)
-                            Button("지금 지우기", role: .destructive) {
-                                for roll in camera.rolls ?? [] { roll.rememberCamera() }
-                                context.delete(camera)
-                            }
-                            .buttonStyle(.borderless)
-                        }
-                    }
-                } header: {
-                    Text("삭제한 장비")
-                } footer: {
-                    Text("지운 카메라는 24시간 동안 여기 남아요. 필름에 적힌 카메라 정보는 카메라를 지워도 그대로예요.")
-                }
 
                 Section {
                     NavigationLink {

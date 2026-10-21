@@ -21,10 +21,59 @@ struct CloudBackupView: View {
         ("다른 위치", "folder", "파일 앱에 보이는 어느 폴더든 고를 수 있어요."),
     ]
 
+    private func driveRun(_ ok: String?, _ work: @escaping () async throws -> Void) {
+        Task {
+            do {
+                try await work()
+                if let ok { message = (ok, true) }
+            } catch {
+                message = (error.localizedDescription, false)
+            }
+            revision += 1
+        }
+    }
+
     var body: some View {
         let _ = revision
         let connected = AutoBackup.folderName != nil
         Form {
+            Section {
+                if GoogleAuth.isConnected {
+                    LabeledContent("연결됨", value: GoogleAuth.account ?? "구글 드라이브")
+                    if let last = DriveSync.lastSync {
+                        LabeledContent("마지막으로 맞춤", value: last.formatted(date: .abbreviated, time: .shortened))
+                    }
+                    Button("지금 올리기", systemImage: "arrow.up.doc") {
+                        driveRun("드라이브에 올렸어요. 연결돼 있어요.") { try await DriveSync.push(context, force: true) }
+                    }
+                    Button("드라이브에서 장비·기록 복구 (최신 파일)", systemImage: "arrow.down.doc") {
+                        driveRun(nil) {
+                            if let c = try await DriveSync.pull(context, force: true) {
+                                message = ("카메라 \(c.cameras)대, 롤 \(c.rolls)개를 맞췄어요.", true)
+                            } else { message = ("드라이브에 백업 파일이 아직 없어요.", false) }
+                        }
+                    }
+                    Button("드라이브에서 백업 폴더 열기", systemImage: "folder") {
+                        #if os(iOS)
+                        UIApplication.shared.open(DriveClient.folderURL)
+                        #endif
+                    }
+                    Button("연결 끊기", role: .destructive) { GoogleAuth.signOut(); revision += 1 }
+                } else {
+                    Button("구글 드라이브 연결", systemImage: "person.crop.circle.badge.checkmark") {
+                        driveRun("구글 드라이브에 연결했어요. 웹·갤럭시와 같은 기록을 써요.") {
+                            try await GoogleAuth.signIn()
+                            _ = try await DriveSync.pull(context, force: true)
+                            try await DriveSync.push(context, force: true)
+                        }
+                    }
+                }
+            } header: {
+                Text("구글 드라이브 (웹·갤럭시와 함께)")
+            } footer: {
+                Text("구글 계정으로 연결하면 드라이브의 '필름함' 폴더에 장비·필름·롤 기록을 올리고, 웹앱·갤럭시와 같은 파일을 함께 써요. 앱을 열 때 다른 기기에서 고친 기록을 합치고, 나갈 때 바뀐 기록을 올려요. 사진은 올리지 않아요.")
+            }
+
             Section {
                 HStack(spacing: 12) {
                     Image(systemName: connected ? "checkmark.icloud.fill" : "icloud.slash")
@@ -79,7 +128,7 @@ struct CloudBackupView: View {
                     }
                 }
             } header: {
-                Text("상태")
+                Text("파일 앱 폴더")
             } footer: {
                 Text("앱을 닫을 때(홈 화면으로 나갈 때) 정한 주기가 지났고 바뀐 기록이 있으면 '\(DataBackup.fileName)' 하나에 덮어써요. 스캔 사진은 빠져요.")
             }

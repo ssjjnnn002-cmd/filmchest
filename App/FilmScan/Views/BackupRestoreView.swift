@@ -10,6 +10,10 @@ struct BackupRestoreView: View {
     @State private var showImport = false
     @State private var restoreItems: [PhotosPickerItem] = []
     @State private var note: String?
+    @Query(sort: \RollItem.loadedAt, order: .reverse) private var rolls: [RollItem]
+    @Query(sort: \CameraItem.sortOrder) private var cameras: [CameraItem]
+    private var trashed: [RollItem] { rolls.filter { $0.deletedAt != nil } }
+    private var trashedCameras: [CameraItem] { cameras.filter { $0.deletedAt != nil } }
 
     var body: some View {
         Form {
@@ -52,6 +56,53 @@ struct BackupRestoreView: View {
             Text("사진으로 롤 복구")
         } footer: {
             Text("이 앱(아이폰·웹·갤럭시)이 저장한 사진의 표식으로 롤을 다시 묶어요. 웹앱에서 저장한 사진은 필름함 앨범에 없으니 직접 골라 주세요. 클라우드 백업을 먼저 복구하면 필름·카메라 정보까지 함께 돌아와요.")
+        }
+
+        Section {
+            if trashed.isEmpty {
+                Text("최근 24시간 안에 지운 롤이 없어요").foregroundStyle(.secondary)
+            }
+            ForEach(trashed) { roll in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(roll.filmName)
+                        Text(roll.cameraName).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    // 목록 한 줄에 버튼이 둘이면 한 번 눌러도 둘 다 눌린다 → 각각 따로 눌리게
+                    Button("되돌리기") { roll.deletedAt = nil }
+                        .buttonStyle(.borderless)
+                    Button("지금 지우기", role: .destructive) { context.delete(roll) }
+                        .buttonStyle(.borderless)
+                }
+            }
+        } header: {
+            Text("삭제한 롤")
+        } footer: {
+            Text("지운 롤은 24시간 동안 여기 남아요. 그 뒤에는 기록만 지워지고, 사진 앱의 사진은 그대로예요.")
+        }
+
+        Section {
+            if trashedCameras.isEmpty {
+                Text("최근 24시간 안에 지운 카메라가 없어요").foregroundStyle(.secondary)
+            }
+            ForEach(trashedCameras) { camera in
+                HStack {
+                    Text(camera.displayName)
+                    Spacer()
+                    Button("되돌리기") { camera.deletedAt = nil }
+                        .buttonStyle(.borderless)
+                    Button("지금 지우기", role: .destructive) {
+                        for roll in camera.rolls ?? [] { roll.rememberCamera() }
+                        context.delete(camera)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+        } header: {
+            Text("삭제한 장비")
+        } footer: {
+            Text("지운 카메라는 24시간 동안 여기 남아요. 필름에 적힌 카메라 정보는 카메라를 지워도 그대로예요.")
         }
         }
         .formStyle(.grouped)
