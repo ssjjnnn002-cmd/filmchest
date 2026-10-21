@@ -231,6 +231,22 @@ enum AutoBackup {
         return nil
     }
 
+    /// 연결한 클라우드 폴더의 백업 파일로 기록을 되살린다 (지금 있는 것은 지우지 않고 합친다)
+    @MainActor
+    static func restoreFromFolder(_ context: ModelContext) throws -> (cameras: Int, rolls: Int) {
+        guard let dir = folder() else { throw CocoaError(.fileNoSuchFile) }
+        let ok = dir.startAccessingSecurityScopedResource()
+        defer { if ok { dir.stopAccessingSecurityScopedResource() } }
+        let target = dir.appendingPathComponent(DataBackup.fileName)
+        var data: Data?
+        var failure: Error?
+        NSFileCoordinator().coordinate(readingItemAt: target, options: [], error: nil) { url in
+            do { data = try Data(contentsOf: url) } catch { failure = error }
+        }
+        if let failure { throw failure }
+        return try DataBackup.restore(data ?? Data(), into: context)
+    }
+
     /// 연결 확인: 폴더에 작은 파일을 쓰고 다시 읽은 뒤 지운다
     static func verify() -> String? {
         guard let dir = folder() else { return "폴더가 연결되지 않았어요." }

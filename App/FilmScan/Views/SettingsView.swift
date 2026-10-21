@@ -156,20 +156,20 @@ struct SettingsView: View {
                             do {
                                 let result = try await PhotoRestore.restoreAppAlbums(context: context)
                                 note = result.frames == 0
-                                    ? "필름함 앨범에서 이 앱 표식이 있는 사진을 찾지 못했어요."
+                                    ? "필름함 앨범에서 표식이 있는 사진을 찾지 못했어요. 웹앱·갤럭시에서 저장한 사진은 '사진 직접 고르기'로 골라 주세요."
                                     : "롤 \(result.rolls)개, 사진 \(result.frames)장을 가져왔어요."
                             } catch {
                                 note = error.localizedDescription
                             }
                         }
                     }
-                    PhotosPicker(selection: $restoreItems, matching: .images, photoLibrary: .shared()) {
+                    PhotosPicker(selection: $restoreItems, matching: .images, preferredItemEncoding: .current, photoLibrary: .shared()) {
                         Text("사진 직접 고르기")
                     }
                 } header: {
                     Text("사진으로 롤 복구")
                 } footer: {
-                    Text("이 앱이 사진 앱에 저장한 사진의 표식으로 롤을 다시 묶어요. 앨범에 없는 사진은 직접 고르면 돼요.")
+                    Text("이 앱(아이폰·웹·갤럭시)이 저장한 사진의 표식으로 롤을 다시 묶어요. 웹앱에서 저장한 사진은 필름함 앨범에 없으니 직접 골라 주세요. 클라우드 백업을 먼저 복구하면 필름·카메라 정보까지 함께 돌아와요.")
                 }
 
                 Section {

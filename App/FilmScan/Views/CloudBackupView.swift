@@ -11,6 +11,7 @@ struct CloudBackupView: View {
     @State private var message: (text: String, ok: Bool)?
     @State private var revision = 0
     @State private var confirmDisconnect = false
+    @State private var confirmRestore = false
 
     private let clouds: [(name: String, symbol: String, help: String)] = [
         ("구글 드라이브", "externaldrive.connected.to.line.below", "구글 드라이브 앱을 설치하고 로그인해 두세요. 고르는 창의 위치 목록에 Google Drive가 없으면 ⋯ 를 눌러 켜면 돼요."),
@@ -65,6 +66,7 @@ struct CloudBackupView: View {
                         }
                         revision += 1
                     }
+                    Button("클라우드 백업에서 복구", systemImage: "arrow.down.doc") { confirmRestore = true }
                     Picker("자동 백업", selection: $backupDays) {
                         Text("끔").tag(0)
                         Text("매일").tag(1)
@@ -134,6 +136,17 @@ struct CloudBackupView: View {
                 }
             }
             revision += 1
+        }
+        .confirmationDialog("클라우드의 '\(DataBackup.fileName)'로 기록을 되살릴까요? 지금 있는 기록은 지우지 않고 합쳐요.", isPresented: $confirmRestore, titleVisibility: .visible) {
+            Button("복구") {
+                do {
+                    let c = try AutoBackup.restoreFromFolder(context)
+                    message = ("카메라 \(c.cameras)대, 롤 \(c.rolls)개를 되살렸어요. 사진은 '사진으로 롤 복구'로 붙여 주세요.", true)
+                } catch {
+                    message = ("클라우드에서 백업 파일을 읽지 못했어요. 연결 확인을 눌러 보세요.", false)
+                }
+                revision += 1
+            }
         }
         .confirmationDialog("클라우드 연결을 끊을까요? 이미 올린 백업 파일은 그대로 남아요.", isPresented: $confirmDisconnect, titleVisibility: .visible) {
             Button("연결 끊기", role: .destructive) {

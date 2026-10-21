@@ -243,6 +243,7 @@ enum PhotoRestore {
             let options = PHImageRequestOptions()
             options.isNetworkAccessAllowed = true
             options.deliveryMode = .highQualityFormat
+            options.version = .original   // 회전 등 편집본이 아니라 표식이 남은 원본
             options.isSynchronous = false
             let box = ResumeBox()
             PHImageManager.default().requestImageDataAndOrientation(for: asset, options: options) { data, _, _, info in
@@ -256,20 +257,17 @@ enum PhotoRestore {
         return Hit(rollID: parsed.0, frame: parsed.1, assetID: asset.localIdentifier, thumbnail: thumb)
     }
 
-    private static func mark(in data: Data) -> (UUID, Int)? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-              let iptc = props[kCGImagePropertyIPTCDictionary] as? [CFString: Any] else { return nil }
-        let words: [String]
-        if let list = iptc[kCGImagePropertyIPTCKeywords] as? [String] { words = list }
-        else if let one = iptc[kCGImagePropertyIPTCKeywords] as? String { words = [one] }
-        else { return nil }
-        for word in words {
-            let parts = word.split(separator: ":")
-            guard parts.count == 3, parts[0] == "filmchest",
-                  let id = UUID(uuidString: String(parts[1])),
-                  let frame = Int(parts[2]) else { continue }
-            return (id, frame)
+    /// 이 앱(아이폰·웹·갤럭시)이 남긴 롤 표식 "filmchest:<id>:<번호>".
+    /// IPTC·EXIF·XMP·윈도우 태그(UTF-16) 어디에 있든 파일 앞부분에서 찾는다.
+    static func mark(in data: Data) -> (UUID, Int)? {
+        let head = data.prefix(512 * 1024)
+        let ascii = String(decoding: head.map { $0 == 0 ? 0x20 : $0 }, as: UTF8.self)
+        let squeezed = String(decoding: head.filter { $0 != 0 }, as: UTF8.self)
+        let pattern = /filmchest:([0-9a-fA-F-]{36}):(\d+)/
+        for text in [ascii, squeezed] {
+            if let m = text.firstMatch(of: pattern), let id = UUID(uuidString: String(m.1)), let frame = Int(m.2) {
+                return (id, frame)
+            }
         }
         return nil
     }
