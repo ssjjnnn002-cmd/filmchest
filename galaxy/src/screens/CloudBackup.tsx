@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { Text, View } from 'react-native'
 import {
-  backupFileName, cloudDays, cloudLast, cloudName, cloudUri, disconnectCloud, linkCloudFile, localBackupAt, openAppSettings, shareForCloud, verifyCloud, writeCloud,
+  backupFileName, importAll, cloudDays, cloudLast, cloudName, cloudUri, disconnectCloud, linkCloudFile, localBackupAt, openAppSettings, shareForCloud, verifyCloud, writeCloud,
 } from '../backup'
 import { setPref } from '../store'
 import { Group, Row, RowText, Section, Select, Sub } from '../kit'
@@ -29,7 +29,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
   const refresh = () => setRev((n) => n + 1)
   const connected = !!cloudUri()
   const run = async (fn: () => Promise<unknown>, ok: string) => {
-    try { await fn(); setMsg({ text: ok, ok: true }) } catch (e) { setMsg({ text: (e as Error).message || '하지 못했어요', ok: false }) }
+    try { await fn(); if (ok) setMsg({ text: ok, ok: true }) } catch (e) { setMsg({ text: (e as Error).message || '하지 못했어요', ok: false }) }
     refresh()
   }
   return (
@@ -47,6 +47,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
           {connected ? [
             <Row key="v" onPress={() => run(async () => { const f = await verifyCloud(); if (f) throw new Error(f) }, `${cloudName() ?? '파일'}에 저장하고 다시 읽었어요. 연결돼 있어요.`)}><RowText>연결 확인</RowText></Row>,
             <Row key="b" onPress={() => run(writeCloud, '지금 백업했어요.')}><RowText>지금 백업</RowText></Row>,
+            <Row key="r" onPress={() => run(async () => { const n = await importAll(cloudUri()!); setMsg({ text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요. 사진은 '사진으로 롤 복구'로 붙여 주세요.`, ok: true }) }, '')}><RowText>클라우드 백업에서 복구</RowText></Row>,
             <Row key="d" static><RowText>자동 백업</RowText>
               <Select value={String(cloudDays())} title="자동 백업" options={[['0', '끔'], ['1', '매일'], ['7', '매주']]} onChange={(v) => { setPref('cloudDays', v); refresh() }} />
             </Row>,

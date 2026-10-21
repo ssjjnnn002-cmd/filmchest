@@ -34,7 +34,7 @@ export function RollGalleryButton({ rollId, title, onToast, block }: {
   const save = async () => {
     if (!files?.length) return
     setBusy(true)
-    const r = await saveImagesToGallery(files)
+    const r = await saveImagesToGallery(files, `필름함 ${title}`.replace(/[/\\:]/g, '-').slice(0, 60))
     setBusy(false)
     if (r.denied) { onToast('사진 저장을 허용해 주세요'); return }
     if (!r.saved) {

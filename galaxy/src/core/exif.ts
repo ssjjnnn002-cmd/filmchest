@@ -164,6 +164,8 @@ export function writeMeta(data: Uint8Array, m: FrameMeta): Uint8Array {
   ex['0th'][I.ImageDescription] = utf8Binary(cap)
   ex['0th'][I.XPComment] = ucs2(cap)
   ex['0th'][I.XPKeywords] = ucs2(keywords(m).join(';'))
+  // 롤 표식은 사진 앱·다른 앱이 지우기 어려운 EXIF 사용자 설명에도 남긴다 (복구용)
+  if (m.rollId) ex.Exif[E.UserComment] = `ASCII\0\0\0filmchest:${m.rollId}:${m.frame}`
   if (m.point) {
     ex.GPS[G.GPSLatitudeRef] = m.point.latitude >= 0 ? 'N' : 'S'
     ex.GPS[G.GPSLatitude] = toDMS(m.point.latitude)
@@ -229,29 +231,15 @@ function ratio(v: unknown): number | undefined {
   return undefined
 }
 
-function fromUCS2(v: unknown) {
-  if (!Array.isArray(v)) return undefined
-  let s = ''
-  for (let i = 0; i < v.length - 1; i += 2) {
-    const c = (v[i] as number) | ((v[i + 1] as number) << 8)
-    if (!c) break
-    s += String.fromCharCode(c)
-  }
-  return s
-}
-
 /** 이 앱이 사진에 남긴 롤 표식 */
+/** 이 앱(아이폰·웹·갤럭시)이 사진에 남긴 롤 표식. EXIF·IPTC·XMP 어디에 있든 파일 앞부분 바이트에서 찾는다 (UTF-16 윈도우 태그 포함) */
 export function readFilmchestMark(data: Uint8Array): { rollId: string; frame: number } | undefined {
-  if (!isJpeg(data)) return undefined
-  try {
-    const ex = piexif.load(bytesToBinary(data))
-    const text = fromUCS2(ex['0th']?.[piexif.ImageIFD.XPKeywords])
-    const m = text?.match(/filmchest:([0-9a-fA-F-]{36}):(\d+)/)
-    if (!m) return undefined
-    return { rollId: m[1], frame: Number(m[2]) }
-  } catch {
-    return undefined
-  }
+  const head = data.subarray(0, Math.min(data.length, 512 * 1024))
+  const ascii = bytesToBinary(head)
+  const re = /filmchest:([0-9a-fA-F-]{36}):(\d+)/
+  let m = ascii.match(re)
+  if (!m) m = ascii.replace(/\0/g, '').match(re)
+  return m ? { rollId: m[1], frame: Number(m[2]) } : undefined
 }
 
 /** 사진 파일의 방향 정보만 바꿔 시계 방향 90°×turns로 보이게 한다 (다시 압축하지 않아 화질·촬영 정보가 그대로). JPEG만. */

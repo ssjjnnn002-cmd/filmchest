@@ -77,6 +77,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
       <Section title="백업" foot={`${localBackupAt() ? `마지막 백업 ${new Date(localBackupAt()!).toLocaleString('ko-KR')}. ` : ''}장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 웹앱 백업 파일도 불러올 수 있어요.`}>
         <Group>
           <Row chev value={cloudStatus()} onPress={() => setCloud(true)}><RowText>클라우드 백업</RowText></Row>
+          <Row chev onPress={() => setCloud(true)}><RowText>클라우드 백업에서 복구</RowText></Row>
           <Row onPress={async () => { await writeLocalBackup(); await saveFileNow(backupFileName, await exportAll(), 'application/json') }}>백업 파일로 저장</Row>
           <Row onPress={async () => {
             const [file] = await pickFiles(['application/json', 'text/plain', '*/*'], false)
@@ -91,13 +92,13 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </Group>
       </Section>
 
-      <Section title="사진으로 롤 복구" foot="이 앱으로 저장했던 사진을 고르면 표식으로 롤을 다시 묶어요.">
+      <Section title="사진으로 롤 복구" foot="이 앱(아이폰·웹·갤럭시)으로 저장했던 사진을 고르면 표식으로 롤을 다시 묶어요. 클라우드 백업을 먼저 복구하면 필름·카메라 정보까지 함께 돌아와요.">
         <Group>
           <Row onPress={async () => {
             const files = await pickFiles(['image/jpeg'])
             if (!files.length) return
             const result = await restorePhotos(files)
-            setNote(result.frames === 0 ? '이 앱이 남긴 표식이 없는 사진이에요.' : `롤 ${result.rolls}개, 사진 ${result.frames}장을 가져왔어요.`)
+            setNote(result.frames === 0 ? '표식을 찾지 못했어요. 이 앱에서 저장한 원본 사진을 골라 주세요.' : `롤 ${result.rolls}개, 사진 ${result.frames}장을 가져왔어요.`)
           }}>이 앱이 저장한 사진 고르기</Row>
         </Group>
       </Section>
