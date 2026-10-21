@@ -1,6 +1,12 @@
 // 구글 드라이브에 백업 파일 하나를 올리고 덮어쓴다 (drive.file 권한: 이 앱이 만든 파일만 본다)
 import { getPref, setPref } from '../platform'
+import { db } from '../db'
+import type { Frame, Roll } from './types'
 import { backupFileName, backupKey, exportAll, importAll } from './backup'
+import { FOLDER, ROOT_NAME, createFile, downloadUrl, ensureFolder, findByName, listChildren, mediaUrl, rollFolderName } from './driveApi'
+import { rotatedBlob } from './importer'
+import { restorePhotos } from './restore'
+import { rollTitle } from '../ui/common'
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
 export const driveAvailable = !!clientId
@@ -44,42 +50,127 @@ export async function driveToken(prompt = ''): Promise<string> {
 export const driveConnected = () => getPref('driveConnected', '' as string) === '1'
 export const driveLastBackup = () => Number(getPref('driveLast', '0')) || undefined
 export const driveIntervalDays = () => Number(getPref('driveDays', '1'))
-export function disconnectDrive() { setPref('driveConnected', ''); setPref('driveFileId', ''); token = undefined }
+export function disconnectDrive() {
+  for (const k of ['driveConnected', 'driveFileId', 'driveRoot', 'driveKey']) setPref(k, '')
+  setPref('driveRollFolders', '{}'); setPref('driveFrames', '{}')
+  token = undefined
+}
 export const hasDriveToken = () => !!token && token.until > Date.now() + 60_000
 
-/** force가 아니면 바뀐 게 없을 때 올리지 않는다 (같은 파일에 덮어쓰기) */
+type Fetchable = { status: number; ok: boolean }
+/** 드라이브 안 '필름함' 폴더 (지웠으면 다시 만든다) */
+async function rootFolder(t: string) {
+  const id = await ensureFolder(t, ROOT_NAME)
+  setPref('driveRoot', id)
+  return id
+}
+async function putBlob(t: string, id: string, blob: Blob): Promise<Fetchable> {
+  return fetch(mediaUrl(id), { method: 'PATCH', headers: { Authorization: `Bearer ${t}`, 'Content-Type': blob.type || 'application/octet-stream' }, body: blob })
+}
+
+/** 기록 백업 파일: 드라이브 '필름함' 폴더 안 하나에 덮어쓴다. force가 아니면 바뀐 게 없을 때 건너뛴다 */
 export async function backupToDrive(force = false) {
   const t = await driveToken()
   const blob = await exportAll()
   const key = await backupKey(blob)
-  let id = getPref('driveFileId', '')
-  if (!force && id && key === getPref('driveKey', '' as string)) { setPref('driveLast', String(Date.now())); return }
-  const meta = { name: backupFileName, mimeType: 'application/json' }
-  const body = new FormData()
-  body.append('metadata', new Blob([JSON.stringify(id ? {} : meta)], { type: 'application/json' }))
-  body.append('file', blob)
-  const url = id
-    ? `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=multipart`
-    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart'
-  let res = await fetch(url, { method: id ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${t}` }, body })
-  if (res.status === 404 && id) {   // 드라이브에서 지운 경우 새로 만든다
-    setPref('driveFileId', '')
-    return backupToDrive(true)
+  let id = getPref('driveFileId', '' as string)
+  if (!force && id && key === getPref('driveKey', '' as string)) { setPref('driveLast', String(Date.now())); void syncPhotosToDrive().catch(() => {}); return }
+  const root = await rootFolder(t)
+  if (!id) id = (await findByName(t, backupFileName, root)) ?? (await createFile(t, backupFileName, root, 'application/json'))
+  let res = await putBlob(t, id, blob)
+  if (res.status === 404) {   // 드라이브에서 지운 경우 새로 만든다
+    id = await createFile(t, backupFileName, root, 'application/json')
+    res = await putBlob(t, id, blob)
   }
   if (!res.ok) throw new Error(`드라이브에 올리지 못했어요 (${res.status})`)
-  id = (await res.json()).id
   setPref('driveFileId', id)
   setPref('driveKey', key)
   setPref('driveLast', String(Date.now()))
+  void syncPhotosToDrive().catch(() => {})
 }
 
+export const drivePhotosOn = () => getPref('drivePhotos', '1' as string) === '1'
+type Progress = (done: number, total: number) => void
+let syncing: Promise<number> | undefined
+
+/** 스캔 사진: '필름함/날짜 롤 이름/01.jpg' 로 올린다. 이미 올린 사진은 건너뛰고, 돌렸으면 다시 올린다 */
+export function syncPhotosToDrive(onProgress?: Progress): Promise<number> {
+  if (!drivePhotosOn()) return Promise.resolve(0)
+  syncing ??= (async () => {
+    try {
+      const t = await driveToken()
+      const root = await rootFolder(t)
+      const folders: Record<string, string> = JSON.parse(getPref('driveRollFolders', '{}'))
+      const sent: Record<string, string> = JSON.parse(getPref('driveFrames', '{}'))
+      const rolls = (await db.rolls.toArray()).filter((r) => !r.deletedAt)
+      const todo: { roll: Roll; frame: Frame }[] = []
+      for (const roll of rolls) {
+        for (const frame of await db.frames.where('rollId').equals(roll.id).toArray()) {
+          if (sent[frame.id]?.split(':')[1] !== String(frame.rotation ?? 0)) todo.push({ roll, frame })
+        }
+      }
+      let done = 0
+      onProgress?.(0, todo.length)
+      for (const { roll, frame } of todo) {
+        const original = await db.originals.get(frame.id)
+        if (!original) { done += 1; continue }
+        let folder = folders[roll.id]
+        if (!folder) {
+          const camera = roll.cameraId ? await db.cameras.get(roll.cameraId) : undefined
+          folder = await ensureFolder(t, rollFolderName(rollTitle(roll, camera), roll.days[0]?.startedAt ?? roll.loadedAt), root)
+          folders[roll.id] = folder
+          setPref('driveRollFolders', JSON.stringify(folders))
+        }
+        const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase().replace('jpeg', 'jpg')
+        const blob = await rotatedBlob(original.blob, frame.rotation)
+        const name = `${String(frame.index).padStart(2, '0')}.${ext}`
+        let id = sent[frame.id]?.split(':')[0]
+        if (!id) id = (await findByName(t, name, folder)) ?? (await createFile(t, name, folder, blob.type || 'image/jpeg'))
+        let res = await putBlob(t, id, blob)
+        if (res.status === 404) {
+          delete folders[roll.id]
+          throw new Error('드라이브에서 폴더가 지워졌어요. 다시 올려 주세요.')
+        }
+        if (!res.ok) throw new Error(`사진을 올리지 못했어요 (${res.status})`)
+        sent[frame.id] = `${id}:${frame.rotation ?? 0}`
+        setPref('driveFrames', JSON.stringify(sent))
+        done += 1
+        onProgress?.(done, todo.length)
+      }
+      return todo.length
+    } finally {
+      syncing = undefined
+    }
+  })()
+  return syncing
+}
+
+/** 드라이브의 기록 백업으로 되살린다 */
 export async function restoreFromDrive() {
   const t = await driveToken()
-  const id = getPref('driveFileId', '')
+  const root = await rootFolder(t)
+  const id = getPref('driveFileId', '') || await findByName(t, backupFileName, root)
   if (!id) throw new Error('드라이브에 백업이 없어요')
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, { headers: { Authorization: `Bearer ${t}` } })
+  const res = await fetch(downloadUrl(id), { headers: { Authorization: `Bearer ${t}` } })
   if (!res.ok) throw new Error('백업을 받지 못했어요')
   return importAll(await res.blob())
+}
+
+/** 드라이브 '필름함' 폴더의 사진을 내려받아 롤에 다시 붙인다 (사진 속 표식·정보로) */
+export async function restorePhotosFromDrive(onProgress?: Progress) {
+  const t = await driveToken()
+  const root = await rootFolder(t)
+  const files: File[] = []
+  const folders = (await listChildren(t, root)).filter((f) => f.mimeType === FOLDER)
+  const items: { id: string; name: string }[] = []
+  for (const f of folders) items.push(...(await listChildren(t, f.id)).filter((x) => x.mimeType.startsWith('image/')))
+  onProgress?.(0, items.length)
+  for (const [i, it] of items.entries()) {
+    const res = await fetch(downloadUrl(it.id), { headers: { Authorization: `Bearer ${t}` } })
+    if (res.ok) { const b = await res.blob(); files.push(new File([b], it.name, { type: b.type || 'image/jpeg' })) }
+    onProgress?.(i + 1, items.length)
+  }
+  return restorePhotos(files)
 }
 
 export function driveDue() {

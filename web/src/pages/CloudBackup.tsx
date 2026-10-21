@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Sheet } from '../ui/common'
 import { setPref } from '../platform'
 import { backupFileName } from '../core/backup'
-import { backupToDrive, restoreFromDrive, disconnectDrive, driveAvailable, driveConnected, driveIntervalDays, driveLastBackup, driveToken } from '../core/drive'
+import { backupToDrive, restoreFromDrive, restorePhotosFromDrive, syncPhotosToDrive, drivePhotosOn, disconnectDrive, driveAvailable, driveConnected, driveIntervalDays, driveLastBackup, driveToken } from '../core/drive'
 import {
   allowFolder, backupToFolder, restoreFromFolder, disconnectFolder, folderAvailable, folderCloud, folderDays, folderLast, folderName, folderPermission, pickFolder, verifyFolder,
 } from '../core/folderBackup'
@@ -26,6 +26,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
   const [, setRev] = useState(0)
   const [perm, setPerm] = useState<string>('none')
   const [msg, setMsg] = useState<{ text: string; ok: boolean }>()
+  const [progress, setProgress] = useState('')
   const refresh = () => { setRev((n) => n + 1); void folderPermission().then(setPerm) }
   useEffect(refresh, [])
   const folder = folderName()
@@ -33,7 +34,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
   const connected = !!folder || drive
   const last = Math.max(folderLast() ?? 0, driveLastBackup() ?? 0)
   const run = async (fn: () => Promise<unknown>, ok: string) => {
-    try { await fn(); if (ok) setMsg({ text: ok, ok: true }) } catch (e) { setMsg({ text: (e as Error).message || '하지 못했어요', ok: false }) }
+    try { await fn(); if (ok) setMsg({ text: ok, ok: true }) } catch (e) { setProgress(''); setMsg({ text: (e as Error).message || '하지 못했어요', ok: false }) }
     refresh()
   }
   return (
@@ -71,6 +72,22 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
           {drive && (
             <>
               <button className="row" onClick={() => run(() => backupToDrive(true), '구글 드라이브에 저장했어요. 연결돼 있어요.')}>연결 확인 · 지금 백업</button>
+              <label className="toggle">
+                <span>스캔 사진도 올리기<span className="sub" style={{ display: 'block' }}>필름함 폴더 안에 롤마다 폴더를 만들어요</span></span>
+                <input type="checkbox" className="switch" checked={drivePhotosOn()} onChange={(e) => { setPref('drivePhotos', e.target.checked ? '1' : '0'); refresh() }} />
+              </label>
+              {drivePhotosOn() && (
+                <button className="row" disabled={!!progress} onClick={() => run(async () => {
+                  const n = await syncPhotosToDrive((d, total) => setProgress(total ? `${d} / ${total}장 올리는 중` : ''))
+                  setProgress('')
+                  setMsg({ text: n ? `사진 ${n}장을 올렸어요.` : '새로 올릴 사진이 없어요.', ok: true })
+                }, '')}>{progress || '사진 지금 올리기'}</button>
+              )}
+              <button className="row" disabled={!!progress} onClick={() => { if (confirm('드라이브에 올린 사진을 내려받아 롤에 다시 붙일까요? 기록 백업을 먼저 복구하면 필름·카메라 정보까지 함께 돌아와요.')) void run(async () => {
+                const n = await restorePhotosFromDrive((d, total) => setProgress(total ? `${d} / ${total}장 받는 중` : ''))
+                setProgress('')
+                setMsg({ text: `롤 ${n.rolls}개, 사진 ${n.frames}장을 되살렸어요.`, ok: true })
+              }, '') }}>드라이브에서 사진 복구</button>
               <button className="row" onClick={() => { if (confirm('구글 드라이브 백업으로 기록을 되살릴까요? 지금 있는 기록은 지우지 않고 합쳐요.')) void run(async () => { const n = await restoreFromDrive(); setMsg({ text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요.`, ok: true }) }, '') }}>클라우드 백업에서 복구</button>
               <label className="row static">
                 <span className="grow">자동 백업</span>
@@ -92,7 +109,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
           <div className="group">
             <button className="row accent" onClick={() => run(async () => { await driveToken('consent'); await backupToDrive(true) }, '구글 드라이브에 연결하고 첫 백업을 올렸어요.')}>구글 드라이브 계정 연결</button>
           </div>
-          <p className="footnote">구글 로그인 창에서 허용을 누르면 돼요. 이 앱이 만든 파일만 볼 수 있어요.</p>
+          <p className="footnote">구글 로그인 창에서 허용을 누르면 돼요. 내 드라이브에 '필름함' 폴더를 만들고, 이 앱이 만든 파일만 볼 수 있어요.</p>
         </div>
       )}
 
