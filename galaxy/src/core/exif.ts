@@ -2,7 +2,8 @@
 import piexif from 'piexifjs'
 import type { FilmStock } from './films'
 import { filmDisplayName } from './films'
-import type { GeoPoint, MeterShot } from './types'
+import type { GeoPoint, LocationSegment, MeterShot, Roll } from './types'
+import { uid } from './types'
 
 // JPEG의 EXIF만 바꾼다 (이미지 데이터는 그대로 → 화질 손실 없음).
 // TIFF 등은 메타데이터를 쓰지 않고 원본 그대로 둔다.
@@ -275,4 +276,72 @@ export function guessRollFromMeta(data: Uint8Array): { key: string; frame?: numb
   } catch {
     return undefined
   }
+}
+
+/** 복구용: 이 앱이 사진에 적은 장소·좌표·메모·현상소·스캐너·찍은 시각 (아이폰·웹·갤럭시 공통 형식) */
+export function readPhotoInfo(data: Uint8Array): { date?: number; place?: string; point?: { latitude: number; longitude: number }; memo?: string; lab?: string; scanner?: string } {
+  if (!isJpeg(data)) return {}
+  try {
+    const ex = piexif.load(bytesToBinary(data))
+    const I = piexif.ImageIFD, E = piexif.ExifIFD, G = piexif.GPSIFD
+    const str = (v: unknown) => (typeof v === 'string' ? binaryUtf8(v).replace(/\0/g, '').trim() || undefined : undefined)
+    const ucs = (v: unknown) => {
+      if (!Array.isArray(v)) return ''
+      let s = ''
+      for (let i = 0; i + 1 < v.length; i += 2) { const c = (v[i] as number) | ((v[i + 1] as number) << 8); if (!c) break; s += String.fromCharCode(c) }
+      return s
+    }
+    const caption = str(ex['0th']?.[I.ImageDescription]) ?? ''
+    const keywords = new Set(ucs(ex['0th']?.[I.XPKeywords]).split(';').map((x) => x.trim()).filter(Boolean))
+    // 아이폰은 IPTC 키워드라 EXIF엔 없을 수 있다 → 파일 안 IPTC 글자에서도 찾는다
+    const raw = new TextDecoder().decode(data.subarray(0, Math.min(data.length, 256 * 1024)))
+    const scanner = str(ex['0th']?.[I.Software])
+    const parts = caption.split(' · ').map((x) => x.trim())
+    const at = parts.findIndex((x) => /^\d+\/\d+$/.test(x))
+    const rest = parts.slice(at + 1).filter((x) => x && x !== scanner)
+    const known = (x: string) => keywords.has(x) || (keywords.size === 0 && raw.split(x).length > 2)
+    const dms = (v: unknown) => (Array.isArray(v) && v.length === 3 ? v.reduce((n: number, p, i) => n + (Number(p[0]) / Number(p[1] || 1)) / 60 ** i, 0) : undefined)
+    const lat = dms(ex.GPS?.[G.GPSLatitude]), lon = dms(ex.GPS?.[G.GPSLongitude])
+    const point = lat !== undefined && lon !== undefined
+      ? { latitude: ex.GPS?.[G.GPSLatitudeRef] === 'S' ? -lat : lat, longitude: ex.GPS?.[G.GPSLongitudeRef] === 'W' ? -lon : lon } : undefined
+    let place: string | undefined
+    if (rest[0] && known(rest[0]) && (point || rest.filter(known).length >= 2)) place = rest[0]
+    const others = rest.filter((x) => x !== place)
+    const d = (ex.Exif?.[E.DateTimeOriginal] as string | undefined)?.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/)
+    return {
+      date: d ? new Date(+d[1], +d[2] - 1, +d[3], +d[4], +d[5], +d[6]).getTime() : undefined,
+      place, point, scanner,
+      lab: [...others].reverse().find(known),
+      memo: others.find((x) => !known(x)),
+    }
+  } catch {
+    return {}
+  }
+}
+
+/** 복구한 사진들로 롤의 빈 정보만 채운다 (장소 구간·현상소·스캐너·맡긴 날·불러온 날·해상도·용량) */
+export function rollPatchFromPhotos(roll: Roll, items: { frame: number; info: ReturnType<typeof readPhotoInfo>; w?: number; h?: number; bytes?: number }[]): Partial<Roll> {
+  const patch: Partial<Roll> = {}
+  const sorted = [...items].sort((a, b) => a.frame - b.frame)
+  const dates = sorted.map((x) => x.info.date).filter((d): d is number => !!d)
+  const first = dates.length ? Math.min(...dates) : undefined
+  const pick = <K extends 'lab' | 'scanner'>(k: K) => sorted.map((x) => x.info[k]).find(Boolean)
+  if (!roll.days.length && first) { patch.days = [{ id: uid(), startedAt: first, startFrame: 1 }]; patch.loadedAt = first }
+  if (!roll.lab && pick('lab')) patch.lab = pick('lab')
+  if (!roll.scanner && pick('scanner')) patch.scanner = pick('scanner')
+  if (!roll.droppedAt) patch.droppedAt = roll.days[0]?.startedAt ?? first
+  if (!roll.importedAt) patch.importedAt = Date.now()
+  const big = sorted.reduce((m, x) => ((x.w ?? 0) > (m.w ?? 0) ? x : m), sorted[0])
+  if (big?.w && (roll.scanW ?? 0) < big.w) { patch.scanW = big.w; patch.scanH = big.h }
+  if (!roll.scanFormat) patch.scanFormat = 'JPG'
+  patch.scanBytes = (roll.scanBytes ?? 0) + sorted.reduce((n, x) => n + (x.bytes ?? 0), 0)
+  if (!roll.locations.length) {
+    const segs: LocationSegment[] = []
+    for (const x of sorted) {
+      if (!x.info.place || segs[segs.length - 1]?.name === x.info.place) continue
+      segs.push({ id: uid(), startFrame: x.frame, name: x.info.place, point: x.info.point, memo: x.info.memo })
+    }
+    if (segs.length) patch.locations = segs
+  }
+  return patch
 }

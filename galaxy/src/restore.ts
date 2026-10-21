@@ -1,6 +1,6 @@
 // 웹 core/restore.ts (사진·썸네일은 기기 파일)
 import { db, restoreRoll } from './data'
-import { guessRollFromMeta, readFilmchestMark } from './core/exif'
+import { guessRollFromMeta, readFilmchestMark, readPhotoInfo, rollPatchFromPhotos } from './core/exif'
 import { allFilms, filmDisplayName } from './core/films'
 import { uid } from './core/types'
 import type { Roll } from './core/types'
@@ -20,7 +20,7 @@ export async function thumbOf(bytes: Uint8Array, type: string, name: string) {
 
 /** 이 앱이 저장한 사진의 표식으로 롤을 다시 만든다. */
 export async function restorePhotos(files: PickedFile[]) {
-  const groups = new Map<string, { frame: number; bytes: Uint8Array; type: string }[]>()
+  const groups = new Map<string, { frame: number; bytes: Uint8Array; type: string; info: ReturnType<typeof readPhotoInfo> }[]>()
   // 표식이 없는 사진: 사진 정보로 짐작한 롤 (같은 카메라·필름·날짜끼리). 웹과 같은 규칙
   const guessed = new Map<string, Partial<Roll>>()
   const hash = (s: string) => { let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h.toString(36) }
@@ -43,7 +43,7 @@ export async function restorePhotos(files: PickedFile[]) {
       frame = g.frame ?? (groups.get(rollId)?.length ?? 0) + 1
     }
     const list = groups.get(rollId!) ?? []
-    list.push({ frame: frame!, bytes: data, type: file.mimeType || 'image/jpeg' })
+    list.push({ frame: frame!, bytes: data, type: file.mimeType || 'image/jpeg', info: readPhotoInfo(data) })
     groups.set(rollId!, list)
   }
   let rolls = 0
@@ -62,6 +62,7 @@ export async function restorePhotos(files: PickedFile[]) {
       rolls += 1
     }
     const existing = new Set((await db.frames.where('rollId').equals(rollId).toArray()).map((f) => f.index))
+    const added: Parameters<typeof rollPatchFromPhotos>[1] = []
     for (const item of items) {
       if (existing.has(item.frame)) continue
       const id = uid()
@@ -69,12 +70,14 @@ export async function restorePhotos(files: PickedFile[]) {
       const blob = writeBytes('originals', `${id}.jpg`, item.bytes)
       await db.frames.add({
         id, rollId, index: item.frame, thumb, favorite: false, w, h, bytes: item.bytes.length,
+        takenAt: item.info.date, locationName: item.info.place,
       })
+      added.push({ frame: item.frame, info: item.info, w, h, bytes: item.bytes.length })
       await db.originals.add({ frameId: id, rollId, blob })
       frames += 1
     }
     const count = Math.max(roll.frameCount ?? 0, ...items.map((item) => item.frame))
-    await db.rolls.update(rollId, { frameCount: count, status: 'imported' })
+    await db.rolls.update(rollId, { ...rollPatchFromPhotos(roll, added), frameCount: count, status: 'imported' })
   }
   return { rolls, frames }
 }
