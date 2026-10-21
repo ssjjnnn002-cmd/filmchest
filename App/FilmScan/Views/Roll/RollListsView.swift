@@ -353,7 +353,7 @@ struct RollsView: View {
             if let status, r.status != status { return false }
             if !search.isEmpty {
                 let text = [r.filmName, r.cameraName, r.labName ?? "", r.note ?? "",
-                            r.locations.map { "\($0.name) \($0.memo ?? "")" }.joined(separator: " ")]
+                            r.locations.map { "\($0.name) \($0.memo ?? "")" }.joined(separator: " "), r.tags.joined(separator: " ")]
                 if !text.contains(where: { $0.localizedCaseInsensitiveContains(search) }) { return false }
             }
             return true
@@ -392,7 +392,7 @@ struct RollsView: View {
                     }
                 }
             }
-            .searchable(text: $search, prompt: "필름, 카메라, 장소, 현상소, 메모")
+            .searchable(text: $search, prompt: "필름, 카메라, 장소, 현상소, 메모, 태그")
             .background(Theme.paper)
             .navigationTitle("롤 보관함")
             .navigationDestination(for: RollItem.self) { RollDetailView(roll: $0) }

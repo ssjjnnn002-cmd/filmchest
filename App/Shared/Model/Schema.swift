@@ -17,6 +17,13 @@ final class CameraItem {
     @Attribute(.externalStorage) var photo: Data?   // 누끼 딴 PNG (사진 한 장)
     /// 사진 썸네일 크기 (1 = 기본)
     var photoScale: Double = 1
+    /// 사진 위치 (카드 크기에 대한 비율, 0 = 가운데)
+    var photoOffsetX: Double = 0
+    var photoOffsetY: Double = 0
+    /// 나만의 태그 (검색·목록용)
+    var tags: [String] = []
+    /// 그립, 스트랩, 셔터 버튼 같은 악세서리 (구입 금액 합계에 들어간다)
+    var accessories: [GearAccessory] = []
     @Attribute(.externalStorage) var spinData: Data? // 360° 회전 사진 (PNG 배열)
     var bodyStyleRaw: String = CameraBodyStyle.slr.rawValue
     var bodyStyleManual: Bool = false             // 사용자가 형태를 직접 바꿨는지
@@ -84,6 +91,7 @@ final class LensItem {
     var purchasedAt: Date?
     var price: String?
     var seller: String?
+    var tags: [String] = []
     /// 줌렌즈면 true. 화각이 비어 있으면 이름에서 짐작한다.
     var zoomLens: Bool = false
     /// 가장 짧은 화각(mm). 단렌즈는 이 값.
@@ -221,6 +229,7 @@ final class RollItem {
     var note: String?
     var albumIdentifier: String?
     var isFavorite: Bool = false
+    var tags: [String] = []
     /// 보관함 썸네일로 쓸 컷 번호 (없으면 첫 장)
     var coverFrameIndex: Int?
     // 스캔 해상도 (대표값)
@@ -638,6 +647,24 @@ final class ProjectItem {
     }
 }
 
+/// 카메라 악세서리 한 개
+struct GearAccessory: Codable, Hashable, Identifiable {
+    var id = UUID()
+    var name: String = ""
+    var price: String?
+    var purchasedAt: Date?
+}
+
+/// "1,234,000" 같은 금액 글씨를 숫자로
+enum PriceSum {
+    static func value(_ text: String?) -> Int { Int((text ?? "").filter(\.isNumber)) ?? 0 }
+    static func text(_ n: Int) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        return (f.string(from: NSNumber(value: n)) ?? "\(n)") + "원"
+    }
+}
+
 enum FilmStorage: String, CaseIterable, Identifiable {
     case fridge, freezer, drawer, room
     var id: String { rawValue }
@@ -661,6 +688,7 @@ final class FilterItem {
     var purchasedAt: Date?
     var price: String?
     var seller: String?
+    var tags: [String] = []
     var createdAt: Date = Date()
 
     init(name: String) {

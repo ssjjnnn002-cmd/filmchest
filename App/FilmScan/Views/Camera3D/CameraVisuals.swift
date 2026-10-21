@@ -65,8 +65,15 @@ struct CameraCoverView: View {
         if interactive, camera.spinData != nil {
             SpinViewer(frames: camera.spinFrames)
         } else if let data = camera.coverImageData {
-            CameraImageView(data: data)
-                .scaleEffect(camera.spinData == nil ? camera.photoScale : 1)
+            let photoOnly = camera.spinData == nil
+            GeometryReader { geo in
+                CameraImageView(data: data)
+                    .scaleEffect(photoOnly ? camera.photoScale : 1)
+                    .offset(x: photoOnly ? camera.photoOffsetX * geo.size.width : 0,
+                            y: photoOnly ? camera.photoOffsetY * geo.size.height : 0)
+                    .frame(width: geo.size.width, height: geo.size.height)
+            }
+            .clipped()
         } else if interactive {
             DummyCamera3DView(id: camera.dummyModelID, colorHex: CameraBodyStyle.defaultColorHex)
         } else {

@@ -27,8 +27,25 @@ struct LibraryView: View {
     @State private var showAddLens = false
     @State private var showAddFilter = false
     @State private var showAddFilm = false
+    @State private var tagFilter: String?
+    @Query private var lensTagSource: [LensItem]
+    @Query private var filterTagSource: [FilterItem]
 
-    private var visible: [CameraItem] { cameras.filter { $0.deletedAt == nil } }
+    private var visible: [CameraItem] { cameras.filter { $0.deletedAt == nil && (editing || tagFilter == nil || $0.tags.contains(tagFilter!)) } }
+
+    /// 지금 탭의 장비에 붙은 태그 (많이 쓴 순)
+    private var tabTags: [String] {
+        let all: [String]
+        switch gear {
+        case .camera: all = cameras.filter { $0.deletedAt == nil }.flatMap(\.tags)
+        case .lens: all = lensTagSource.flatMap(\.tags)
+        case .filter: all = filterTagSource.flatMap(\.tags)
+        case .film: all = []
+        }
+        var count: [String: Int] = [:]
+        all.forEach { count[$0, default: 0] += 1 }
+        return count.keys.sorted { (count[$0]!, $1) > (count[$1]!, $0) }
+    }
     private var emptyCameras: Int { visible.filter { $0.loadedRoll == nil }.count }
 
     private var orderedCameras: [CameraItem] {
@@ -44,14 +61,28 @@ struct LibraryView: View {
                 Picker("장비", selection: $gear) {
                     ForEach(GearTab.allCases) { Text($0.title).tag($0) }
                 }
+                .onChange(of: gear) { tagFilter = nil }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .padding(.horizontal)
                 .padding(.top, 4)
                 .padding(.bottom, 2)
+                if !tabTags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(tabTags, id: \.self) { t in
+                                Button("#\(t)") { tagFilter = tagFilter == t ? nil : t }
+                                    .buttonStyle(.bordered)
+                                    .tint(tagFilter == t ? Theme.safelight : .secondary)
+                                    .controlSize(.small)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
             }
             if gear != .camera && !editing {
-                GearBrowser(tab: gear, layout: layout)
+                GearBrowser(tab: gear, layout: layout, tag: tagFilter)
                     .padding(.horizontal)
                     .padding(.vertical, 8)
             } else if visible.isEmpty {

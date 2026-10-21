@@ -104,9 +104,19 @@ struct PurchaseFields: View {
 
     var body: some View {
         Section("구입") {
-            Toggle("구입 날짜", isOn: $hasDate)
-            if hasDate {
-                DatePicker("날짜", selection: $date, displayedComponents: .date)
+            // 처음부터 달력으로 고른다. 고르면 기록되고, 지우기로 비운다.
+            HStack {
+                DatePicker(selection: Binding(get: { date }, set: { date = $0; hasDate = true }), displayedComponents: .date) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("구입 날짜")
+                        if !hasDate { Text("기록 안 함").font(.caption).foregroundStyle(.secondary) }
+                    }
+                }
+                if hasDate {
+                    Button { hasDate = false } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("구입 날짜 지우기")
+                }
             }
             TextField("구입 금액", text: $price)
                 #if os(iOS)
@@ -150,8 +160,11 @@ struct PurchaseFields: View {
 struct GearBrowser: View {
     let tab: GearTab
     var layout: LayoutMode = .grid
-    @Query(sort: \LensItem.createdAt) private var lenses: [LensItem]
-    @Query(sort: \FilterItem.createdAt) private var filters: [FilterItem]
+    var tag: String? = nil
+    @Query(sort: \LensItem.createdAt) private var allLenses: [LensItem]
+    @Query(sort: \FilterItem.createdAt) private var allFilters: [FilterItem]
+    private var lenses: [LensItem] { allLenses.filter { tag == nil || $0.tags.contains(tag!) } }
+    private var filters: [FilterItem] { allFilters.filter { tag == nil || $0.tags.contains(tag!) } }
     @Query(sort: \FilmLotItem.createdAt, order: .reverse) private var lots: [FilmLotItem]
     @State private var lensEdit: LensItem?
     @State private var filterEdit: FilterItem?
@@ -486,6 +499,7 @@ struct FilterEditView: View {
     @State private var date = Date()
     @State private var price = ""
     @State private var seller = ""
+    @State private var tags: [String] = []
     @State private var confirm = false
 
     var body: some View {
@@ -505,6 +519,7 @@ struct FilterEditView: View {
                     chipRow(filterDiameters.filter { $0 != diameter }) { diameter = $0 }
                 }
                 PurchaseFields(hasDate: $hasDate, date: $date, price: $price, seller: $seller)
+                TagField(tags: $tags)
                 if filter != nil {
                     Section { Button("필터 삭제", role: .destructive) { confirm = true } }
                 }
@@ -525,6 +540,7 @@ struct FilterEditView: View {
                 date = filter.purchasedAt ?? Date()
                 price = filter.price ?? ""
                 seller = filter.seller ?? ""
+                tags = filter.tags
             }
             .confirmationDialog("이 필터를 삭제할까요?", isPresented: $confirm, titleVisibility: .visible) {
                 Button("삭제", role: .destructive) {
@@ -557,6 +573,7 @@ struct FilterEditView: View {
         target.purchasedAt = hasDate ? date : nil
         target.price = PriceText.grouped(price).nilIfBlank
         target.seller = seller.nilIfBlank
+        target.tags = tags
         if let place = seller.nilIfBlank { SellerDirectory.remember(place) }
         dismiss()
     }

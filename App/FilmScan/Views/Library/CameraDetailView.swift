@@ -55,9 +55,14 @@ struct CameraDetailView: View {
                     LabeledContent("배터리", value: camera.batteryType ?? "")
                 } else {
                     LabeledContent("종류", value: camera.batteryType ?? "모름")
-                    LabeledContent("마지막 교체") {
-                        Text(camera.batteryAgeText ?? "기록 없음")
-                            .foregroundStyle(camera.batteryDue ? .orange : .secondary)
+                    DatePicker(selection: Binding(get: { camera.batteryReplacedAt ?? Date() },
+                                                  set: { camera.batteryReplacedAt = $0 }),
+                               in: ...Date(), displayedComponents: .date) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("마지막 교체")
+                            Text(camera.batteryAgeText ?? "기록 없음").font(.caption)
+                                .foregroundStyle(camera.batteryDue ? .orange : .secondary)
+                        }
                     }
                     Button("오늘 교체함", systemImage: "battery.100.bolt") {
                         camera.batteryReplacedAt = Date()
@@ -68,6 +73,25 @@ struct CameraDetailView: View {
             } footer: {
                 if camera.batteryDue {
                     Text("교체한 지 1년이 넘었어요. 노출계가 정확하지 않을 수 있어요.").foregroundStyle(.orange)
+                }
+            }
+
+            if !camera.tags.isEmpty {
+                Section("태그") { FlowTags(tags: camera.tags) }
+            }
+
+            if camera.price?.nilIfBlank != nil || !camera.accessories.isEmpty {
+                Section {
+                    if let p = camera.price?.nilIfBlank { LabeledContent("본체", value: PriceSum.text(PriceSum.value(p))) }
+                    ForEach(camera.accessories) { a in
+                        LabeledContent(a.name, value: a.price?.nilIfBlank.map { PriceSum.text(PriceSum.value($0)) } ?? "-")
+                    }
+                    LabeledContent("합계") {
+                        Text(PriceSum.text(PriceSum.value(camera.price) + camera.accessories.reduce(0) { $0 + PriceSum.value($1.price) }))
+                            .font(.body.weight(.semibold)).foregroundStyle(.primary)
+                    }
+                } header: {
+                    Text("쓴 금액")
                 }
             }
 
@@ -254,6 +278,7 @@ struct LensEditView: View {
     @State private var purchaseDate = Date()
     @State private var price = ""
     @State private var seller = ""
+    @State private var tags: [String] = []
 
     private var currentMount: String { mountEditable ? mountText : mount }
 
@@ -284,6 +309,7 @@ struct LensEditView: View {
                     specField("최소개방", text: $apertureClose, unit: "f/", leading: true, numeric: false)
                 }
                 PurchaseFields(hasDate: $hasPurchaseDate, date: $purchaseDate, price: $price, seller: $seller)
+                TagField(tags: $tags)
                 if lens != nil {
                     Section {
                         Button("렌즈 삭제", systemImage: "trash", role: .destructive) { confirmDelete = true }
@@ -336,6 +362,7 @@ struct LensEditView: View {
         purchaseDate = lens?.purchasedAt ?? Date()
         price = lens?.price ?? ""
         seller = lens?.seller ?? ""
+        tags = lens?.tags ?? []
     }
 
     private func applyOptics(_ name: String) {
@@ -394,6 +421,7 @@ struct LensEditView: View {
         target.purchasedAt = hasPurchaseDate ? purchaseDate : nil
         target.price = PriceText.grouped(price).nilIfBlank
         target.seller = seller.nilIfBlank
+        target.tags = tags
         if let place = seller.nilIfBlank { SellerDirectory.remember(place) }
         dismiss()
     }

@@ -37,6 +37,11 @@ struct CameraEditView: View {
     @State private var liftFailed = false
     @State private var showCamera = false
     @State private var photoScale: Double = 1
+    @State private var photoOffset = CGSize.zero          // 칸 크기 대비 비율
+    @State private var dragStart: CGSize?
+    @State private var pinchStart: Double?
+    @State private var tags: [String] = []
+    @State private var accessories: [GearAccessory] = []
 
     var body: some View {
         NavigationStack {
@@ -54,11 +59,13 @@ struct CameraEditView: View {
                     if photo != nil {
                         HStack {
                             Text("크기")
-                            Slider(value: $photoScale, in: 0.5...1.6, step: 0.05)
-                            Button("기본") { photoScale = 1 }
+                            Slider(value: $photoScale, in: 0.3...3, step: 0.05)
+                            Button("기본") { photoScale = 1; photoOffset = .zero }
                                 .buttonStyle(.borderless)
-                                .disabled(photoScale == 1)
+                                .disabled(photoScale == 1 && photoOffset == .zero)
                         }
+                        Text("사진을 끌어서 옮기고, 두 손가락으로 키우거나 줄여요. 칸 밖은 잘려요.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     if photo == nil && spin.isEmpty {
                         styleRow
@@ -130,9 +137,17 @@ struct CameraEditView: View {
 
                 Section {
                     TextField("배터리 종류", text: $battery)
-                    Toggle("마지막 교체일 기록", isOn: $hasBatteryDate)
-                    if hasBatteryDate {
-                        DatePicker("마지막 교체", selection: $batteryDate, displayedComponents: .date)
+                    HStack {
+                        DatePicker(selection: Binding(get: { batteryDate }, set: { batteryDate = $0; hasBatteryDate = true }), displayedComponents: .date) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("마지막 교체")
+                                if !hasBatteryDate { Text("기록 안 함").font(.caption).foregroundStyle(.secondary) }
+                            }
+                        }
+                        if hasBatteryDate {
+                            Button { hasBatteryDate = false } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                                .buttonStyle(.borderless)
+                        }
                     }
                 } header: {
                     Text("배터리")
@@ -141,6 +156,10 @@ struct CameraEditView: View {
                 }
 
                 PurchaseFields(hasDate: $hasPurchaseDate, date: $purchaseDate, price: $price, seller: $seller)
+
+                AccessoryFields(items: $accessories, bodyPrice: price)
+
+                TagField(tags: $tags)
 
                 Section {
                     HStack(spacing: 8) {
@@ -203,9 +222,31 @@ struct CameraEditView: View {
         if !spin.isEmpty {
             SpinViewer(frames: spin)
         } else if let photo {
-            CameraImageView(data: photo)
-                .scaleEffect(photoScale)
-                .animation(.snappy, value: photoScale)
+            GeometryReader { geo in
+                CameraImageView(data: photo)
+                    .scaleEffect(photoScale)
+                    .offset(x: photoOffset.width * geo.size.width, y: photoOffset.height * geo.size.height)
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture()
+                            .onChanged { v in
+                                let base = dragStart ?? photoOffset
+                                dragStart = base
+                                photoOffset = CGSize(width: base.width + v.translation.width / max(geo.size.width, 1),
+                                                     height: base.height + v.translation.height / max(geo.size.height, 1))
+                            }
+                            .onEnded { _ in dragStart = nil }
+                            .simultaneously(with: MagnifyGesture()
+                                .onChanged { v in
+                                    let base = pinchStart ?? photoScale
+                                    pinchStart = base
+                                    photoScale = min(max(base * v.magnification, 0.3), 3)
+                                }
+                                .onEnded { _ in pinchStart = nil })
+                    )
+            }
+            .clipped()
         } else {
             DummyCamera3DView(id: DummyModelID(brand: brand, model: model, style: style), colorHex: CameraBodyStyle.defaultColorHex)
         }
@@ -265,6 +306,9 @@ struct CameraEditView: View {
         photo = camera.photo
         spin = camera.spinFrames
         photoScale = camera.photoScale
+        photoOffset = CGSize(width: camera.photoOffsetX, height: camera.photoOffsetY)
+        tags = camera.tags
+        accessories = camera.accessories
         manualStyle = camera.bodyStyleManual ? camera.bodyStyle : nil
         battery = camera.batteryType ?? ""
         hasBatteryDate = camera.batteryReplacedAt != nil
@@ -329,6 +373,7 @@ struct CameraEditView: View {
         lifting = true
         liftFailed = false
         photoScale = 1
+        photoOffset = .zero
         if let ready = await SubjectLifter.alreadyTransparent(data) {
             photo = ready   // 이미 배경이 투명한 PNG
         } else if let lifted = await SubjectLifter.lift(data) {
@@ -367,6 +412,10 @@ struct CameraEditView: View {
         target.photo = photo
         target.spinFrames = spin
         target.photoScale = photoScale
+        target.photoOffsetX = photoOffset.width
+        target.photoOffsetY = photoOffset.height
+        target.tags = tags
+        target.accessories = accessories.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
         for roll in target.rolls ?? [] { roll.rememberCamera() }
         dismiss()
     }

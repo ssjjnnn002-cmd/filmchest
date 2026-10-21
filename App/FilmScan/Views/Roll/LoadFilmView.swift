@@ -23,6 +23,7 @@ struct LoadFilmView: View {
     @State private var addingLens = false
     @State private var pushPull = 0          // 증감 스톱
     @State private var startToday = true
+    @State private var startDate = Date()
     @State private var search = ""
     @State private var showAllFilms = false
     @Query(sort: \CustomFilmItem.createdAt, order: .reverse) private var customFilms: [CustomFilmItem]
@@ -183,13 +184,16 @@ struct LoadFilmView: View {
                             LabeledContent("감도", value: pushPull == 0 ? "ISO \(film.iso)"
                                            : "ISO \(shotISO ?? film.iso) (\(pushPull > 0 ? "+" : "")\(pushPull) 스톱)")
                         }
-                        Toggle("오늘 촬영일로 추가", isOn: $startToday)
+                        Toggle("첫 촬영일 추가", isOn: $startToday)
+                        if startToday {
+                            DatePicker("날짜", selection: $startDate, in: ...Date(), displayedComponents: .date)
+                        }
                     } footer: {
                         VStack(alignment: .leading, spacing: 4) {
                             if Subscriptions.subscriptionEnabled, !Subscriptions.shared.isSubscribed {
                                 Text("무료 롤 \(RollQuota.used(in: context))/\(RollQuota.freeLimit)")
                             }
-                            if startToday { Text("지금 시각과 현재 위치를 첫 촬영일로 기록해요.") }
+                            if startToday && Calendar.current.isDateInToday(startDate) { Text("지금 시각과 현재 위치를 첫 촬영일로 기록해요.") }
                         }
                     }
                 }
@@ -285,8 +289,10 @@ struct LoadFilmView: View {
         Subscriptions.shared.noteRollCreated(in: context)
 
         if startToday {
-            roll.shootingDays = [ShootingDay(startedAt: Date(), startFrame: 1)]
-            router.fillCurrentPlace(for: roll)   // 위치는 화면을 닫은 뒤 백그라운드에서 채운다
+            let today = Calendar.current.isDateInToday(startDate)
+            roll.shootingDays = [ShootingDay(startedAt: today ? Date() : startDate, startFrame: 1)]
+            if today { router.fillCurrentPlace(for: roll) }
+            if !today { roll.loadedAt = startDate }   // 위치는 화면을 닫은 뒤 백그라운드에서 채운다
         }
         router.tab = .shooting
         dismiss()

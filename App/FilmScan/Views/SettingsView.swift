@@ -16,6 +16,9 @@ struct SettingsView: View {
     @State private var gearDoc = GearDocument(data: Data())
     @State private var showExport = false
     @State private var showImport = false
+    @State private var pickFolder = false
+    @State private var backupRevision = 0
+    @AppStorage(AutoBackup.intervalKey) private var backupDays = 1
     @State private var restoreItems: [PhotosPickerItem] = []
     @State private var note: String?
     @AppStorage(AppSettings.Key.meterOffset, store: AppSettings.defaults) private var meterOffset = AppSettings.meterDefault
@@ -129,17 +132,46 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Button("장비 파일로 저장") {
-                        if let data = try? GearBackup.data(cameras: cameras.filter { $0.deletedAt == nil }, lenses: lenses) {
+                    let _ = backupRevision
+                    Button { pickFolder = true } label: {
+                        LabeledContent("백업 폴더", value: AutoBackup.folderName ?? "고르기")
+                    }
+                .fileImporter(isPresented: $pickFolder, allowedContentTypes: [.folder]) { result in
+                    guard case .success(let url) = result else { return }
+                    AutoBackup.setFolder(url)
+                    do {
+                        try AutoBackup.run(context)
+                        note = "\(url.lastPathComponent) 폴더에 백업했어요."
+                    } catch { note = "이 폴더에는 저장할 수 없어요." }
+                    backupRevision += 1
+                }
+                    Picker("자동 백업", selection: $backupDays) {
+                        Text("끔").tag(0)
+                        Text("매일").tag(1)
+                        Text("매주").tag(7)
+                    }
+                    .disabled(AutoBackup.folderName == nil)
+                    if AutoBackup.folderName != nil {
+                        Button("지금 백업") {
+                            do {
+                                try AutoBackup.run(context)
+                                note = "백업했어요."
+                            } catch { note = "백업하지 못했어요. 폴더를 다시 골라 주세요." }
+                            backupRevision += 1
+                        }
+                    }
+                    Button("백업 파일로 저장") {
+                        if let data = try? DataBackup.data(from: context) {
                             gearDoc = GearDocument(data: data)
                             showExport = true
                         }
                     }
-                    Button("장비 파일 불러오기") { showImport = true }
+                    Button("백업 불러오기") { showImport = true }
                 } header: {
-                    Text("장비 백업")
+                    Text("백업")
                 } footer: {
-                    Text("카메라와 렌즈만 파일로 옮겨요. 이미 있는 장비는 같은 항목으로 합치고, 롤은 지우지 않아요.")
+                    let last = AutoBackup.lastBackup.map { "마지막 백업 \($0.formatted(date: .abbreviated, time: .shortened)). " } ?? ""
+                    Text(last + "장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 파일 앱에서 구글 드라이브나 iCloud Drive 폴더를 고르면 앱을 닫을 때 알아서 올라가요.")
                 }
 
                 Section {
@@ -177,17 +209,17 @@ struct SettingsView: View {
             .formStyle(.grouped)
             .filmKeyboard()
             .sheet(isPresented: $showPaywall) { PaywallView() }
-            .fileExporter(isPresented: $showExport, document: gearDoc, contentType: .json, defaultFilename: "filmchest-gear.json") { _ in }
+            .fileExporter(isPresented: $showExport, document: gearDoc, contentType: .json, defaultFilename: DataBackup.fileName) { _ in }
             .fileImporter(isPresented: $showImport, allowedContentTypes: [.json]) { result in
                 guard case .success(let url) = result else { return }
                 let accessing = url.startAccessingSecurityScopedResource()
                 defer { if accessing { url.stopAccessingSecurityScopedResource() } }
                 do {
                     let data = try Data(contentsOf: url)
-                    let counts = try GearBackup.merge(data, into: context)
-                    note = "카메라 \(counts.cameras)대, 렌즈 \(counts.lenses)개를 불러왔어요."
+                    let counts = try DataBackup.restore(data, into: context)
+                    note = "카메라 \(counts.cameras)대, 롤 \(counts.rolls)개를 불러왔어요."
                 } catch {
-                    note = "장비 파일을 읽지 못했어요."
+                    note = "백업 파일을 읽지 못했어요."
                 }
             }
             .onChange(of: restoreItems) { _, items in
