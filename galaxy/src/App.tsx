@@ -1,4 +1,5 @@
 // 웹 App.tsx와 같은 뼈대: 탭 4개, 탭마다 쌓이는 화면, 필름 장착·스캔 가져오기·zip 대기열.
+import { importAll, restoredBackupUri, startLocalAutoBackup } from './backup'
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Animated, BackHandler, Easing, Pressable, Text, View } from 'react-native'
 import { BlurView } from 'expo-blur'
@@ -87,6 +88,16 @@ export function App() {
   const [incomingPhotos, setIncomingPhotos] = useState<PickedFile[] | null>(null)
   // 다른 앱(사진·파일·카톡)의 '공유'로 받은 파일: zip이면 어디로 넣을지, 사진이면 롤마다 나누기
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent()
+  // 하루 한 번 기록 백업 파일을 써 두고(안드로이드가 구글 드라이브로 올림), 새로 설치해 비어 있으면 되살린다
+  useEffect(() => {
+    startLocalAutoBackup()
+    void restoredBackupUri().then(async (uri) => {
+      if (!uri) return
+      const c = await importAll(uri)
+      if (c.cameras || c.rolls) toast('백업에서 기록을 되살렸어요')
+    }).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   useEffect(() => {
     if (!hasShareIntent) return
     const files: PickedFile[] = (shareIntent.files ?? []).map((f) => ({

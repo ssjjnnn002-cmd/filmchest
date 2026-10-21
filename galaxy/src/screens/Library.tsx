@@ -15,6 +15,7 @@ import { useTheme } from '../theme'
 import { seedExample } from '../seed'
 import { CameraEdit } from './CameraEdit'
 import { GearAdd, GearBoard, type GearKind } from './Gear'
+import { TagFilter } from '../gearExtras'
 import { Settings } from './Settings'
 
 export const batteryDue = (c: Camera) =>
@@ -29,6 +30,9 @@ export function Library() {
   const rolls = useLiveQuery(async () => (await db.rolls.where('status').equals('loaded').toArray()).filter(kept), []) ?? []
   const [adding, setAdding] = useState(false)
   const [gear, setGear] = useState<GearKind | 'camera'>('camera')
+  const [tag, setTag] = useState<string>()
+  const lensTags = useLiveQuery(async () => (await db.lenses.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
+  const filterTags = useLiveQuery(async () => (await db.filters.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
   const [gearAdd, setGearAdd] = useState(false)
   const [settings, setSettings] = useState(false)
   const [layout, setLayout] = useState<string>(getPref('libraryLayout', 'grid'))
@@ -57,6 +61,7 @@ export function Library() {
   const shown = (order.length ? order : (cameras ?? []).map((x) => x.id))
     .map((id) => byId.get(id))
     .filter((x): x is Camera => !!x)
+    .filter((x) => editing || !tag || (x.tags ?? []).includes(tag))
 
   const toggleLayout = () => {
     const next = layout === 'grid' ? 'list' : 'grid'
@@ -147,11 +152,16 @@ export function Library() {
 
       {!editing && (
         <View style={{ marginBottom: 12 }}>
-          <Segmented value={gear} options={[['camera', '카메라'], ['lens', '렌즈'], ['filter', '필터'], ['film', '필름']]} onChange={setGear} />
+          <Segmented value={gear} options={[['camera', '카메라'], ['lens', '렌즈'], ['filter', '필터'], ['film', '필름']]} onChange={(g) => { setGear(g); setTag(undefined) }} />
         </View>
       )}
+      {!editing && gear !== 'film' ? (
+        <View style={{ marginBottom: 8 }}>
+          <TagFilter tags={gear === 'camera' ? (cameras ?? []).flatMap((x) => x.tags ?? []) : gear === 'lens' ? lensTags : filterTags} value={tag} onChange={setTag} />
+        </View>
+      ) : null}
 
-      {gear !== 'camera' && !editing ? <GearBoard kind={gear} layout={layout} /> : null}
+      {gear !== 'camera' && !editing ? <GearBoard kind={gear} layout={layout} tag={tag} /> : null}
 
       {gear === 'camera' && cameras && cameras.length === 0 ? (
         <Empty icon="camera" title="카메라가 없어요">

@@ -15,6 +15,7 @@ import { getPref, useLiveQuery } from '../store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
 import { useTheme } from '../theme'
 import { CustomFilmEdit } from './CustomFilmEdit'
+import { OptionalDate, TagField } from '../gearExtras'
 
 export type GearKind = 'lens' | 'filter' | 'film'
 const storageName: Record<FilmStorage, string> = { fridge: '냉장고', freezer: '냉동고', drawer: '서랍', room: '상온' }
@@ -68,12 +69,7 @@ export function PurchaseFields({ date, setDate, price, setPrice, seller, setSell
   return (
     <Section title="구입">
       <Group>
-        <Row>
-          <Text style={{ flex: 1 }}>구입 날짜</Text>
-          <Pressable onPress={() => setDate(date === undefined ? Date.now() : undefined)}>
-            <Text>{date === undefined ? '없음' : new Date(date).toISOString().slice(0, 10)}</Text>
-          </Pressable>
-        </Row>
+        <OptionalDate label="구입 날짜" value={date} onChange={setDate} />
         <Field label="구입 금액" value={price} onChangeText={(v) => setPrice(groupPrice(v))} keyboardType="number-pad" />
         <Field label="구입처" value={seller} onChangeText={setSeller} />
         {hits.length > 0 && <Chips>{hits.map((name) => (
@@ -128,10 +124,10 @@ async function storePhoto(id: string, uri?: string, cleared?: boolean) {
   else if (cleared) await deleteCameraPhoto(id)
 }
 
-export function GearBoard({ kind, layout }: { kind: GearKind; layout: string }) {
+export function GearBoard({ kind, layout, tag }: { kind: GearKind; layout: string; tag?: string }) {
   const c = useTheme()
-  const lenses = useLiveQuery(() => db.lenses.orderBy('createdAt').toArray(), [])
-  const filters = useLiveQuery(() => db.filters.orderBy('createdAt').toArray(), [])
+  const lenses = useLiveQuery(async () => (await db.lenses.orderBy('createdAt').toArray()).filter((x) => !tag || (x.tags ?? []).includes(tag)), [tag])
+  const filters = useLiveQuery(async () => (await db.filters.orderBy('createdAt').toArray()).filter((x) => !tag || (x.tags ?? []).includes(tag)), [tag])
   const lots = useLiveQuery(() => db.filmLots.orderBy('createdAt').reverse().toArray(), [])
   const [edit, setEdit] = useState<string | null>(null)
   const grid = layout === 'grid'
@@ -215,6 +211,7 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
   const [date, setDate] = useState(lens?.purchasedAt)
   const [price, setPrice] = useState(groupPrice(lens?.price ?? ''))
   const [seller, setSeller] = useState(lens?.seller ?? '')
+  const [tags, setTags] = useState<string[]>(lens?.tags ?? [])
   const [confirm, setConfirm] = useState(false)
   const hits = lensesFor(mount, model).filter((name) => name !== model).slice(0, 6)
   const apply = (name: string) => {
@@ -234,7 +231,7 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
       zoom, focalMin: min || undefined, focalMax: max || undefined,
       apertureOpen: open.trim() || undefined, apertureClose: close.trim() || undefined,
       hasPhoto: cleared ? false : !!(uri || lens?.hasPhoto),
-      purchasedAt: date, price: groupPrice(price) || undefined, seller: seller.trim() || undefined,
+      purchasedAt: date, price: groupPrice(price) || undefined, seller: seller.trim() || undefined, tags,
       createdAt: lens?.createdAt ?? Date.now(),
     }
     await storePhoto(data.id, uri, cleared)
@@ -264,6 +261,7 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
         </Group>
       </Section>
       <PurchaseFields date={date} setDate={setDate} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller} used={used} />
+      <TagField tags={tags} setTags={setTags} />
       {lens && <Group><Row onPress={() => setConfirm(true)}><Text style={{ color: '#ff453a' }}>렌즈 삭제</Text></Row></Group>}
       {confirm && lens && <Confirm message="이 렌즈를 삭제할까요? 이 렌즈로 찍은 롤 기록은 남아요." onCancel={() => setConfirm(false)}
         onConfirm={async () => { await db.lenses.delete(lens.id); onClose() }} />}
@@ -280,13 +278,14 @@ function FilterEdit({ filter, onClose }: { filter?: GearFilter; onClose: () => v
   const [date, setDate] = useState(filter?.purchasedAt)
   const [price, setPrice] = useState(groupPrice(filter?.price ?? ''))
   const [seller, setSeller] = useState(filter?.seller ?? '')
+  const [tags, setTags] = useState<string[]>(filter?.tags ?? [])
   const [confirm, setConfirm] = useState(false)
   const kinds = filterKinds.filter((item) => !name || item.toLowerCase().includes(name.toLowerCase())).filter((item) => item !== name).slice(0, 8)
   const save = async () => {
     const data: GearFilter = {
       id: filter?.id ?? uid(), name: name.trim(), diameter: diameter.replace(/[^\d.]/g, '') || undefined,
       hasPhoto: cleared ? false : !!(uri || filter?.hasPhoto),
-      purchasedAt: date, price: groupPrice(price) || undefined, seller: seller.trim() || undefined,
+      purchasedAt: date, price: groupPrice(price) || undefined, seller: seller.trim() || undefined, tags,
       createdAt: filter?.createdAt ?? Date.now(),
     }
     await storePhoto(data.id, uri, cleared)
@@ -307,6 +306,7 @@ function FilterEdit({ filter, onClose }: { filter?: GearFilter; onClose: () => v
         </Group>
       </Section>
       <PurchaseFields date={date} setDate={setDate} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller} used={used} />
+      <TagField tags={tags} setTags={setTags} />
       {filter && <Group><Row onPress={() => setConfirm(true)}><Text style={{ color: '#ff453a' }}>필터 삭제</Text></Row></Group>}
       {confirm && filter && <Confirm message="이 필터를 삭제할까요?" onCancel={() => setConfirm(false)}
         onConfirm={async () => { await db.filters.delete(filter.id); onClose() }} />}

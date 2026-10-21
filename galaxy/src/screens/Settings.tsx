@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Text, View } from 'react-native'
 import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll } from '../data'
 import { getPref, useLiveQuery } from '../store'
-import { exportGear, importGear } from '../gear'
+import { backupFileName, exportAll, importAll, localBackupAt, writeLocalBackup } from '../backup'
 import { restorePhotos } from '../restore'
 import { filmById } from '../core/films'
 import { bytesText } from '../core/display'
@@ -68,19 +68,19 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </Group>
       </Section>
 
-      <Section title="장비 백업" foot="카메라와 렌즈만 파일로 옮겨요. 이미 있는 장비는 같은 항목으로 합치고, 롤은 지우지 않아요.">
+      <Section title="백업" foot={`${localBackupAt() ? `마지막 백업 ${new Date(localBackupAt()!).toLocaleString('ko-KR')}. ` : ''}장비·필름·롤 기록을 하루 한 번 백업 파일로 써 두고, 휴대폰의 구글 백업이 켜져 있으면 구글 드라이브로 올라가요. 스캔 사진은 빠져요. 웹앱 백업 파일도 불러올 수 있어요.`}>
         <Group>
-          <Row onPress={async () => { await saveFileNow('filmchest-gear.json', await exportGear(), 'application/json') }}>장비 파일로 저장</Row>
+          <Row onPress={async () => { await writeLocalBackup(); await saveFileNow(backupFileName, await exportAll(), 'application/json') }}>백업 파일로 저장</Row>
           <Row onPress={async () => {
             const [file] = await pickFiles(['application/json', 'text/plain', '*/*'], false)
             if (!file) return
             try {
-              const counts = await importGear(file.uri)
-              setNote(`카메라 ${counts.cameras}대, 렌즈 ${counts.lenses}개를 불러왔어요.`)
+              const counts = await importAll(file.uri)
+              setNote(`카메라 ${counts.cameras}대, 롤 ${counts.rolls}개를 불러왔어요.`)
             } catch {
-              setNote('장비 파일을 읽지 못했어요.')
+              setNote('백업 파일을 읽지 못했어요.')
             }
-          }}>장비 파일 불러오기</Row>
+          }}>백업 불러오기</Row>
         </Group>
       </Section>
 

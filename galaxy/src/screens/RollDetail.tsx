@@ -16,6 +16,7 @@ import { RollGalleryButton } from '../GallerySave'
 import { useTheme } from '../theme'
 import { DayEdit, LabDropOff, LensChangeEdit, PlaceEdit } from './Editors'
 import { RollProjects } from './Projects'
+import { TagField } from '../gearExtras'
 import { FramePrint } from './FramePrint'
 import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
 import { ScanButton } from './Pending'
@@ -176,6 +177,7 @@ export function RollDetail({ id }: { id: string }) {
       </Section>
 
       <RollProjects roll={roll} />
+      <TagField tags={roll.tags ?? []} setTags={(tags) => db.rolls.update(id, { tags })} />
 
       <Section title="메모">
         <Group>

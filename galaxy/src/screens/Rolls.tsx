@@ -58,7 +58,7 @@ export function Rolls() {
     if (cameraId && r.cameraId !== cameraId) return false
     if (status && r.status !== status) return false
     if (search) {
-      const text = [rollFilmName(r), cameraName(r), r.lab, r.note, ...r.locations.map((l) => `${l.name} ${l.memo ?? ''}`)].join(' ').toLowerCase()
+      const text = [rollFilmName(r), cameraName(r), r.lab, r.note, ...r.locations.map((l) => `${l.name} ${l.memo ?? ''}`), ...(r.tags ?? [])].join(' ').toLowerCase()
       if (!text.includes(search.toLowerCase())) return false
     }
     return true
@@ -93,7 +93,7 @@ export function Rolls() {
       <ProjectStrip rolls={rolls ?? []} />
 
       <View style={{ gap: 10 }}>
-        <SearchBox placeholder="필름, 카메라, 장소, 메모" value={search} onChange={setSearch} />
+        <SearchBox placeholder="필름, 카메라, 장소, 메모, 태그" value={search} onChange={setSearch} />
         <Segmented value={grouping} options={(Object.keys(groupingName) as Grouping[]).map((g) => [g, groupingName[g]])}
           onChange={(g) => { setGrouping(g); setPref('rollGrouping', g) }} />
         <Chips>

@@ -1,9 +1,9 @@
 // 웹 pages/CameraEdit.tsx
-import { useEffect, useMemo, useState } from 'react'
-import { Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Image, PanResponder, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { db, rememberCamera } from '../data'
-import type { BodyStyle, Camera, FilmFormat } from '../core/types'
+import type { BodyStyle, Camera, FilmFormat, GearAccessory } from '../core/types'
 import { formatInfo, styleName, uid } from '../core/types'
 import { brandsMatching, catalog, catalogMatch, catalogName, inferStyle, kindText, modelsMatching, type CatalogCamera } from '../core/cameras'
 import { profileFor } from '../core/profiles'
@@ -15,6 +15,7 @@ import { Sheet, SheetBtn } from '../overlay'
 import { groupPrice } from '../core/optics'
 import { PurchaseFields, rememberSeller, useUsedSellers } from './Gear'
 import { useTheme } from '../theme'
+import { AccessoryFields, OptionalDate, TagField } from '../gearExtras'
 import { features } from '../core/features'
 
 const BODY_COLOR = '#1C1C1E'
@@ -48,6 +49,33 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
   const [bgRemoved, setBgRemoved] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [photoScale, setPhotoScale] = useState(camera?.photoScale ?? 1)
+  const [offset, setOffset] = useState({ x: camera?.photoOffsetX ?? 0, y: camera?.photoOffsetY ?? 0 })
+  const [tags, setTags] = useState<string[]>(camera?.tags ?? [])
+  const [accessories, setAccessories] = useState<GearAccessory[]>(camera?.accessories ?? [])
+  // 끌어서 옮기기 · 두 손가락으로 확대
+  const box = useRef({ w: 1, h: 1 })
+  const live = useRef({ scale: photoScale, offset })
+  live.current = { scale: photoScale, offset }
+  const start = useRef<{ x: number; y: number; scale: number; dist?: number; ox: number; oy: number } | null>(null)
+  const pan = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderGrant: () => { start.current = null },
+    onPanResponderMove: (e, g) => {
+      const t = e.nativeEvent.touches
+      if (t.length >= 2) {
+        const dist = Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY)
+        if (!start.current?.dist) start.current = { x: 0, y: 0, scale: live.current.scale, dist, ox: live.current.offset.x, oy: live.current.offset.y }
+        setPhotoScale(Math.min(3, Math.max(0.3, start.current.scale * dist / Math.max(start.current.dist!, 1))))
+      } else {
+        if (!start.current || start.current.dist) start.current = { x: g.dx, y: g.dy, scale: live.current.scale, ox: live.current.offset.x, oy: live.current.offset.y }
+        const s0 = start.current
+        setOffset({ x: s0.ox + (g.dx - s0.x) / box.current.w, y: s0.oy + (g.dy - s0.y) / box.current.h })
+      }
+    },
+    onPanResponderRelease: () => { start.current = null },
+  }), [])
   const usePhoto = async (file: { data: string; type: string }, remove: boolean) => {
     setProcessing(true)
     try {
@@ -133,6 +161,10 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
       color: BODY_COLOR,
       hasPhoto: !!photo,
       photoScale: photo ? photoScale : undefined,
+      photoOffsetX: photo && offset.x ? offset.x : undefined,
+      photoOffsetY: photo && offset.y ? offset.y : undefined,
+      tags,
+      accessories: accessories.filter((a) => a.name.trim()),
       battery: battery.trim() || undefined,
       batteryAt,
       prewind,
@@ -165,8 +197,10 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
       <Section title="외관">
         <Group style={{ padding: 12, gap: 12 }}>
           {photo ? (
-            <View style={{ height: 220, borderRadius: 16, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: c.fill }}>
-              <Image source={{ uri: `data:image/png;base64,${photo}` }} resizeMode="contain" style={{ width: '100%', height: '100%', transform: [{ scale: photoScale }] }} />
+            <View {...pan.panHandlers} onLayout={(e) => { box.current = { w: e.nativeEvent.layout.width || 1, h: e.nativeEvent.layout.height || 1 } }}
+              style={{ height: 220, borderRadius: 16, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: c.fill }}>
+              <Image source={{ uri: `data:image/png;base64,${photo}` }} resizeMode="contain"
+                style={{ width: '100%', height: '100%', transform: [{ translateX: offset.x * box.current.w }, { translateY: offset.y * box.current.h }, { scale: photoScale }] }} />
               {processing ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: c.dark ? 'rgba(31,29,27,0.6)' : 'rgba(255,255,255,0.6)' }}><Spinner /></View> : null}
             </View>
           ) : processing ? (
@@ -177,8 +211,8 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
           {photo ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <Text style={{ fontSize: 17, color: c.ink }}>크기</Text>
-              <RangeSlider value={photoScale} min={0.5} max={1.6} step={0.05} onChange={setPhotoScale} />
-              <Btn label="기본" size="small" disabled={photoScale === 1} onPress={() => setPhotoScale(1)} />
+              <RangeSlider value={photoScale} min={0.3} max={3} step={0.05} onChange={setPhotoScale} />
+              <Btn label="기본" size="small" disabled={photoScale === 1 && !offset.x && !offset.y} onPress={() => { setPhotoScale(1); setOffset({ x: 0, y: 0 }) }} />
             </View>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 32 }}>
@@ -235,14 +269,13 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
       <Section title="배터리" foot="교체한 지 1년이 지나면 내 장비에서 알려 드려요.">
         <Group>
           <Field label="배터리 종류" value={battery} onChangeText={setBattery} />
-          <Toggle label="마지막 교체일 기록" value={batteryAt !== undefined} onChange={(v) => setBatteryAt(v ? Date.now() : undefined)} />
-          {batteryAt !== undefined ? (
-            <Field label="마지막 교체"><DateInput value={batteryAt} onChange={setBatteryAt} /></Field>
-          ) : null}
+          <OptionalDate label="마지막 교체" value={batteryAt} onChange={setBatteryAt} max={Date.now()} />
         </Group>
       </Section>
 
       <PurchaseFields date={purchasedAt} setDate={setPurchasedAt} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller} used={usedSellers} />
+      <AccessoryFields items={accessories} setItems={setAccessories} bodyPrice={price} />
+      <TagField tags={tags} setTags={setTags} />
 
       {features.meter ? <Section title="필름 감기" foot={prewind == null
         ? '아직 고르지 않았어요. 노출계를 열면 한 번 묻고, 고른 쪽이 이 카메라에 저장돼요.'

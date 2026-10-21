@@ -305,10 +305,20 @@ export function CameraCover({ camera, height = 110 }: { camera: Camera; height?:
   const hash = modelHash(profileFor(camera.brand, camera.model, camera.style))
   const model = modelShots[hash] ?? modelShots[modelHash(profileFor('', '', camera.style))]
   if (photo) {
-    return <Image source={{ uri: photo }} resizeMode="contain" style={{ width: '100%', height, transform: camera.photoScale && camera.photoScale !== 1 ? [{ scale: camera.photoScale }] : undefined }} />
+    return <CoverPhoto uri={photo} height={height} camera={camera} />
   }
   if (model) return <Image source={model} resizeMode="contain" style={{ width: '100%', height }} />
   return <View style={{ height, alignItems: 'center', justifyContent: 'center' }}><Spinner /></View>
+}
+
+function CoverPhoto({ uri, height, camera }: { uri: string; height: number; camera: Camera }) {
+  const [w, setW] = useState(0)
+  return (
+    <View style={{ width: '100%', height, overflow: 'hidden' }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      <Image source={{ uri }} resizeMode="contain" style={{ width: '100%', height,
+        transform: [{ translateX: (camera.photoOffsetX ?? 0) * w }, { translateY: (camera.photoOffsetY ?? 0) * height }, { scale: camera.photoScale ?? 1 }] }} />
+    </View>
+  )
 }
 
 /** 웹 <select class="input">: 오른쪽 회색 글자, 누르면 목록 창 */

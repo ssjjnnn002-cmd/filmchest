@@ -6,13 +6,14 @@ import { useLiveQuery } from '../store'
 import { useNav } from '../App'
 import type { Camera, Lens } from '../core/types'
 import { lensSpec } from '../core/optics'
-import { formatInfo, uid } from '../core/types'
+import { formatInfo, priceText, priceValue, uid } from '../core/types'
+import { OptionalDate, TagChips } from '../gearExtras'
 import { profileFor } from '../core/profiles'
 import { lensesFor } from '../core/lenses'
 import { fmtDay, rollFilmName } from '../core/display'
 import { Model3D } from '../Model3D'
 import { useCameraPhoto } from '../files'
-import { Field, Footnote, Group, Row, RowText, Section, Sub } from '../kit'
+import { CameraCover, Field, Footnote, Group, Row, RowText, Section, Sub } from '../kit'
 import { Icon } from '../icons'
 import { GlassBtn, Page } from '../page'
 import { Confirm, Menu, Sheet, SheetBtn } from '../overlay'
@@ -48,7 +49,7 @@ export function CameraDetail({ id }: { id: string }) {
 
       <View style={{ alignItems: 'center', gap: 4, marginBottom: 8 }}>
         {photo
-          ? <Image source={{ uri: photo }} resizeMode="contain" style={{ width: '100%', height: 240 }} />
+          ? <CameraCover camera={camera} height={240} />
           : <View style={{ width: '100%' }}><Model3D profile={profileFor(camera.brand, camera.model, camera.style)} color="#1C1C1E" height={260} /></View>}
         <Text style={{ fontSize: 24, fontWeight: '700', marginTop: 4, color: c.ink, textAlign: 'center' }}>{camera.brand} {camera.model}</Text>
         <Sub>{[formatInfo[camera.format].name, camera.mount ? `${camera.mount} 마운트` : camera.fixedLens].filter(Boolean).join(' · ')}</Sub>
@@ -60,16 +61,31 @@ export function CameraDetail({ id }: { id: string }) {
             <Row static value={camera.battery}><RowText>배터리</RowText></Row>
           ) : [
             <Row key="kind" static value={camera.battery ?? '모름'}><RowText>종류</RowText></Row>,
-            <Row key="at" static>
-              <RowText>마지막 교체</RowText>
-              <Text style={{ fontSize: 17, color: batteryDue(camera) ? c.warn : c.muted }}>{camera.batteryAt ? fmtDay(camera.batteryAt) : '기록 없음'}</Text>
-            </Row>,
+            <OptionalDate key="at" label="마지막 교체" value={camera.batteryAt} max={Date.now()}
+              onChange={(v) => db.cameras.update(id, { batteryAt: v })} />,
             <Row key="now" onPress={() => db.cameras.update(id, { batteryAt: Date.now() })}>
               <Icon name="battery" size={20} color={c.safelight} /><RowText color={c.safelight}>오늘 교체함</RowText>
             </Row>,
           ]}
         </Group>
       </Section>
+
+      {camera.tags?.length ? <Section title="태그"><TagChips tags={camera.tags} /></Section> : null}
+
+      {priceValue(camera.price) > 0 || camera.accessories?.length ? (
+        <Section title="쓴 금액">
+          <Group>
+            {priceValue(camera.price) > 0 ? <Row static value={priceText(priceValue(camera.price))}><RowText>본체</RowText></Row> : null}
+            {(camera.accessories ?? []).map((a) => (
+              <Row key={a.id} static value={a.price ? priceText(priceValue(a.price)) : '-'}><RowText>{a.name}</RowText></Row>
+            ))}
+            <Row static>
+              <Text style={{ flex: 1, fontSize: 17, fontWeight: '700', color: c.ink }}>합계</Text>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>{priceText(priceValue(camera.price) + (camera.accessories ?? []).reduce((n, a) => n + priceValue(a.price), 0))}</Text>
+            </Row>
+          </Group>
+        </Section>
+      ) : null}
 
       <Section title="장착된 필름">
         <Group>
