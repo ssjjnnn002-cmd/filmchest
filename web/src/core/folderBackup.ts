@@ -1,7 +1,7 @@
 // 컴퓨터의 클라우드 동기화 폴더(구글 드라이브·OneDrive·Dropbox·iCloud Drive 앱 폴더)에 백업 파일을 덮어쓴다.
 // 크롬·엣지 같은 브라우저에서만 된다 (폴더 고르기 API). 권한은 웹앱 안에서 '허용'을 눌러 받는다.
 import { getPref, setPref } from '../platform'
-import { backupFileName, exportAll } from './backup'
+import { backupFileName, exportAll, importAll } from './backup'
 
 type Perm = 'granted' | 'denied' | 'prompt'
 type DirHandle = FileSystemDirectoryHandle & {
@@ -83,6 +83,15 @@ export async function verifyFolder(): Promise<string | undefined> {
   } catch {
     return '이 폴더에 저장할 수 없어요. 폴더를 다시 골라 주세요.'
   }
+}
+
+/** 연결한 폴더의 백업 파일로 되살린다 */
+export async function restoreFromFolder() {
+  const dir = await loadHandle()
+  if (!dir) throw new Error('폴더가 연결되지 않았어요')
+  if (await dir.queryPermission({ mode: 'readwrite' }) !== 'granted' && await dir.requestPermission({ mode: 'readwrite' }) !== 'granted') throw new Error('권한을 허용해 주세요')
+  const file = await (await dir.getFileHandle(backupFileName)).getFile().catch(() => { throw new Error('폴더에 백업 파일이 없어요') })
+  return importAll(file)
 }
 
 export async function disconnectFolder() {

@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Sheet } from '../ui/common'
 import { setPref } from '../platform'
 import { backupFileName } from '../core/backup'
-import { backupToDrive, disconnectDrive, driveAvailable, driveConnected, driveIntervalDays, driveLastBackup, driveToken } from '../core/drive'
+import { backupToDrive, restoreFromDrive, disconnectDrive, driveAvailable, driveConnected, driveIntervalDays, driveLastBackup, driveToken } from '../core/drive'
 import {
-  allowFolder, backupToFolder, disconnectFolder, folderAvailable, folderCloud, folderDays, folderLast, folderName, folderPermission, pickFolder, verifyFolder,
+  allowFolder, backupToFolder, restoreFromFolder, disconnectFolder, folderAvailable, folderCloud, folderDays, folderLast, folderName, folderPermission, pickFolder, verifyFolder,
 } from '../core/folderBackup'
 
 const clouds = [
@@ -33,7 +33,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
   const connected = !!folder || drive
   const last = Math.max(folderLast() ?? 0, driveLastBackup() ?? 0)
   const run = async (fn: () => Promise<unknown>, ok: string) => {
-    try { await fn(); setMsg({ text: ok, ok: true }) } catch (e) { setMsg({ text: (e as Error).message || '하지 못했어요', ok: false }) }
+    try { await fn(); if (ok) setMsg({ text: ok, ok: true }) } catch (e) { setMsg({ text: (e as Error).message || '하지 못했어요', ok: false }) }
     refresh()
   }
   return (
@@ -57,6 +57,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
             <>
               <button className="row" onClick={() => run(async () => { const f = await verifyFolder(); if (f) throw new Error(f) }, `${folderCloud() ?? '폴더'}에 저장하고 다시 읽었어요. 연결돼 있어요.`)}>연결 확인</button>
               <button className="row" onClick={() => run(backupToFolder, `'${backupFileName}'을 저장했어요.`)}>지금 백업</button>
+              <button className="row" onClick={() => { if (confirm('클라우드 백업으로 기록을 되살릴까요? 지금 있는 기록은 지우지 않고 합쳐요.')) void run(async () => { const n = await restoreFromFolder(); setMsg({ text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요.`, ok: true }) }, '') }}>클라우드 백업에서 복구</button>
               <label className="row static">
                 <span className="grow">자동 백업</span>
                 <select className="input" style={{ width: 'auto', textAlign: 'right' }} value={String(folderDays())}
@@ -70,6 +71,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
           {drive && (
             <>
               <button className="row" onClick={() => run(backupToDrive, '구글 드라이브에 저장했어요. 연결돼 있어요.')}>연결 확인 · 지금 백업</button>
+              <button className="row" onClick={() => { if (confirm('구글 드라이브 백업으로 기록을 되살릴까요? 지금 있는 기록은 지우지 않고 합쳐요.')) void run(async () => { const n = await restoreFromDrive(); setMsg({ text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요.`, ok: true }) }, '') }}>클라우드 백업에서 복구</button>
               <label className="row static">
                 <span className="grow">자동 백업</span>
                 <select className="input" style={{ width: 'auto', textAlign: 'right' }} value={String(driveIntervalDays())}

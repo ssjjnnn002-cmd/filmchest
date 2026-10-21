@@ -111,6 +111,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
         <h2>백업</h2>
         <div className="group">
           <button className="row" onClick={() => setCloud(true)}><span className="grow">클라우드 백업</span><span className="value">{cloudStatus()}</span><Icon name="chev" size={18} /></button>
+          <button className="row" onClick={() => setCloud(true)}><span className="grow">클라우드 백업에서 복구</span><Icon name="chev" size={18} /></button>
           <button className="row" onClick={async () => saveFileNow(backupFileName, await exportAll())}>백업 파일로 저장</button>
           <label className="row">백업 불러오기
             <input type="file" accept="application/json,.json" hidden onChange={async (e) => {
@@ -133,16 +134,16 @@ export function Settings({ onClose }: { onClose: () => void }) {
         <h2>사진으로 롤 복구</h2>
         <div className="group">
           <label className="row">이 앱이 저장한 사진 고르기
-            <input type="file" accept="image/jpeg,image/jpg" multiple hidden onChange={async (e) => {
+            <input type="file" accept="image/*" multiple hidden onChange={async (e) => {
               const files = [...(e.target.files ?? [])]
               e.target.value = ''
               if (!files.length) return
               const result = await restorePhotos(files)
-              setNote(result.frames === 0 ? '이 앱이 남긴 표식이 없는 사진이에요.' : `롤 ${result.rolls}개, 사진 ${result.frames}장을 가져왔어요.`)
+              setNote(result.frames === 0 ? '표식을 찾지 못했어요. 아이폰에서는 사진 앱 대신 \'파일\'에서 고르거나, 원본으로 공유해서 저장한 사진을 골라 주세요.' : `롤 ${result.rolls}개, 사진 ${result.frames}장을 가져왔어요.`)
             }} />
           </label>
         </div>
-        <p className="footnote">웹에서는 사진 앱 앨범을 직접 열 수 없어요. 이 앱으로 저장했던 사진을 고르면 표식으로 롤을 다시 묶어요.</p>
+        <p className="footnote">이 앱(아이폰·웹·갤럭시)으로 저장했던 사진을 고르면 표식으로 롤을 다시 묶어요. 클라우드 백업을 먼저 복구하면 필름·카메라 정보까지 함께 돌아와요.</p>
       </div>
 
       <div className="section">
