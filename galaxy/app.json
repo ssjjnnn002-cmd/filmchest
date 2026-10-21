@@ -49,6 +49,7 @@
       "expo-sqlite",
       "./plugins/withReleaseSigning",
       "./plugins/withBackupRules",
+      "./plugins/withFixedFontScale",
       "@react-native-community/datetimepicker",
       [
         "expo-media-library",
