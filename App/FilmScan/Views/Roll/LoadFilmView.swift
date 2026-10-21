@@ -184,7 +184,7 @@ struct LoadFilmView: View {
                             LabeledContent("감도", value: pushPull == 0 ? "ISO \(film.iso)"
                                            : "ISO \(shotISO ?? film.iso) (\(pushPull > 0 ? "+" : "")\(pushPull) 스톱)")
                         }
-                        Toggle("첫 촬영일 추가", isOn: $startToday)
+                        Toggle("오늘을 촬영일로 설정하기", isOn: $startToday)
                         if startToday {
                             DatePicker("날짜", selection: $startDate, in: ...Date(), displayedComponents: .date)
                         }

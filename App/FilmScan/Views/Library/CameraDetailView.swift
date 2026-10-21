@@ -12,6 +12,10 @@ struct CameraDetailView: View {
     @State private var editingLens: LensItem?
     @State private var addingLens = false
     @Query(sort: \LensItem.createdAt) private var allLenses: [LensItem]
+    @Query(sort: \FilterItem.createdAt) private var allAccessories: [FilterItem]
+    @State private var confirmBattery = false
+
+    private var myAccessories: [FilterItem] { camera.accessoryIDs.compactMap { id in allAccessories.first { $0.id == id } } }
 
     private var lenses: [LensItem] {
         if camera.lensesChosen {
@@ -50,6 +54,9 @@ struct CameraDetailView: View {
                 .listRowBackground(Color.clear)
             }
 
+            // 태그는 들어오자마자 보이고 바로 고친다
+            TagField(tags: $camera.tags)
+
             Section {
                 if camera.batteryNotNeeded {
                     LabeledContent("배터리", value: camera.batteryType ?? "")
@@ -64,9 +71,10 @@ struct CameraDetailView: View {
                                 .foregroundStyle(camera.batteryDue ? .orange : .secondary)
                         }
                     }
-                    Button("오늘 교체함", systemImage: "battery.100.bolt") {
-                        camera.batteryReplacedAt = Date()
-                    }
+                    Button("오늘 교체함", systemImage: "battery.100.bolt") { confirmBattery = true }
+                        .confirmationDialog("오늘 배터리를 교체했나요?", isPresented: $confirmBattery, titleVisibility: .visible) {
+                            Button("오늘 교체함") { camera.batteryReplacedAt = Date() }
+                        }
                 }
             } header: {
                 Text("배터리")
@@ -76,18 +84,14 @@ struct CameraDetailView: View {
                 }
             }
 
-            if !camera.tags.isEmpty {
-                Section("태그") { FlowTags(tags: camera.tags) }
-            }
-
-            if camera.price?.nilIfBlank != nil || !camera.accessories.isEmpty {
+            if camera.price?.nilIfBlank != nil || !myAccessories.isEmpty {
                 Section {
                     if let p = camera.price?.nilIfBlank { LabeledContent("본체", value: PriceSum.text(PriceSum.value(p))) }
-                    ForEach(camera.accessories) { a in
+                    ForEach(myAccessories) { a in
                         LabeledContent(a.name, value: a.price?.nilIfBlank.map { PriceSum.text(PriceSum.value($0)) } ?? "-")
                     }
                     LabeledContent("합계") {
-                        Text(PriceSum.text(PriceSum.value(camera.price) + camera.accessories.reduce(0) { $0 + PriceSum.value($1.price) }))
+                        Text(PriceSum.text(PriceSum.value(camera.price) + myAccessories.reduce(0) { $0 + PriceSum.value($1.price) }))
                             .font(.body.weight(.semibold)).foregroundStyle(.primary)
                     }
                 } header: {
@@ -294,6 +298,7 @@ struct LensEditView: View {
                     TextField("렌즈", text: $model)
                     LensSuggestions(mount: currentMount, text: $model, onPick: applyOptics)
                 }
+                TagField(tags: $tags)
                 Section("사양") {
                     Picker("종류", selection: $zoom) {
                         Text("단렌즈").tag(false)
@@ -309,7 +314,6 @@ struct LensEditView: View {
                     specField("최소개방", text: $apertureClose, unit: "f/", leading: true, numeric: false)
                 }
                 PurchaseFields(hasDate: $hasPurchaseDate, date: $purchaseDate, price: $price, seller: $seller)
-                TagField(tags: $tags)
                 if lens != nil {
                     Section {
                         Button("렌즈 삭제", systemImage: "trash", role: .destructive) { confirmDelete = true }

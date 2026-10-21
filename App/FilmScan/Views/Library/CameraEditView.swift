@@ -41,7 +41,7 @@ struct CameraEditView: View {
     @State private var dragStart: CGSize?
     @State private var pinchStart: Double?
     @State private var tags: [String] = []
-    @State private var accessories: [GearAccessory] = []
+    @State private var accessoryIDs: [UUID] = []
 
     var body: some View {
         NavigationStack {
@@ -126,6 +126,8 @@ struct CameraEditView: View {
                     }
                 }
 
+                TagField(tags: $tags)
+
                 Section("렌즈") {
                     Toggle("렌즈 교환식", isOn: $interchangeable)
                     if interchangeable {
@@ -157,9 +159,7 @@ struct CameraEditView: View {
 
                 PurchaseFields(hasDate: $hasPurchaseDate, date: $purchaseDate, price: $price, seller: $seller)
 
-                AccessoryFields(items: $accessories, bodyPrice: price)
-
-                TagField(tags: $tags)
+                AccessoryLinkFields(ids: $accessoryIDs, bodyPrice: price)
 
                 Section {
                     HStack(spacing: 8) {
@@ -308,7 +308,7 @@ struct CameraEditView: View {
         photoScale = camera.photoScale
         photoOffset = CGSize(width: camera.photoOffsetX, height: camera.photoOffsetY)
         tags = camera.tags
-        accessories = camera.accessories
+        accessoryIDs = camera.accessoryIDs
         manualStyle = camera.bodyStyleManual ? camera.bodyStyle : nil
         battery = camera.batteryType ?? ""
         hasBatteryDate = camera.batteryReplacedAt != nil
@@ -415,7 +415,7 @@ struct CameraEditView: View {
         target.photoOffsetX = photoOffset.width
         target.photoOffsetY = photoOffset.height
         target.tags = tags
-        target.accessories = accessories.filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        target.accessoryIDs = accessoryIDs
         for roll in target.rolls ?? [] { roll.rememberCamera() }
         dismiss()
     }

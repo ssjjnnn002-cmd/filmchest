@@ -16,9 +16,6 @@ struct SettingsView: View {
     @State private var gearDoc = GearDocument(data: Data())
     @State private var showExport = false
     @State private var showImport = false
-    @State private var pickFolder = false
-    @State private var backupRevision = 0
-    @AppStorage(AutoBackup.intervalKey) private var backupDays = 1
     @State private var restoreItems: [PhotosPickerItem] = []
     @State private var note: String?
     @AppStorage(AppSettings.Key.meterOffset, store: AppSettings.defaults) private var meterOffset = AppSettings.meterDefault
@@ -48,6 +45,9 @@ struct SettingsView: View {
                 }
 
                 statsSection
+                Section {
+                    NavigationLink("장비에 쓴 돈") { SpendingView() }
+                }
                 if Features.meter { meterSection }
 
                 Section {
@@ -132,33 +132,10 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    let _ = backupRevision
-                    Button { pickFolder = true } label: {
-                        LabeledContent("백업 폴더", value: AutoBackup.folderName ?? "고르기")
-                    }
-                .fileImporter(isPresented: $pickFolder, allowedContentTypes: [.folder]) { result in
-                    guard case .success(let url) = result else { return }
-                    AutoBackup.setFolder(url)
-                    do {
-                        try AutoBackup.run(context)
-                        note = "\(url.lastPathComponent) 폴더에 백업했어요."
-                    } catch { note = "이 폴더에는 저장할 수 없어요." }
-                    backupRevision += 1
-                }
-                    Picker("자동 백업", selection: $backupDays) {
-                        Text("끔").tag(0)
-                        Text("매일").tag(1)
-                        Text("매주").tag(7)
-                    }
-                    .disabled(AutoBackup.folderName == nil)
-                    if AutoBackup.folderName != nil {
-                        Button("지금 백업") {
-                            do {
-                                try AutoBackup.run(context)
-                                note = "백업했어요."
-                            } catch { note = "백업하지 못했어요. 폴더를 다시 골라 주세요." }
-                            backupRevision += 1
-                        }
+                    NavigationLink {
+                        CloudBackupView()
+                    } label: {
+                        LabeledContent("클라우드 백업", value: AutoBackup.folderName == nil ? "연결 안 됨" : "연결됨 · \(AutoBackup.cloudName ?? "폴더")")
                     }
                     Button("백업 파일로 저장") {
                         if let data = try? DataBackup.data(from: context) {
@@ -170,8 +147,7 @@ struct SettingsView: View {
                 } header: {
                     Text("백업")
                 } footer: {
-                    let last = AutoBackup.lastBackup.map { "마지막 백업 \($0.formatted(date: .abbreviated, time: .shortened)). " } ?? ""
-                    Text(last + "장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 파일 앱에서 구글 드라이브나 iCloud Drive 폴더를 고르면 앱을 닫을 때 알아서 올라가요.")
+                    Text("장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요.")
                 }
 
                 Section {

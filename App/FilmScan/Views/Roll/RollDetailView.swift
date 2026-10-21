@@ -57,6 +57,8 @@ struct RollDetailView: View {
         List {
             header
 
+            TagField(tags: Binding(get: { roll.tags }, set: { roll.tags = $0 }))
+
             if Features.meter {
             Section {
                 Picker("보기", selection: $detailTab) {
@@ -195,7 +197,6 @@ struct RollDetailView: View {
 
             RollProjectsSection(roll: roll)
 
-            TagField(tags: Binding(get: { roll.tags }, set: { roll.tags = $0 }))
 
             Section("메모") {
                 TextField("메모", text: Binding(get: { roll.note ?? "" }, set: { roll.note = $0.nilIfBlank }), axis: .vertical)

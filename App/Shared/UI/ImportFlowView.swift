@@ -364,17 +364,18 @@ struct RollRow: View {
             FilmCanisterView(stock: roll.film, format: roll.format).frame(width: 48, height: 48)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(roll.filmName).font(.subheadline.weight(.semibold))
+                    Text(roll.filmName).font(.subheadline.weight(.semibold)).lineLimit(1)
                     StatusBadge(status: roll.status)
                     if roll.isFavorite {
                         Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
                     }
                 }
                 Text([roll.cameraLabel, roll.dateRangeText].compactMap { $0 }.joined(separator: " · "))
-                    .font(.caption).foregroundStyle(.secondary)
-                if let place = roll.sortedLocations.map(\.name).joined(separator: ", ").nilIfBlank {
-                    Text(place).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                // 장소·태그 줄은 비어 있어도 자리를 지켜서 모든 줄 높이가 같다
+                let place = roll.sortedLocations.map(\.name).joined(separator: ", ")
+                Text(place.isEmpty ? " " : place).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                TagLine(tags: roll.tags)
             }
             Spacer(minLength: 0)
         }

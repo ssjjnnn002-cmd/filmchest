@@ -13,7 +13,7 @@ enum GearTab: String, CaseIterable, Identifiable {
         switch self {
         case .camera: "카메라"
         case .lens: "렌즈"
-        case .filter: "필터"
+        case .filter: "액세서리"
         case .film: "필름"
         }
     }
@@ -161,14 +161,31 @@ struct GearBrowser: View {
     let tab: GearTab
     var layout: LayoutMode = .grid
     var tag: String? = nil
+    var search = ""
+    var grouped = false
     @Query(sort: \LensItem.createdAt) private var allLenses: [LensItem]
     @Query(sort: \FilterItem.createdAt) private var allFilters: [FilterItem]
-    private var lenses: [LensItem] { allLenses.filter { tag == nil || $0.tags.contains(tag!) } }
-    private var filters: [FilterItem] { allFilters.filter { tag == nil || $0.tags.contains(tag!) } }
-    @Query(sort: \FilmLotItem.createdAt, order: .reverse) private var lots: [FilmLotItem]
+    @Query(sort: \FilmLotItem.createdAt, order: .reverse) private var allLots: [FilmLotItem]
     @State private var lensEdit: LensItem?
     @State private var filterEdit: FilterItem?
     @State private var lotEdit: FilmLotItem?
+
+    private func keep(_ tags: [String], _ text: [String]) -> Bool {
+        if let tag, !tags.contains(tag) { return false }
+        let q = search.trimmingCharacters(in: .whitespaces)
+        return q.isEmpty || (text + tags).contains { $0.localizedCaseInsensitiveContains(q) }
+    }
+    private var lenses: [LensItem] { allLenses.filter { keep($0.tags, [$0.displayName, $0.specLine, $0.mount]) } }
+    private var filters: [FilterItem] { allFilters.filter { keep($0.tags, [$0.name, $0.kindName, $0.diameterText]) } }
+    private var lots: [FilmLotItem] { allLots.filter { keep([], [$0.title, $0.metaLine]) } }
+    private var hasAny: Bool {
+        switch tab {
+        case .camera: true
+        case .lens: !allLenses.isEmpty
+        case .filter: !allFilters.isEmpty
+        case .film: !allLots.isEmpty
+        }
+    }
 
     var body: some View {
         Group {
@@ -176,14 +193,40 @@ struct GearBrowser: View {
             case .camera:
                 EmptyView()
             case .lens:
-                if lenses.isEmpty { empty("렌즈가 없어요", "가진 렌즈를 등록해 보세요.") }
-                else if layout == .grid { lensGrid } else { lensList }
+                if allLenses.isEmpty { empty("렌즈가 없어요", "가진 렌즈를 등록해 보세요.") }
+                else if lenses.isEmpty { noMatch }
+                else {
+                    sections(tagSections(lenses, grouped: grouped, tags: \.tags)) { items in
+                        if layout == .grid {
+                            grid(items) { lens in Button { lensEdit = lens } label: { LensGearCard(lens: lens) }.buttonStyle(.plain) }
+                        } else {
+                            rows(items) { lens in Button { lensEdit = lens } label: { LensGearRow(lens: lens) }.buttonStyle(.plain) }
+                        }
+                    }
+                }
             case .filter:
-                if filters.isEmpty { empty("필터가 없어요", "가진 필터를 등록해 보세요.") }
-                else if layout == .grid { filterGrid } else { filterList }
+                if allFilters.isEmpty { empty("액세서리가 없어요", "필터, 그립, 스트랩처럼 가진 장비를 등록해 보세요.") }
+                else if filters.isEmpty { noMatch }
+                else {
+                    // 묶지 않을 때는 유형별로 나눠 보여 준다
+                    let secs = grouped ? tagSections(filters, grouped: true, tags: \.tags)
+                        : Dictionary(grouping: filters, by: \.kindName).sorted { kindOrder($0.key) < kindOrder($1.key) }.map { (title: Optional($0.key), items: $0.value) }
+                    sections(secs) { items in
+                        if layout == .grid {
+                            grid(items) { f in Button { filterEdit = f } label: { FilterGearCard(filter: f) }.buttonStyle(.plain) }
+                        } else {
+                            rows(items) { f in Button { filterEdit = f } label: { FilterGearRow(filter: f) }.buttonStyle(.plain) }
+                        }
+                    }
+                }
             case .film:
-                if lots.isEmpty { empty("필름 재고가 없어요", "가진 롤을 등록해 보세요.") }
-                else if layout == .grid { filmGrid } else { filmList }
+                if allLots.isEmpty { empty("필름 재고가 없어요", "가진 롤을 등록해 보세요.") }
+                else if lots.isEmpty { noMatch }
+                else if layout == .grid {
+                    grid(lots) { lot in Button { lotEdit = lot } label: { FilmGearCard(lot: lot) }.buttonStyle(.plain) }
+                } else {
+                    rows(lots) { lot in Button { lotEdit = lot } label: { FilmGearRow(lot: lot) }.buttonStyle(.plain) }
+                }
             }
         }
         .sheet(item: $lensEdit) { LensEditView(lens: $0, mount: $0.mount) }
@@ -191,51 +234,33 @@ struct GearBrowser: View {
         .sheet(item: $lotEdit) { FilmLotEditView(lot: $0) }
     }
 
-    private var lensGrid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160, maximum: 260), spacing: 12, alignment: .top)], spacing: 12) {
-            ForEach(lenses) { lens in
-                Button { lensEdit = lens } label: { LensGearCard(lens: lens) }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    private func kindOrder(_ kind: String) -> Int { AccessoryKinds.all().firstIndex(of: kind) ?? 999 }
+
+    private var noMatch: some View {
+        ContentUnavailableView("맞는 장비가 없어요", systemImage: "magnifyingglass").padding(.top, 40)
+    }
+
+    private func sections<Item: Identifiable, Content: View>(_ secs: [(title: String?, items: [Item])],
+                                                            @ViewBuilder content: @escaping ([Item]) -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            ForEach(Array(secs.enumerated()), id: \.offset) { _, sec in
+                VStack(alignment: .leading, spacing: 8) {
+                    if let title = sec.title {
+                        Text("\(title) · \(sec.items.count)")
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                            .padding(.horizontal, 4)
+                    }
+                    content(sec.items)
+                }
             }
         }
     }
 
-    private var lensList: some View {
-        rows(lenses) { lens in
-            Button { lensEdit = lens } label: { LensGearRow(lens: lens) }.buttonStyle(.plain)
-        }
-    }
-
-    private var filterGrid: some View {
+    private func grid<Item: Identifiable, Cell: View>(_ items: [Item], @ViewBuilder cell: @escaping (Item) -> Cell) -> some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 160, maximum: 260), spacing: 12, alignment: .top)], spacing: 12) {
-            ForEach(filters) { filter in
-                Button { filterEdit = filter } label: { FilterGearCard(filter: filter) }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            ForEach(items) { item in
+                cell(item).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-        }
-    }
-
-    private var filterList: some View {
-        rows(filters) { filter in
-            Button { filterEdit = filter } label: { FilterGearRow(filter: filter) }.buttonStyle(.plain)
-        }
-    }
-
-    private var filmGrid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160, maximum: 260), spacing: 12, alignment: .top)], spacing: 12) {
-            ForEach(lots) { lot in
-                Button { lotEdit = lot } label: { FilmGearCard(lot: lot) }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            }
-        }
-    }
-
-    private var filmList: some View {
-        rows(lots) { lot in
-            Button { lotEdit = lot } label: { FilmGearRow(lot: lot) }.buttonStyle(.plain)
         }
     }
 
@@ -280,9 +305,10 @@ private struct LensGearCard: View {
                 .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 .opacity(lens.brand.nilIfBlank == nil ? 0 : 1)
             Text(lens.specLine.isEmpty ? " " : lens.specLine)
-                .font(.caption2).foregroundStyle(.secondary).lineLimit(2)
-                .frame(maxWidth: .infinity, minHeight: 28, alignment: .topLeading)
+                .font(.caption2).foregroundStyle(.secondary).lineLimit(2, reservesSpace: true)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
                 .opacity(lens.specLine.isEmpty ? 0 : 1)
+            TagLine(tags: lens.tags)
         }
         .modifier(GearCardChrome())
     }
@@ -296,11 +322,8 @@ private struct LensGearRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(lens.displayName.trimmingCharacters(in: .whitespaces).isEmpty ? "렌즈" : lens.displayName)
                     .font(.subheadline.weight(.semibold)).lineLimit(1)
-                if !lens.specLine.isEmpty {
-                    Text(lens.specLine).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                } else if let mount = lens.mount.nilIfBlank {
-                    Text(mount).font(.caption).foregroundStyle(.secondary)
-                }
+                Text(lens.specLine.nilIfBlank ?? lens.mount.nilIfBlank ?? " ").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                TagLine(tags: lens.tags)
             }
             Spacer(minLength: 0)
         }
@@ -313,12 +336,11 @@ private struct FilterGearCard: View {
     let filter: FilterItem
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            GearPhotoThumb(data: filter.photo, symbol: "camera.filters").frame(height: 110)
-            Text(filter.name.isEmpty ? "필터" : filter.name).font(.headline).lineLimit(2)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .topLeading)
-            Text(filter.diameterText.isEmpty ? " " : filter.diameterText)
-                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                .opacity(filter.diameterText.isEmpty ? 0 : 1)
+            GearPhotoThumb(data: filter.photo, symbol: filter.isFilter ? "camera.filters" : "shippingbox").frame(height: 110)
+            Text(filter.name.isEmpty ? filter.kindName : filter.name).font(.headline).lineLimit(2, reservesSpace: true)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            Text(filter.subLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            TagLine(tags: filter.tags)
         }
         .modifier(GearCardChrome())
     }
@@ -328,12 +350,11 @@ private struct FilterGearRow: View {
     let filter: FilterItem
     var body: some View {
         HStack(spacing: 14) {
-            GearPhotoThumb(data: filter.photo, symbol: "camera.filters").frame(width: 68, height: 52)
+            GearPhotoThumb(data: filter.photo, symbol: filter.isFilter ? "camera.filters" : "shippingbox").frame(width: 68, height: 52)
             VStack(alignment: .leading, spacing: 3) {
-                Text(filter.name.isEmpty ? "필터" : filter.name).font(.subheadline.weight(.semibold)).lineLimit(1)
-                if !filter.diameterText.isEmpty {
-                    Text(filter.diameterText).font(.caption).foregroundStyle(.secondary)
-                }
+                Text(filter.name.isEmpty ? filter.kindName : filter.name).font(.subheadline.weight(.semibold)).lineLimit(1)
+                Text(filter.subLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                TagLine(tags: filter.tags)
             }
             Spacer(minLength: 0)
         }
@@ -392,6 +413,10 @@ private struct GearPhotoThumb: View {
             }
         }
     }
+}
+
+private extension FilterItem {
+    var subLine: String { [kindName, diameterText.nilIfBlank, price?.nilIfBlank.map { PriceSum.text(PriceSum.value($0)) }].compactMap { $0 }.joined(separator: " · ") }
 }
 
 private extension FilmLotItem {
@@ -488,10 +513,14 @@ struct GearPhotoEditor: View {
     }
 }
 
+/// 액세서리 추가·수정 (필터, 그립, 스트랩 … 유형은 사용자가 더할 수 있다)
 struct FilterEditView: View {
     let filter: FilterItem?
+    var presetKind: String? = nil
+    var onSaved: ((FilterItem) -> Void)? = nil
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @State private var kind = AccessoryKinds.filter
     @State private var name = ""
     @State private var diameter = ""
     @State private var photo: Data?
@@ -501,38 +530,66 @@ struct FilterEditView: View {
     @State private var seller = ""
     @State private var tags: [String] = []
     @State private var confirm = false
+    @State private var addingKind = false
+    @State private var newKind = ""
+    @State private var kinds = AccessoryKinds.all()
+
+    private var isFilter: Bool { kind == AccessoryKinds.filter }
 
     var body: some View {
         NavigationStack {
             Form {
-                GearPhotoEditor(photo: $photo, symbol: "camera.filters")
-                Section("필터") {
-                    TextField("종류", text: $name)
-                    let hits = filterNames.filter { name.isEmpty || $0.localizedCaseInsensitiveContains(name) }.filter { $0 != name }.prefix(8)
-                    if !hits.isEmpty {
-                        chipRow(Array(hits)) { name = $0 }
+                GearPhotoEditor(photo: $photo, symbol: isFilter ? "camera.filters" : "shippingbox")
+                Section("액세서리") {
+                    Picker("유형", selection: Binding(get: { kind }, set: { v in
+                        if v == "__add" { addingKind = true } else { kind = v }
+                    })) {
+                        ForEach(kinds, id: \.self) { Text($0).tag($0) }
+                        Text("유형 추가…").tag("__add")
                     }
-                    TextField("직경 (mm)", text: $diameter)
-                        #if os(iOS)
-                        .keyboardType(.decimalPad)
-                        #endif
-                    chipRow(filterDiameters.filter { $0 != diameter }) { diameter = $0 }
+                    TextField(isFilter ? "종류 (예: UV, ND8)" : "이름", text: $name)
+                    if isFilter {
+                        let hits = filterNames.filter { name.isEmpty || $0.localizedCaseInsensitiveContains(name) }.filter { $0 != name }.prefix(8)
+                        if !hits.isEmpty {
+                            chipRow(Array(hits)) { name = $0 }
+                        }
+                        TextField("직경 (mm)", text: $diameter)
+                            #if os(iOS)
+                            .keyboardType(.decimalPad)
+                            #endif
+                        chipRow(filterDiameters.filter { $0 != diameter }) { diameter = $0 }
+                    }
                 }
-                PurchaseFields(hasDate: $hasDate, date: $date, price: $price, seller: $seller)
                 TagField(tags: $tags)
+                PurchaseFields(hasDate: $hasDate, date: $date, price: $price, seller: $seller)
                 if filter != nil {
-                    Section { Button("필터 삭제", role: .destructive) { confirm = true } }
+                    Section { Button("액세서리 삭제", role: .destructive) { confirm = true } }
                 }
             }
-            .navigationTitle(filter == nil ? "필터 추가" : "필터 수정")
+            .navigationTitle(filter == nil ? "액세서리 추가" : "액세서리 수정")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("저장") { save() }.disabled(name.nilIfBlank == nil || diameter.filter { $0.isNumber || $0 == "." }.isEmpty)
+                    Button("저장") { save() }.disabled(name.nilIfBlank == nil)
                 }
             }
+            .alert("유형 추가", isPresented: $addingKind) {
+                TextField("예: 핫슈 수평계", text: $newKind)
+                Button("추가") {
+                    if let k = newKind.nilIfBlank {
+                        AccessoryKinds.add(k)
+                        kinds = AccessoryKinds.all()
+                        kind = k
+                    }
+                    newKind = ""
+                }
+                Button("취소", role: .cancel) { newKind = "" }
+            }
             .onAppear {
+                if let presetKind { kind = presetKind }
                 guard let filter else { return }
+                kind = filter.kindName
+                if !kinds.contains(kind) { AccessoryKinds.add(kind); kinds = AccessoryKinds.all() }
                 name = filter.name
                 diameter = filter.diameter
                 photo = filter.photo
@@ -542,7 +599,7 @@ struct FilterEditView: View {
                 seller = filter.seller ?? ""
                 tags = filter.tags
             }
-            .confirmationDialog("이 필터를 삭제할까요?", isPresented: $confirm, titleVisibility: .visible) {
+            .confirmationDialog("이 액세서리를 삭제할까요?", isPresented: $confirm, titleVisibility: .visible) {
                 Button("삭제", role: .destructive) {
                     if let filter { context.delete(filter) }
                     dismiss()
@@ -567,14 +624,16 @@ struct FilterEditView: View {
             context.insert(item)
             return item
         }()
+        target.kind = kind
         target.name = name.trimmingCharacters(in: .whitespaces)
-        target.diameter = diameter.filter { $0.isNumber || $0 == "." }
+        target.diameter = isFilter ? diameter.filter { $0.isNumber || $0 == "." } : ""
         target.photo = photo
         target.purchasedAt = hasDate ? date : nil
         target.price = PriceText.grouped(price).nilIfBlank
         target.seller = seller.nilIfBlank
         target.tags = tags
         if let place = seller.nilIfBlank { SellerDirectory.remember(place) }
+        onSaved?(target)
         dismiss()
     }
 }

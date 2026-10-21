@@ -23,7 +23,9 @@ final class CameraItem {
     /// 나만의 태그 (검색·목록용)
     var tags: [String] = []
     /// 그립, 스트랩, 셔터 버튼 같은 악세서리 (구입 금액 합계에 들어간다)
-    var accessories: [GearAccessory] = []
+    var accessories: [GearAccessory] = []      // 예전 방식 (액세서리 탭으로 옮긴 뒤 비운다)
+    /// 이 카메라에 쓰는 액세서리 (액세서리 탭의 FilterItem id)
+    var accessoryIDs: [UUID] = []
     @Attribute(.externalStorage) var spinData: Data? // 360° 회전 사진 (PNG 배열)
     var bodyStyleRaw: String = CameraBodyStyle.slr.rawValue
     var bodyStyleManual: Bool = false             // 사용자가 형태를 직접 바꿨는지
@@ -656,6 +658,25 @@ struct GearAccessory: Codable, Hashable, Identifiable {
 }
 
 /// "1,234,000" 같은 금액 글씨를 숫자로
+/// 액세서리 유형 목록: 기본 + 사용자가 추가한 것
+enum AccessoryKinds {
+    static let filter = "필터"
+    static let defaults = [filter, "그립", "소프트 셔터 버튼", "스트랩", "스트랩 고리", "렌즈 후드", "렌즈 캡", "케이스",
+                           "플래시", "노출계", "삼각대", "릴리즈 케이블", "배터리", "어댑터", "기타"]
+    private static let key = "filmscan.accessoryKinds"
+    static func all() -> [String] {
+        let added = UserDefaults.standard.stringArray(forKey: key) ?? []
+        return defaults + added.filter { !defaults.contains($0) }
+    }
+    static func add(_ raw: String) {
+        guard let name = raw.nilIfBlank, !all().contains(name) else { return }
+        UserDefaults.standard.set((UserDefaults.standard.stringArray(forKey: key) ?? []) + [name], forKey: key)
+    }
+    static func remove(_ name: String) {
+        UserDefaults.standard.set((UserDefaults.standard.stringArray(forKey: key) ?? []).filter { $0 != name }, forKey: key)
+    }
+}
+
 enum PriceSum {
     static func value(_ text: String?) -> Int { Int((text ?? "").filter(\.isNumber)) ?? 0 }
     static func text(_ n: Int) -> String {
@@ -682,6 +703,8 @@ enum FilmStorage: String, CaseIterable, Identifiable {
 final class FilterItem {
     var id: UUID = UUID()
     var name: String = ""
+    /// 액세서리 유형 (필터, 그립, 스트랩 … 사용자가 추가 가능). 예전 필터는 비어 있음 = 필터
+    var kind: String = ""
     /// 필터 직경(mm). 40.5처럼 소수도 있다.
     var diameter: String = ""
     @Attribute(.externalStorage) var photo: Data?
@@ -694,6 +717,9 @@ final class FilterItem {
     init(name: String) {
         self.name = name
     }
+
+    var kindName: String { kind.nilIfBlank ?? AccessoryKinds.filter }
+    var isFilter: Bool { kindName == AccessoryKinds.filter }
 
     var diameterText: String {
         guard let mm = diameter.nilIfBlank else { return "" }

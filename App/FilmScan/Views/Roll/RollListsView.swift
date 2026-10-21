@@ -338,6 +338,7 @@ struct RollsView: View {
     @State private var favoritesOnly = false
     @State private var filmID: String?
     @State private var cameraID: UUID?
+    @State private var tagFilter: String?
     @AppStorage("rollGrouping") private var grouping: RollGrouping = .month
     @State private var status: RollStatus?
     @State private var deleting: RollItem?
@@ -351,6 +352,7 @@ struct RollsView: View {
             if let filmID, r.filmStockID != filmID { return false }
             if let cameraID, r.camera?.id != cameraID { return false }
             if let status, r.status != status { return false }
+            if let tagFilter, !r.tags.contains(tagFilter) { return false }
             if !search.isEmpty {
                 let text = [r.filmName, r.cameraName, r.labName ?? "", r.note ?? "",
                             r.locations.map { "\($0.name) \($0.memo ?? "")" }.joined(separator: " "), r.tags.joined(separator: " ")]
@@ -361,17 +363,28 @@ struct RollsView: View {
     }
 
     private var isFiltering: Bool {
-        favoritesOnly || filmID != nil || cameraID != nil || status != nil
+        favoritesOnly || filmID != nil || cameraID != nil || status != nil || tagFilter != nil
     }
 
     /// 보기 단위(월/분기/반기/년)로 묶기. 최근 기간이 위로.
-    private var groups: [(key: Int, title: String, rolls: [RollItem])] {
+    private var groups: [(key: String, title: String, rolls: [RollItem])] {
+        let newest: ([RollItem]) -> [RollItem] = { $0.sorted { ($0.sortedDays.first?.startedAt ?? $0.loadedAt) > ($1.sortedDays.first?.startedAt ?? $1.loadedAt) } }
+        if grouping == .tag {
+            // 태그마다 한 묶음 (태그가 여럿이면 여러 묶음에 보인다), 태그 없는 롤은 맨 아래
+            var out = Set(filtered.flatMap(\.tags)).sorted().map { t in
+                (key: "t:\(t)", title: "#\(t)", rolls: newest(filtered.filter { $0.tags.contains(t) }))
+            }
+            let none = filtered.filter { $0.tags.isEmpty }
+            if !none.isEmpty { out.append((key: "t:", title: "태그 없음", rolls: newest(none))) }
+            return out
+        }
         // 촬영일을 모르는 롤은 맨 아래 '날짜 알 수 없음'으로 (키 0)
-        Dictionary(grouping: filtered) { $0.dateUnknown ? 0 : grouping.key(for: $0.sortedDays.first?.startedAt ?? $0.loadedAt) }
-            .map { ($0.key, $0.key == 0 ? "날짜 알 수 없음" : grouping.title(for: $0.key),
-                    $0.value.sorted { ($0.sortedDays.first?.startedAt ?? $0.loadedAt) > ($1.sortedDays.first?.startedAt ?? $1.loadedAt) }) }
+        return Dictionary(grouping: filtered) { $0.dateUnknown ? 0 : grouping.key(for: $0.sortedDays.first?.startedAt ?? $0.loadedAt) }
             .sorted { $0.key > $1.key }
+            .map { (String($0.key), $0.key == 0 ? "날짜 알 수 없음" : grouping.title(for: $0.key), newest($0.value)) }
     }
+
+    private var allTags: [String] { Set(rolls.filter { $0.deletedAt == nil }.flatMap(\.tags)).sorted() }
 
     // 필터 선택지 (기록에 있는 것만)
     private var films: [(id: String, name: String)] {
@@ -522,6 +535,16 @@ struct RollsView: View {
                 }
                 .buttonStyle(FilterChipStyle(active: cameraID != nil))
 
+                if !allTags.isEmpty {
+                    Menu {
+                        Button("전체") { tagFilter = nil }
+                        ForEach(allTags, id: \.self) { t in Button("#\(t)") { tagFilter = t } }
+                    } label: {
+                        chipLabel(tagFilter.map { "#\($0)" } ?? "태그", active: tagFilter != nil)
+                    }
+                    .buttonStyle(FilterChipStyle(active: tagFilter != nil))
+                }
+
                 Menu {
                     Button("전체") { status = nil }
                     ForEach(RollStatus.allCases, id: \.self) { s in Button(s.displayName) { status = s } }
@@ -551,6 +574,7 @@ struct RollsView: View {
         filmID = nil
         cameraID = nil
         status = nil
+        tagFilter = nil
     }
 }
 
@@ -571,7 +595,7 @@ struct FilterChipStyle: ButtonStyle {
 
 /// 롤 보관함 보기 단위
 enum RollGrouping: String, CaseIterable, Identifiable {
-    case month, quarter, half, year
+    case month, quarter, half, year, tag
 
     var id: String { rawValue }
 
@@ -581,6 +605,7 @@ enum RollGrouping: String, CaseIterable, Identifiable {
         case .quarter: "분기"
         case .half: "반기"
         case .year: "년"
+        case .tag: "태그"
         }
     }
 
@@ -592,7 +617,7 @@ enum RollGrouping: String, CaseIterable, Identifiable {
         case .month: return y * 100 + m
         case .quarter: return y * 100 + (m - 1) / 3 + 1
         case .half: return y * 100 + (m <= 6 ? 1 : 2)
-        case .year: return y * 100
+        case .year, .tag: return y * 100
         }
     }
 
@@ -602,7 +627,7 @@ enum RollGrouping: String, CaseIterable, Identifiable {
         case .month: return "\(y)년 \(n)월"
         case .quarter: return "\(y)년 \(n)분기"
         case .half: return "\(y)년 \(n == 1 ? "상반기" : "하반기")"
-        case .year: return "\(y)년"
+        case .year, .tag: return "\(y)년"
         }
     }
 }
@@ -638,7 +663,8 @@ struct RollGridCard: View {
                     StatusBadge(status: roll.status)
                 }
                 Text(roll.cameraName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                Text(roll.dateRangeText).font(.caption2).foregroundStyle(.secondary)
+                Text(roll.dateRangeText).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                TagLine(tags: roll.tags)
             }
         }
         .padding(10)

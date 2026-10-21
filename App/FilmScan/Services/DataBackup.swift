@@ -26,6 +26,7 @@ enum DataBackup {
         var tags: [String]; var accessories: [GearAccessory]; var bodyStyleRaw: String; var bodyStyleManual: Bool
         var batteryType: String?; var batteryReplacedAt: Date?; var prewind: Bool?; var createdAt: Date; var sortOrder: Int
         var purchasedAt: Date?; var price, seller: String?; var lensesChosen: Bool; var linkedLensIDs: [UUID]
+        var accessoryIDs: [UUID]?
     }
     struct Lens: Codable {
         var id: UUID; var brand, model, mount: String; var photo: Data?; var createdAt: Date
@@ -35,6 +36,7 @@ enum DataBackup {
     struct Filter: Codable {
         var id: UUID; var name, diameter: String; var photo: Data?; var purchasedAt: Date?
         var price, seller: String?; var tags: [String]; var createdAt: Date
+        var kind: String?
     }
     struct Lot: Codable {
         var id: UUID; var filmStockID, customName, formatRaw: String; var count, lowAt: Int; var storageRaw: String
@@ -65,7 +67,7 @@ enum DataBackup {
                 photoOffsetY: $0.photoOffsetY, tags: $0.tags, accessories: $0.accessories, bodyStyleRaw: $0.bodyStyleRaw,
                 bodyStyleManual: $0.bodyStyleManual, batteryType: $0.batteryType, batteryReplacedAt: $0.batteryReplacedAt,
                 prewind: $0.prewind, createdAt: $0.createdAt, sortOrder: $0.sortOrder, purchasedAt: $0.purchasedAt,
-                price: $0.price, seller: $0.seller, lensesChosen: $0.lensesChosen, linkedLensIDs: $0.linkedLensIDs)
+                price: $0.price, seller: $0.seller, lensesChosen: $0.lensesChosen, linkedLensIDs: $0.linkedLensIDs, accessoryIDs: $0.accessoryIDs)
         }
         f.lenses = all(LensItem.self).map {
             Lens(id: $0.id, brand: $0.brand, model: $0.model, mount: $0.mount, photo: $0.photo, createdAt: $0.createdAt,
@@ -74,7 +76,7 @@ enum DataBackup {
         }
         f.filters = all(FilterItem.self).map {
             Filter(id: $0.id, name: $0.name, diameter: $0.diameter, photo: $0.photo, purchasedAt: $0.purchasedAt,
-                   price: $0.price, seller: $0.seller, tags: $0.tags, createdAt: $0.createdAt)
+                   price: $0.price, seller: $0.seller, tags: $0.tags, createdAt: $0.createdAt, kind: $0.kind)
         }
         f.lots = all(FilmLotItem.self).map {
             Lot(id: $0.id, filmStockID: $0.filmStockID, customName: $0.customName, formatRaw: $0.formatRaw, count: $0.count,
@@ -126,6 +128,7 @@ enum DataBackup {
             t.batteryReplacedAt = c.batteryReplacedAt; t.prewind = c.prewind; t.createdAt = c.createdAt; t.sortOrder = c.sortOrder
             t.purchasedAt = c.purchasedAt; t.price = c.price; t.seller = c.seller; t.lensesChosen = c.lensesChosen
             t.linkedLensIDs = c.linkedLensIDs; t.deletedAt = nil
+            if let ids = c.accessoryIDs { t.accessoryIDs = ids }
         }
         for l in f.lenses {
             let t = find(lenses, { let x = LensItem(brand: l.brand, model: l.model, mount: l.mount); x.id = l.id; return x }) { $0.id == l.id }
@@ -138,6 +141,7 @@ enum DataBackup {
             let t = find(filters, { let n = FilterItem(name: x.name); n.id = x.id; return n }) { $0.id == x.id }
             t.name = x.name; t.diameter = x.diameter; if let p = x.photo { t.photo = p }; t.purchasedAt = x.purchasedAt
             t.price = x.price; t.seller = x.seller; t.tags = x.tags; t.createdAt = x.createdAt
+            if let k = x.kind { t.kind = k }
         }
         let lots = all(FilmLotItem.self)
         for x in f.lots {
@@ -195,7 +199,59 @@ enum AutoBackup {
             UserDefaults.standard.set(data, forKey: bookmarkKey)
         }
     }
-    static func clearFolder() { UserDefaults.standard.removeObject(forKey: bookmarkKey) }
+    static func clearFolder() {
+        UserDefaults.standard.removeObject(forKey: bookmarkKey)
+        UserDefaults.standard.removeObject(forKey: cloudKey)
+        UserDefaults.standard.removeObject(forKey: checkKey)
+    }
+
+    private static let cloudKey = "filmscan.backupCloud"
+    private static let checkKey = "filmscan.backupChecked"
+    /// 사용자가 고른 클라우드 이름 (폴더 경로로 알 수 있으면 그것을 쓴다)
+    static var cloudName: String? {
+        get {
+            guard let url = folder() else { return nil }
+            return detectCloud(url) ?? UserDefaults.standard.string(forKey: cloudKey)
+        }
+        set { UserDefaults.standard.set(newValue, forKey: cloudKey) }
+    }
+    static var lastCheck: Date? { UserDefaults.standard.object(forKey: checkKey) as? Date }
+    /// 이 iPhone 안 폴더라 클라우드로 올라가지 않는지
+    static var isLocalOnly: Bool {
+        guard let path = folder()?.path else { return false }
+        return path.contains("/Containers/Shared/AppGroup/") && detectCloud(folder()!) == nil && cloudName == nil
+    }
+
+    static func detectCloud(_ url: URL) -> String? {
+        let p = url.path
+        if p.contains("com~apple~CloudDocs") || p.contains("Mobile Documents") { return "iCloud Drive" }
+        if p.localizedCaseInsensitiveContains("GoogleDrive") || p.contains("com.google.Drive") { return "구글 드라이브" }
+        if p.localizedCaseInsensitiveContains("OneDrive") { return "OneDrive" }
+        if p.localizedCaseInsensitiveContains("Dropbox") { return "Dropbox" }
+        return nil
+    }
+
+    /// 연결 확인: 폴더에 작은 파일을 쓰고 다시 읽은 뒤 지운다
+    static func verify() -> String? {
+        guard let dir = folder() else { return "폴더가 연결되지 않았어요." }
+        let ok = dir.startAccessingSecurityScopedResource()
+        defer { if ok { dir.stopAccessingSecurityScopedResource() } }
+        let test = dir.appendingPathComponent(".필름함 연결 확인.txt")
+        let stamp = Date().formatted(.iso8601)
+        var failure: String?
+        NSFileCoordinator().coordinate(writingItemAt: test, options: .forReplacing, error: nil) { url in
+            do {
+                try Data(stamp.utf8).write(to: url, options: .atomic)
+                let back = try String(contentsOf: url, encoding: .utf8)
+                if back != stamp { failure = "저장한 내용을 다시 읽지 못했어요." }
+                try? FileManager.default.removeItem(at: url)
+            } catch {
+                failure = "이 폴더에 저장할 수 없어요. 폴더를 다시 골라 주세요."
+            }
+        }
+        if failure == nil { UserDefaults.standard.set(Date(), forKey: checkKey) }
+        return failure
+    }
 
     private static func folder() -> URL? {
         guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }

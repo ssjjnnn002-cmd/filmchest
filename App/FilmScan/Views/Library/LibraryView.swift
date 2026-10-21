@@ -28,10 +28,23 @@ struct LibraryView: View {
     @State private var showAddFilter = false
     @State private var showAddFilm = false
     @State private var tagFilter: String?
+    @State private var search = ""
+    @AppStorage("gearGrouped") private var grouped = false
     @Query private var lensTagSource: [LensItem]
     @Query private var filterTagSource: [FilterItem]
 
-    private var visible: [CameraItem] { cameras.filter { $0.deletedAt == nil && (editing || tagFilter == nil || $0.tags.contains(tagFilter!)) } }
+    private var visible: [CameraItem] {
+        let q = search.trimmingCharacters(in: .whitespaces)
+        return cameras.filter { c in
+            guard c.deletedAt == nil else { return false }
+            if editing { return true }
+            if let tagFilter, !c.tags.contains(tagFilter) { return false }
+            return q.isEmpty || ([c.displayName, c.nickname ?? "", c.mount ?? "", c.fixedLensName ?? ""] + c.tags).contains { $0.localizedCaseInsensitiveContains(q) }
+        }
+    }
+    private var hasCameras: Bool { cameras.contains { $0.deletedAt == nil } }
+    /// 태그로 묶었을 때는 순서 바꾸기 없이 묶음마다 보여 준다
+    private var showGrouped: Bool { grouped && !editing && gear == .camera }
 
     /// 지금 탭의 장비에 붙은 태그 (많이 쓴 순)
     private var tabTags: [String] {
@@ -61,12 +74,39 @@ struct LibraryView: View {
                 Picker("장비", selection: $gear) {
                     ForEach(GearTab.allCases) { Text($0.title).tag($0) }
                 }
-                .onChange(of: gear) { tagFilter = nil }
+                .onChange(of: gear) { tagFilter = nil; search = "" }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .padding(.horizontal)
                 .padding(.top, 4)
                 .padding(.bottom, 2)
+                HStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                        TextField("\(gear.title) 검색", text: $search)
+                            .autocorrectionDisabled()
+                        if !search.isEmpty {
+                            Button { search = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 8)
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
+                    if gear != .film {
+                        Button {
+                            withAnimation { grouped.toggle() }
+                        } label: {
+                            Label("태그별로 묶기", systemImage: "rectangle.3.group")
+                                .labelStyle(.iconOnly)
+                                .padding(9)
+                                .foregroundStyle(grouped ? .white : Theme.safelight)
+                                .background(grouped ? Theme.safelight : Theme.card, in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityValue(grouped ? "켜짐" : "꺼짐")
+                    }
+                }
+                .padding(.horizontal)
                 if !tabTags.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 6) {
@@ -82,9 +122,40 @@ struct LibraryView: View {
                 }
             }
             if gear != .camera && !editing {
-                GearBrowser(tab: gear, layout: layout, tag: tagFilter)
+                GearBrowser(tab: gear, layout: layout, tag: tagFilter, search: search, grouped: grouped)
                     .padding(.horizontal)
                     .padding(.vertical, 8)
+            } else if hasCameras && visible.isEmpty {
+                ContentUnavailableView("맞는 카메라가 없어요", systemImage: "magnifyingglass").padding(.top, 60)
+            } else if showGrouped {
+                VStack(alignment: .leading, spacing: 16) {
+                    ForEach(Array(tagSections(orderedCameras, grouped: true, tags: \.tags).enumerated()), id: \.offset) { _, sec in
+                        Text("\(sec.title ?? "") · \(sec.items.count)")
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                            .padding(.horizontal, 4)
+                        if layout == .grid {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160, maximum: 260), spacing: 12, alignment: .top)], spacing: 12) {
+                                ForEach(sec.items) { camera in
+                                    CameraCard(camera: camera, placeholder: false, tracksGesture: false,
+                                               onLoadFilm: { router.loadFilm(camera: camera) }, onPhase: { _ in })
+                                }
+                            }
+                        } else {
+                            LazyVStack(spacing: 0) {
+                                ForEach(sec.items) { camera in
+                                    CameraListRow(camera: camera, placeholder: false, tracksGesture: false,
+                                                  onLoadFilm: { router.loadFilm(camera: camera) }, onPhase: { _ in })
+                                    if camera.id != sec.items.last?.id { Divider().padding(.leading, 96) }
+                                }
+                            }
+                            .background(Theme.card, in: RoundedRectangle(cornerRadius: 18))
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .frame(maxWidth: 1100)
+                .frame(maxWidth: .infinity)
             } else if visible.isEmpty {
                 ContentUnavailableView {
                     Label("카메라가 없어요", systemImage: "camera")
@@ -133,7 +204,10 @@ struct LibraryView: View {
             }
         }
         .overlay { dragOverlay }
-        .onAppear { if order.isEmpty { order = visible.map(\.id) } }
+        .onAppear {
+            if order.isEmpty { order = visible.map(\.id) }
+            AccessoryMigration.run(context)
+        }
         .onChange(of: visible.map(\.id)) { _, ids in
             if dragging == nil { order = ids }
         }
@@ -320,8 +394,10 @@ private struct CameraCard: View {
                                 Label("배터리 교체", systemImage: "battery.25")
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(.orange)
+                                    .lineLimit(1)
                             }
                         }
+                        TagLine(tags: camera.tags)
                     }
                 }
                 .contentShape(Rectangle())
@@ -401,15 +477,19 @@ private struct CameraListRow: View {
                     CameraCoverView(camera: camera)
                         .frame(width: 68, height: 52)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(camera.displayName).font(.subheadline.weight(.semibold)).lineLimit(1)
+                        HStack(spacing: 4) {
+                            Text(camera.displayName).font(.subheadline.weight(.semibold)).lineLimit(1)
+                            if camera.batteryDue {
+                                Image(systemName: "battery.25").font(.caption).foregroundStyle(.orange)
+                                    .accessibilityLabel("배터리 교체할 때가 됐어요")
+                            }
+                        }
                         if let roll = camera.loadedRoll {
                             Text(roll.filmName).font(.caption).foregroundStyle(Theme.safelight).lineLimit(1)
                         } else {
                             Text("비어 있음").font(.caption).foregroundStyle(.secondary)
                         }
-                        if camera.batteryDue {
-                            Label("배터리 교체할 때가 됐어요", systemImage: "battery.25").font(.caption2).foregroundStyle(.orange)
-                        }
+                        TagLine(tags: camera.tags)
                     }
                     Spacer(minLength: 0)
                 }
