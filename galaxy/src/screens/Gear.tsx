@@ -8,7 +8,7 @@ import { lensesFor } from '../core/lenses'
 import { filmFits, filterDiameters, filterKinds, groupPrice, lensSpec, parseLens } from '../core/optics'
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
 import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
-import { deleteCameraPhoto, readBytes, saveCameraPhoto, useCameraPhoto } from '../files'
+import { deleteCameraPhoto, readBytes, saveCameraPhoto, useCameraPhoto, usePhotoBleeds } from '../files'
 import { Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Group, Row, Section, Segmented, Select, Sub } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { getPref, useLiveQuery } from '../store'
@@ -207,8 +207,15 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false }: {
 
 function GearImage({ id, hasPhoto, tall }: { id: string; hasPhoto?: boolean; tall: boolean }) {
   const uri = useCameraPhoto(id, !!hasPhoto)
+  // 그냥 사진: 바둑판에서는 카드 위쪽·양옆을 꽉 채우고(카드 안쪽 여백 14), 목록에서는 모서리를 둥글게
+  const bleed = usePhotoBleeds(id, !!hasPhoto)
+  if (uri && bleed) {
+    return tall
+      ? <Image source={{ uri }} resizeMode="cover" style={{ height: 124, margin: -14, marginBottom: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22 }} />
+      : <Image source={{ uri }} resizeMode="cover" style={{ width: 68, height: 52, borderRadius: 8 }} />
+  }
   return uri
-    ? <Image source={{ uri }} style={{ width: '100%', height: tall ? 110 : 52 }} resizeMode="contain" />
+    ? <Image source={{ uri }} style={{ width: tall ? '100%' : 68, height: tall ? 110 : 52, borderRadius: tall ? undefined : 8 }} resizeMode="contain" />
     : <View style={{ height: tall ? 110 : 52, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 28, opacity: 0.3 }}>◎</Text></View>
 }
 

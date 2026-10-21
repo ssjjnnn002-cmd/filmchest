@@ -25,6 +25,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [theme, setTheme] = useState<string>(getPref<string>('theme', 'system'))
   const [usage, setUsage] = useState<{ used: number; quota: number }>()
   const [confirm, setConfirm] = useState(false)
+  const [purge, setPurge] = useState<{ kind: 'roll' | 'camera'; id: string }>()
   const [privacy, setPrivacy] = useState(false)
   const [note, setNote] = useState<string>()
   const [cloud, setCloud] = useState(false)
@@ -128,7 +129,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 <Row key={roll.id} static>
                   <RowText>{filmById(roll.filmId)?.name ?? '필름 알 수 없음'}</RowText>
                   <Btn label="되돌리기" kind="ghost" onPress={() => { void restoreRoll(roll.id) }} />
-                  <Btn label="지금 지우기" kind="danger" onPress={() => { void deleteRoll(roll.id, true) }} />
+                  <Btn label="지금 지우기" kind="danger" onPress={() => setPurge({ kind: 'roll', id: roll.id })} />
                 </Row>
               ))}
             </Group>
@@ -141,11 +142,16 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 <Row key={camera.id} static>
                   <RowText>{camera.brand} {camera.model}</RowText>
                   <Btn label="되돌리기" kind="ghost" onPress={() => { void restoreCamera(camera.id) }} />
-                  <Btn label="지금 지우기" kind="danger" onPress={() => { void purgeCamera(camera.id) }} />
+                  <Btn label="지금 지우기" kind="danger" onPress={() => setPurge({ kind: 'camera', id: camera.id })} />
                 </Row>
               ))}
             </Group>
           </Section>
+          {purge ? (
+            <Confirm message={purge.kind === 'roll' ? '이 롤 기록을 지금 지울까요? 되돌릴 수 없어요. 사진 앱에 저장한 사진은 그대로 남아요.' : '이 카메라를 지금 지울까요? 되돌릴 수 없어요. 필름에 적힌 카메라 정보는 남아요.'} action="지우기"
+              onCancel={() => setPurge(undefined)}
+              onConfirm={() => { const p = purge; setPurge(undefined); void (p.kind === 'roll' ? deleteRoll(p.id, true) : purgeCamera(p.id)) }} />
+          ) : null}
 
           <Group>
             <Row chev onPress={() => setSpending(true)}><RowText>통계</RowText></Row>

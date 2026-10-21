@@ -10,6 +10,8 @@ struct BackupRestoreView: View {
     @State private var showImport = false
     @State private var restoreItems: [PhotosPickerItem] = []
     @State private var note: String?
+    @State private var purgeRoll: RollItem?
+    @State private var purgeCamera: CameraItem?
     @Query(sort: \RollItem.loadedAt, order: .reverse) private var rolls: [RollItem]
     @Query(sort: \CameraItem.sortOrder) private var cameras: [CameraItem]
     private var trashed: [RollItem] { rolls.filter { $0.deletedAt != nil } }
@@ -72,7 +74,7 @@ struct BackupRestoreView: View {
                     // 목록 한 줄에 버튼이 둘이면 한 번 눌러도 둘 다 눌린다 → 각각 따로 눌리게
                     Button("되돌리기") { roll.deletedAt = nil }
                         .buttonStyle(.borderless)
-                    Button("지금 지우기", role: .destructive) { context.delete(roll) }
+                    Button("지금 지우기", role: .destructive) { purgeRoll = roll }
                         .buttonStyle(.borderless)
                 }
             }
@@ -92,10 +94,7 @@ struct BackupRestoreView: View {
                     Spacer()
                     Button("되돌리기") { camera.deletedAt = nil }
                         .buttonStyle(.borderless)
-                    Button("지금 지우기", role: .destructive) {
-                        for roll in camera.rolls ?? [] { roll.rememberCamera() }
-                        context.delete(camera)
-                    }
+                    Button("지금 지우기", role: .destructive) { purgeCamera = camera }
                     .buttonStyle(.borderless)
                 }
             }
@@ -106,6 +105,23 @@ struct BackupRestoreView: View {
         }
         }
         .formStyle(.grouped)
+        .confirmationDialog("이 롤 기록을 지금 지울까요? 되돌릴 수 없어요. 사진 앱에 저장한 사진은 그대로 남아요.",
+                            isPresented: Binding(get: { purgeRoll != nil }, set: { if !$0 { purgeRoll = nil } }), titleVisibility: .visible) {
+            Button("지우기", role: .destructive) {
+                if let roll = purgeRoll { context.delete(roll) }
+                purgeRoll = nil
+            }
+        }
+        .confirmationDialog("이 카메라를 지금 지울까요? 되돌릴 수 없어요. 필름에 적힌 카메라 정보는 남아요.",
+                            isPresented: Binding(get: { purgeCamera != nil }, set: { if !$0 { purgeCamera = nil } }), titleVisibility: .visible) {
+            Button("지우기", role: .destructive) {
+                if let camera = purgeCamera {
+                    for roll in camera.rolls ?? [] { roll.rememberCamera() }
+                    context.delete(camera)
+                }
+                purgeCamera = nil
+            }
+        }
     .fileExporter(isPresented: $showExport, document: gearDoc, contentType: .json, defaultFilename: DataBackup.fileName) { _ in }
     .fileImporter(isPresented: $showImport, allowedContentTypes: [.json]) { result in
         guard case .success(let url) = result else { return }

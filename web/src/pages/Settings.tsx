@@ -16,6 +16,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [theme, setTheme] = useState<string>(getPref('theme', 'system'))
   const [usage, setUsage] = useState<{ used: number; quota: number }>()
   const [confirm, setConfirm] = useState(false)
+  const [purge, setPurge] = useState<{ kind: 'roll' | 'camera'; id: string }>()
   const [privacy, setPrivacy] = useState(false)
   const [note, setNote] = useState<string>()
   const [cloud, setCloud] = useState(false)
@@ -173,7 +174,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 <div className="row" key={roll.id}>
                   <span className="grow">{filmById(roll.filmId)?.name ?? '필름 알 수 없음'}</span>
                   <button className="btn ghost" onClick={() => { void restoreRoll(roll.id) }}>되돌리기</button>
-                  <button className="btn ghost" style={{ color: '#c0392b' }} onClick={() => { void deleteRoll(roll.id, true) }}>지금 지우기</button>
+                  <button className="btn ghost" style={{ color: '#c0392b' }} onClick={() => setPurge({ kind: 'roll', id: roll.id })}>지금 지우기</button>
                 </div>
               ))}
             </div>
@@ -188,12 +189,17 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 <div className="row" key={camera.id}>
                   <span className="grow">{camera.brand} {camera.model}</span>
                   <button className="btn ghost" onClick={() => { void restoreCamera(camera.id) }}>되돌리기</button>
-                  <button className="btn ghost" style={{ color: '#c0392b' }} onClick={() => { void purgeCamera(camera.id) }}>지금 지우기</button>
+                  <button className="btn ghost" style={{ color: '#c0392b' }} onClick={() => setPurge({ kind: 'camera', id: camera.id })}>지금 지우기</button>
                 </div>
               ))}
             </div>
             <p className="footnote">지운 카메라는 24시간 동안 여기 남아요. 필름에 적힌 카메라 정보는 카메라를 지워도 그대로예요.</p>
           </div>
+          {purge && (
+            <Confirm message={purge.kind === 'roll' ? '이 롤 기록을 지금 지울까요? 되돌릴 수 없어요. 사진 앱에 저장한 사진은 그대로 남아요.' : '이 카메라를 지금 지울까요? 되돌릴 수 없어요. 필름에 적힌 카메라 정보는 남아요.'} action="지우기"
+              onCancel={() => setPurge(undefined)}
+              onConfirm={() => { const p = purge; setPurge(undefined); void (p.kind === 'roll' ? deleteRoll(p.id, true) : purgeCamera(p.id)) }} />
+          )}
 
           <div className="section">
             <div className="group">

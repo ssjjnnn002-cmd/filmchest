@@ -398,7 +398,7 @@ export function useObjectURL(blob?: Blob) {
 const BODY_COLOR = '#1C1C1E'
 
 /** 카메라 대표 모습: 기기 파일로 둔 사진 → 기본 3D 모형 정지 이미지. 기본 모형은 항상 검정. */
-export function CameraCover({ camera, height = 110 }: { camera: Camera; height?: number }) {
+export function CameraCover({ camera, height = 110, fill }: { camera: Camera; height?: number; fill?: boolean }) {
   const wantPhoto = !!(camera.hasPhoto || camera.photo)
   const photo = useCameraPhoto(camera.id, wantPhoto)
   const baked = modelHash(profileFor(camera.brand, camera.model, camera.style))
@@ -419,7 +419,7 @@ export function CameraCover({ camera, height = 110 }: { camera: Camera; height?:
     ? <div style={{ overflow: photo ? 'hidden' : undefined }}>
         <img src={src} alt={`${camera.brand} ${camera.model}`} draggable={false}
           onError={photo ? undefined : useDrawnModel}
-          style={{ width: '100%', height, objectFit: 'contain', display: 'block',
+          style={{ width: '100%', height, objectFit: fill && photo ? 'cover' : 'contain', display: 'block',
             transform: photo ? `translate(${(camera.photoOffsetX ?? 0) * 100}%, ${(camera.photoOffsetY ?? 0) * 100}%) scale(${camera.photoScale ?? 1})` : undefined }} />
       </div>
     : <div style={{ height, display: 'grid', placeItems: 'center' }}><div className="spinner" /></div>

@@ -76,6 +76,31 @@ export function useCameraPhoto(id: string, enabled = true) {
   return enabled ? cameraPhotoUri(id) : undefined
 }
 
+/** 배경을 지운 PNG(투명)인지. 파일이 바뀔 때만 앞 4바이트를 다시 읽는다. */
+const cutouts = new Map<string, { at: number; png: boolean }>()
+function isCutout(id: string) {
+  const f = photoFile(id)
+  if (!f.exists) return undefined
+  const at = f.modificationTime ?? 0
+  const hit = cutouts.get(id)
+  if (hit && hit.at === at) return hit.png
+  let png = false
+  try {
+    const h = f.open()
+    const b = h.readBytes(4)
+    h.close()
+    png = b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47
+  } catch { return undefined }
+  cutouts.set(id, { at, png })
+  return png
+}
+
+/** 그냥 사진(배경 안 지운 사진)이면 true. 칸을 꽉 채워 보여 줄지 정할 때 쓴다. */
+export function usePhotoBleeds(id: string, enabled = true) {
+  useSyncExternalStore(subscribe, () => revision, () => revision)
+  return enabled && isCutout(id) === false
+}
+
 // --- base64 (웹 도구 WebView와 주고받기)
 
 export function bytesToB64(bytes: Uint8Array) {

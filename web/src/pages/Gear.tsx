@@ -9,7 +9,7 @@ import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core
 import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
 import { getPref } from '../platform'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
-import { deleteCameraPhoto, saveCameraPhoto, useCameraPhoto } from '../photoStore'
+import { deleteCameraPhoto, saveCameraPhoto, useCameraPhoto, usePhotoBleeds } from '../photoStore'
 import { Canister, Confirm, Icon, Sheet } from '../ui/common'
 import { CustomFilmEdit } from './CustomFilmEdit'
 import { TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../ui/gearExtras'
@@ -220,8 +220,15 @@ export function GearAdd({ kind, onClose }: { kind: GearKind; onClose: () => void
 
 function GearPhoto({ id, hasPhoto, grid }: { id: string; hasPhoto?: boolean; grid: boolean }) {
   const url = useCameraPhoto(id, !!hasPhoto)
+  // 그냥 사진: 바둑판에서는 카드 위쪽·양옆을 꽉 채우고, 목록에서는 모서리를 둥글게
+  const bleed = usePhotoBleeds(id, !!hasPhoto)
+  if (url && bleed) {
+    return grid
+      ? <img src={url} alt="" className="gear-bleed" />
+      : <img src={url} alt="" style={{ width: 68, height: 52, objectFit: 'cover', borderRadius: 8, flex: 'none' }} />
+  }
   return url
-    ? <img src={url} alt="" style={{ width: grid ? '100%' : 68, height: grid ? 110 : 52, objectFit: 'contain' }} />
+    ? <img src={url} alt="" style={{ width: grid ? '100%' : 68, height: grid ? 110 : 52, objectFit: 'contain', borderRadius: grid ? undefined : 8, flex: grid ? undefined : 'none' }} />
     : <span style={{ width: grid ? '100%' : 68, height: grid ? 110 : 52, display: 'grid', placeItems: 'center' }}><Icon name="camera" size={28} /></span>
 }
 

@@ -8,6 +8,8 @@ import type { Camera } from './core/types'
 const urls = new Map<string, string>()
 const blobs = new Map<string, Blob>()
 const pending = new Map<string, Promise<string | undefined>>()
+/** 배경을 지운 PNG(투명)인지. 그냥 사진이면 카드 칸을 꽉 채워 보여 준다. */
+const cutouts = new Map<string, boolean>()
 let revision = 0
 const listeners = new Set<() => void>()
 
@@ -35,6 +37,13 @@ function publish(id: string, blob: Blob) {
   const url = URL.createObjectURL(blob)
   blobs.set(id, blob)
   urls.set(id, url)
+  cutouts.delete(id)
+  void blob.slice(0, 4).arrayBuffer().then((buf) => {
+    if (blobs.get(id) !== blob) return
+    const b = new Uint8Array(buf)
+    cutouts.set(id, b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47)
+    emit()
+  }).catch(() => {})
   emit()
   return url
 }
@@ -95,6 +104,7 @@ export async function saveCameraPhoto(id: string, blob: Blob) {
 export async function deleteCameraPhoto(id: string) {
   urls.delete(id)
   blobs.delete(id)
+  cutouts.delete(id)
   pending.delete(id)
   emit()
   try {
@@ -168,6 +178,12 @@ export async function migrateCameraPhotos() {
 }
 
 /** 기기 파일에 있는 카메라 사진 주소. 없으면 불러온 뒤 다시 그린다. */
+/** 그냥 사진(배경 안 지운 사진)이면 true. 칸을 꽉 채워 보여 줄지 정할 때 쓴다. */
+export function usePhotoBleeds(id?: string, enabled = true) {
+  useSyncExternalStore(subscribe, () => revision, () => revision)
+  return !!id && enabled && cutouts.get(id) === false
+}
+
 export function useCameraPhoto(id?: string, enabled = true) {
   const rev = useSyncExternalStore(subscribe, () => revision, () => revision)
   const url = id && enabled ? urls.get(id) : undefined

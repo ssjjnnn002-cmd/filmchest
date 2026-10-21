@@ -366,6 +366,10 @@ select.input { appearance: none; -webkit-appearance: none; color: var(--muted); 
 [data-reorder] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 [data-reorder] img { -webkit-user-drag: none; pointer-events: none; }
 .card .cover img { max-height: 120px; object-fit: contain; }
+/* 그냥 사진: 카드 안쪽 여백(16px)만큼 넘겨 위쪽·양옆을 꽉 채운다 */
+.card .cover.bleed { height: 136px; margin: -16px -16px 0; }
+.card .cover.bleed img { max-height: none; }
+.card > .gear-bleed { width: calc(100% + 32px); max-width: none; height: 126px; margin: -16px -16px 0; object-fit: cover; display: block; }
 .card .name { cursor: pointer; min-width: 0; }
 .card .name b { display: block; font-size: 19px; font-weight: 700; }
 .card .name .sub { font-size: 15px; }

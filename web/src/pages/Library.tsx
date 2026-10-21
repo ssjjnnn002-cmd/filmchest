@@ -11,7 +11,7 @@ import { GearAdd, GearBoard, type GearKind } from './Gear'
 import { TagFilter, TagLine, migrateAccessories, tagSections } from '../ui/gearExtras'
 import { Settings } from './Settings'
 import { getPref, setPref } from '../platform'
-import { cameraPhotoURL } from '../photoStore'
+import { cameraPhotoURL, usePhotoBleeds } from '../photoStore'
 import { seedExample } from '../seed'
 
 export const batteryDue = (c: Camera) =>
@@ -382,9 +382,11 @@ function ReorderItem({ id, editing, placeholder, onLongPress, onStart, children 
 function CameraCard({ camera, roll }: { camera: Camera; roll?: Roll }) {
   const nav = useNav()
   const open = () => nav.push({ type: 'camera', id: camera.id })
+  // 그냥 사진: 카드 위쪽·양옆을 꽉 채운다 (다른 카드와 높이는 같게)
+  const bleed = usePhotoBleeds(camera.id, !!(camera.hasPhoto || camera.photo))
   return (
     <div className="card">
-      <div className="cover" onClick={open}><CameraCover camera={camera} /></div>
+      <div className={bleed ? 'cover bleed' : 'cover'} onClick={open}><CameraCover camera={camera} height={bleed ? 136 : 110} fill={bleed} /></div>
       <div className="name" onClick={open}>
         <b className="truncate">{camera.model}</b>
         <span className="sub">{camera.brand}</span>{' '}
@@ -406,10 +408,11 @@ function CameraCard({ camera, roll }: { camera: Camera; roll?: Roll }) {
 
 function CameraRow({ camera, roll }: { camera: Camera; roll?: Roll }) {
   const nav = useNav()
+  const bleed = usePhotoBleeds(camera.id, !!(camera.hasPhoto || camera.photo))
   return (
     <div className="row" style={{ cursor: 'default' }}>
       <button className="row" style={{ padding: 0, minHeight: 0 }} onClick={() => nav.push({ type: 'camera', id: camera.id })}>
-        <div style={{ width: 68 }}><CameraCover camera={camera} height={52} /></div>
+        <div style={{ width: 68, borderRadius: 8, overflow: 'hidden', flex: 'none' }}><CameraCover camera={camera} height={52} fill={bleed} /></div>
         <div className="grow">
           <b className="truncate" style={{ display: 'block', fontWeight: 600 }}>{camera.brand} {camera.model}</b>
           <span className="sub truncate" style={roll ? { color: 'var(--safelight)' } : undefined}>
