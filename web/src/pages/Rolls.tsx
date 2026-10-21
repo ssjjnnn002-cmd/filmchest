@@ -54,7 +54,7 @@ export function Rolls() {
     if (cameraId && r.cameraId !== cameraId) return false
     if (status && r.status !== status) return false
     if (search) {
-      const text = [rollFilmName(r), cameraName(r), r.lab, r.note, ...r.locations.map((l) => `${l.name} ${l.memo ?? ''}`)].join(' ').toLowerCase()
+      const text = [rollFilmName(r), cameraName(r), r.lab, r.note, ...r.locations.map((l) => `${l.name} ${l.memo ?? ''}`), ...(r.tags ?? [])].join(' ').toLowerCase()
       if (!text.includes(search.toLowerCase())) return false
     }
     return true
@@ -95,7 +95,7 @@ export function Rolls() {
       <div className="rolls-tools">
         <label className="search">
           <Icon name="search" size={18} />
-          <input type="search" placeholder="필름, 카메라, 장소, 메모" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="검색" />
+          <input type="search" placeholder="필름, 카메라, 장소, 메모, 태그" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="검색" />
         </label>
         <div className="segmented slide" role="tablist" aria-label="보기 단위"
           style={{ '--i': (Object.keys(groupingName) as Grouping[]).indexOf(grouping), '--n': 4 } as React.CSSProperties}>

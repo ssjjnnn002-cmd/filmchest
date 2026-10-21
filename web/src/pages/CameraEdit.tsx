@@ -1,13 +1,14 @@
 import { prepareCameraPhoto } from '../core/cutout'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { db, rememberCamera } from '../db'
 import { cameraPhotoBlob, deleteCameraPhoto, saveCameraPhoto } from '../photoStore'
-import type { BodyStyle, Camera, FilmFormat } from '../core/types'
+import type { BodyStyle, Camera, FilmFormat, GearAccessory } from '../core/types'
 import { formatInfo, styleName, uid } from '../core/types'
 import { brandsMatching, catalog, catalogMatch, catalogName, inferStyle, kindText, modelsMatching, type CatalogCamera } from '../core/cameras'
 import { profileFor } from '../core/profiles'
 import { Model3D } from '../ui/Viewers'
 import { Sheet, toInputDate, useObjectURL } from '../ui/common'
+import { AccessoryFields, TagField } from '../ui/gearExtras'
 import { groupPrice } from '../core/optics'
 import { PurchaseFields, rememberSeller, useUsedSellers } from './Gear'
 import { features } from '../core/features'
@@ -41,8 +42,38 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
   const [bgRemoved, setBgRemoved] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [photoScale, setPhotoScale] = useState(camera?.photoScale ?? 1)
+  const [offset, setOffset] = useState({ x: camera?.photoOffsetX ?? 0, y: camera?.photoOffsetY ?? 0 })
+  const [tags, setTags] = useState<string[]>(camera?.tags ?? [])
+  const [accessories, setAccessories] = useState<GearAccessory[]>(camera?.accessories ?? [])
+  // 끌어서 옮기기 · 두 손가락으로 확대
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const gesture = useRef<{ dist: number; scale: number } | null>(null)
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const p = [...pointers.current.values()]
+    gesture.current = p.length === 2 ? { dist: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), scale: photoScale } : null
+  }
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const prev = pointers.current.get(e.pointerId)
+    if (!prev) return
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const p = [...pointers.current.values()]
+    if (p.length === 2 && gesture.current) {
+      const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y)
+      setPhotoScale(Math.min(3, Math.max(0.3, gesture.current.scale * d / Math.max(gesture.current.dist, 1))))
+    } else if (p.length === 1) {
+      const r = e.currentTarget.getBoundingClientRect()
+      setOffset((o) => ({ x: o.x + (e.clientX - prev.x) / r.width, y: o.y + (e.clientY - prev.y) / r.height }))
+    }
+  }
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    pointers.current.delete(e.pointerId)
+    gesture.current = null
+  }
   const usePhoto = async (file: Blob, remove: boolean) => {
     setProcessing(true)
+    setOffset({ x: 0, y: 0 })
     try {
       const r = await prepareCameraPhoto(file, remove)
       setPhoto(r.blob)
@@ -116,6 +147,10 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
       color: BODY_COLOR,
       hasPhoto: !!photo,
       photoScale: photo ? photoScale : undefined,
+      photoOffsetX: photo && offset.x ? offset.x : undefined,
+      photoOffsetY: photo && offset.y ? offset.y : undefined,
+      tags,
+      accessories: accessories.filter((a) => a.name.trim()),
       battery: battery.trim() || undefined,
       batteryAt,
       prewind,
@@ -144,8 +179,10 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
         <div className="group" style={{ padding: 12, display: 'grid', gap: 12 }}>
           {photoURL
             ? (
-              <div className="photo-preview">
-                <img src={photoURL} alt="" style={{ transform: `scale(${photoScale})` }} />
+              <div className="photo-preview" style={{ touchAction: 'none', cursor: 'grab' }}
+                onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
+                onWheel={(e) => setPhotoScale((s) => Math.min(3, Math.max(0.3, s * (e.deltaY < 0 ? 1.05 : 0.95))))}>
+                <img src={photoURL} alt="" draggable={false} style={{ transform: `translate(${offset.x * 100}%, ${offset.y * 100}%) scale(${photoScale})`, transition: 'none', pointerEvents: 'none' }} />
                 {processing && <div className="photo-busy"><div className="spinner" /></div>}
               </div>
             )
@@ -155,11 +192,12 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
           {photo && (
             <div className="toggle" style={{ padding: 0 }}>
               <span>크기</span>
-              <input type="range" className="slider" min={0.5} max={1.6} step={0.05} value={photoScale}
+              <input type="range" className="slider" min={0.3} max={3} step={0.05} value={photoScale}
                 onChange={(e) => setPhotoScale(Number(e.target.value))} aria-label="사진 크기" />
-              <button className="btn small" onClick={() => setPhotoScale(1)} disabled={photoScale === 1}>기본</button>
+              <button className="btn small" onClick={() => { setPhotoScale(1); setOffset({ x: 0, y: 0 }) }} disabled={photoScale === 1 && !offset.x && !offset.y}>기본</button>
             </div>
           )}
+          {photo && <p className="sub" style={{ textAlign: 'center', margin: 0 }}>사진을 끌어서 옮기고, 두 손가락으로 키우거나 줄여요. 칸 밖은 잘려요.</p>}
 
           {!photo && (
             <div className="toggle" style={{ padding: 0 }}>
@@ -272,24 +310,20 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
             <label htmlFor="cam-battery">배터리 종류</label>
             <input id="cam-battery" className="input" value={battery} onChange={(e) => setBattery(e.target.value)} />
           </div>
-          <label className="toggle">
-            <span>마지막 교체일 기록</span>
-            <input type="checkbox" className="switch" checked={batteryAt !== undefined}
-              onChange={(e) => setBatteryAt(e.target.checked ? Date.now() : undefined)} />
-          </label>
-          {batteryAt !== undefined && (
-            <div className="field">
-              <label htmlFor="cam-bdate">마지막 교체</label>
-              <input id="cam-bdate" type="date" className="input" value={toInputDate(batteryAt)}
-                onChange={(e) => e.target.value && setBatteryAt(new Date(`${e.target.value}T12:00:00`).getTime())} />
-            </div>
-          )}
+          <div className="field">
+            <label htmlFor="cam-bdate">마지막 교체</label>
+            <input id="cam-bdate" type="date" className="input" value={batteryAt !== undefined ? toInputDate(batteryAt) : ''}
+              onChange={(e) => setBatteryAt(e.target.value ? new Date(`${e.target.value}T12:00:00`).getTime() : undefined)} />
+            {batteryAt !== undefined && <button type="button" className="chip-x" aria-label="교체일 지우기" onClick={() => setBatteryAt(undefined)}>×</button>}
+          </div>
         </div>
         <p className="footnote">교체한 지 1년이 지나면 내 장비에서 알려 드려요.</p>
       </div>
 
       <PurchaseFields date={purchasedAt} setDate={setPurchasedAt} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller}
         used={usedSellers} />
+      <AccessoryFields items={accessories} setItems={setAccessories} bodyPrice={price} />
+      <TagField tags={tags} setTags={setTags} />
 
       {features.meter && <div className="section">
         <h2>필름 감기</h2>

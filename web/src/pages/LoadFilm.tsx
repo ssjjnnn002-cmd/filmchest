@@ -6,7 +6,7 @@ import { formatInfo, uid } from '../core/types'
 import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films'
 import { CustomFilmEdit } from './CustomFilmEdit'
 import { lensesFor } from '../core/lenses'
-import { CameraCover, Canister, Sheet } from '../ui/common'
+import { CameraCover, Canister, Sheet, toInputDate } from '../ui/common'
 import { currentPlace, locationAvailable, weatherAt } from '../platform'
 
 export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: string; onClose: (loaded?: Roll) => void }) {
@@ -22,6 +22,8 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const [newLens, setNewLens] = useState('')
   const [push, setPush] = useState(0)
   const [today, setToday] = useState(true)
+  const [startDay, setStartDay] = useState(toInputDate(Date.now()))
+  const isToday = startDay === toInputDate(Date.now())
   // 내가 만든 필름 (바뀌면 다시 그리도록)
   const customRows = useLiveQuery(() => db.customFilms.toArray(), []) ?? []
   const [customEdit, setCustomEdit] = useState<string | 'new' | null>(null)
@@ -86,15 +88,16 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
     }
     if (loaded) await db.rolls.update(loaded.id, { status: 'finished', finishedAt: Date.now() })
     const now = Date.now()
+    const start = isToday ? now : new Date(`${startDay}T12:00:00`).getTime()
     const roll: Roll = {
       id: uid(), cameraId: camera.id, cameraBrand: camera.brand, cameraModel: camera.model, cameraFormat: camera.format, cameraFixedLens: camera.fixedLens,
-      lensId: lens?.id, filmId: film.id, shotISO, status: 'loaded', loadedAt: now,
-      days: today ? [{ id: uid(), startedAt: now, startFrame: 1 }] : [], locations: [], favorite: false, isArchive: false,
+      lensId: lens?.id, filmId: film.id, shotISO, status: 'loaded', loadedAt: today ? start : now,
+      days: today ? [{ id: uid(), startedAt: start, startFrame: 1 }] : [], locations: [], favorite: false, isArchive: false,
     }
     await db.rolls.add(roll)
     onClose(roll)
     // 위치는 창을 닫은 뒤 채운다
-    if (today && locationAvailable()) {
+    if (today && isToday && locationAvailable()) {
       const place = await currentPlace()
       if (place) await db.rolls.update(roll.id, { locations: [{ id: uid(), startFrame: 1, name: place.name, point: place.point, weather: weatherAt(place.point) }] })
     }
@@ -198,11 +201,18 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
               </span>
             </div>
             <label className="toggle">
-              <span>오늘 촬영일로 추가</span>
+              <span>첫 촬영일 추가</span>
               <input type="checkbox" className="switch" checked={today} onChange={(e) => setToday(e.target.checked)} />
             </label>
+            {today && (
+              <div className="field">
+                <label htmlFor="start-day">날짜</label>
+                <input id="start-day" type="date" className="input" max={toInputDate(Date.now())} value={startDay}
+                  onChange={(e) => setStartDay(e.target.value || toInputDate(Date.now()))} />
+              </div>
+            )}
           </div>
-          {today && <p className="footnote">{locationAvailable() ? '지금 시각과 현재 위치를 첫 촬영일로 기록해요.' : '지금 시각을 첫 촬영일로 기록해요. 장소는 롤 화면에서 넣을 수 있어요.'}</p>}
+          {today && isToday && <p className="footnote">{locationAvailable() ? '지금 시각과 현재 위치를 첫 촬영일로 기록해요.' : '지금 시각을 첫 촬영일로 기록해요. 장소는 롤 화면에서 넣을 수 있어요.'}</p>}
         </div>
       )}
       {customEdit && (

@@ -4,12 +4,13 @@ import { db, deleteCamera, kept } from '../db'
 import { useNav } from '../App'
 import type { Camera, Lens } from '../core/types'
 import { lensSpec } from '../core/optics'
-import { formatInfo, uid } from '../core/types'
+import { formatInfo, priceText, priceValue, uid } from '../core/types'
+import { TagChips } from '../ui/gearExtras'
 import { profileFor } from '../core/profiles'
 import { lensesFor } from '../core/lenses'
 import { Model3D } from '../ui/Viewers'
 import { useCameraPhoto } from '../photoStore'
-import { Confirm, Icon, PageHeader, Sheet, fmtDay, rollFilmName } from '../ui/common'
+import { Confirm, Icon, PageHeader, Sheet, rollFilmName, toInputDate } from '../ui/common'
 import { RollRow } from '../ui/RollRow'
 import { CameraEdit } from './CameraEdit'
 import { batteryDue } from './Library'
@@ -95,7 +96,10 @@ export function CameraDetail({ id }: { id: string }) {
 
       <div style={{ display: 'grid', justifyItems: 'center', gap: 4, marginBottom: 8 }}>
         {photo
-          ? <img src={photo} alt="" style={{ maxHeight: 240, objectFit: 'contain' }} />
+          ? <div style={{ width: '100%', height: 240, overflow: 'hidden' }}>
+              <img src={photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain',
+                transform: `translate(${(camera.photoOffsetX ?? 0) * 100}%, ${(camera.photoOffsetY ?? 0) * 100}%) scale(${camera.photoScale ?? 1})` }} />
+            </div>
           : <div style={{ width: '100%' }}><Model3D profile={profileFor(camera.brand, camera.model, camera.style)} color="#1C1C1E" height={260} /></div>}
         <h2 style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{camera.brand} {camera.model}</h2>
         <span className="sub">{[formatInfo[camera.format].name, camera.mount ? `${camera.mount} 마운트` : camera.fixedLens].filter(Boolean).join(' · ')}</span>
@@ -109,12 +113,13 @@ export function CameraDetail({ id }: { id: string }) {
           ) : (
             <>
               <div className="row static"><span className="grow">종류</span><span className="value">{camera.battery ?? '모름'}</span></div>
-              <div className="row static">
+              <label className="row static">
                 <span className="grow">마지막 교체</span>
-                <span className="value" style={batteryDue(camera) ? { color: 'var(--warn)' } : undefined}>
-                  {camera.batteryAt ? fmtDay(camera.batteryAt) : '기록 없음'}
-                </span>
-              </div>
+                <input type="date" className="input" aria-label="마지막 교체일" max={toInputDate(Date.now())}
+                  style={{ width: 'auto', textAlign: 'right', color: batteryDue(camera) ? 'var(--warn)' : undefined }}
+                  value={camera.batteryAt ? toInputDate(camera.batteryAt) : ''}
+                  onChange={(e) => db.cameras.update(id, { batteryAt: e.target.value ? new Date(`${e.target.value}T12:00:00`).getTime() : undefined })} />
+              </label>
               <button className="row accent" onClick={() => db.cameras.update(id, { batteryAt: Date.now() })}>
                 <Icon name="battery" /> 오늘 교체함
               </button>
@@ -123,6 +128,23 @@ export function CameraDetail({ id }: { id: string }) {
         </div>
         {batteryDue(camera) && <p className="footnote warn">교체한 지 1년이 넘었어요. 노출계가 정확하지 않을 수 있어요.</p>}
       </div>
+
+      {(camera.tags?.length ?? 0) > 0 && (
+        <div className="section"><h2>태그</h2><TagChips tags={camera.tags} /></div>
+      )}
+
+      {(priceValue(camera.price) > 0 || (camera.accessories?.length ?? 0) > 0) && (
+        <div className="section">
+          <h2>쓴 금액</h2>
+          <div className="group">
+            {priceValue(camera.price) > 0 && <div className="row static"><span className="grow">본체</span><span className="value">{priceText(priceValue(camera.price))}</span></div>}
+            {(camera.accessories ?? []).map((a) => (
+              <div key={a.id} className="row static"><span className="grow">{a.name}</span><span className="value">{a.price ? priceText(priceValue(a.price)) : '-'}</span></div>
+            ))}
+            <div className="row static"><b className="grow">합계</b><b>{priceText(priceValue(camera.price) + (camera.accessories ?? []).reduce((n, a) => n + priceValue(a.price), 0))}</b></div>
+          </div>
+        </div>
+      )}
 
       <div className="section">
         <h2>장착된 필름</h2>

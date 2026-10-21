@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { startDriveAutoBackup } from './core/drive'
 import { liveQuery } from 'dexie'
 import { App } from './App'
 import { db } from './db'
@@ -38,6 +39,8 @@ document.addEventListener('focusin', (e) => {
 // 내가 만든 필름을 먼저 불러온 뒤 그린다 (필름 이름이 처음부터 보이게). 바뀌면 다시 채운다.
 liveQuery(() => db.customFilms.toArray()).subscribe((rows) => setCustomFilms(rows))
 await db.customFilms.toArray().then(setCustomFilms).catch(() => {})
+
+startDriveAutoBackup()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

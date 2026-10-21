@@ -9,6 +9,7 @@ import { RollGalleryButton } from '../ui/GallerySave'
 import { Canister, cameraName, Confirm, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollTitle, sortedDays, sortedLocations } from '../ui/common'
 import { DayEdit, LabDropOff, LensChangeEdit, PlaceEdit } from './Editors'
 import { RollProjects } from './Projects'
+import { TagField } from '../ui/gearExtras'
 import { FramePrint } from './FramePrint'
 import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
 import { ScanButton } from './Pending'
@@ -177,6 +178,7 @@ export function RollDetail({ id }: { id: string }) {
       </div>
 
       <RollProjects roll={roll} />
+      <TagField tags={roll.tags ?? []} setTags={(tags) => db.rolls.update(id, { tags })} />
 
       <div className="section">
         <h2>메모</h2>

@@ -57,6 +57,12 @@ export interface Camera {
   hasPhoto?: boolean
   /** 사진 썸네일 크기 (1 = 기본) */
   photoScale?: number
+  /** 사진 위치 (칸 크기 대비 비율) */
+  photoOffsetX?: number
+  photoOffsetY?: number
+  tags?: string[]
+  /** 그립, 소프트 셔터 버튼, 스트랩 … */
+  accessories?: GearAccessory[]
   battery?: string
   batteryAt?: number
   /** 필름을 먼저 끝까지 감아 두고 거꾸로 세는 카메라 (모르면 비움) */
@@ -90,8 +96,19 @@ export interface Lens {
   purchasedAt?: number
   price?: string
   seller?: string
+  tags?: string[]
   createdAt: number
 }
+
+export interface GearAccessory {
+  id: string
+  name: string
+  price?: string
+}
+
+/** "123,000" → 123000 */
+export const priceValue = (text?: string) => Number((text ?? '').replace(/\D/g, '')) || 0
+export const priceText = (n: number) => `${n.toLocaleString('ko-KR')}원`
 
 export interface GearFilter {
   id: string
@@ -101,6 +118,7 @@ export interface GearFilter {
   purchasedAt?: number
   price?: string
   seller?: string
+  tags?: string[]
   createdAt: number
 }
 
@@ -158,6 +176,7 @@ export interface Roll {
   importedAt?: number
   frameCount?: number
   note?: string
+  tags?: string[]
   favorite: boolean
   isArchive: boolean
   /** 보관함 썸네일로 쓸 사진 번호 (없으면 첫 장) */

@@ -12,6 +12,7 @@ import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
 import { deleteCameraPhoto, saveCameraPhoto, useCameraPhoto } from '../photoStore'
 import { Canister, Confirm, Icon, Sheet } from '../ui/common'
 import { CustomFilmEdit } from './CustomFilmEdit'
+import { TagField } from '../ui/gearExtras'
 
 export type GearKind = 'lens' | 'filter' | 'film'
 const storageName: Record<FilmStorage, string> = { fridge: '냉장고', freezer: '냉동고', drawer: '서랍', room: '상온' }
@@ -52,17 +53,12 @@ export function PurchaseFields({ date, setDate, price, setPrice, seller, setSell
     <div className="section">
       <h2>구입</h2>
       <div className="group">
-        <label className="toggle">
-          <span>구입 날짜</span>
-          <input type="checkbox" className="switch" checked={date !== undefined} onChange={(e) => setDate(e.target.checked ? Date.now() : undefined)} />
-        </label>
-        {date !== undefined && (
-          <div className="field">
-            <label htmlFor="buy-date">날짜</label>
-            <input id="buy-date" type="date" className="input" value={new Date(date).toISOString().slice(0, 10)}
-              onChange={(e) => e.target.value && setDate(new Date(`${e.target.value}T12:00:00`).getTime())} />
-          </div>
-        )}
+        <div className="field">
+          <label htmlFor="buy-date">구입 날짜</label>
+          <input id="buy-date" type="date" className="input" value={date !== undefined ? new Date(date).toISOString().slice(0, 10) : ''}
+            onChange={(e) => setDate(e.target.value ? new Date(`${e.target.value}T12:00:00`).getTime() : undefined)} />
+          {date !== undefined && <button type="button" className="chip-x" aria-label="구입 날짜 지우기" onClick={() => setDate(undefined)}>×</button>}
+        </div>
         <div className="field">
           <label htmlFor="buy-price">구입 금액</label>
           <input id="buy-price" className="input" inputMode="numeric" value={price} onChange={(e) => setPrice(groupPrice(e.target.value))} />
@@ -140,9 +136,9 @@ function PhotoField({ id, hasPhoto, blob, setBlob, cleared, setCleared }: {
   )
 }
 
-export function GearBoard({ kind, layout }: { kind: GearKind; layout: string }) {
-  const lenses = useLiveQuery(() => db.lenses.orderBy('createdAt').toArray(), [])
-  const filters = useLiveQuery(() => db.filters.orderBy('createdAt').toArray(), [])
+export function GearBoard({ kind, layout, tag }: { kind: GearKind; layout: string; tag?: string }) {
+  const lenses = useLiveQuery(() => db.lenses.orderBy('createdAt').filter((x) => !tag || (x.tags ?? []).includes(tag)).toArray(), [tag])
+  const filters = useLiveQuery(() => db.filters.orderBy('createdAt').filter((x) => !tag || (x.tags ?? []).includes(tag)).toArray(), [tag])
   const lots = useLiveQuery(() => db.filmLots.orderBy('createdAt').reverse().toArray(), [])
   const [edit, setEdit] = useState<string | 'new' | null>(null)
   const items = kind === 'lens' ? lenses : kind === 'filter' ? filters : lots
@@ -229,6 +225,7 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
   const [date, setDate] = useState(lens?.purchasedAt)
   const [price, setPrice] = useState(groupPrice(lens?.price ?? ''))
   const [seller, setSeller] = useState(lens?.seller ?? '')
+  const [tags, setTags] = useState<string[]>(lens?.tags ?? [])
   const [confirm, setConfirm] = useState(false)
   const hits = lensesFor(mount, model).filter((name) => name !== model).slice(0, 6)
   const apply = (name: string) => {
@@ -248,7 +245,7 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
       zoom, focalMin: min || undefined, focalMax: max || undefined,
       apertureOpen: open.trim() || undefined, apertureClose: close.trim() || undefined,
       hasPhoto: cleared ? false : !!(blob || lens?.hasPhoto),
-      purchasedAt: date, price: groupPrice(price) || undefined, seller: seller.trim() || undefined,
+      purchasedAt: date, price: groupPrice(price) || undefined, seller: seller.trim() || undefined, tags,
       createdAt: lens?.createdAt ?? Date.now(),
     }
     if (blob) await saveCameraPhoto(data.id, blob)
@@ -288,6 +285,7 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
         </div>
       </div>
       <PurchaseFields date={date} setDate={setDate} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller} used={used} />
+      <TagField tags={tags} setTags={setTags} />
       {lens && <div className="group"><button className="row danger" onClick={() => setConfirm(true)}>렌즈 삭제</button></div>}
       {confirm && lens && <Confirm message="이 렌즈를 삭제할까요? 이 렌즈로 찍은 롤 기록은 남아요." onCancel={() => setConfirm(false)}
         onConfirm={async () => { await db.lenses.delete(lens.id); onClose() }} />}
@@ -304,13 +302,14 @@ function FilterEdit({ filter, onClose }: { filter?: GearFilter; onClose: () => v
   const [date, setDate] = useState(filter?.purchasedAt)
   const [price, setPrice] = useState(groupPrice(filter?.price ?? ''))
   const [seller, setSeller] = useState(filter?.seller ?? '')
+  const [tags, setTags] = useState<string[]>(filter?.tags ?? [])
   const [confirm, setConfirm] = useState(false)
   const kinds = filterKinds.filter((item) => !name || item.toLowerCase().includes(name.toLowerCase())).filter((item) => item !== name).slice(0, 8)
   const save = async () => {
     const data: GearFilter = {
       id: filter?.id ?? uid(), name: name.trim(), diameter: diameter.replace(/[^\d.]/g, '') || undefined,
       hasPhoto: cleared ? false : !!(blob || filter?.hasPhoto),
-      purchasedAt: date, price: groupPrice(price) || undefined, seller: seller.trim() || undefined,
+      purchasedAt: date, price: groupPrice(price) || undefined, seller: seller.trim() || undefined, tags,
       createdAt: filter?.createdAt ?? Date.now(),
     }
     if (blob) await saveCameraPhoto(data.id, blob)
@@ -333,6 +332,7 @@ function FilterEdit({ filter, onClose }: { filter?: GearFilter; onClose: () => v
         </div>
       </div>
       <PurchaseFields date={date} setDate={setDate} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller} used={used} />
+      <TagField tags={tags} setTags={setTags} />
       {filter && <div className="group"><button className="row danger" onClick={() => setConfirm(true)}>필터 삭제</button></div>}
       {confirm && filter && <Confirm message="이 필터를 삭제할까요?" onCancel={() => setConfirm(false)}
         onConfirm={async () => { await db.filters.delete(filter.id); onClose() }} />}

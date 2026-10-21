@@ -414,10 +414,12 @@ export function CameraCover({ camera, height = 110 }: { camera: Camera; height?:
   }
   const src = photo ?? model
   return src
-    ? <img src={src} alt={`${camera.brand} ${camera.model}`} draggable={false}
-        onError={photo ? undefined : useDrawnModel}
-        style={{ width: '100%', height, objectFit: 'contain', display: 'block',
-          transform: photo && camera.photoScale && camera.photoScale !== 1 ? `scale(${camera.photoScale})` : undefined }} />
+    ? <div style={{ overflow: photo ? 'hidden' : undefined }}>
+        <img src={src} alt={`${camera.brand} ${camera.model}`} draggable={false}
+          onError={photo ? undefined : useDrawnModel}
+          style={{ width: '100%', height, objectFit: 'contain', display: 'block',
+            transform: photo ? `translate(${(camera.photoOffsetX ?? 0) * 100}%, ${(camera.photoOffsetY ?? 0) * 100}%) scale(${camera.photoScale ?? 1})` : undefined }} />
+      </div>
     : <div style={{ height, display: 'grid', placeItems: 'center' }}><div className="spinner" /></div>
 }
 

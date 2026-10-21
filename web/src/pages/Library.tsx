@@ -8,6 +8,7 @@ import { filmById } from '../core/films'
 import { CameraCover, Canister, GlassGroup, Icon, PageHeader, rollFilmName } from '../ui/common'
 import { CameraEdit } from './CameraEdit'
 import { GearAdd, GearBoard, type GearKind } from './Gear'
+import { TagFilter } from '../ui/gearExtras'
 import { Settings } from './Settings'
 import { getPref, setPref } from '../platform'
 import { cameraPhotoURL } from '../photoStore'
@@ -34,6 +35,9 @@ export function Library() {
   const [adding, setAdding] = useState(false)
   const [gear, setGear] = useState<GearKind | 'camera'>('camera')
   const [gearAdd, setGearAdd] = useState(false)
+  const [tag, setTag] = useState<string>()
+  const lensTags = useLiveQuery(async () => (await db.lenses.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
+  const filterTags = useLiveQuery(async () => (await db.filters.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
   const [settings, setSettings] = useState(false)
   const [layout, setLayout] = useState<string>(getPref('libraryLayout', 'grid'))
   // 순서 편집 중: 카드가 흔들리고, 눌러도 들어가지 않는다. 화면 배치는 그대로 둔다(끄는 카드가 어긋나지 않게).
@@ -65,6 +69,7 @@ export function Library() {
   const shown = (order.length ? order : (cameras ?? []).map((c) => c.id))
     .map((id) => byId.get(id))
     .filter((c): c is Camera => !!c)
+    .filter((c) => editing || !tag || (c.tags ?? []).includes(tag))
 
   const toggleLayout = () => {
     const next = layout === 'grid' ? 'list' : 'grid'
@@ -234,12 +239,15 @@ export function Library() {
       {!editing && (
         <div className="segmented" role="tablist" aria-label="장비" style={{ margin: '4px 0 12px' }}>
           {([['camera', '카메라'], ['lens', '렌즈'], ['filter', '필터'], ['film', '필름']] as const).map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={gear === id} className={gear === id ? 'on' : ''} onClick={() => setGear(id)}>{label}</button>
+            <button key={id} type="button" role="tab" aria-selected={gear === id} className={gear === id ? 'on' : ''} onClick={() => { setGear(id); setTag(undefined) }}>{label}</button>
           ))}
         </div>
       )}
+      {!editing && gear !== 'film' && (
+        <TagFilter tags={gear === 'camera' ? (cameras ?? []).flatMap((c) => c.tags ?? []) : gear === 'lens' ? lensTags : filterTags} value={tag} onChange={setTag} />
+      )}
 
-      {gear !== 'camera' && !editing && <GearBoard kind={gear} layout={layout} />}
+      {gear !== 'camera' && !editing && <GearBoard kind={gear} layout={layout} tag={tag} />}
 
       {gear === 'camera' && cameras && cameras.length === 0 && (
         <div className="empty">
