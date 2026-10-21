@@ -66,6 +66,11 @@ struct CloudBackupView: View {
                         }
                         revision += 1
                     }
+                    #if os(iOS)
+                    if let open = AutoBackup.folderOpenURL {
+                        Button("백업 폴더 열기", systemImage: "folder") { UIApplication.shared.open(open) }
+                    }
+                    #endif
                     Button("클라우드 백업에서 복구", systemImage: "arrow.down.doc") { confirmRestore = true }
                     Picker("자동 백업", selection: $backupDays) {
                         Text("끔").tag(0)

@@ -200,6 +200,12 @@ enum AutoBackup {
             UserDefaults.standard.set(data, forKey: bookmarkKey)
         }
     }
+    /// 파일 앱에서 백업 폴더를 연다
+    static var folderOpenURL: URL? {
+        guard let url = folder() else { return nil }
+        return URL(string: "shareddocuments://" + url.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!)
+    }
+
     static func clearFolder() {
         UserDefaults.standard.removeObject(forKey: bookmarkKey)
         UserDefaults.standard.removeObject(forKey: cloudKey)
