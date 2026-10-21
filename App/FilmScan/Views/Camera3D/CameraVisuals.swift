@@ -60,6 +60,8 @@ struct CameraCoverView: View {
     let camera: CameraItem
     /// true면 상세 화면처럼 직접 돌려 볼 수 있다
     var interactive = false
+    /// 그냥 사진은 칸을 꽉 채운다
+    var fill = false
 
     var body: some View {
         if interactive, camera.spinData != nil {
@@ -67,7 +69,7 @@ struct CameraCoverView: View {
         } else if let data = camera.coverImageData {
             let photoOnly = camera.spinData == nil
             GeometryReader { geo in
-                CameraImageView(data: data)
+                CameraImageView(data: data, fill: fill)
                     .scaleEffect(photoOnly ? camera.photoScale : 1)
                     .offset(x: photoOnly ? camera.photoOffsetX * geo.size.width : 0,
                             y: photoOnly ? camera.photoOffsetY * geo.size.height : 0)
@@ -80,6 +82,11 @@ struct CameraCoverView: View {
             DummyCameraImage(id: camera.dummyModelID, colorHex: CameraBodyStyle.defaultColorHex)
         }
     }
+}
+
+extension CameraItem {
+    /// 카드 위쪽을 꽉 채워 보여 줄 사진 (배경 지운 PNG·360° 사진은 제외)
+    var bleedsPhoto: Bool { spinData == nil && (photo.map { !$0.isCutoutPNG } ?? false) }
 }
 
 extension Color {

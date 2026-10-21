@@ -376,10 +376,20 @@ private struct CameraCard: View {
         VStack(spacing: 0) {
             NavigationLink(value: camera) {
                 VStack(alignment: .leading, spacing: 10) {
-                    CameraCoverView(camera: camera)
-                        .frame(height: 110)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 8)
+                    if camera.bleedsPhoto {
+                        // 그냥 사진: 카드 위쪽·양옆을 꽉 채운다 (다른 카드와 높이는 같게)
+                        CameraCoverView(camera: camera, fill: true)
+                            .frame(height: 132)
+                            .frame(maxWidth: .infinity)
+                            .clipped()
+                            .padding(.horizontal, -14)
+                            .padding(.top, -14)
+                    } else {
+                        CameraCoverView(camera: camera)
+                            .frame(height: 110)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 8)
+                    }
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(camera.model)
@@ -414,6 +424,7 @@ private struct CameraCard: View {
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 18))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.black.opacity(0.06)))
         .opacity(placeholder ? 0.28 : 1)
         .modifier(Wiggle(on: editing && !placeholder))
@@ -474,8 +485,9 @@ private struct CameraListRow: View {
           HStack(spacing: 14) {
             NavigationLink(value: camera) {
                 HStack(spacing: 14) {
-                    CameraCoverView(camera: camera)
+                    CameraCoverView(camera: camera, fill: camera.bleedsPhoto)
                         .frame(width: 68, height: 52)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 4) {
                             Text(camera.displayName).font(.subheadline.weight(.semibold)).lineLimit(1)

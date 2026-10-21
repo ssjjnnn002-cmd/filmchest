@@ -89,12 +89,18 @@ enum CanisterCache {
 /// 카메라 사진(누끼). 큰 PNG는 백그라운드에서 줄여 읽는다.
 struct CameraImageView: View {
     let data: Data?
+    /// true면 칸을 꽉 채운다 (넘치는 부분은 잘림)
+    var fill = false
     @State private var image: CGImage?
 
     var body: some View {
         Group {
             if let image {
-                Image(cgImage: image).resizable().scaledToFit()
+                if fill {
+                    Image(cgImage: image).resizable().scaledToFill()
+                } else {
+                    Image(cgImage: image).resizable().scaledToFit()
+                }
             } else if data != nil {
                 ProgressView().controlSize(.small)
             } else {
@@ -132,4 +138,9 @@ struct StatusBadge: View {
         case .imported: .green
         }
     }
+}
+
+extension Data {
+    /// 배경을 지운 PNG(투명)인지. 그냥 사진(JPEG·HEIC)이면 블록을 꽉 채워 보여 준다.
+    var isCutoutPNG: Bool { starts(with: [0x89, 0x50, 0x4E, 0x47]) }
 }

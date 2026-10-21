@@ -290,6 +290,7 @@ private struct GearCardChrome: ViewModifier {
             .padding(14)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Theme.card, in: RoundedRectangle(cornerRadius: 18))
+            .clipShape(RoundedRectangle(cornerRadius: 18))
             .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.black.opacity(0.06)))
     }
 }
@@ -298,7 +299,7 @@ private struct LensGearCard: View {
     let lens: LensItem
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            GearPhotoThumb(data: lens.photo, symbol: "camera.aperture").frame(height: 110)
+            GearPhotoThumb(data: lens.photo, symbol: "camera.aperture", card: true)
             Text(lens.model.isEmpty ? "렌즈" : lens.model).font(.headline).lineLimit(2)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .topLeading)
             Text(lens.brand.nilIfBlank ?? " ")
@@ -318,7 +319,7 @@ private struct LensGearRow: View {
     let lens: LensItem
     var body: some View {
         HStack(spacing: 14) {
-            GearPhotoThumb(data: lens.photo, symbol: "camera.aperture").frame(width: 68, height: 52)
+            GearPhotoThumb(data: lens.photo, symbol: "camera.aperture").frame(width: 68, height: 52).clipShape(RoundedRectangle(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 3) {
                 Text(lens.displayName.trimmingCharacters(in: .whitespaces).isEmpty ? "렌즈" : lens.displayName)
                     .font(.subheadline.weight(.semibold)).lineLimit(1)
@@ -336,7 +337,7 @@ private struct FilterGearCard: View {
     let filter: FilterItem
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            GearPhotoThumb(data: filter.photo, symbol: filter.isFilter ? "camera.filters" : "shippingbox").frame(height: 110)
+            GearPhotoThumb(data: filter.photo, symbol: filter.isFilter ? "camera.filters" : "shippingbox", card: true)
             Text(filter.name.isEmpty ? filter.kindName : filter.name).font(.headline).lineLimit(2, reservesSpace: true)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             Text(filter.subLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -350,7 +351,7 @@ private struct FilterGearRow: View {
     let filter: FilterItem
     var body: some View {
         HStack(spacing: 14) {
-            GearPhotoThumb(data: filter.photo, symbol: filter.isFilter ? "camera.filters" : "shippingbox").frame(width: 68, height: 52)
+            GearPhotoThumb(data: filter.photo, symbol: filter.isFilter ? "camera.filters" : "shippingbox").frame(width: 68, height: 52).clipShape(RoundedRectangle(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 3) {
                 Text(filter.name.isEmpty ? filter.kindName : filter.name).font(.subheadline.weight(.semibold)).lineLimit(1)
                 Text(filter.subLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -401,10 +402,24 @@ private struct FilmGearRow: View {
 private struct GearPhotoThumb: View {
     let data: Data?
     var symbol: String
+    /// 바둑판 카드: 그냥 사진이면 카드 위쪽·양옆을 꽉 채운다 (높이는 다른 카드와 같게)
+    var card = false
+    private var bleed: Bool { data.map { !$0.isCutoutPNG } ?? false }
     var body: some View {
+        if card {
+            if bleed {
+                thumb.frame(height: 124).frame(maxWidth: .infinity).clipped().padding(.horizontal, -14).padding(.top, -14)
+            } else {
+                thumb.frame(height: 110)
+            }
+        } else {
+            thumb
+        }
+    }
+    private var thumb: some View {
         Group {
             if data != nil {
-                CameraImageView(data: data)
+                CameraImageView(data: data, fill: bleed)
             } else {
                 Image(systemName: symbol)
                     .font(.largeTitle)
@@ -439,6 +454,7 @@ struct GearPhotoEditor: View {
     @State private var showCamera = false
     @State private var lifting = false
     @State private var liftFailed = false
+    @State private var canLift = false
 
     var body: some View {
         Section {
@@ -469,6 +485,16 @@ struct GearPhotoEditor: View {
             PhotosPicker(selection: $pickerItem, matching: .images) {
                 Label("앨범에서 사진 고르기", systemImage: "photo")
             }
+            if canLift, let current = photo {
+                Button("배경 지우기", systemImage: "wand.and.stars") {
+                    Task {
+                        lifting = true
+                        if let lifted = await SubjectLifter.lift(current) { photo = lifted; canLift = false } else { liftFailed = true }
+                        lifting = false
+                    }
+                }
+                .disabled(lifting)
+            }
             if photo != nil {
                 Button("사진 지우기", systemImage: "trash", role: .destructive) {
                     photo = nil
@@ -479,7 +505,7 @@ struct GearPhotoEditor: View {
             Text("사진")
         } footer: {
             if liftFailed {
-                Text("배경을 지우지 못해 원본을 그대로 썼어요.")
+                Text("배경을 지우지 못했어요. 사진은 그대로예요.")
             }
         }
         .onChange(of: pickerItem) { _, item in
@@ -501,13 +527,13 @@ struct GearPhotoEditor: View {
         guard let data else { return }
         lifting = true
         liftFailed = false
+        // 배경이 이미 투명한 PNG는 그대로, 그냥 사진은 사진 그대로 (배경 지우기는 버튼으로 고를 때만)
         if let ready = await SubjectLifter.alreadyTransparent(data) {
             photo = ready
-        } else if let lifted = await SubjectLifter.lift(data) {
-            photo = lifted
+            canLift = false
         } else {
             photo = data
-            liftFailed = true
+            canLift = true
         }
         lifting = false
     }

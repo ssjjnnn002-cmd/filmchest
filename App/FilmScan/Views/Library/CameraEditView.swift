@@ -35,6 +35,7 @@ struct CameraEditView: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var lifting = false
     @State private var liftFailed = false
+    @State private var canLift = false
     @State private var showCamera = false
     @State private var photoScale: Double = 1
     @State private var photoOffset = CGSize.zero          // 칸 크기 대비 비율
@@ -78,6 +79,16 @@ struct CameraEditView: View {
                     PhotosPicker(selection: $pickerItem, matching: .images) {
                         Label("앨범에서 사진 고르기", systemImage: "photo")
                     }
+                    if canLift, let current = photo {
+                        Button("배경 지우기", systemImage: "wand.and.stars") {
+                            Task {
+                                lifting = true
+                                if let lifted = await SubjectLifter.lift(current) { photo = lifted; canLift = false } else { liftFailed = true }
+                                lifting = false
+                            }
+                        }
+                        .disabled(lifting)
+                    }
                     if photo != nil || !spin.isEmpty {
                         Button("사진 지우고 기본 모형 쓰기", systemImage: "trash", role: .destructive) {
                             photo = nil
@@ -89,7 +100,7 @@ struct CameraEditView: View {
                     Text("외관")
                 } footer: {
                     if liftFailed {
-                        Text("카메라를 찾지 못해 원본을 그대로 썼어요. 단색 배경에서 다시 찍어 보세요.")
+                        Text("카메라를 찾지 못해 배경을 지우지 못했어요. 단색 배경에서 찍은 사진으로 다시 해 보세요.")
                     } else if photo == nil && spin.isEmpty {
                         Text("사진이 없으면 고른 형태의 기본 모형으로 보여요.")
                     }
@@ -374,15 +385,14 @@ struct CameraEditView: View {
         liftFailed = false
         photoScale = 1
         photoOffset = .zero
+        // 배경이 이미 투명한 PNG는 그대로, 그냥 사진은 사진 그대로 (배경 지우기는 버튼으로 고를 때만)
         if let ready = await SubjectLifter.alreadyTransparent(data) {
-            photo = ready   // 이미 배경이 투명한 PNG
-        } else if let lifted = await SubjectLifter.lift(data) {
-            photo = lifted
+            photo = ready
+            canLift = false
         } else {
             photo = data
-            liftFailed = true
+            canLift = true
         }
-        spin = []
         lifting = false
     }
 
