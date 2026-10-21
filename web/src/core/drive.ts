@@ -85,6 +85,7 @@ export async function backupToDrive(force = false) {
   if (!res.ok) throw new Error(`드라이브에 올리지 못했어요 (${res.status})`)
   setPref('driveFileId', id)
   setPref('driveKey', key)
+  setPref('drivePulledAt', String(Date.now()))
   setPref('driveLast', String(Date.now()))
   void syncPhotosToDrive().catch(() => {})
 }
@@ -148,6 +149,24 @@ export function syncPhotosToDrive(onProgress?: Progress): Promise<number> {
   return syncing
 }
 
+/** 다른 기기(아이폰·갤럭시)가 올린 최신 기록이면 받아서 합친다. force면 늘 받는다 */
+export async function pullFromDrive(force = false) {
+  const t = await driveToken()
+  const root = await rootFolder(t)
+  const id = getPref('driveFileId', '' as string) || await findByName(t, backupFileName, root)
+  if (!id) return undefined
+  setPref('driveFileId', id)
+  const res = await fetch(downloadUrl(id), { headers: { Authorization: `Bearer ${t}` } })
+  if (!res.ok) return undefined
+  const blob = await res.blob()
+  const saved = Date.parse(JSON.parse(await blob.text())?.savedAt ?? '') || 0
+  if (!force && saved <= Number(getPref('drivePulledAt', '0'))) return undefined
+  const counts = await importAll(blob)
+  setPref('drivePulledAt', String(saved))
+  setPref('driveKey', await backupKey(await exportAll()))
+  return counts
+}
+
 /** 드라이브의 기록 백업으로 되살린다 */
 export async function restoreFromDrive() {
   const t = await driveToken()
@@ -186,6 +205,15 @@ export function driveDue() {
 export function startDriveAutoBackup() {
   if (!driveAvailable) return
   const tryNow = () => { if (driveDue() && hasDriveToken()) void backupToDrive().catch(() => {}) }
+  // 앱을 열거나 다시 볼 때: 다른 기기에서 고친 기록이 있으면 합친다 (구글 연결이 살아 있을 때)
+  let pulledOnce = false
+  const pull = () => { if (driveConnected() && hasDriveToken()) void pullFromDrive().catch(() => {}) }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pull() })
+  document.addEventListener('pointerdown', () => {
+    if (pulledOnce || !driveConnected()) return
+    pulledOnce = true
+    void driveToken('').then(() => pullFromDrive()).catch(() => {})
+  }, { capture: true, once: false })
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') tryNow() })
   const onTap = () => {
     if (!driveDue()) return

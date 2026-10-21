@@ -73,42 +73,6 @@ export function Settings({ onClose }: { onClose: () => void }) {
       )}
 
       <div className="section">
-        <h2>삭제한 롤</h2>
-        <div className="group">
-          {deleted.length === 0 && <div className="row static sub">최근 24시간 안에 지운 롤이 없어요</div>}
-          {deleted.map((roll) => (
-            <div className="row" key={roll.id}>
-              <span className="grow">{filmById(roll.filmId)?.name ?? '필름 알 수 없음'}</span>
-              <button className="btn ghost" onClick={() => { void restoreRoll(roll.id) }}>되돌리기</button>
-              <button className="btn ghost" style={{ color: '#c0392b' }} onClick={() => { void deleteRoll(roll.id, true) }}>지금 지우기</button>
-            </div>
-          ))}
-        </div>
-        <p className="footnote">지운 롤은 24시간 동안 여기 남아요. 사진 앱에 저장한 사진은 그대로예요.</p>
-      </div>
-
-      <div className="section">
-        <h2>삭제한 장비</h2>
-        <div className="group">
-          {deletedCameras.length === 0 && <div className="row static sub">최근 24시간 안에 지운 카메라가 없어요</div>}
-          {deletedCameras.map((camera) => (
-            <div className="row" key={camera.id}>
-              <span className="grow">{camera.brand} {camera.model}</span>
-              <button className="btn ghost" onClick={() => { void restoreCamera(camera.id) }}>되돌리기</button>
-              <button className="btn ghost" style={{ color: '#c0392b' }} onClick={() => { void purgeCamera(camera.id) }}>지금 지우기</button>
-            </div>
-          ))}
-        </div>
-        <p className="footnote">지운 카메라는 24시간 동안 여기 남아요. 필름에 적힌 카메라 정보는 카메라를 지워도 그대로예요.</p>
-      </div>
-
-      <div className="section">
-        <div className="group">
-          <button className="row" onClick={() => setSpending(true)}><span className="grow">통계</span><Icon name="chev" size={18} /></button>
-        </div>
-      </div>
-
-      <div className="section">
         <div className="group">
           <button className="row" onClick={() => setBackupOpen(true)}><span className="grow">백업 및 복구</span><span className="value">{cloudStatus()}</span><Icon name="chev" size={18} /></button>
         </div>
@@ -200,6 +164,41 @@ export function Settings({ onClose }: { onClose: () => void }) {
               </label>
             </div>
             <p className="footnote">이 앱(아이폰·웹·갤럭시)으로 저장했던 사진을 고르면 표식으로 롤을 다시 묶어요. 클라우드 백업을 먼저 복구하면 필름·카메라 정보까지 함께 돌아와요.</p>
+          </div>
+          <div className="section">
+            <h2>삭제한 롤</h2>
+            <div className="group">
+              {deleted.length === 0 && <div className="row static sub">최근 24시간 안에 지운 롤이 없어요</div>}
+              {deleted.map((roll) => (
+                <div className="row" key={roll.id}>
+                  <span className="grow">{filmById(roll.filmId)?.name ?? '필름 알 수 없음'}</span>
+                  <button className="btn ghost" onClick={() => { void restoreRoll(roll.id) }}>되돌리기</button>
+                  <button className="btn ghost" style={{ color: '#c0392b' }} onClick={() => { void deleteRoll(roll.id, true) }}>지금 지우기</button>
+                </div>
+              ))}
+            </div>
+            <p className="footnote">지운 롤은 24시간 동안 여기 남아요. 사진 앱에 저장한 사진은 그대로예요.</p>
+          </div>
+
+          <div className="section">
+            <h2>삭제한 장비</h2>
+            <div className="group">
+              {deletedCameras.length === 0 && <div className="row static sub">최근 24시간 안에 지운 카메라가 없어요</div>}
+              {deletedCameras.map((camera) => (
+                <div className="row" key={camera.id}>
+                  <span className="grow">{camera.brand} {camera.model}</span>
+                  <button className="btn ghost" onClick={() => { void restoreCamera(camera.id) }}>되돌리기</button>
+                  <button className="btn ghost" style={{ color: '#c0392b' }} onClick={() => { void purgeCamera(camera.id) }}>지금 지우기</button>
+                </div>
+              ))}
+            </div>
+            <p className="footnote">지운 카메라는 24시간 동안 여기 남아요. 필름에 적힌 카메라 정보는 카메라를 지워도 그대로예요.</p>
+          </div>
+
+          <div className="section">
+            <div className="group">
+              <button className="row" onClick={() => setSpending(true)}><span className="grow">통계</span><Icon name="chev" size={18} /></button>
+            </div>
           </div>
         </Sheet>
       )}

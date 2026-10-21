@@ -49,43 +49,6 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </Group>
       </Section>
 
-      <Section title="삭제한 롤" foot="지운 롤은 24시간 동안 여기 남아요. 사진 앱에 저장한 사진은 그대로예요.">
-        <Group>
-          {deleted.length === 0 ? <Row static><Sub>최근 24시간 안에 지운 롤이 없어요</Sub></Row> : null}
-          {deleted.map((roll) => (
-            <Row key={roll.id} static>
-              <RowText>{filmById(roll.filmId)?.name ?? '필름 알 수 없음'}</RowText>
-              <Btn label="되돌리기" kind="ghost" onPress={() => { void restoreRoll(roll.id) }} />
-              <Btn label="지금 지우기" kind="danger" onPress={() => { void deleteRoll(roll.id, true) }} />
-            </Row>
-          ))}
-        </Group>
-      </Section>
-
-      <Section title="삭제한 장비" foot="지운 카메라는 24시간 동안 여기 남아요. 필름에 적힌 카메라 정보는 카메라를 지워도 그대로예요.">
-        <Group>
-          {deletedCameras.length === 0 ? <Row static><Sub>최근 24시간 안에 지운 카메라가 없어요</Sub></Row> : null}
-          {deletedCameras.map((camera) => (
-            <Row key={camera.id} static>
-              <RowText>{camera.brand} {camera.model}</RowText>
-              <Btn label="되돌리기" kind="ghost" onPress={() => { void restoreCamera(camera.id) }} />
-              <Btn label="지금 지우기" kind="danger" onPress={() => { void purgeCamera(camera.id) }} />
-            </Row>
-          ))}
-        </Group>
-      </Section>
-
-      <Group>
-        <Row chev onPress={() => setSpending(true)}><RowText>통계</RowText></Row>
-        <Row chev value={update} onPress={async () => {
-          try {
-            const u = await checkUpdate()
-            if (u.newer) { setUpdate('새 버전 있음'); void downloadUpdate(); setNote('새 버전을 내려받아요. 다 받으면 알림을 눌러 설치하세요. 기록은 그대로 남아요.') }
-            else { setUpdate('최신 버전'); setNote('지금 최신 버전이에요.') }
-          } catch { setNote('업데이트를 확인하지 못했어요. 인터넷 연결을 확인해 주세요.') }
-        }}><RowText>업데이트 확인</RowText></Row>
-      </Group>
-
       <Group><Row chev value={cloudStatus()} onPress={() => setBackupOpen(true)}><RowText>백업 및 복구</RowText></Row></Group>
 
       <Section title="안내">
@@ -158,6 +121,42 @@ export function Settings({ onClose }: { onClose: () => void }) {
               }}>이 앱이 저장한 사진 고르기</Row>
             </Group>
           </Section>
+          <Section title="삭제한 롤" foot="지운 롤은 24시간 동안 여기 남아요. 사진 앱에 저장한 사진은 그대로예요.">
+            <Group>
+              {deleted.length === 0 ? <Row static><Sub>최근 24시간 안에 지운 롤이 없어요</Sub></Row> : null}
+              {deleted.map((roll) => (
+                <Row key={roll.id} static>
+                  <RowText>{filmById(roll.filmId)?.name ?? '필름 알 수 없음'}</RowText>
+                  <Btn label="되돌리기" kind="ghost" onPress={() => { void restoreRoll(roll.id) }} />
+                  <Btn label="지금 지우기" kind="danger" onPress={() => { void deleteRoll(roll.id, true) }} />
+                </Row>
+              ))}
+            </Group>
+          </Section>
+
+          <Section title="삭제한 장비" foot="지운 카메라는 24시간 동안 여기 남아요. 필름에 적힌 카메라 정보는 카메라를 지워도 그대로예요.">
+            <Group>
+              {deletedCameras.length === 0 ? <Row static><Sub>최근 24시간 안에 지운 카메라가 없어요</Sub></Row> : null}
+              {deletedCameras.map((camera) => (
+                <Row key={camera.id} static>
+                  <RowText>{camera.brand} {camera.model}</RowText>
+                  <Btn label="되돌리기" kind="ghost" onPress={() => { void restoreCamera(camera.id) }} />
+                  <Btn label="지금 지우기" kind="danger" onPress={() => { void purgeCamera(camera.id) }} />
+                </Row>
+              ))}
+            </Group>
+          </Section>
+
+          <Group>
+            <Row chev onPress={() => setSpending(true)}><RowText>통계</RowText></Row>
+            <Row chev value={update} onPress={async () => {
+              try {
+                const u = await checkUpdate()
+                if (u.newer) { setUpdate('새 버전 있음'); void downloadUpdate(); setNote('새 버전을 내려받아요. 다 받으면 알림을 눌러 설치하세요. 기록은 그대로 남아요.') }
+                else { setUpdate('최신 버전'); setNote('지금 최신 버전이에요.') }
+              } catch { setNote('업데이트를 확인하지 못했어요. 인터넷 연결을 확인해 주세요.') }
+            }}><RowText>업데이트 확인</RowText></Row>
+          </Group>
         </Sheet>
       ) : null}
       {cloud ? <CloudBackup onClose={() => setCloud(false)} /> : null}

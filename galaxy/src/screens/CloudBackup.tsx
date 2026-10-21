@@ -61,7 +61,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
             <Row key="d" static><RowText>자동 백업</RowText>
               <Select value={String(Drive.driveDays())} title="자동 백업" options={[['0', '끔'], ['1', '매일'], ['7', '매주']]} onChange={(v) => { setPref('driveDays', v); refresh() }} />
             </Row>,
-            <Row key="r" onPress={() => run(async () => { const n = await Drive.restoreFromDrive(); setMsg({ text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요.`, ok: true }) }, '')}><RowText>드라이브 기록 백업에서 복구</RowText></Row>,
+            <Row key="r" onPress={() => run(async () => { const n = await Drive.pullFromDrive(true); setMsg(n ? { text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요.`, ok: true } : { text: '드라이브에 기록 파일이 아직 없어요.', ok: false }) }, '')}><RowText>드라이브에서 장비·기록 복구 (최신 파일)</RowText></Row>,
             <Row key="ph" onPress={() => { if (!progress) void run(async () => {
               const n = await Drive.restorePhotosFromDrive((d, t) => setProgress(t ? `${d} / ${t}장 받는 중` : ''))
               setProgress(''); setMsg({ text: `롤 ${n.rolls}개, 사진 ${n.frames}장을 되살렸어요.`, ok: true })

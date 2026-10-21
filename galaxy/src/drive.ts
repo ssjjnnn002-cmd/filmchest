@@ -1,7 +1,7 @@
 // 갤럭시: 구글 계정으로 로그인해 드라이브 '필름함' 폴더에 기록 백업과 롤별 사진 폴더를 올린다 (웹 core/drive.ts와 같은 구조)
 import { GoogleSignin } from '@react-native-google-signin/google-signin'
 import * as FS from 'expo-file-system/legacy'
-import { Linking } from 'react-native'
+import { AppState, Linking } from 'react-native'
 import { db } from './data'
 import type { Frame, Roll } from './core/types'
 import { FOLDER, ROOT_NAME, createFile, downloadUrl, ensureFolder, findByName, listChildren, mediaUrl, rollFolderName } from './core/driveApi'
@@ -91,6 +91,7 @@ export async function backupToDrive(force = false, interactive = true) {
     if (status >= 300) throw new Error(`드라이브에 올리지 못했어요 (${status})`)
     setPref('driveFileId', id)
     setPref('driveKey', k)
+    setPref('drivePulledAt', String(Date.now()))
   }
   setPref('driveLast', String(Date.now()))
   void syncPhotosToDrive(undefined, interactive).catch(() => {})
@@ -147,6 +148,32 @@ export function syncPhotosToDrive(onProgress?: Progress, interactive = true): Pr
     }
   })()
   return syncing
+}
+
+/** 다른 기기(아이폰·웹)가 올린 최신 기록이면 받아서 합친다. force면 늘 받는다 */
+export async function pullFromDrive(force = false, interactive = true) {
+  const t = await token(interactive)
+  const root = await rootFolder(t)
+  const id = getPref('driveFileId', '' as string) || await findByName(t, backupFileName, root)
+  if (!id) return undefined
+  setPref('driveFileId', id)
+  const dest = `${folder('backup').uri.replace(/\/?$/, '/')}drive-download.json`
+  const r = await FS.downloadAsync(downloadUrl(id), dest, { headers: { Authorization: `Bearer ${t}` } })
+  if (r.status >= 300) return undefined
+  const text = await FS.readAsStringAsync(r.uri)
+  const saved = Date.parse(JSON.parse(text)?.savedAt ?? '') || 0
+  if (!force && saved <= Number(getPref('drivePulledAt', '0'))) return undefined
+  const counts = await importAll(r.uri)
+  setPref('drivePulledAt', String(saved))
+  setPref('driveKey', key(await exportAll()))
+  return counts
+}
+
+/** 앱을 열거나 다시 볼 때 (로그인 창 없이, 실패는 조용히) */
+export function startDrivePull() {
+  const pull = () => { if (driveConnected()) void pullFromDrive(false, false).catch(() => {}) }
+  pull()
+  AppState.addEventListener('change', (s) => { if (s === 'active') pull() })
 }
 
 export async function restoreFromDrive() {

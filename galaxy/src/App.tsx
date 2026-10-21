@@ -91,6 +91,7 @@ export function App() {
   // 하루 한 번 기록 백업 파일을 써 두고(안드로이드가 구글 드라이브로 올림), 새로 설치해 비어 있으면 되살린다
   useEffect(() => {
     startLocalAutoBackup()
+    void import('./drive').then((d) => d.startDrivePull())
     void restoredBackupUri().then(async (uri) => {
       if (!uri) return
       const c = await importAll(uri)

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Icon, Sheet } from '../ui/common'
 import { setPref } from '../platform'
 import { backupFileName } from '../core/backup'
-import { driveFolderUrl, backupToDrive, restoreFromDrive, restorePhotosFromDrive, syncPhotosToDrive, drivePhotosOn, disconnectDrive, driveAvailable, driveConnected, driveIntervalDays, driveLastBackup, driveToken } from '../core/drive'
+import { driveFolderUrl, backupToDrive, pullFromDrive, restorePhotosFromDrive, syncPhotosToDrive, drivePhotosOn, disconnectDrive, driveAvailable, driveConnected, driveIntervalDays, driveLastBackup, driveToken } from '../core/drive'
 import {
   allowFolder, backupToFolder, restoreFromFolder, disconnectFolder, folderAvailable, folderCloud, folderDays, folderLast, folderName, folderPermission, pickFolder, verifyFolder,
 } from '../core/folderBackup'
@@ -89,7 +89,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
                 setProgress('')
                 setMsg({ text: `롤 ${n.rolls}개, 사진 ${n.frames}장을 되살렸어요.`, ok: true })
               }, '') }}>드라이브에서 사진 복구</button>
-              <button className="row" onClick={() => { if (confirm('구글 드라이브 백업으로 기록을 되살릴까요? 지금 있는 기록은 지우지 않고 합쳐요.')) void run(async () => { const n = await restoreFromDrive(); setMsg({ text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요.`, ok: true }) }, '') }}>클라우드 백업에서 복구</button>
+              <button className="row" onClick={() => { if (confirm('드라이브의 최신 기록 파일로 장비·롤 정보를 되살릴까요? 지금 있는 기록은 지우지 않고 합쳐요.')) void run(async () => { const n = await pullFromDrive(true); setMsg(n ? { text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요.`, ok: true } : { text: '드라이브에 기록 파일이 아직 없어요.', ok: false }) }, '') }}>드라이브에서 장비·기록 복구 (최신 파일)</button>
               <label className="row static">
                 <span className="grow">자동 백업</span>
                 <select className="input" style={{ width: 'auto', textAlign: 'right' }} value={String(driveIntervalDays())}
