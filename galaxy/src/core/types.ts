@@ -63,8 +63,10 @@ export interface Camera {
   photoOffsetX?: number
   photoOffsetY?: number
   tags?: string[]
-  /** 그립, 소프트 셔터 버튼, 스트랩 … */
+  /** 예전 방식 (액세서리 탭으로 옮긴 뒤 비운다) */
   accessories?: GearAccessory[]
+  /** 이 카메라에 쓰는 액세서리 (액세서리 탭의 GearFilter id) */
+  accessoryIds?: string[]
   battery?: string
   batteryAt?: number
   /** 필름을 먼저 끝까지 감아 두고 거꾸로 세는 카메라 (모르면 비움) */
@@ -110,10 +112,18 @@ export interface GearAccessory {
 
 /** "123,000" → 123000 */
 export const priceValue = (text?: string) => Number((text ?? '').replace(/\D/g, '')) || 0
+export const FILTER_KIND = '필터'
+export const defaultAccessoryKinds = [FILTER_KIND, '그립', '소프트 셔터 버튼', '스트랩', '스트랩 고리', '렌즈 후드', '렌즈 캡', '케이스',
+  '플래시', '노출계', '삼각대', '릴리즈 케이블', '배터리', '어댑터', '기타']
+export const kindOf = (a: { kind?: string }) => a.kind?.trim() || FILTER_KIND
+
 export const priceText = (n: number) => `${n.toLocaleString('ko-KR')}원`
 
+/** 액세서리 (필터, 그립, 스트랩 … 유형은 사용자가 더할 수 있다). 이름은 예전 필터 그대로 GearFilter */
 export interface GearFilter {
   id: string
+  /** 유형. 비어 있으면 필터 */
+  kind?: string
   name: string
   diameter?: string
   hasPhoto?: boolean

@@ -7,13 +7,14 @@ import { useNav } from '../App'
 import type { Roll, RollStatus } from '../core/types'
 import { statusName } from '../core/types'
 import { dateUnknown, rollFilmName, rollStart } from '../core/display'
+import { tagSections } from '../gearExtras'
 import { Btn, Chip, Chips, Empty, Group, OptionsModal, Row, SearchBox, Section, Segmented } from '../kit'
 import { GlassBtn, Page } from '../page'
 import { RollCard, RollRow } from '../RollRow'
 import { ProjectStrip } from './Projects'
 
-type Grouping = 'month' | 'quarter' | 'half' | 'year'
-const groupingName: Record<Grouping, string> = { month: '월', quarter: '분기', half: '반기', year: '년' }
+type Grouping = 'month' | 'quarter' | 'half' | 'year' | 'tag'
+const groupingName: Record<Grouping, string> = { month: '월', quarter: '분기', half: '반기', year: '년', tag: '태그' }
 
 function periodKey(g: Grouping, ms: number) {
   const d = new Date(ms)
@@ -44,6 +45,7 @@ export function Rolls() {
   const [cameraId, setCameraId] = useState('')
   const [status, setStatus] = useState<RollStatus | ''>('')
   const [search, setSearch] = useState('')
+  const [tag, setTag] = useState('')
   const [gridW, setGridW] = useState(0)
 
   const cameraName = (r: Roll) => {
@@ -57,22 +59,27 @@ export function Rolls() {
     if (filmId && r.filmId !== filmId) return false
     if (cameraId && r.cameraId !== cameraId) return false
     if (status && r.status !== status) return false
+    if (tag && !r.tags?.includes(tag)) return false
     if (search) {
       const text = [rollFilmName(r), cameraName(r), r.lab, r.note, ...r.locations.map((l) => `${l.name} ${l.memo ?? ''}`), ...(r.tags ?? [])].join(' ').toLowerCase()
       if (!text.includes(search.toLowerCase())) return false
     }
     return true
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [rolls, favoritesOnly, filmId, cameraId, status, search, cameras])
+  }), [rolls, favoritesOnly, filmId, cameraId, status, tag, search, cameras])
 
   const groups = useMemo(() => {
+    if (grouping === 'tag') {
+      // 태그마다 한 묶음 (태그가 여럿이면 여러 묶음), 태그 없는 롤은 맨 아래
+      return tagSections(filtered, true).map((sec) => ({ key: sec.title ?? '', title: sec.title ?? '', rolls: [...sec.items].sort((a, b) => rollStart(b) - rollStart(a)) }))
+    }
     const m = new Map<number, Roll[]>()
     for (const r of filtered) {
       const k = dateUnknown(r) ? 0 : periodKey(grouping, rollStart(r))
       m.set(k, [...(m.get(k) ?? []), r])
     }
     return [...m.entries()].sort((a, b) => b[0] - a[0])
-      .map(([k, list]) => ({ key: k, title: periodTitle(grouping, k), rolls: list.sort((a, b) => rollStart(b) - rollStart(a)) }))
+      .map(([k, list]) => ({ key: String(k), title: periodTitle(grouping, k), rolls: list.sort((a, b) => rollStart(b) - rollStart(a)) }))
   }, [filtered, grouping])
 
   const filmOptions = useMemo(() => {
@@ -81,9 +88,10 @@ export function Rolls() {
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
   }, [rolls])
   const cameraOptions = cameras.filter((c) => (rolls ?? []).some((r) => r.cameraId === c.id))
-  const filtering = favoritesOnly || filmId || cameraId || status
+  const tagOptions = useMemo(() => [...new Set((rolls ?? []).filter(kept).flatMap((r) => r.tags ?? []))].sort((a, b) => a.localeCompare(b)), [rolls])
+  const filtering = favoritesOnly || filmId || cameraId || status || tag
 
-  const reset = () => { setFavoritesOnly(false); setFilmId(''); setCameraId(''); setStatus('') }
+  const reset = () => { setFavoritesOnly(false); setFilmId(''); setCameraId(''); setStatus(''); setTag('') }
 
   return (
     <Page title="롤 보관함"
@@ -100,6 +108,7 @@ export function Rolls() {
           <Chip label="즐겨찾기" icon="star" active={favoritesOnly} onPress={() => setFavoritesOnly(!favoritesOnly)} />
           <ChipSelect label="필름" value={filmId} onChange={setFilmId} options={filmOptions} />
           <ChipSelect label="카메라" value={cameraId} onChange={setCameraId} options={cameraOptions.map((c) => [c.id, `${c.brand} ${c.model}`])} />
+          {tagOptions.length > 0 ? <ChipSelect label="태그" value={tag} onChange={setTag} options={tagOptions.map((t) => [t, `#${t}`])} /> : null}
           <ChipSelect label="진행 상태" value={status} onChange={(v) => setStatus(v as RollStatus | '')}
             options={(Object.keys(statusName) as RollStatus[]).map((s) => [s, statusName[s]])} />
           {filtering ? <Chip label="초기화 ✕" onPress={reset} /> : null}

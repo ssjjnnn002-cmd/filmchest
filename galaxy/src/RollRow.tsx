@@ -7,6 +7,7 @@ import { formatInfo } from './core/types'
 import { cameraName, dateRangeText, rollCameraFormat, rollFilm, rollFilmName, sortedLocations } from './core/display'
 import { Canister, StatusBadge, Sub } from './kit'
 import { useTheme } from './theme'
+import { TagLine } from './gearExtras'
 
 export function RollRow({ roll }: { roll: Roll }) {
   const c = useTheme()
@@ -22,7 +23,8 @@ export function RollRow({ roll }: { roll: Roll }) {
           {roll.favorite ? <Text style={{ color: '#F5B700' }}>★</Text> : null}
         </View>
         <Sub lines={1}>{[cameraName(camera, roll), dateRangeText(roll)].join(' · ')}</Sub>
-        {places ? <Sub lines={1}>{places}</Sub> : null}
+        <Sub lines={1}>{places || ' '}</Sub>
+        <TagLine tags={roll.tags} />
       </View>
     </View>
   )
@@ -45,7 +47,8 @@ export function RollCard({ roll, onPress }: { roll: Roll; onPress: () => void })
         <StatusBadge status={roll.status} />
       </View>
       <Sub lines={1}>{cameraName(camera, roll)}</Sub>
-      <Sub>{dateRangeText(roll)}{formatInfo[format].is120 ? ` · ${formatInfo[format].name}` : ''}</Sub>
+      <Sub lines={1}>{dateRangeText(roll)}{formatInfo[format].is120 ? ` · ${formatInfo[format].name}` : ''}</Sub>
+      <TagLine tags={roll.tags} />
     </Pressable>
   )
 }

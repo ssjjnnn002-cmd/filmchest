@@ -5,6 +5,8 @@ import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCam
 import { getPref, useLiveQuery } from '../store'
 import { backupFileName, exportAll, importAll, localBackupAt, writeLocalBackup } from '../backup'
 import { restorePhotos } from '../restore'
+import { CloudBackup, cloudStatus } from './CloudBackup'
+import { Spending } from './Spending'
 import { filmById } from '../core/films'
 import { bytesText } from '../core/display'
 import { sections } from '../core/privacyText'
@@ -24,6 +26,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [confirm, setConfirm] = useState(false)
   const [privacy, setPrivacy] = useState(false)
   const [note, setNote] = useState<string>()
+  const [cloud, setCloud] = useState(false)
+  const [spending, setSpending] = useState(false)
   const deleted = useLiveQuery(async () => (await db.rolls.toArray()).filter((r) => r.deletedAt), []) ?? []
   const deletedCameras = useLiveQuery(async () => (await db.cameras.toArray()).filter((x) => x.deletedAt), []) ?? []
   useEffect(() => { storageEstimate().then(setUsage); void purgeOldRolls(); void purgeOldCameras() }, [])
@@ -68,8 +72,11 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </Group>
       </Section>
 
-      <Section title="백업" foot={`${localBackupAt() ? `마지막 백업 ${new Date(localBackupAt()!).toLocaleString('ko-KR')}. ` : ''}장비·필름·롤 기록을 하루 한 번 백업 파일로 써 두고, 휴대폰의 구글 백업이 켜져 있으면 구글 드라이브로 올라가요. 스캔 사진은 빠져요. 웹앱 백업 파일도 불러올 수 있어요.`}>
+      <Group><Row chev onPress={() => setSpending(true)}><RowText>장비에 쓴 돈</RowText></Row></Group>
+
+      <Section title="백업" foot={`${localBackupAt() ? `마지막 백업 ${new Date(localBackupAt()!).toLocaleString('ko-KR')}. ` : ''}장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 웹앱 백업 파일도 불러올 수 있어요.`}>
         <Group>
+          <Row chev value={cloudStatus()} onPress={() => setCloud(true)}><RowText>클라우드 백업</RowText></Row>
           <Row onPress={async () => { await writeLocalBackup(); await saveFileNow(backupFileName, await exportAll(), 'application/json') }}>백업 파일로 저장</Row>
           <Row onPress={async () => {
             const [file] = await pickFiles(['application/json', 'text/plain', '*/*'], false)
@@ -135,6 +142,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
             onClose()
           }} />
       ) : null}
+      {cloud ? <CloudBackup onClose={() => setCloud(false)} /> : null}
+      {spending ? <Spending onClose={() => setSpending(false)} /> : null}
     </Sheet>
   )
 }

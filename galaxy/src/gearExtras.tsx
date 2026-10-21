@@ -3,11 +3,9 @@ import { useMemo, useState } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
 import { DateTimePickerAndroid as Picker } from '@react-native-community/datetimepicker'
 import { db } from './data'
-import type { GearAccessory } from './core/types'
-import { priceText, priceValue, uid } from './core/types'
-import { groupPrice } from './core/optics'
+import { defaultAccessoryKinds, uid } from './core/types'
 import { Chip, Chips, Group, Row, Section } from './kit'
-import { getPref, useLiveQuery } from './store'
+import { getPref, setPref, useLiveQuery } from './store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from './suggest'
 import { useTheme } from './theme'
 
@@ -98,40 +96,59 @@ export function TagFilter({ tags, value, onChange }: { tags: string[]; value?: s
   return <Chips>{list.map((t) => <Chip key={t} label={`#${t}`} flat active={value === t} onPress={() => onChange(value === t ? undefined : t)} />)}</Chips>
 }
 
-const accessoryNames = ['그립', '소프트 셔터 버튼', '스트랩', '스트랩 고리', '렌즈 후드', '케이스']
+/** 액세서리 유형: 기본 + 사용자가 더한 것 */
+export function accessoryKinds(): string[] {
+  let added: string[] = []
+  try { added = JSON.parse(getPref('accessoryKinds', '[]')) } catch { /* 없음 */ }
+  return [...defaultAccessoryKinds, ...added.filter((k) => !defaultAccessoryKinds.includes(k))]
+}
+export function addAccessoryKind(raw: string) {
+  const name = raw.trim()
+  if (!name || accessoryKinds().includes(name)) return
+  let added: string[] = []
+  try { added = JSON.parse(getPref('accessoryKinds', '[]')) } catch { /* 없음 */ }
+  setPref('accessoryKinds', JSON.stringify([...added, name]))
+}
 
-export function AccessoryFields({ items, setItems, bodyPrice }: { items: GearAccessory[]; setItems: (v: GearAccessory[]) => void; bodyPrice: string }) {
+/** 태그별로 묶기 (웹과 같음) */
+export function tagSections<T extends { tags?: string[] }>(items: T[], grouped: boolean): { title?: string; items: T[] }[] {
+  if (!grouped) return [{ items }]
+  const all = [...new Set(items.flatMap((x) => x.tags ?? []))].sort((a, b) => a.localeCompare(b))
+  const out: { title?: string; items: T[] }[] = all.map((t) => ({ title: `#${t}`, items: items.filter((x) => x.tags?.includes(t)) }))
+  const none = items.filter((x) => !x.tags?.length)
+  if (none.length) out.push({ title: '태그 없음', items: none })
+  return out
+}
+
+/** 블록 안 태그 한 줄. 없어도 자리를 지켜 블록 높이가 같다 */
+export function TagLine({ tags }: { tags?: string[] }) {
   const c = useTheme()
-  const total = priceValue(bodyPrice) + items.reduce((n, a) => n + priceValue(a.price), 0)
-  const patch = (id: string, p: Partial<GearAccessory>) => setItems(items.map((a) => (a.id === id ? { ...a, ...p } : a)))
   return (
-    <Section title="악세서리">
-      <Group>
-        {items.map((a) => (
-          <Row key={a.id}>
-            <TextInput value={a.name} onChangeText={(v) => patch(a.id, { name: v })} placeholder="이름" placeholderTextColor={c.faint}
-              style={{ flex: 1, fontSize: 17, color: c.ink, paddingVertical: 4 }} />
-            <TextInput value={a.price ?? ''} onChangeText={(v) => patch(a.id, { price: groupPrice(v) || undefined })} placeholder="가격"
-              placeholderTextColor={c.faint} keyboardType="number-pad"
-              style={{ width: 110, fontSize: 17, color: c.ink, textAlign: 'right', paddingVertical: 4 }} />
-            <Pressable onPress={() => setItems(items.filter((x) => x.id !== a.id))} hitSlop={8} accessibilityLabel="악세서리 지우기">
-              <Text style={{ fontSize: 18, color: c.muted, marginLeft: 10 }}>×</Text>
-            </Pressable>
-          </Row>
-        ))}
-        <Chips>
-          {accessoryNames.map((n) => <Chip key={n} label={`+ ${n}`} flat onPress={() => setItems([...items, { id: uid(), name: n }])} />)}
-          <Chip label="+ 직접 입력" flat onPress={() => setItems([...items, { id: uid(), name: '' }])} />
-        </Chips>
-        {total > 0 && (
-          <Row static>
-            <Text style={{ flex: 1, fontSize: 17, color: c.ink }}>본체 + 악세서리</Text>
-            <Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>{priceText(total)}</Text>
-          </Row>
-        )}
-      </Group>
-    </Section>
+    <Text numberOfLines={1} style={{ fontSize: 12, lineHeight: 17, height: 17, fontWeight: '600', color: c.safelight, opacity: tags?.length ? 1 : 0 }}>
+      {tags?.length ? tags.map((t) => `#${t}`).join(' ') : ' '}
+    </Text>
   )
+}
+
+/** 묶음 제목 */
+export function GroupTitle({ children }: { children: string }) {
+  const c = useTheme()
+  return <Text style={{ fontSize: 14, fontWeight: '600', color: c.muted, marginTop: 6, marginHorizontal: 4 }}>{children}</Text>
+}
+
+/** 예전에 카메라 안에 적어 둔 액세서리를 액세서리 탭 장비로 옮긴다 */
+export async function migrateAccessories() {
+  for (const cam of await db.cameras.toArray()) {
+    if (!cam.accessories?.length) continue
+    const ids = [...(cam.accessoryIds ?? [])]
+    for (const a of cam.accessories) {
+      if (!a.name.trim()) continue
+      const id = uid()
+      await db.filters.put({ id, kind: accessoryKinds().includes(a.name) ? a.name : '기타', name: a.name, price: a.price, createdAt: Date.now() })
+      ids.push(id)
+    }
+    await db.cameras.update(cam.id, { accessories: undefined, accessoryIds: ids })
+  }
 }
 
 /** 비워 둘 수 있는 날짜: 누르면 바로 달력, × 로 지우기 */

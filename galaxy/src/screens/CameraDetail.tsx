@@ -7,7 +7,7 @@ import { useNav } from '../App'
 import type { Camera, Lens } from '../core/types'
 import { lensSpec } from '../core/optics'
 import { formatInfo, priceText, priceValue, uid } from '../core/types'
-import { OptionalDate, TagChips } from '../gearExtras'
+import { OptionalDate, TagField } from '../gearExtras'
 import { profileFor } from '../core/profiles'
 import { lensesFor } from '../core/lenses'
 import { fmtDay, rollFilmName } from '../core/display'
@@ -33,9 +33,12 @@ export function CameraDetail({ id }: { id: string }) {
   const [confirm, setConfirm] = useState(false)
   const [lensEdit, setLensEdit] = useState<Lens | 'pick' | null>(null)
   const [menu, setMenu] = useState(false)
+  const [confirmBattery, setConfirmBattery] = useState(false)
+  const allAccessories = useLiveQuery(() => db.filters.toArray(), []) ?? []
 
   if (!camera) return <Page title="" onBack={nav.pop} large={false}><View /></Page>
   const lenses = lensesOnCamera(camera, allLenses)
+  const myAccessories = (camera.accessoryIds ?? []).map((x) => allAccessories.find((a) => a.id === x)).filter((a): a is NonNullable<typeof a> => !!a)
   const loaded = rolls.find((r) => r.status === 'loaded')
   const history = rolls.filter((r) => r.status !== 'loaded')
   const noBattery = (camera.battery ?? '').startsWith('필요 없음')
@@ -55,6 +58,8 @@ export function CameraDetail({ id }: { id: string }) {
         <Sub>{[formatInfo[camera.format].name, camera.mount ? `${camera.mount} 마운트` : camera.fixedLens].filter(Boolean).join(' · ')}</Sub>
       </View>
 
+      <TagField tags={camera.tags ?? []} setTags={(tags) => db.cameras.update(id, { tags })} />
+
       <Section title="배터리" foot={batteryDue(camera) ? '교체한 지 1년이 넘었어요. 노출계가 정확하지 않을 수 있어요.' : undefined} warn>
         <Group>
           {noBattery ? (
@@ -63,25 +68,24 @@ export function CameraDetail({ id }: { id: string }) {
             <Row key="kind" static value={camera.battery ?? '모름'}><RowText>종류</RowText></Row>,
             <OptionalDate key="at" label="마지막 교체" value={camera.batteryAt} max={Date.now()}
               onChange={(v) => db.cameras.update(id, { batteryAt: v })} />,
-            <Row key="now" onPress={() => db.cameras.update(id, { batteryAt: Date.now() })}>
+            <Row key="now" onPress={() => setConfirmBattery(true)}>
               <Icon name="battery" size={20} color={c.safelight} /><RowText color={c.safelight}>오늘 교체함</RowText>
             </Row>,
           ]}
         </Group>
       </Section>
 
-      {camera.tags?.length ? <Section title="태그"><TagChips tags={camera.tags} /></Section> : null}
 
-      {priceValue(camera.price) > 0 || camera.accessories?.length ? (
+      {priceValue(camera.price) > 0 || myAccessories.length ? (
         <Section title="쓴 금액">
           <Group>
             {priceValue(camera.price) > 0 ? <Row static value={priceText(priceValue(camera.price))}><RowText>본체</RowText></Row> : null}
-            {(camera.accessories ?? []).map((a) => (
+            {myAccessories.map((a) => (
               <Row key={a.id} static value={a.price ? priceText(priceValue(a.price)) : '-'}><RowText>{a.name}</RowText></Row>
             ))}
             <Row static>
               <Text style={{ flex: 1, fontSize: 17, fontWeight: '700', color: c.ink }}>합계</Text>
-              <Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>{priceText(priceValue(camera.price) + (camera.accessories ?? []).reduce((n, a) => n + priceValue(a.price), 0))}</Text>
+              <Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>{priceText(priceValue(camera.price) + myAccessories.reduce((n, a) => n + priceValue(a.price), 0))}</Text>
             </Row>
           </Group>
         </Section>
@@ -134,6 +138,10 @@ export function CameraDetail({ id }: { id: string }) {
       {editing ? <CameraEdit camera={camera} onClose={() => setEditing(false)} /> : null}
       {lensEdit === 'pick' ? <LensPick camera={camera} lenses={allLenses} attached={lenses} onClose={() => setLensEdit(null)} /> : null}
       {lensEdit && lensEdit !== 'pick' ? <LensEdit lens={lensEdit} mount={camera.mount!} brand={camera.brand} onClose={() => setLensEdit(null)} /> : null}
+      {confirmBattery ? (
+        <Confirm message="오늘 배터리를 교체했나요?" action="오늘 교체함" safe onCancel={() => setConfirmBattery(false)}
+          onConfirm={async () => { setConfirmBattery(false); await db.cameras.update(id, { batteryAt: Date.now() }) }} />
+      ) : null}
       {confirm ? (
         <Confirm message="이 카메라를 삭제할까요? 필름에 적힌 카메라 정보는 남고, 24시간 안에는 설정에서 되돌릴 수 있어요." onCancel={() => setConfirm(false)}
           onConfirm={async () => { setConfirm(false); await deleteCamera(id); nav.pop() }} />

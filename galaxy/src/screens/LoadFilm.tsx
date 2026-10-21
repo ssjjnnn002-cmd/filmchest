@@ -206,7 +206,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
                 <Btn label="+" size="small" onPress={() => setPush(Math.min(3, push + 1))} />
               </View>
             </View>
-            <Toggle label="첫 촬영일 추가" value={today} onChange={setToday} />
+            <Toggle label="오늘을 촬영일로 설정하기" value={today} onChange={setToday} />
             {today ? <Field label="날짜"><DateInput value={startAt} max={Date.now()} onChange={setStartAt} /></Field> : null}
           </Group>
         </Section>

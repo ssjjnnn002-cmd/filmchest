@@ -8,14 +8,14 @@ import { useNav } from '../App'
 import type { Camera, Roll } from '../core/types'
 import { filmById } from '../core/films'
 import { rollFilmName } from '../core/display'
-import { Btn, CameraCover, Canister, Empty, EmptyText, Segmented } from '../kit'
+import { Btn, CameraCover, Canister, Empty, EmptyText, SearchBox, Segmented } from '../kit'
 import { Icon } from '../icons'
 import { GlassBtn, GlassGroup, Page } from '../page'
 import { useTheme } from '../theme'
 import { seedExample } from '../seed'
 import { CameraEdit } from './CameraEdit'
 import { GearAdd, GearBoard, type GearKind } from './Gear'
-import { TagFilter } from '../gearExtras'
+import { GroupTitle, TagFilter, TagLine, migrateAccessories, tagSections } from '../gearExtras'
 import { Settings } from './Settings'
 
 export const batteryDue = (c: Camera) =>
@@ -31,6 +31,10 @@ export function Library() {
   const [adding, setAdding] = useState(false)
   const [gear, setGear] = useState<GearKind | 'camera'>('camera')
   const [tag, setTag] = useState<string>()
+  const [search, setSearch] = useState('')
+  const [grouped, setGrouped] = useState(getPref('gearGrouped', '' as string) === '1')
+  const query = search.trim().toLowerCase()
+  useEffect(() => { void migrateAccessories() }, [])
   const lensTags = useLiveQuery(async () => (await db.lenses.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
   const filterTags = useLiveQuery(async () => (await db.filters.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
   const [gearAdd, setGearAdd] = useState(false)
@@ -62,6 +66,7 @@ export function Library() {
     .map((id) => byId.get(id))
     .filter((x): x is Camera => !!x)
     .filter((x) => editing || !tag || (x.tags ?? []).includes(tag))
+    .filter((x) => editing || !query || [x.brand, x.model, x.nickname, x.mount, x.fixedLens, ...(x.tags ?? [])].some((t) => t?.toLowerCase().includes(query)))
 
   const toggleLayout = () => {
     const next = layout === 'grid' ? 'list' : 'grid'
@@ -147,21 +152,33 @@ export function Library() {
         ? <GlassBtn label="완료" prominent onPress={() => setEditing(false)} />
         : <GlassGroup items={[
           { icon: grid ? 'list' : 'grid', label: grid ? '목록으로 보기' : '그리드로 보기', onPress: toggleLayout },
-          { icon: 'plus', label: gear === 'camera' ? '카메라 추가' : `${gear === 'lens' ? '렌즈' : gear === 'filter' ? '필터' : '필름'} 추가`, onPress: () => gear === 'camera' ? setAdding(true) : setGearAdd(true) },
+          { icon: 'plus', label: gear === 'camera' ? '카메라 추가' : `${gear === 'lens' ? '렌즈' : gear === 'filter' ? '액세서리' : '필름'} 추가`, onPress: () => gear === 'camera' ? setAdding(true) : setGearAdd(true) },
         ]} />}>
 
       {!editing && (
         <View style={{ marginBottom: 12 }}>
-          <Segmented value={gear} options={[['camera', '카메라'], ['lens', '렌즈'], ['filter', '필터'], ['film', '필름']]} onChange={(g) => { setGear(g); setTag(undefined) }} />
+          <Segmented value={gear} options={[['camera', '카메라'], ['lens', '렌즈'], ['filter', '액세서리'], ['film', '필름']]} onChange={(g) => { setGear(g); setTag(undefined); setSearch('') }} />
         </View>
       )}
+      {!editing ? (
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+          <View style={{ flex: 1 }}><SearchBox value={search} onChange={setSearch} placeholder={`${({ camera: '카메라', lens: '렌즈', filter: '액세서리', film: '필름' } as const)[gear]} 검색`} /></View>
+          {gear !== 'film' ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="태그별로 묶기" accessibilityState={{ selected: grouped }}
+              onPress={() => { setGrouped(!grouped); setPref('gearGrouped', grouped ? '' : '1') }}
+              style={{ height: 44, paddingHorizontal: 14, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: grouped ? c.safelight : c.fill }}>
+              <Text style={{ color: grouped ? '#fff' : c.safelight, fontWeight: '600', fontSize: 15 }}>태그별</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
       {!editing && gear !== 'film' ? (
         <View style={{ marginBottom: 8 }}>
           <TagFilter tags={gear === 'camera' ? (cameras ?? []).flatMap((x) => x.tags ?? []) : gear === 'lens' ? lensTags : filterTags} value={tag} onChange={setTag} />
         </View>
       ) : null}
 
-      {gear !== 'camera' && !editing ? <GearBoard kind={gear} layout={layout} tag={tag} /> : null}
+      {gear !== 'camera' && !editing ? <GearBoard kind={gear} layout={layout} tag={tag} search={search} grouped={grouped} /> : null}
 
       {gear === 'camera' && cameras && cameras.length === 0 ? (
         <Empty icon="camera" title="카메라가 없어요">
@@ -187,8 +204,19 @@ export function Library() {
             <Icon name="right" size={20} color="#fff" />
           </Pressable>
 
+          {shown.length === 0 ? <Empty icon="search" title="맞는 카메라가 없어요" /> : null}
+          {grouped && !editing ? tagSections(shown, true).map((sec) => (
+            <View key={sec.title} style={{ gap: 8 }}>
+              <GroupTitle>{`${sec.title} · ${sec.items.length}`}</GroupTitle>
+              <View style={grid ? { flexDirection: 'row', flexWrap: 'wrap', gap: 14 } : { backgroundColor: c.cell, borderRadius: 22 }}>
+                {sec.items.map((x) => grid
+                  ? <View key={x.id} style={{ width: cell }}><CameraCard camera={x} roll={loadedFor(x)} /></View>
+                  : <CameraRow key={x.id} camera={x} roll={loadedFor(x)} />)}
+              </View>
+            </View>
+          )) : null}
           <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-            style={grid
+            style={grouped && !editing ? { height: 0, overflow: 'hidden' } : grid
               ? { flexDirection: 'row', flexWrap: 'wrap', gap: 14 }
               : { backgroundColor: c.cell, borderRadius: 22 }}>
             {shown.map(item)}
@@ -270,9 +298,10 @@ function CameraCard({ camera, roll, editing }: { camera: Camera; roll?: Roll; ed
       </Pressable>
       <Pressable disabled={editing} onPress={open} style={{ minWidth: 0 }}>
         <Text numberOfLines={1} style={{ fontSize: 19, fontWeight: '700', color: c.ink }}>{camera.model}</Text>
-        <Text style={{ fontSize: 15, color: c.muted }}>
+        <Text numberOfLines={1} style={{ fontSize: 15, color: c.muted }}>
           {camera.brand}{batteryDue(camera) ? <Text style={{ color: c.warn, fontSize: 12, fontWeight: '600' }}>{'  '}배터리 교체</Text> : null}
         </Text>
+        <TagLine tags={camera.tags} />
       </Pressable>
       <View style={{ height: 0.5, backgroundColor: c.sep }} />
       {roll ? (
@@ -300,10 +329,10 @@ function CameraRow({ camera, roll, editing }: { camera: Camera; roll?: Roll; edi
         <View style={{ width: 68 }}><CameraCover camera={camera} height={52} /></View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text numberOfLines={1} style={{ fontSize: 17, fontWeight: '600', color: c.ink }}>{camera.brand} {camera.model}</Text>
-          {roll
-            ? <Text numberOfLines={1} style={{ fontSize: 14, color: c.safelight }}>{rollFilmName(roll)}</Text>
-            : <Text style={{ fontSize: 14, color: c.muted }}>비어 있음</Text>}
-          {batteryDue(camera) ? <Text style={{ color: c.warn, fontSize: 12, fontWeight: '600' }}>배터리 교체할 때가 됐어요</Text> : null}
+          <Text numberOfLines={1} style={{ fontSize: 14, color: roll ? c.safelight : c.muted }}>
+            {roll ? rollFilmName(roll) : '비어 있음'}{batteryDue(camera) ? <Text style={{ color: c.warn, fontSize: 12, fontWeight: '600' }}>  배터리 교체</Text> : null}
+          </Text>
+          <TagLine tags={camera.tags} />
         </View>
       </Pressable>
       {editing ? <View style={{ width: 34 }} /> : roll

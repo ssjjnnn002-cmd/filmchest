@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Image, PanResponder, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { db, rememberCamera } from '../data'
-import type { BodyStyle, Camera, FilmFormat, GearAccessory } from '../core/types'
+import type { BodyStyle, Camera, FilmFormat } from '../core/types'
 import { formatInfo, styleName, uid } from '../core/types'
 import { brandsMatching, catalog, catalogMatch, catalogName, inferStyle, kindText, modelsMatching, type CatalogCamera } from '../core/cameras'
 import { profileFor } from '../core/profiles'
@@ -13,9 +13,9 @@ import { webTool } from '../webTools'
 import { Btn, Chip, DateInput, Field, Footnote, Group, RangeSlider, Row, RowText, Section, Segmented, Select, Spinner, Sub, Toggle } from '../kit'
 import { Sheet, SheetBtn } from '../overlay'
 import { groupPrice } from '../core/optics'
-import { PurchaseFields, rememberSeller, useUsedSellers } from './Gear'
+import { AccessoryLinkFields, PurchaseFields, rememberSeller, useUsedSellers } from './Gear'
 import { useTheme } from '../theme'
-import { AccessoryFields, OptionalDate, TagField } from '../gearExtras'
+import { OptionalDate, TagField } from '../gearExtras'
 import { features } from '../core/features'
 
 const BODY_COLOR = '#1C1C1E'
@@ -51,7 +51,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
   const [photoScale, setPhotoScale] = useState(camera?.photoScale ?? 1)
   const [offset, setOffset] = useState({ x: camera?.photoOffsetX ?? 0, y: camera?.photoOffsetY ?? 0 })
   const [tags, setTags] = useState<string[]>(camera?.tags ?? [])
-  const [accessories, setAccessories] = useState<GearAccessory[]>(camera?.accessories ?? [])
+  const [accessoryIds, setAccessoryIds] = useState<string[]>(camera?.accessoryIds ?? [])
   // 끌어서 옮기기 · 두 손가락으로 확대
   const box = useRef({ w: 1, h: 1 })
   const live = useRef({ scale: photoScale, offset })
@@ -164,7 +164,8 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
       photoOffsetX: photo && offset.x ? offset.x : undefined,
       photoOffsetY: photo && offset.y ? offset.y : undefined,
       tags,
-      accessories: accessories.filter((a) => a.name.trim()),
+      accessories: undefined,
+      accessoryIds,
       battery: battery.trim() || undefined,
       batteryAt,
       prewind,
@@ -257,6 +258,8 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
         </Group>
       </Section>
 
+      <TagField tags={tags} setTags={setTags} />
+
       <Section title="렌즈">
         <Group>
           <Toggle label="렌즈 교환식" value={interchangeable} onChange={setInterchangeable} />
@@ -274,8 +277,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
       </Section>
 
       <PurchaseFields date={purchasedAt} setDate={setPurchasedAt} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller} used={usedSellers} />
-      <AccessoryFields items={accessories} setItems={setAccessories} bodyPrice={price} />
-      <TagField tags={tags} setTags={setTags} />
+      <AccessoryLinkFields ids={accessoryIds} setIds={setAccessoryIds} bodyPrice={price} />
 
       {features.meter ? <Section title="필름 감기" foot={prewind == null
         ? '아직 고르지 않았어요. 노출계를 열면 한 번 묻고, 고른 쪽이 이 카메라에 저장돼요.'

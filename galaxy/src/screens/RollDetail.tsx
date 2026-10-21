@@ -73,6 +73,7 @@ export function RollDetail({ id }: { id: string }) {
           </Pressable>
         </View>
       }>
+      <TagField tags={roll.tags ?? []} setTags={(tags) => db.rolls.update(id, { tags })} />
 
       <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center', marginHorizontal: 4, marginBottom: 8 }}>
         <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={104} />
@@ -177,7 +178,6 @@ export function RollDetail({ id }: { id: string }) {
       </Section>
 
       <RollProjects roll={roll} />
-      <TagField tags={roll.tags ?? []} setTags={(tags) => db.rolls.update(id, { tags })} />
 
       <Section title="메모">
         <Group>

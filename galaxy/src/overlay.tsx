@@ -80,8 +80,8 @@ export function Sheet({ title, onClose, left, right, children, page, scroll = tr
 }
 
 /** 페이지 안 확인 창 (.alert) */
-export function Confirm({ message, action = '삭제', onConfirm, onCancel }: {
-  message: string; action?: string; onConfirm: () => void; onCancel: () => void
+export function Confirm({ message, action = '삭제', safe, onConfirm, onCancel }: {
+  message: string; action?: string; safe?: boolean; onConfirm: () => void; onCancel: () => void
 }) {
   const c = useTheme()
   const btn = (label: string, color: string, fn: () => void) => (
@@ -97,7 +97,7 @@ export function Confirm({ message, action = '삭제', onConfirm, onCancel }: {
             <Text style={{ color: c.ink, fontSize: 17, fontWeight: '600', textAlign: 'center', lineHeight: 23, marginBottom: 16 }}>{message}</Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               {btn('취소', c.ink, onCancel)}
-              {btn(action, c.danger, onConfirm)}
+              {btn(action, safe ? c.safelight : c.danger, onConfirm)}
             </View>
           </BlurView>
         </Pressable>

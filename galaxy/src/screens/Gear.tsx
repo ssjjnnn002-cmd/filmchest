@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Image, Pressable, Text, View } from 'react-native'
+import { Image, Pressable, Text, TextInput, View } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { db } from '../data'
 import type { CustomFilmRow } from '../core/films'
@@ -7,15 +7,15 @@ import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films
 import { lensesFor } from '../core/lenses'
 import { filmFits, filterDiameters, filterKinds, groupPrice, lensSpec, parseLens } from '../core/optics'
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
-import { formatInfo, uid } from '../core/types'
+import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
 import { deleteCameraPhoto, readBytes, saveCameraPhoto, useCameraPhoto } from '../files'
-import { Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Group, Row, Section, Segmented, Sub } from '../kit'
+import { Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Group, Row, Section, Segmented, Select, Sub } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { getPref, useLiveQuery } from '../store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
 import { useTheme } from '../theme'
 import { CustomFilmEdit } from './CustomFilmEdit'
-import { OptionalDate, TagField } from '../gearExtras'
+import { GroupTitle, OptionalDate, TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../gearExtras'
 
 export type GearKind = 'lens' | 'filter' | 'film'
 const storageName: Record<FilmStorage, string> = { fridge: '냉장고', freezer: '냉동고', drawer: '서랍', room: '상온' }
@@ -124,60 +124,83 @@ async function storePhoto(id: string, uri?: string, cleared?: boolean) {
   else if (cleared) await deleteCameraPhoto(id)
 }
 
-export function GearBoard({ kind, layout, tag }: { kind: GearKind; layout: string; tag?: string }) {
+export function GearBoard({ kind, layout, tag, search = '', grouped = false }: { kind: GearKind; layout: string; tag?: string; search?: string; grouped?: boolean }) {
   const c = useTheme()
-  const lenses = useLiveQuery(async () => (await db.lenses.orderBy('createdAt').toArray()).filter((x) => !tag || (x.tags ?? []).includes(tag)), [tag])
-  const filters = useLiveQuery(async () => (await db.filters.orderBy('createdAt').toArray()).filter((x) => !tag || (x.tags ?? []).includes(tag)), [tag])
-  const lots = useLiveQuery(() => db.filmLots.orderBy('createdAt').reverse().toArray(), [])
+  const allLenses = useLiveQuery(() => db.lenses.orderBy('createdAt').toArray(), [])
+  const allFilters = useLiveQuery(() => db.filters.orderBy('createdAt').toArray(), [])
+  const allLots = useLiveQuery(() => db.filmLots.orderBy('createdAt').reverse().toArray(), [])
   const [edit, setEdit] = useState<string | null>(null)
   const grid = layout === 'grid'
-  const items = kind === 'lens' ? lenses : kind === 'filter' ? filters : lots
+  const q = search.trim().toLowerCase()
+  const keep = (tags: string[] | undefined, text: (string | undefined)[]) =>
+    (!tag || !!tags?.includes(tag)) && (!q || [...text, ...(tags ?? [])].some((t) => t?.toLowerCase().includes(q)))
+  const lenses = (allLenses ?? []).filter((l) => keep(l.tags, [l.brand, l.model, l.mount, lensSpec(l)]))
+  const filters = (allFilters ?? []).filter((f) => keep(f.tags, [f.name, kindOf(f), f.diameter]))
+  const lots = (allLots ?? []).filter((l) => keep(undefined, [filmDisplayName(filmById(l.filmId)), storageName[l.storage]]))
+  const all = kind === 'lens' ? allLenses : kind === 'filter' ? allFilters : allLots
+  const shown = kind === 'lens' ? lenses : kind === 'filter' ? filters : lots
   const empty = kind === 'lens' ? ['렌즈가 없어요', '가진 렌즈를 등록해 보세요.']
-    : kind === 'filter' ? ['필터가 없어요', '가진 필터를 등록해 보세요.']
+    : kind === 'filter' ? ['액세서리가 없어요', '필터, 그립, 스트랩처럼 가진 장비를 등록해 보세요.']
     : ['필름 재고가 없어요', '가진 롤을 등록해 보세요.']
-  const card = { backgroundColor: c.cell, borderRadius: 22, padding: 14, gap: 8, width: grid ? '48%' as const : undefined }
+  const card = { backgroundColor: c.cell, borderRadius: 22, padding: 14, gap: 6, width: '48%' as const }
+  const row = { padding: 14, flexDirection: 'row' as const, gap: 12, alignItems: 'center' as const }
+  // 줄 수를 정해 두어 블록 높이가 모두 같다
+  const title = (t: string) => <Text style={{ fontWeight: '700', color: c.ink, fontSize: 16, lineHeight: 21, height: grid ? 42 : 21 }} numberOfLines={grid ? 2 : 1}>{t}</Text>
+  const sub = (t?: string, lines = 1) => <Text style={{ color: c.muted, fontSize: 13, lineHeight: 18, height: 18 * lines }} numberOfLines={lines}>{t || ' '}</Text>
+  const box = (children: React.ReactNode) => <View style={grid ? { flexDirection: 'row', flexWrap: 'wrap', gap: 12 } : { backgroundColor: c.cell, borderRadius: 22 }}>{children}</View>
+  const lensCell = (lens: Lens) => (
+    <Pressable key={lens.id} onPress={() => setEdit(lens.id)} style={grid ? card : row}>
+      <GearImage id={lens.id} hasPhoto={lens.hasPhoto} tall={grid} />
+      <View style={{ flex: grid ? undefined : 1, gap: 2 }}>
+        {title(lens.model || '렌즈')}
+        {sub(grid ? lens.brand : [lens.brand, lensSpec(lens)].filter(Boolean).join(' · '))}
+        {grid && sub(lensSpec(lens), 2)}
+        <TagLine tags={lens.tags} />
+      </View>
+    </Pressable>
+  )
+  const filterCell = (f: GearFilter) => (
+    <Pressable key={f.id} onPress={() => setEdit(f.id)} style={grid ? card : row}>
+      <GearImage id={f.id} hasPhoto={f.hasPhoto} tall={grid} />
+      <View style={{ flex: grid ? undefined : 1, gap: 2 }}>
+        {title(f.name || kindOf(f))}
+        {sub([kindOf(f), f.diameter ? `직경 ${f.diameter}mm` : '', f.price ? priceText(priceValue(f.price)) : ''].filter(Boolean).join(' · '))}
+        <TagLine tags={f.tags} />
+      </View>
+    </Pressable>
+  )
+  const sections = <T extends { tags?: string[] }>(list: T[], cell: (x: T) => React.ReactNode, secs = tagSections(list, grouped)) =>
+    secs.map((sec, n) => (
+      <View key={sec.title ?? n} style={{ gap: 8 }}>
+        {sec.title ? <GroupTitle>{`${sec.title} · ${sec.items.length}`}</GroupTitle> : null}
+        {box(sec.items.map(cell))}
+      </View>
+    ))
+  const kindOrder = (k: string) => { const i = accessoryKinds().indexOf(k); return i < 0 ? 999 : i }
   return (
     <View style={{ gap: 12 }}>
-      {items && items.length === 0 && (
-        <Empty icon="camera" title={empty[0]}><EmptyText>{empty[1]}</EmptyText></Empty>
-      )}
-      {items && items.length > 0 && (
-        <View style={grid ? { flexDirection: 'row', flexWrap: 'wrap', gap: 12 } : { backgroundColor: c.cell, borderRadius: 22 }}>
-          {kind === 'lens' && (lenses ?? []).map((lens) => (
-            <Pressable key={lens.id} onPress={() => setEdit(lens.id)} style={grid ? card : { padding: 14, gap: 4 }}>
-              <GearImage id={lens.id} hasPhoto={lens.hasPhoto} tall={grid} />
-              <Text style={{ fontWeight: '700', color: c.ink }} numberOfLines={2}>{lens.model || '렌즈'}</Text>
-              {!!lens.brand && <Sub>{lens.brand}</Sub>}
-              {!!lensSpec(lens) && <Sub>{lensSpec(lens)}</Sub>}
-            </Pressable>
-          ))}
-          {kind === 'filter' && (filters ?? []).map((filter) => (
-            <Pressable key={filter.id} onPress={() => setEdit(filter.id)} style={grid ? card : { padding: 14, gap: 4 }}>
-              <GearImage id={filter.id} hasPhoto={filter.hasPhoto} tall={grid} />
-              <Text style={{ fontWeight: '700', color: c.ink }} numberOfLines={2}>{filter.name || '필터'}</Text>
-              {!!filter.diameter && <Sub>직경 {filter.diameter}mm</Sub>}
-            </Pressable>
-          ))}
-          {kind === 'film' && (lots ?? []).map((lot) => {
-            const film = filmById(lot.filmId)
-            const late = !!lot.expiresAt && lot.expiresAt < Date.now()
-            return (
-              <Pressable key={lot.id} onPress={() => setEdit(lot.id)} style={grid ? { ...card, alignItems: 'flex-start' } : { padding: 14, flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                <Canister film={film} format={lot.format} size={grid ? 96 : 52} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: '700', color: c.ink }} numberOfLines={2}>{filmDisplayName(film)}</Text>
-                  <Sub>{formatInfo[lot.format].name} · {storageName[lot.storage]} · {lot.count}롤</Sub>
-                  {late && <Text style={{ color: '#ff453a' }}>기한 지남</Text>}
-                  {!late && lot.count <= lot.lowAt && <Text style={{ color: '#ff9f0a' }}>부족</Text>}
-                </View>
-              </Pressable>
-            )
-          })}
-        </View>
-      )}
-      {edit && kind === 'lens' && <LensEdit lens={(lenses ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
-      {edit && kind === 'filter' && <FilterEdit filter={(filters ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
-      {edit && kind === 'film' && <FilmEdit lot={(lots ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
+      {all && all.length === 0 && <Empty icon="camera" title={empty[0]}><EmptyText>{empty[1]}</EmptyText></Empty>}
+      {all && all.length > 0 && shown.length === 0 && <Empty icon="search" title="맞는 장비가 없어요" />}
+      {kind === 'lens' && lenses.length > 0 && sections(lenses, lensCell)}
+      {kind === 'filter' && filters.length > 0 && sections(filters, filterCell, grouped ? undefined
+        : [...new Set(filters.map(kindOf))].sort((a, b) => kindOrder(a) - kindOrder(b)).map((k) => ({ title: k, items: filters.filter((f) => kindOf(f) === k) })))}
+      {kind === 'film' && lots.length > 0 && box(lots.map((lot) => {
+        const film = filmById(lot.filmId)
+        const late = !!lot.expiresAt && lot.expiresAt < Date.now()
+        return (
+          <Pressable key={lot.id} onPress={() => setEdit(lot.id)} style={grid ? { ...card, alignItems: 'flex-start' } : row}>
+            <Canister film={film} format={lot.format} size={grid ? 96 : 52} />
+            <View style={{ flex: grid ? undefined : 1, gap: 2, alignSelf: 'stretch' }}>
+              {title(filmDisplayName(film))}
+              {sub(`${formatInfo[lot.format].name} · ${storageName[lot.storage]} · ${lot.count}롤`, grid ? 2 : 1)}
+              <Text style={{ color: late ? '#ff453a' : '#ff9f0a', fontSize: 13, height: 18, opacity: late || lot.count <= lot.lowAt ? 1 : 0 }}>{late ? '기한 지남' : '부족'}</Text>
+            </View>
+          </Pressable>
+        )
+      }))}
+      {edit && kind === 'lens' && <LensEdit lens={(allLenses ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
+      {edit && kind === 'filter' && <FilterEdit filter={(allFilters ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
+      {edit && kind === 'film' && <FilmEdit lot={(allLots ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
     </View>
   )
 }
@@ -251,6 +274,7 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
           {hits.length > 0 && <Chips>{hits.map((name) => <Chip key={name} label={name} onPress={() => apply(name)} />)}</Chips>}
         </Group>
       </Section>
+      <TagField tags={tags} setTags={setTags} />
       <Section title="사양">
         <Group>
           <Segmented value={zoom ? 'zoom' : 'prime'} options={[['prime', '단렌즈'], ['zoom', '줌렌즈']]} onChange={(v) => setZoom(v === 'zoom')} />
@@ -261,7 +285,6 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
         </Group>
       </Section>
       <PurchaseFields date={date} setDate={setDate} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller} used={used} />
-      <TagField tags={tags} setTags={setTags} />
       {lens && <Group><Row onPress={() => setConfirm(true)}><Text style={{ color: '#ff453a' }}>렌즈 삭제</Text></Row></Group>}
       {confirm && lens && <Confirm message="이 렌즈를 삭제할까요? 이 렌즈로 찍은 롤 기록은 남아요." onCancel={() => setConfirm(false)}
         onConfirm={async () => { await db.lenses.delete(lens.id); onClose() }} />}
@@ -269,8 +292,12 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
   )
 }
 
-function FilterEdit({ filter, onClose }: { filter?: GearFilter; onClose: () => void }) {
+/** 액세서리 추가·수정 (유형은 사용자가 더할 수 있다) */
+export function FilterEdit({ filter, onClose, onSaved }: { filter?: GearFilter; onClose: () => void; onSaved?: (f: GearFilter) => void }) {
+  const c = useTheme()
   const used = useUsedSellers()
+  const [kind, setKind] = useState(filter ? kindOf(filter) : FILTER_KIND)
+  const [kinds, setKinds] = useState(() => { const k = accessoryKinds(); return filter && !k.includes(kindOf(filter)) ? [...k, kindOf(filter)] : k })
   const [name, setName] = useState(filter?.name ?? '')
   const [diameter, setDiameter] = useState(filter?.diameter ?? '')
   const [uri, setUri] = useState<string>()
@@ -280,10 +307,12 @@ function FilterEdit({ filter, onClose }: { filter?: GearFilter; onClose: () => v
   const [seller, setSeller] = useState(filter?.seller ?? '')
   const [tags, setTags] = useState<string[]>(filter?.tags ?? [])
   const [confirm, setConfirm] = useState(false)
-  const kinds = filterKinds.filter((item) => !name || item.toLowerCase().includes(name.toLowerCase())).filter((item) => item !== name).slice(0, 8)
+  const [newKind, setNewKind] = useState<string | null>(null)
+  const isFilter = kind === FILTER_KIND
+  const hints = isFilter ? filterKinds.filter((item) => !name || item.toLowerCase().includes(name.toLowerCase())).filter((item) => item !== name).slice(0, 8) : []
   const save = async () => {
     const data: GearFilter = {
-      id: filter?.id ?? uid(), name: name.trim(), diameter: diameter.replace(/[^\d.]/g, '') || undefined,
+      id: filter?.id ?? uid(), kind, name: name.trim(), diameter: isFilter ? diameter.replace(/[^\d.]/g, '') || undefined : undefined,
       hasPhoto: cleared ? false : !!(uri || filter?.hasPhoto),
       purchasedAt: date, price: groupPrice(price) || undefined, seller: seller.trim() || undefined, tags,
       createdAt: filter?.createdAt ?? Date.now(),
@@ -291,26 +320,92 @@ function FilterEdit({ filter, onClose }: { filter?: GearFilter; onClose: () => v
     await storePhoto(data.id, uri, cleared)
     await db.filters.put(data)
     rememberSeller(seller)
+    onSaved?.(data)
     onClose()
   }
   return (
-    <Sheet title={filter ? '필터 수정' : '필터 추가'} onClose={onClose}
-      right={<SheetBtn label="저장" accent disabled={!name.trim() || !diameter.replace(/[^\d.]/g, '')} onPress={save} />}>
+    <Sheet title={filter ? '액세서리 수정' : '액세서리 추가'} onClose={onClose}
+      right={<SheetBtn label="저장" accent disabled={!name.trim()} onPress={save} />}>
       <PhotoBlock id={filter?.id} hasPhoto={filter?.hasPhoto} uri={uri} setUri={setUri} cleared={cleared} setCleared={setCleared} />
-      <Section title="필터">
+      <Section title="액세서리">
         <Group>
-          <Field label="종류" value={name} onChangeText={setName} />
-          {kinds.length > 0 && <Chips>{kinds.map((item) => <Chip key={item} label={item} onPress={() => setName(item)} />)}</Chips>}
-          <Field label="직경 (mm)" value={diameter} onChangeText={setDiameter} keyboardType="decimal-pad" />
-          <Chips>{filterDiameters.filter((item) => item !== diameter).map((item) => <Chip key={item} label={item} onPress={() => setDiameter(item)} />)}</Chips>
+          <Field label="유형"><Select value={kind} title="유형" options={[...kinds.map((k) => [k, k] as [string, string]), ['__add', '유형 추가…']]}
+            color={c.safelight} onChange={(v) => { if (v === '__add') setNewKind(''); else setKind(v) }} /></Field>
+          {newKind !== null && (
+            <Row>
+              <TextInput value={newKind} onChangeText={setNewKind} autoFocus placeholder="새 유형 (예: 핫슈 수평계)" placeholderTextColor={c.faint}
+                style={{ flex: 1, fontSize: 17, color: c.ink, paddingVertical: 4 }} />
+              <Pressable disabled={!newKind.trim()} hitSlop={8} onPress={() => { addAccessoryKind(newKind); setKinds(accessoryKinds()); setKind(newKind.trim()); setNewKind(null) }}>
+                <Text style={{ color: newKind.trim() ? c.safelight : c.faint, fontSize: 17 }}>추가</Text>
+              </Pressable>
+            </Row>
+          )}
+          <Field label={isFilter ? '종류' : '이름'} value={name} onChangeText={setName} />
+          {hints.length > 0 && <Chips>{hints.map((item) => <Chip key={item} label={item} onPress={() => setName(item)} />)}</Chips>}
+          {isFilter && <Field label="직경 (mm)" value={diameter} onChangeText={setDiameter} keyboardType="decimal-pad" />}
+          {isFilter && <Chips>{filterDiameters.filter((item) => item !== diameter).map((item) => <Chip key={item} label={item} onPress={() => setDiameter(item)} />)}</Chips>}
         </Group>
       </Section>
-      <PurchaseFields date={date} setDate={setDate} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller} used={used} />
       <TagField tags={tags} setTags={setTags} />
-      {filter && <Group><Row onPress={() => setConfirm(true)}><Text style={{ color: '#ff453a' }}>필터 삭제</Text></Row></Group>}
-      {confirm && filter && <Confirm message="이 필터를 삭제할까요?" onCancel={() => setConfirm(false)}
+      <PurchaseFields date={date} setDate={setDate} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller} used={used} />
+      {filter && <Group><Row onPress={() => setConfirm(true)}><Text style={{ color: '#ff453a' }}>액세서리 삭제</Text></Row></Group>}
+      {confirm && filter && <Confirm message="이 액세서리를 삭제할까요?" onCancel={() => setConfirm(false)}
         onConfirm={async () => { await db.filters.delete(filter.id); onClose() }} />}
     </Sheet>
+  )
+}
+
+/** 카메라에 쓰는 액세서리: 액세서리 탭에 등록한 것에서 고르고, 없으면 바로 추가하고 돌아온다 */
+export function AccessoryLinkFields({ ids, setIds, bodyPrice }: { ids: string[]; setIds: (v: string[]) => void; bodyPrice: string }) {
+  const c = useTheme()
+  const items = useLiveQuery(() => db.filters.orderBy('createdAt').toArray(), []) ?? []
+  const [picking, setPicking] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const chosen = ids.map((id) => items.find((x) => x.id === id)).filter((x): x is GearFilter => !!x)
+  const total = priceValue(bodyPrice) + chosen.reduce((n, a) => n + priceValue(a.price), 0)
+  const toggle = (id: string) => setIds(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id])
+  const kinds = [...new Set(items.map(kindOf))]
+  return (
+    <Section title="액세서리" foot="내 장비의 액세서리 탭에 등록한 것에서 골라요.">
+      <Group>
+        {chosen.map((a) => (
+          <Row key={a.id} static>
+            <View style={{ flex: 1 }}><Text style={{ fontSize: 17, color: c.ink }} numberOfLines={1}>{a.name}</Text><Sub>{kindOf(a)}</Sub></View>
+            {a.price ? <Text style={{ color: c.muted, fontSize: 17 }}>{priceText(priceValue(a.price))}</Text> : null}
+            <Pressable onPress={() => toggle(a.id)} hitSlop={8} accessibilityLabel={`${a.name} 빼기`}><Text style={{ fontSize: 18, color: c.muted, marginLeft: 10 }}>×</Text></Pressable>
+          </Row>
+        ))}
+        <Row onPress={() => setPicking(true)}><Text style={{ color: c.safelight, fontSize: 17 }}>＋ 액세서리 고르기</Text></Row>
+        {total > 0 && (
+          <Row static>
+            <Text style={{ flex: 1, fontSize: 17, color: c.ink }}>본체 + 액세서리</Text>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>{priceText(total)}</Text>
+          </Row>
+        )}
+      </Group>
+      {picking && (
+        <Sheet title="액세서리 고르기" onClose={() => setPicking(false)} right={<SheetBtn label="완료" accent onPress={() => setPicking(false)} />}>
+          <Group><Row onPress={() => setAdding(true)}><Text style={{ color: c.safelight, fontSize: 17 }}>＋ 새 액세서리 추가</Text></Row></Group>
+          {items.length === 0 && <Sub>등록된 액세서리가 없어요. 추가하면 여기서 바로 골라져요.</Sub>}
+          {kinds.map((k) => (
+            <Section key={k} title={k}>
+              <Group>
+                {items.filter((x) => kindOf(x) === k).map((a) => (
+                  <Row key={a.id} onPress={() => toggle(a.id)}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 17, color: c.ink }} numberOfLines={1}>{a.name}</Text>
+                      <Sub>{[a.diameter ? `직경 ${a.diameter}mm` : '', a.price ? priceText(priceValue(a.price)) : ''].filter(Boolean).join(' · ') || ' '}</Sub>
+                    </View>
+                    <Text style={{ fontSize: 20, color: ids.includes(a.id) ? c.safelight : c.muted }}>{ids.includes(a.id) ? '●' : '○'}</Text>
+                  </Row>
+                ))}
+              </Group>
+            </Section>
+          ))}
+          {adding && <FilterEdit onClose={() => setAdding(false)} onSaved={(f) => { if (!ids.includes(f.id)) setIds([...ids, f.id]) }} />}
+        </Sheet>
+      )}
+    </Section>
   )
 }
 
