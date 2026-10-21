@@ -96,22 +96,34 @@ export async function linkCloudFile(name: string) {
 }
 
 /** 연결한 파일에 덮어쓴다. 일부 클라우드는 덮어쓸 때 뒤를 자르지 않아서 이전 길이만큼 공백으로 채운다 */
-export async function writeCloud() {
+/** 내용 열쇠 (저장 시각은 빼고) */
+function bodyKey(body: Uint8Array) {
+  const text = new TextDecoder().decode(body).replace(/"savedAt":"[^"]*",?/, '')
+  let h = 5381
+  for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0
+  return `${text.length}-${h.toString(36)}`
+}
+
+/** force가 아니면 지난번과 내용이 같을 때 올리지 않는다 (같은 파일에 덮어쓰기) */
+export async function writeCloud(force = false) {
   const uri = cloudUri()
   if (!uri) throw new Error('연결된 파일이 없어요')
   const body = await exportAll()
+  const key = bodyKey(body)
+  if (!force && key === getPref('cloudKey', '' as string)) { setPref('cloudLast', String(Date.now())); return }
   const prev = Number(getPref('cloudLen', '0')) || 0
   const out = new Uint8Array(Math.max(body.length, prev)).fill(0x20)
   out.set(body)
   try { new File(uri).write(out) } catch { throw new Error('파일에 쓸 수 없어요. 파일을 다시 골라 주세요.') }
   setPref('cloudLen', String(body.length))
+  setPref('cloudKey', key)
   setPref('cloudLast', String(Date.now()))
 }
 
 /** 연결 확인: 덮어쓴 뒤 다시 읽어서 같은지 본다 */
 export async function verifyCloud(): Promise<string | undefined> {
   try {
-    await writeCloud()
+    await writeCloud(true)
     const text = new TextDecoder().decode(await new File(cloudUri()!).bytes())
     const json = JSON.parse(text)
     return json?.kind === 'filmchest-backup-web' ? undefined : '저장한 내용을 다시 읽지 못했어요.'

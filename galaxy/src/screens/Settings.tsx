@@ -6,7 +6,8 @@ import { getPref, useLiveQuery } from '../store'
 import { backupFileName, exportAll, importAll, localBackupAt, writeLocalBackup } from '../backup'
 import { restorePhotos } from '../restore'
 import { CloudBackup, cloudStatus } from './CloudBackup'
-import { Spending } from './Spending'
+import { Stats } from './Stats'
+import { checkUpdate, downloadUpdate, installedBuilt } from '../update'
 import { filmById } from '../core/films'
 import { bytesText } from '../core/display'
 import { sections } from '../core/privacyText'
@@ -28,6 +29,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [note, setNote] = useState<string>()
   const [cloud, setCloud] = useState(false)
   const [spending, setSpending] = useState(false)
+  const [update, setUpdate] = useState(() => (installedBuilt() ? new Date(installedBuilt() * 1000).toLocaleDateString('ko-KR') : ''))
   const deleted = useLiveQuery(async () => (await db.rolls.toArray()).filter((r) => r.deletedAt), []) ?? []
   const deletedCameras = useLiveQuery(async () => (await db.cameras.toArray()).filter((x) => x.deletedAt), []) ?? []
   useEffect(() => { storageEstimate().then(setUsage); void purgeOldRolls(); void purgeOldCameras() }, [])
@@ -72,7 +74,16 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </Group>
       </Section>
 
-      <Group><Row chev onPress={() => setSpending(true)}><RowText>장비에 쓴 돈</RowText></Row></Group>
+      <Group>
+        <Row chev onPress={() => setSpending(true)}><RowText>통계</RowText></Row>
+        <Row chev value={update} onPress={async () => {
+          try {
+            const u = await checkUpdate()
+            if (u.newer) { setUpdate('새 버전 있음'); void downloadUpdate(); setNote('새 버전을 내려받아요. 다 받으면 알림을 눌러 설치하세요. 기록은 그대로 남아요.') }
+            else { setUpdate('최신 버전'); setNote('지금 최신 버전이에요.') }
+          } catch { setNote('업데이트를 확인하지 못했어요. 인터넷 연결을 확인해 주세요.') }
+        }}><RowText>업데이트 확인</RowText></Row>
+      </Group>
 
       <Section title="백업" foot={`${localBackupAt() ? `마지막 백업 ${new Date(localBackupAt()!).toLocaleString('ko-KR')}. ` : ''}장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 웹앱 백업 파일도 불러올 수 있어요.`}>
         <Group>
@@ -144,7 +155,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
           }} />
       ) : null}
       {cloud ? <CloudBackup onClose={() => setCloud(false)} /> : null}
-      {spending ? <Spending onClose={() => setSpending(false)} /> : null}
+      {spending ? <Stats onClose={() => setSpending(false)} /> : null}
     </Sheet>
   )
 }

@@ -55,7 +55,14 @@ export function FilmStrip({ roll, frames, onSelect }: { roll: Roll; frames: Fram
           {edge(true, film ? edgeMarking(film) : '')}
           <View style={{ backgroundColor: c.filmBase, paddingHorizontal: 4 }}>
             <View style={{ width: w, height: h, backgroundColor: '#000', overflow: 'hidden' }}>
-              {f.thumb ? <Image source={{ uri: f.thumb }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : null}
+              {f.thumb ? (() => {
+                // 돌린 사진은 돌린 채로 칸을 채운다
+                const t = (((f.rotation ?? 0) % 4) + 4) % 4
+                const side = t % 2 === 1
+                return <Image source={{ uri: f.thumb }} resizeMode="cover"
+                  style={t ? { position: 'absolute', width: side ? h : w, height: side ? w : h, left: (w - (side ? h : w)) / 2, top: (h - (side ? w : h)) / 2, transform: [{ rotate: `${t * 90}deg` }] }
+                    : { width: '100%', height: '100%' }} />
+              })() : null}
               {f.favorite ? <Text style={{ position: 'absolute', top: 5, right: 6, color: c.safelight, fontSize: 13, textShadowColor: '#000', textShadowRadius: 2 }}>♥</Text> : null}
             </View>
           </View>
@@ -184,7 +191,7 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
           <Btn label="닫기" kind="ghost" onPress={onClose} />
           <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{i + 1} / {frames.length}</Text>
           <View style={{ flexDirection: 'row', gap: 4 }}>
-            <RoundBtn icon="heart" label={fav ? '즐겨찾기 해제' : '즐겨찾기'} color={fav ? c.safelight : '#fff'} onPress={() => db.frames.update(frame.id, { favorite: !fav })} />
+            <RoundBtn icon={fav ? 'heartFill' : 'heart'} label={fav ? '즐겨찾기 해제' : '즐겨찾기'} color={fav ? c.safelight : '#fff'} onPress={() => db.frames.update(frame.id, { favorite: !fav })} />
             {original ? (
               <RoundBtn icon="download" label="이 사진 갤러리에 저장" onPress={async () => {
                 const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase()

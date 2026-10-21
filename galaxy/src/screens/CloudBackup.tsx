@@ -34,7 +34,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
   }
   return (
     <Sheet title="클라우드 백업" onClose={onClose} right={<SheetBtn label="완료" accent onPress={onClose} />}>
-      <Section title="상태" foot={`앱을 나갈 때 정한 주기가 지났으면 연결한 '${backupFileName}' 파일을 덮어써요. 스캔 사진은 빠져요.`}>
+      <Section title="상태" foot={`앱을 나갈 때 정한 주기가 지났고 바뀐 기록이 있으면 연결한 '${backupFileName}' 파일에 덮어써요. 스캔 사진은 빠져요.`}>
         <Group>
           <Row static>
             <Text style={{ fontSize: 24, color: connected ? c.safelight : c.muted, marginRight: 4 }}>{connected ? '☁︎' : '⊘'}</Text>
@@ -46,7 +46,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
           {msg ? <Row static><Text style={{ color: msg.ok ? '#30a46c' : c.danger, fontSize: 15 }}>{msg.ok ? '✓ ' : '✕ '}{msg.text}</Text></Row> : null}
           {connected ? [
             <Row key="v" onPress={() => run(async () => { const f = await verifyCloud(); if (f) throw new Error(f) }, `${cloudName() ?? '파일'}에 저장하고 다시 읽었어요. 연결돼 있어요.`)}><RowText>연결 확인</RowText></Row>,
-            <Row key="b" onPress={() => run(writeCloud, '지금 백업했어요.')}><RowText>지금 백업</RowText></Row>,
+            <Row key="b" onPress={() => run(() => writeCloud(true), '지금 백업했어요.')}><RowText>지금 백업</RowText></Row>,
             <Row key="r" onPress={() => run(async () => { const n = await importAll(cloudUri()!); setMsg({ text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요. 사진은 '사진으로 롤 복구'로 붙여 주세요.`, ok: true }) }, '')}><RowText>클라우드 백업에서 복구</RowText></Row>,
             <Row key="d" static><RowText>자동 백업</RowText>
               <Select value={String(cloudDays())} title="자동 백업" options={[['0', '끔'], ['1', '매일'], ['7', '매주']]} onChange={(v) => { setPref('cloudDays', v); refresh() }} />
