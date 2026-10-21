@@ -19,6 +19,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [privacy, setPrivacy] = useState(false)
   const [note, setNote] = useState<string>()
   const [cloud, setCloud] = useState(false)
+  const [backupOpen, setBackupOpen] = useState(false)
   const [spending, setSpending] = useState(false)
   const deleted = useLiveQuery(async () => (await db.rolls.toArray()).filter((r) => r.deletedAt), []) ?? []
   const deletedCameras = useLiveQuery(async () => (await db.cameras.toArray()).filter((c) => c.deletedAt), []) ?? []
@@ -108,42 +109,9 @@ export function Settings({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="section">
-        <h2>백업</h2>
         <div className="group">
-          <button className="row" onClick={() => setCloud(true)}><span className="grow">클라우드 백업</span><span className="value">{cloudStatus()}</span><Icon name="chev" size={18} /></button>
-          <button className="row" onClick={() => setCloud(true)}><span className="grow">클라우드 백업에서 복구</span><Icon name="chev" size={18} /></button>
-          <button className="row" onClick={async () => saveFileNow(backupFileName, await exportAll())}>백업 파일로 저장</button>
-          <label className="row">백업 불러오기
-            <input type="file" accept="application/json,.json" hidden onChange={async (e) => {
-              const file = e.target.files?.[0]
-              e.target.value = ''
-              if (!file) return
-              try {
-                const counts = await importAll(file)
-                setNote(`카메라 ${counts.cameras}대, 롤 ${counts.rolls}개를 불러왔어요.`)
-              } catch {
-                setNote('백업 파일을 읽지 못했어요.')
-              }
-            }} />
-          </label>
+          <button className="row" onClick={() => setBackupOpen(true)}><span className="grow">백업 및 복구</span><span className="value">{cloudStatus()}</span><Icon name="chev" size={18} /></button>
         </div>
-        <p className="footnote">장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 이미 있는 항목은 합치고 지우지 않아요.</p>
-      </div>
-
-      <div className="section">
-        <h2>사진으로 롤 복구</h2>
-        <div className="group">
-          <label className="row">이 앱이 저장한 사진 고르기
-            <input type="file" accept="image/*" multiple hidden onChange={async (e) => {
-              const files = [...(e.target.files ?? [])]
-              e.target.value = ''
-              if (!files.length) return
-              const result = await restorePhotos(files)
-              setNote(result.frames === 0 ? '표식을 찾지 못했어요. 아이폰에서는 사진 앱 대신 \'파일\'에서 고르거나, 원본으로 공유해서 저장한 사진을 골라 주세요.' : `롤 ${result.rolls}개, 사진 ${result.frames}장을 가져왔어요.`)
-            }} />
-          </label>
-        </div>
-        <p className="footnote">이 앱(아이폰·웹·갤럭시)으로 저장했던 사진을 고르면 표식으로 롤을 다시 묶어요. 클라우드 백업을 먼저 복구하면 필름·카메라 정보까지 함께 돌아와요.</p>
       </div>
 
       <div className="section">
@@ -193,8 +161,49 @@ export function Settings({ onClose }: { onClose: () => void }) {
             onClose()
           }} />
       )}
-      {cloud && <CloudBackup onClose={() => setCloud(false)} />}
       {spending && <Stats onClose={() => setSpending(false)} />}
+      {backupOpen && (
+        <Sheet title="백업 및 복구" onClose={() => setBackupOpen(false)} right={<button className="btn ghost" onClick={() => setBackupOpen(false)}><b>완료</b></button>}>
+          <div className="section">
+            <h2>백업</h2>
+            <div className="group">
+              <button className="row" onClick={() => setCloud(true)}><span className="grow">클라우드 백업</span><span className="value">{cloudStatus()}</span><Icon name="chev" size={18} /></button>
+              <button className="row" onClick={async () => saveFileNow(backupFileName, await exportAll())}>백업 파일로 저장</button>
+              <label className="row">백업 불러오기
+                <input type="file" accept="application/json,.json" hidden onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (!file) return
+                  try {
+                    const counts = await importAll(file)
+                    setNote(`카메라 ${counts.cameras}대, 롤 ${counts.rolls}개를 불러왔어요.`)
+                  } catch {
+                    setNote('백업 파일을 읽지 못했어요.')
+                  }
+                }} />
+              </label>
+            </div>
+            <p className="footnote">장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 이미 있는 항목은 합치고 지우지 않아요.</p>
+          </div>
+
+          <div className="section">
+            <h2>사진으로 롤 복구</h2>
+            <div className="group">
+              <label className="row">이 앱이 저장한 사진 고르기
+                <input type="file" accept="image/*" multiple hidden onChange={async (e) => {
+                  const files = [...(e.target.files ?? [])]
+                  e.target.value = ''
+                  if (!files.length) return
+                  const result = await restorePhotos(files)
+                  setNote(result.frames === 0 ? '표식을 찾지 못했어요. 아이폰에서는 사진 앱 대신 \'파일\'에서 고르거나, 원본으로 공유해서 저장한 사진을 골라 주세요.' : `롤 ${result.rolls}개, 사진 ${result.frames}장을 가져왔어요.`)
+                }} />
+              </label>
+            </div>
+            <p className="footnote">이 앱(아이폰·웹·갤럭시)으로 저장했던 사진을 고르면 표식으로 롤을 다시 묶어요. 클라우드 백업을 먼저 복구하면 필름·카메라 정보까지 함께 돌아와요.</p>
+          </div>
+        </Sheet>
+      )}
+      {cloud && <CloudBackup onClose={() => setCloud(false)} />}
     </Sheet>
   )
 }

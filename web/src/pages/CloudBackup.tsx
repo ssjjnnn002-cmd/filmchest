@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Sheet } from '../ui/common'
+import { Icon, Sheet } from '../ui/common'
 import { setPref } from '../platform'
 import { backupFileName } from '../core/backup'
-import { backupToDrive, restoreFromDrive, restorePhotosFromDrive, syncPhotosToDrive, drivePhotosOn, disconnectDrive, driveAvailable, driveConnected, driveIntervalDays, driveLastBackup, driveToken } from '../core/drive'
+import { driveFolderUrl, backupToDrive, restoreFromDrive, restorePhotosFromDrive, syncPhotosToDrive, drivePhotosOn, disconnectDrive, driveAvailable, driveConnected, driveIntervalDays, driveLastBackup, driveToken } from '../core/drive'
 import {
   allowFolder, backupToFolder, restoreFromFolder, disconnectFolder, folderAvailable, folderCloud, folderDays, folderLast, folderName, folderPermission, pickFolder, verifyFolder,
 } from '../core/folderBackup'
@@ -72,6 +72,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
           {drive && (
             <>
               <button className="row" onClick={() => run(() => backupToDrive(true), '구글 드라이브에 저장했어요. 연결돼 있어요.')}>연결 확인 · 지금 백업</button>
+              <a className="row" href={driveFolderUrl()} target="_blank" rel="noreferrer"><span className="grow">드라이브에서 백업 폴더 열기</span><Icon name="chev" size={18} /></a>
               <label className="toggle">
                 <span>스캔 사진도 올리기<span className="sub" style={{ display: 'block' }}>필름함 폴더 안에 롤마다 폴더를 만들어요</span></span>
                 <input type="checkbox" className="switch" checked={drivePhotosOn()} onChange={(e) => { setPref('drivePhotos', e.target.checked ? '1' : '0'); refresh() }} />

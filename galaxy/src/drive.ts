@@ -1,6 +1,7 @@
 // 갤럭시: 구글 계정으로 로그인해 드라이브 '필름함' 폴더에 기록 백업과 롤별 사진 폴더를 올린다 (웹 core/drive.ts와 같은 구조)
 import { GoogleSignin } from '@react-native-google-signin/google-signin'
 import * as FS from 'expo-file-system/legacy'
+import { Linking } from 'react-native'
 import { db } from './data'
 import type { Frame, Roll } from './core/types'
 import { FOLDER, ROOT_NAME, createFile, downloadUrl, ensureFolder, findByName, listChildren, mediaUrl, rollFolderName } from './core/driveApi'
@@ -39,6 +40,18 @@ async function token(interactive: boolean) {
   return accessToken
 }
 
+async function rootFolder(t: string) {
+  const id = await ensureFolder(t, ROOT_NAME)
+  setPref('driveRoot', id)
+  return id
+}
+
+/** 드라이브에서 '필름함' 폴더 열기 (드라이브 앱이 있으면 앱으로) */
+export const openDriveFolder = () => {
+  const id = getPref('driveRoot', '' as string)
+  return Linking.openURL(id ? `https://drive.google.com/drive/folders/${id}` : 'https://drive.google.com/drive/my-drive')
+}
+
 async function put(t: string, id: string, uri: string, mime: string) {
   const r = await FS.uploadAsync(mediaUrl(id), uri, {
     httpMethod: 'PATCH', uploadType: FS.FileSystemUploadType.BINARY_CONTENT,
@@ -52,7 +65,7 @@ export async function connectDrive() { await token(true); await backupToDrive(tr
 
 export async function disconnectDrive() {
   await GoogleSignin.signOut().catch(() => {})
-  for (const k of ['driveConnected', 'driveAccount', 'driveFileId', 'driveKey']) setPref(k, '')
+  for (const k of ['driveConnected', 'driveAccount', 'driveFileId', 'driveKey', 'driveRoot']) setPref(k, '')
   setPref('driveRollFolders', '{}'); setPref('driveFrames', '{}')
 }
 
@@ -70,7 +83,7 @@ export async function backupToDrive(force = false, interactive = true) {
   const k = key(body)
   let id = getPref('driveFileId', '' as string)
   if (force || !id || k !== getPref('driveKey', '' as string)) {
-    const root = await ensureFolder(t, ROOT_NAME)
+    const root = await rootFolder(t)
     if (!id) id = (await findByName(t, backupFileName, root)) ?? (await createFile(t, backupFileName, root, 'application/json'))
     const uri = writeBytes('backup', 'drive-upload.json', body)
     let status = await put(t, id, uri, 'application/json')
@@ -92,7 +105,7 @@ export function syncPhotosToDrive(onProgress?: Progress, interactive = true): Pr
   syncing ??= (async () => {
     try {
       const t = await token(interactive)
-      const root = await ensureFolder(t, ROOT_NAME)
+      const root = await rootFolder(t)
       const folders: Record<string, string> = JSON.parse(getPref('driveRollFolders', '{}'))
       const sent: Record<string, string> = JSON.parse(getPref('driveFrames', '{}'))
       const todo: { roll: Roll; frame: Frame }[] = []
@@ -138,7 +151,7 @@ export function syncPhotosToDrive(onProgress?: Progress, interactive = true): Pr
 
 export async function restoreFromDrive() {
   const t = await token(true)
-  const root = await ensureFolder(t, ROOT_NAME)
+  const root = await rootFolder(t)
   const id = getPref('driveFileId', '' as string) || await findByName(t, backupFileName, root)
   if (!id) throw new Error('드라이브에 백업이 없어요')
   const dest = `${folder('backup').uri.replace(/\/?$/, '/')}drive-download.json`
@@ -149,7 +162,7 @@ export async function restoreFromDrive() {
 
 export async function restorePhotosFromDrive(onProgress?: Progress) {
   const t = await token(true)
-  const root = await ensureFolder(t, ROOT_NAME)
+  const root = await rootFolder(t)
   const items: { id: string; name: string; mimeType: string }[] = []
   for (const f of (await listChildren(t, root)).filter((x) => x.mimeType === FOLDER)) {
     items.push(...(await listChildren(t, f.id)).filter((x) => x.mimeType.startsWith('image/')))

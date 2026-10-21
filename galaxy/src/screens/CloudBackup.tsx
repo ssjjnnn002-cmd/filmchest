@@ -52,6 +52,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
               </View>
             </Row>,
             <Row key="b" onPress={() => run(() => Drive.backupToDrive(true), '드라이브에 저장했어요. 연결돼 있어요.')}><RowText>연결 확인 · 지금 백업</RowText></Row>,
+            <Row key="o" chev onPress={() => { void Drive.openDriveFolder() }}><RowText>드라이브에서 백업 폴더 열기</RowText></Row>,
             <Toggle key="p" label="스캔 사진도 올리기" sub="롤마다 폴더를 만들어요" value={Drive.drivePhotosOn()} onChange={(v) => { setPref('drivePhotos', v ? '1' : '0'); refresh() }} />,
             Drive.drivePhotosOn() ? <Row key="u" onPress={() => { if (!progress) void run(async () => {
               const n = await Drive.syncPhotosToDrive((d, t) => setProgress(t ? `${d} / ${t}장 올리는 중` : ''))

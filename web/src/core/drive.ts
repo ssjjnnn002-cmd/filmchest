@@ -89,6 +89,9 @@ export async function backupToDrive(force = false) {
   void syncPhotosToDrive().catch(() => {})
 }
 
+/** 드라이브 웹에서 '필름함' 폴더 (아직 모르면 내 드라이브) */
+export const driveFolderUrl = () => { const id = getPref('driveRoot', '' as string); return id ? `https://drive.google.com/drive/folders/${id}` : 'https://drive.google.com/drive/my-drive' }
+
 export const drivePhotosOn = () => getPref('drivePhotos', '1' as string) === '1'
 type Progress = (done: number, total: number) => void
 let syncing: Promise<number> | undefined
