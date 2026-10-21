@@ -5,6 +5,8 @@ import {
   backupFileName, importAll, cloudDays, cloudLast, cloudName, cloudUri, disconnectCloud, linkCloudFile, localBackupAt, openAppSettings, shareForCloud, verifyCloud, writeCloud,
 } from '../backup'
 import { setPref } from '../store'
+import * as Drive from '../drive'
+import { Toggle } from '../kit'
 import { Group, Row, RowText, Section, Select, Sub } from '../kit'
 import { Sheet, SheetBtn } from '../overlay'
 import { useTheme } from '../theme'
@@ -18,6 +20,7 @@ const clouds: [string, string][] = [
 ]
 
 export function cloudStatus() {
+  if (Drive.driveConnected()) return '연결됨 · 구글 드라이브'
   return cloudUri() ? `연결됨 · ${cloudName() ?? '파일'}` : '연결 안 됨'
 }
 
@@ -26,15 +29,48 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
   const [, setRev] = useState(0)
   const [pick, setPick] = useState<string>()
   const [msg, setMsg] = useState<{ text: string; ok: boolean }>()
+  const [progress, setProgress] = useState('')
+  const drive = Drive.driveConnected()
   const refresh = () => setRev((n) => n + 1)
   const connected = !!cloudUri()
   const run = async (fn: () => Promise<unknown>, ok: string) => {
-    try { await fn(); if (ok) setMsg({ text: ok, ok: true }) } catch (e) { setMsg({ text: (e as Error).message || '하지 못했어요', ok: false }) }
+    try { await fn(); if (ok) setMsg({ text: ok, ok: true }) } catch (e) { setProgress(''); setMsg({ text: (e as Error).message || '하지 못했어요', ok: false }) }
     refresh()
   }
   return (
     <Sheet title="클라우드 백업" onClose={onClose} right={<SheetBtn label="완료" accent onPress={onClose} />}>
-      <Section title="상태" foot={`앱을 나갈 때 정한 주기가 지났고 바뀐 기록이 있으면 연결한 '${backupFileName}' 파일에 덮어써요. 스캔 사진은 빠져요.`}>
+      <Section title="구글 드라이브" foot="내 드라이브에 '필름함' 폴더를 만들고, 기록 백업과 롤마다 사진 폴더를 올려요. 이 앱이 만든 파일만 볼 수 있어요. 앱을 나갈 때 주기가 지났고 바뀐 게 있으면 올려요.">
+        <Group>
+          {msg ? <Row static><Text style={{ color: msg.ok ? '#30a46c' : c.danger, fontSize: 15 }}>{msg.ok ? '✓ ' : '✕ '}{msg.text}</Text></Row> : null}
+          {!drive ? (
+            <Row onPress={() => run(Drive.connectDrive, '구글 드라이브에 연결하고 첫 백업을 올렸어요.')}><Text style={{ color: c.safelight, fontSize: 17, fontWeight: '600' }}>구글 드라이브 연결</Text></Row>
+          ) : [
+            <Row key="s" static>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>연결됨 · {Drive.driveAccount() ?? '구글 드라이브'}</Text>
+                {Drive.driveLast() ? <Sub>마지막 백업 {new Date(Drive.driveLast()!).toLocaleString('ko-KR')}</Sub> : null}
+              </View>
+            </Row>,
+            <Row key="b" onPress={() => run(() => Drive.backupToDrive(true), '드라이브에 저장했어요. 연결돼 있어요.')}><RowText>연결 확인 · 지금 백업</RowText></Row>,
+            <Toggle key="p" label="스캔 사진도 올리기" sub="롤마다 폴더를 만들어요" value={Drive.drivePhotosOn()} onChange={(v) => { setPref('drivePhotos', v ? '1' : '0'); refresh() }} />,
+            Drive.drivePhotosOn() ? <Row key="u" onPress={() => { if (!progress) void run(async () => {
+              const n = await Drive.syncPhotosToDrive((d, t) => setProgress(t ? `${d} / ${t}장 올리는 중` : ''))
+              setProgress(''); setMsg({ text: n ? `사진 ${n}장을 올렸어요.` : '새로 올릴 사진이 없어요.', ok: true })
+            }, '') }}><RowText>{progress || '사진 지금 올리기'}</RowText></Row> : null,
+            <Row key="d" static><RowText>자동 백업</RowText>
+              <Select value={String(Drive.driveDays())} title="자동 백업" options={[['0', '끔'], ['1', '매일'], ['7', '매주']]} onChange={(v) => { setPref('driveDays', v); refresh() }} />
+            </Row>,
+            <Row key="r" onPress={() => run(async () => { const n = await Drive.restoreFromDrive(); setMsg({ text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요.`, ok: true }) }, '')}><RowText>드라이브 기록 백업에서 복구</RowText></Row>,
+            <Row key="ph" onPress={() => { if (!progress) void run(async () => {
+              const n = await Drive.restorePhotosFromDrive((d, t) => setProgress(t ? `${d} / ${t}장 받는 중` : ''))
+              setProgress(''); setMsg({ text: `롤 ${n.rolls}개, 사진 ${n.frames}장을 되살렸어요.`, ok: true })
+            }, '') }}><RowText>드라이브에서 사진 복구</RowText></Row>,
+            <Row key="x" onPress={() => run(Drive.disconnectDrive, '구글 드라이브 연결을 끊었어요. 올린 파일은 그대로예요.')}><RowText color={c.danger}>연결 끊기</RowText></Row>,
+          ]}
+        </Group>
+      </Section>
+
+      <Section title="다른 클라우드 (파일 하나 연결)" foot={`앱을 나갈 때 정한 주기가 지났고 바뀐 기록이 있으면 연결한 '${backupFileName}' 파일에 덮어써요. 스캔 사진은 빠져요.`}>
         <Group>
           <Row static>
             <Text style={{ fontSize: 24, color: connected ? c.safelight : c.muted, marginRight: 4 }}>{connected ? '☁︎' : '⊘'}</Text>
@@ -43,7 +79,6 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
               {cloudLast() ? <Sub>마지막 백업 {new Date(cloudLast()!).toLocaleString('ko-KR')}</Sub> : null}
             </View>
           </Row>
-          {msg ? <Row static><Text style={{ color: msg.ok ? '#30a46c' : c.danger, fontSize: 15 }}>{msg.ok ? '✓ ' : '✕ '}{msg.text}</Text></Row> : null}
           {connected ? [
             <Row key="v" onPress={() => run(async () => { const f = await verifyCloud(); if (f) throw new Error(f) }, `${cloudName() ?? '파일'}에 저장하고 다시 읽었어요. 연결돼 있어요.`)}><RowText>연결 확인</RowText></Row>,
             <Row key="b" onPress={() => run(() => writeCloud(true), '지금 백업했어요.')}><RowText>지금 백업</RowText></Row>,

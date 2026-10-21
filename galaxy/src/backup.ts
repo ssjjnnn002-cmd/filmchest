@@ -62,6 +62,7 @@ export function startLocalAutoBackup() {
   AppState.addEventListener('change', (s) => {
     if (s !== 'background') return
     if (cloudDue()) void writeCloud().catch(() => {})
+    void import('./drive').then((d) => { if (d.driveDue()) void d.backupToDrive(false, false).catch(() => {}) })
     if (Date.now() - (localBackupAt() ?? 0) < 20 * 3_600_000) return
     void writeLocalBackup().catch(() => {})
   })
