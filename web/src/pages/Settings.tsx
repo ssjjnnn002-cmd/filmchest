@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll, storageEstimate } from '../db'
 import { backupFileName, exportAll, importAll } from '../core/backup'
 import { CloudBackup, cloudStatus } from './CloudBackup'
-import { Spending } from './Spending'
+import { Stats } from './Stats'
 import { restorePhotos } from '../core/restore'
 import { filmById } from '../core/films'
 import { Confirm, Icon, Sheet, bytesText } from '../ui/common'
@@ -103,7 +103,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
 
       <div className="section">
         <div className="group">
-          <button className="row" onClick={() => setSpending(true)}><span className="grow">장비에 쓴 돈</span><Icon name="chev" size={18} /></button>
+          <button className="row" onClick={() => setSpending(true)}><span className="grow">통계</span><Icon name="chev" size={18} /></button>
         </div>
       </div>
 
@@ -194,7 +194,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
           }} />
       )}
       {cloud && <CloudBackup onClose={() => setCloud(false)} />}
-      {spending && <Spending onClose={() => setSpending(false)} />}
+      {spending && <Stats onClose={() => setSpending(false)} />}
     </Sheet>
   )
 }

@@ -1,6 +1,6 @@
 // 구글 드라이브에 백업 파일 하나를 올리고 덮어쓴다 (drive.file 권한: 이 앱이 만든 파일만 본다)
 import { getPref, setPref } from '../platform'
-import { backupFileName, exportAll, importAll } from './backup'
+import { backupFileName, backupKey, exportAll, importAll } from './backup'
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
 export const driveAvailable = !!clientId
@@ -47,10 +47,13 @@ export const driveIntervalDays = () => Number(getPref('driveDays', '1'))
 export function disconnectDrive() { setPref('driveConnected', ''); setPref('driveFileId', ''); token = undefined }
 export const hasDriveToken = () => !!token && token.until > Date.now() + 60_000
 
-export async function backupToDrive() {
+/** force가 아니면 바뀐 게 없을 때 올리지 않는다 (같은 파일에 덮어쓰기) */
+export async function backupToDrive(force = false) {
   const t = await driveToken()
   const blob = await exportAll()
+  const key = await backupKey(blob)
   let id = getPref('driveFileId', '')
+  if (!force && id && key === getPref('driveKey', '' as string)) { setPref('driveLast', String(Date.now())); return }
   const meta = { name: backupFileName, mimeType: 'application/json' }
   const body = new FormData()
   body.append('metadata', new Blob([JSON.stringify(id ? {} : meta)], { type: 'application/json' }))
@@ -61,11 +64,12 @@ export async function backupToDrive() {
   let res = await fetch(url, { method: id ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${t}` }, body })
   if (res.status === 404 && id) {   // 드라이브에서 지운 경우 새로 만든다
     setPref('driveFileId', '')
-    return backupToDrive()
+    return backupToDrive(true)
   }
   if (!res.ok) throw new Error(`드라이브에 올리지 못했어요 (${res.status})`)
   id = (await res.json()).id
   setPref('driveFileId', id)
+  setPref('driveKey', key)
   setPref('driveLast', String(Date.now()))
 }
 

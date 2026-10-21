@@ -255,3 +255,23 @@ export function withRotation(data: Uint8Array, turns: number): Uint8Array {
     return data
   }
 }
+
+/** 표식이 없을 때: 이 앱이 적은 사진 정보(설명의 "필름 · 3/36 · …", 카메라, 찍은 날)로 롤을 짐작한다 */
+export function guessRollFromMeta(data: Uint8Array): { key: string; frame?: number; frameCount?: number; film?: string; make?: string; model?: string; date?: number } | undefined {
+  if (!isJpeg(data)) return undefined
+  try {
+    const m = readMeta(data)
+    const parts = (m.caption ?? '').split(' · ').map((x) => x.trim())
+    const at = parts.findIndex((x) => /^\d+\/\d+$/.test(x))
+    const [frame, frameCount] = at >= 0 ? parts[at].split('/').map(Number) : []
+    const film = at > 0 ? parts[0] : undefined
+    const d = (m.dateTimeOriginal ?? m.dateTimeDigitized)?.match(/^(\d{4}):(\d{2}):(\d{2})/)
+    const date = d ? new Date(`${d[1]}-${d[2]}-${d[3]}T12:00:00`).getTime() : undefined
+    // 필름 이름이나 컷 번호가 있어야 이 앱이 내보낸 사진으로 본다
+    if (!film && at < 0) return undefined
+    const day = d ? `${d[1]}${d[2]}${d[3]}` : 'nodate'
+    return { key: [m.make ?? '', m.model ?? '', film ?? '', day].join('|'), frame, frameCount, film, make: m.make, model: m.model, date }
+  } catch {
+    return undefined
+  }
+}

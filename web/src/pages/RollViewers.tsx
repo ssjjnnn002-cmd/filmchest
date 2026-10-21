@@ -38,7 +38,7 @@ export function FilmStrip({ roll, frames, onSelect }: { roll: Roll; frames: Fram
           </div>
           <div className="strip-mid">
             <div className="strip-img" style={{ width: w, height: h }}>
-              <Thumb blob={f.thumb} />
+              <Thumb blob={f.thumb} turns={f.rotation} box={[w, h]} />
               {f.favorite && <span className="heart">♥</span>}
             </div>
           </div>
@@ -51,9 +51,16 @@ export function FilmStrip({ roll, frames, onSelect }: { roll: Roll; frames: Fram
   )
 }
 
-function Thumb({ blob }: { blob?: Blob }) {
+/** 스트립 칸: 돌린 사진은 돌린 채로 칸을 채운다 */
+function Thumb({ blob, turns, box }: { blob?: Blob; turns?: number; box?: [number, number] }) {
   const url = useObjectURL(blob)
-  return url ? <img src={url} alt="" loading="lazy" /> : null
+  const t = (((turns ?? 0) % 4) + 4) % 4
+  if (!url) return null
+  if (!t || !box) return <img src={url} alt="" loading="lazy" />
+  const [w, h] = box
+  const side = t % 2 === 1
+  return <img src={url} alt="" loading="lazy" style={{ position: 'absolute', left: '50%', top: '50%', width: side ? h : w, height: side ? w : h,
+    transform: `translate(-50%, -50%) rotate(${t * 90}deg)` }} />
 }
 
 /** 한 장씩 보기: 좌우로 넘기기, 확대, 하트 */
@@ -99,7 +106,7 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
         <div style={{ display: 'flex', gap: 4 }}>
           <button className="btn ghost icon-btn" aria-label={fav ? '즐겨찾기 해제' : '즐겨찾기'}
             style={{ color: fav ? 'var(--safelight)' : '#fff' }} onClick={() => db.frames.update(frame.id, { favorite: !fav })}>
-            <Icon name="heart" />
+            <Icon name={fav ? 'heartFill' : 'heart'} />
           </button>
           {original && (
             <button className="btn ghost icon-btn" aria-label="이 사진 갤러리에 저장" style={{ color: '#fff' }} onClick={() => {

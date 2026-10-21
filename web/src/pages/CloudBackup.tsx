@@ -56,7 +56,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
           {folder && (
             <>
               <button className="row" onClick={() => run(async () => { const f = await verifyFolder(); if (f) throw new Error(f) }, `${folderCloud() ?? '폴더'}에 저장하고 다시 읽었어요. 연결돼 있어요.`)}>연결 확인</button>
-              <button className="row" onClick={() => run(backupToFolder, `'${backupFileName}'을 저장했어요.`)}>지금 백업</button>
+              <button className="row" onClick={() => run(() => backupToFolder(true), `'${backupFileName}'을 저장했어요.`)}>지금 백업</button>
               <button className="row" onClick={() => { if (confirm('클라우드 백업으로 기록을 되살릴까요? 지금 있는 기록은 지우지 않고 합쳐요.')) void run(async () => { const n = await restoreFromFolder(); setMsg({ text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요.`, ok: true }) }, '') }}>클라우드 백업에서 복구</button>
               <label className="row static">
                 <span className="grow">자동 백업</span>
@@ -70,7 +70,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
           )}
           {drive && (
             <>
-              <button className="row" onClick={() => run(backupToDrive, '구글 드라이브에 저장했어요. 연결돼 있어요.')}>연결 확인 · 지금 백업</button>
+              <button className="row" onClick={() => run(() => backupToDrive(true), '구글 드라이브에 저장했어요. 연결돼 있어요.')}>연결 확인 · 지금 백업</button>
               <button className="row" onClick={() => { if (confirm('구글 드라이브 백업으로 기록을 되살릴까요? 지금 있는 기록은 지우지 않고 합쳐요.')) void run(async () => { const n = await restoreFromDrive(); setMsg({ text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요.`, ok: true }) }, '') }}>클라우드 백업에서 복구</button>
               <label className="row static">
                 <span className="grow">자동 백업</span>
@@ -83,14 +83,14 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
             </>
           )}
         </div>
-        <p className="footnote">웹앱을 닫거나 다른 탭으로 갈 때 정한 주기가 지났으면 '{backupFileName}' 하나를 덮어써요. 스캔 사진은 빠져요.</p>
+        <p className="footnote">웹앱을 닫거나 다른 탭으로 갈 때 정한 주기가 지났고 바뀐 기록이 있으면 '{backupFileName}' 하나에 덮어써요. 스캔 사진은 빠져요.</p>
       </div>
 
       {driveAvailable && !drive && (
         <div className="section">
           <h2>바로 연결</h2>
           <div className="group">
-            <button className="row accent" onClick={() => run(async () => { await driveToken('consent'); await backupToDrive() }, '구글 드라이브에 연결하고 첫 백업을 올렸어요.')}>구글 드라이브 계정 연결</button>
+            <button className="row accent" onClick={() => run(async () => { await driveToken('consent'); await backupToDrive(true) }, '구글 드라이브에 연결하고 첫 백업을 올렸어요.')}>구글 드라이브 계정 연결</button>
           </div>
           <p className="footnote">구글 로그인 창에서 허용을 누르면 돼요. 이 앱이 만든 파일만 볼 수 있어요.</p>
         </div>
@@ -106,7 +106,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
                 if (await allowFolder() !== 'granted') throw new Error('권한을 허용하지 않았어요')
                 const f = await verifyFolder()
                 if (f) throw new Error(f)
-                await backupToFolder()
+                await backupToFolder(true)
               }, `${name}에 연결하고 첫 백업을 저장했어요.`)}>
                 <span className="grow"><span>{name}</span><span className="sub">{help}</span></span>
                 {folderCloud() === name && folder && <span style={{ color: 'var(--safelight)' }}>✓</span>}

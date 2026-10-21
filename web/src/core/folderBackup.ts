@@ -1,7 +1,7 @@
 // 컴퓨터의 클라우드 동기화 폴더(구글 드라이브·OneDrive·Dropbox·iCloud Drive 앱 폴더)에 백업 파일을 덮어쓴다.
 // 크롬·엣지 같은 브라우저에서만 된다 (폴더 고르기 API). 권한은 웹앱 안에서 '허용'을 눌러 받는다.
 import { getPref, setPref } from '../platform'
-import { backupFileName, exportAll, importAll } from './backup'
+import { backupFileName, backupKey, exportAll, importAll } from './backup'
 
 type Perm = 'granted' | 'denied' | 'prompt'
 type DirHandle = FileSystemDirectoryHandle & {
@@ -54,14 +54,19 @@ export async function allowFolder() {
   return dir.requestPermission({ mode: 'readwrite' })
 }
 
-export async function backupToFolder() {
+/** force가 아니면 바뀐 게 없을 때 올리지 않는다 (같은 파일에 덮어쓰기) */
+export async function backupToFolder(force = false) {
   const dir = await loadHandle()
   if (!dir) throw new Error('폴더가 연결되지 않았어요')
   if (await dir.queryPermission({ mode: 'readwrite' }) !== 'granted') throw new Error('권한을 허용해 주세요')
+  const blob = await exportAll()
+  const key = await backupKey(blob)
+  if (!force && key === getPref('folderKey', '' as string)) { setPref('folderLast', String(Date.now())); return }
   const file = await dir.getFileHandle(backupFileName, { create: true })
   const w = await file.createWritable()
-  await w.write(await exportAll())
+  await w.write(blob)
   await w.close()
+  setPref('folderKey', key)
   setPref('folderLast', String(Date.now()))
 }
 

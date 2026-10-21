@@ -56,3 +56,11 @@ export async function importAll(file: Blob): Promise<{ cameras: number; rolls: n
   }
   return { cameras: json.data?.cameras?.length ?? 0, rolls: json.data?.rolls?.length ?? 0 }
 }
+
+/** 백업 내용이 지난번과 같은지 보는 열쇠 (저장 시각은 빼고) */
+export async function backupKey(blob: Blob) {
+  const text = (await blob.text()).replace(/"savedAt":"[^"]*",?/, '')
+  let h = 5381
+  for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0
+  return `${text.length}-${h.toString(36)}`
+}

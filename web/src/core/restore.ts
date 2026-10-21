@@ -1,5 +1,6 @@
 import { db, restoreRoll } from '../db'
-import { readFilmchestMark } from './exif'
+import { guessRollFromMeta, readFilmchestMark } from './exif'
+import { allFilms, filmDisplayName } from './films'
 import { uid } from './types'
 import type { Roll } from './types'
 
@@ -24,13 +25,31 @@ async function thumbOf(blob: Blob) {
 /** 이 앱이 저장한 사진의 표식으로 롤을 다시 만든다. */
 export async function restorePhotos(files: File[]) {
   const groups = new Map<string, { frame: number; blob: Blob }[]>()
+  // 표식이 없는 사진: 사진 정보로 짐작한 롤 (같은 카메라·필름·날짜끼리)
+  const guessed = new Map<string, Partial<Roll>>()
+  const hash = (s: string) => { let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h.toString(36) }
   for (const file of files) {
     const data = new Uint8Array(await file.arrayBuffer())
+    const blob = new Blob([data], { type: file.type || 'image/jpeg' })
     const mark = readFilmchestMark(data)
-    if (!mark) continue
-    const list = groups.get(mark.rollId) ?? []
-    list.push({ frame: mark.frame, blob: new Blob([data], { type: file.type || 'image/jpeg' }) })
-    groups.set(mark.rollId, list)
+    let rollId = mark?.rollId
+    let frame = mark?.frame
+    if (!mark) {
+      const g = guessRollFromMeta(data)
+      if (!g) continue
+      rollId = `meta-${hash(g.key)}`
+      if (!guessed.has(rollId)) {
+        const film = g.film ? allFilms().find((f) => filmDisplayName(f) === g.film) : undefined
+        guessed.set(rollId, {
+          filmId: film?.id ?? '', cameraBrand: g.make, cameraModel: g.model, frameCount: g.frameCount,
+          loadedAt: g.date ?? Date.now(), days: g.date ? [{ id: uid(), startedAt: g.date, startFrame: 1 }] : [],
+        })
+      }
+      frame = g.frame ?? (groups.get(rollId)?.length ?? 0) + 1
+    }
+    const list = groups.get(rollId!) ?? []
+    list.push({ frame: frame!, blob })
+    groups.set(rollId!, list)
   }
   let rolls = 0
   let frames = 0
@@ -41,6 +60,7 @@ export async function restorePhotos(files: File[]) {
       const created: Roll = {
         id: rollId, filmId: '', status: 'imported', loadedAt: Date.now(),
         days: [], locations: [], favorite: false, isArchive: true, frameCount: items.length,
+        ...guessed.get(rollId),
       }
       await db.rolls.add(created)
       roll = created
