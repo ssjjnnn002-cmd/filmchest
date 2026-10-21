@@ -59,7 +59,7 @@ struct CloudBackupView: View {
                     }
                     Button("지금 백업", systemImage: "arrow.up.doc") {
                         do {
-                            try AutoBackup.run(context)
+                            try AutoBackup.run(context, force: true)
                             message = ("'\(DataBackup.fileName)'을 올렸어요.", true)
                         } catch {
                             message = ("백업하지 못했어요. 연결 확인을 눌러 보세요.", false)
@@ -76,7 +76,7 @@ struct CloudBackupView: View {
             } header: {
                 Text("상태")
             } footer: {
-                Text("앱을 닫을 때(홈 화면으로 나갈 때) 정한 주기가 지났으면 '\(DataBackup.fileName)' 하나를 덮어써요. 스캔 사진은 빠져요.")
+                Text("앱을 닫을 때(홈 화면으로 나갈 때) 정한 주기가 지났고 바뀐 기록이 있으면 '\(DataBackup.fileName)' 하나에 덮어써요. 스캔 사진은 빠져요.")
             }
 
             Section {
@@ -129,7 +129,7 @@ struct CloudBackupView: View {
                 message = (failure, false)
             } else {
                 do {
-                    try AutoBackup.run(context)
+                    try AutoBackup.run(context, force: true)
                     message = ("\(AutoBackup.cloudName ?? url.lastPathComponent)에 연결하고 첫 백업을 올렸어요.", true)
                 } catch {
                     message = ("연결했지만 백업을 올리지 못했어요.", false)

@@ -44,9 +44,8 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
-                statsSection
                 Section {
-                    NavigationLink("장비에 쓴 돈") { SpendingView() }
+                    NavigationLink("통계") { StatsView() }
                 }
                 if Features.meter { meterSection }
 
@@ -238,33 +237,6 @@ struct SettingsView: View {
 
     private func topName(_ counts: [String: Int]) -> String {
         counts.max { $0.value < $1.value }?.key ?? "—"
-    }
-
-    private var statsSection: some View {
-        let live = keptRolls
-        let films = Dictionary(grouping: live, by: \.filmName).mapValues(\.count)
-        let cameras = Dictionary(grouping: live, by: \.cameraName).mapValues(\.count)
-        var lensCounts: [String: Int] = [:]
-        var filterCounts: [String: Int] = [:]
-        for roll in live {
-            if let name = roll.lens?.displayName { lensCounts[name, default: 0] += 1 }
-            for change in roll.lensChanges {
-                let name = lenses.first { $0.id == change.lensID }?.displayName ?? "렌즈"
-                lensCounts[name, default: 0] += 1
-            }
-            for shot in roll.meterShots {
-                for name in shot.filters ?? [] { filterCounts[name, default: 0] += 1 }
-            }
-        }
-        let photos = live.reduce(0) { $0 + max($1.frameCount ?? 0, $1.frames?.count ?? 0) }
-        return Section("통계") {
-            LabeledContent("가장 많이 쓴 필름", value: topName(films))
-            LabeledContent("가장 많이 사용한 카메라", value: topName(cameras))
-            LabeledContent("가장 많이 사용한 렌즈", value: topName(lensCounts))
-            LabeledContent("가장 많이 사용한 필터", value: topName(filterCounts))
-            LabeledContent("총 롤", value: "\(live.count)")
-            LabeledContent("총 사진", value: "\(photos)")
-        }
     }
 
     private var meterSection: some View {

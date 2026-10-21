@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import FilmScanCore
+import CryptoKit
 
 /// 사진(스캔)을 뺀 기록 전체를 JSON 한 파일로 저장·복원한다.
 /// 자동 백업은 사용자가 고른 폴더(구글 드라이브·iCloud·OneDrive 등 파일 앱 위치)에 같은 이름으로 덮어쓴다.
@@ -286,10 +287,17 @@ enum AutoBackup {
     }
 
     /// 지금 백업. 폴더가 없으면 nil
+    /// force가 아니면 지난번과 내용이 같을 때 올리지 않는다 (같은 파일에 덮어쓰기)
     @MainActor @discardableResult
-    static func run(_ context: ModelContext) throws -> URL? {
+    static func run(_ context: ModelContext, force: Bool = false) throws -> URL? {
         guard let dir = folder() else { return nil }
         let data = try DataBackup.data(from: context)
+        let body = String(decoding: data, as: UTF8.self).replacingOccurrences(of: #""savedAt":"[^"]*",?"#, with: "", options: .regularExpression)
+        let key = SHA256.hash(data: Data(body.utf8)).map { String(format: "%02x", $0) }.joined()
+        if !force, key == UserDefaults.standard.string(forKey: "filmscan.backupKey") {
+            UserDefaults.standard.set(Date(), forKey: lastKey)
+            return dir.appendingPathComponent(DataBackup.fileName)
+        }
         let ok = dir.startAccessingSecurityScopedResource()
         defer { if ok { dir.stopAccessingSecurityScopedResource() } }
         let target = dir.appendingPathComponent(DataBackup.fileName)
@@ -298,6 +306,7 @@ enum AutoBackup {
             do { try data.write(to: url, options: .atomic) } catch { failure = error }
         }
         if let failure { throw failure }
+        UserDefaults.standard.set(key, forKey: "filmscan.backupKey")
         UserDefaults.standard.set(Date(), forKey: lastKey)
         return target
     }
