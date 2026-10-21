@@ -164,7 +164,7 @@ enum PhotoRestore {
         var frame: Int?
         var assetID: String?
         var thumbnail: Data?
-        /// 표식이 없어 사진 정보로 짐작한 롤 정보
+        /// 사진에 적힌 정보 (필름·카메라·날짜·장소·현상소·스캐너·해상도·용량)
         var guess: Guess?
     }
     struct Guess {
@@ -173,6 +173,15 @@ enum PhotoRestore {
         var model: String?
         var date: Date?
         var frameCount: Int?
+        var place: String?
+        var point: GeoPoint?
+        var memo: String?
+        var lab: String?
+        var scanner: String?
+        var width: Int?
+        var height: Int?
+        var bytes: Int64 = 0
+        var format: String?
     }
 
     @MainActor
@@ -197,6 +206,7 @@ enum PhotoRestore {
         var rolls = (try? context.fetch(FetchDescriptor<RollItem>())) ?? []
         var newRolls = 0
         var newFrames = 0
+        var places: [UUID: [(Int, String, GeoPoint?, String?)]] = [:]
         for hit in hits {
             let roll: RollItem
             if let found = rolls.first(where: { $0.id == hit.rollID }) {
@@ -205,16 +215,6 @@ enum PhotoRestore {
             } else {
                 let created = RollItem(camera: nil, lens: nil, filmStockID: "")
                 created.id = hit.rollID
-                if let g = hit.guess {
-                    if let film = g.film { created.filmStockID = FilmStockCatalog.allIncludingCustom.first { $0.displayName == film }?.id ?? "" }
-                    created.recordedCameraBrand = g.make ?? ""
-                    created.recordedCameraModel = g.model ?? ""
-                    if let date = g.date {
-                        created.loadedAt = date
-                        created.shootingDays = [ShootingDay(startedAt: date, startFrame: 1)]
-                    }
-                    created.frameCount = g.frameCount
-                }
                 created.isArchive = true
                 created.status = .imported
                 created.importedAt = Date()
@@ -225,13 +225,28 @@ enum PhotoRestore {
             }
             let index = hit.frame ?? ((roll.frames ?? []).map(\.index).max() ?? 0) + 1
             if (roll.frames ?? []).contains(where: { $0.index == index }) { continue }
+            let g = hit.guess
+            fill(roll, with: g)
+            if let place = g?.place { places[roll.id, default: []].append((index, place, g?.point, g?.memo)) }
             let frame = FrameItem(index: index, assetIdentifier: hit.assetID, thumbnail: hit.thumbnail,
-                                  takenAt: nil, locationName: nil)
+                                  takenAt: g?.date, locationName: g?.place)
+            frame.pixelWidth = g?.width
+            frame.pixelHeight = g?.height
+            if let b = g?.bytes, b > 0 { frame.byteSize = b; roll.scanBytes = (roll.scanBytes ?? 0) + b }
             frame.roll = roll
             context.insert(frame)
             roll.frameCount = max(roll.frameCount ?? 0, index)
             if roll.status != .imported { roll.status = .imported }
             newFrames += 1
+        }
+        // 장소: 컷 순서대로 같은 장소끼리 한 구간 (이미 장소 기록이 있는 롤은 그대로)
+        for (id, list) in places {
+            guard let roll = rolls.first(where: { $0.id == id }), roll.locations.isEmpty else { continue }
+            var segments: [LocationSegment] = []
+            for (frame, name, point, memo) in list.sorted(by: { $0.0 < $1.0 }) where segments.last?.name != name {
+                segments.append(LocationSegment(startFrame: frame, name: name, point: point, memo: memo))
+            }
+            roll.locations = segments
         }
         try? context.save()
         return (newRolls, newFrames)
@@ -278,11 +293,38 @@ enum PhotoRestore {
         return Hit(rollID: found.0, frame: found.1, assetID: asset.localIdentifier, thumbnail: thumb, guess: found.2)
     }
 
+    /// 비어 있는 롤 정보만 사진에 적힌 정보로 채운다
+    private static func fill(_ roll: RollItem, with g: Guess?) {
+        guard let g else { return }
+        if roll.filmStockID.isEmpty, let film = g.film {
+            roll.filmStockID = FilmStockCatalog.allIncludingCustom.first { $0.displayName == film }?.id ?? ""
+        }
+        if roll.camera == nil && roll.recordedCameraModel.isEmpty {
+            roll.recordedCameraBrand = g.make ?? ""
+            roll.recordedCameraModel = g.model ?? ""
+        }
+        if roll.shootingDays.isEmpty, let date = g.date {
+            roll.loadedAt = date
+            roll.shootingDays = [ShootingDay(startedAt: date, startFrame: 1)]
+        } else if let date = g.date, let first = roll.sortedDays.first, date < first.startedAt, roll.isArchive {
+            roll.shootingDays[0].startedAt = date
+        }
+        if roll.labName == nil { roll.labName = g.lab }
+        if roll.scannerName == nil { roll.scannerName = g.scanner }
+        if roll.droppedOffAt == nil { roll.droppedOffAt = roll.sortedDays.first?.startedAt ?? g.date }
+        if roll.importedAt == nil { roll.importedAt = Date() }
+        if roll.scanFormat == nil { roll.scanFormat = g.format }
+        if let w = g.width, w > (roll.scanPixelWidth ?? 0) { roll.scanPixelWidth = w; roll.scanPixelHeight = g.height }
+        if let n = g.frameCount, n > (roll.frameCount ?? 0) { roll.frameCount = n }
+    }
+
     /// 표식이 있으면 그 롤, 없으면 이 앱이 적은 사진 정보(설명의 "필름 · 3/36", 카메라, 찍은 날)로 짐작한 롤
     private static func hitInfo(_ data: Data) -> (UUID, Int?, Guess?)? {
-        if let m = mark(in: data) { return (m.0, m.1, nil) }
+        let marked = mark(in: data)
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return nil }
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else {
+            return marked.map { ($0.0, $0.1, nil) }
+        }
         let iptc = props[kCGImagePropertyIPTCDictionary] as? [CFString: Any]
         let tiff = props[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
         let exif = props[kCGImagePropertyExifDictionary] as? [CFString: Any]
@@ -290,7 +332,7 @@ enum PhotoRestore {
         let parts = caption.components(separatedBy: " · ").map { $0.trimmingCharacters(in: .whitespaces) }
         let at = parts.firstIndex { $0.wholeMatch(of: /\d+\/\d+/) != nil }
         let film = (at ?? 0) > 0 ? parts[0] : nil
-        guard film != nil || at != nil else { return nil }   // 이 앱이 내보낸 사진으로 볼 근거가 없음
+        guard marked != nil || film != nil || at != nil else { return nil }   // 이 앱이 내보낸 사진으로 볼 근거가 없음
         let nums = at.map { parts[$0].split(separator: "/").compactMap { Int($0) } } ?? []
         let make = tiff?[kCGImagePropertyTIFFMake] as? String
         let model = tiff?[kCGImagePropertyTIFFModel] as? String
@@ -299,11 +341,34 @@ enum PhotoRestore {
         f.dateFormat = "yyyy:MM:dd HH:mm:ss"
         let date = f.date(from: raw)
         let day = String(raw.prefix(10))
+        // 설명 뒤쪽: 장소 · 메모 · 현상소 · 스캐너 (빈 것은 빠짐). 현상소는 키워드에도 있고 메모는 없다
+        let keywords = Set((iptc?[kCGImagePropertyIPTCKeywords] as? [String]) ?? [])
+        let scanner = (tiff?[kCGImagePropertyTIFFSoftware] as? String)?.nilIfBlank
+        var point: GeoPoint?
+        if let gps = props[kCGImagePropertyGPSDictionary] as? [CFString: Any],
+           let lat = gps[kCGImagePropertyGPSLatitude] as? Double, let lon = gps[kCGImagePropertyGPSLongitude] as? Double {
+            point = GeoPoint(latitude: (gps[kCGImagePropertyGPSLatitudeRef] as? String) == "S" ? -lat : lat,
+                             longitude: (gps[kCGImagePropertyGPSLongitudeRef] as? String) == "W" ? -lon : lon)
+        }
+        var place = (iptc?[kCGImagePropertyIPTCObjectName] as? String)?.nilIfBlank
+        var rest = Array(parts.dropFirst((at ?? -1) + 1)).filter { !$0.isEmpty && $0 != scanner }
+        // 장소 이름이 따로 없으면: 좌표가 있거나 키워드 항목이 둘 이상일 때만 첫 항목을 장소로 본다 (하나뿐이면 현상소일 수 있다)
+        if place == nil, let first = rest.first, keywords.contains(first),
+           point != nil || rest.filter({ keywords.contains($0) }).count >= 2 { place = first }
+        if let place { rest.removeAll { $0 == place } }
+        let lab = rest.last { keywords.contains($0) }
+        let memo = rest.first { !keywords.contains($0) }
+        let type = CGImageSourceGetType(source) as String?
+        let info = Guess(film: film, make: make, model: model, date: date, frameCount: nums.count > 1 ? nums[1] : nil,
+                         place: place, point: point, memo: memo, lab: lab, scanner: scanner,
+                         width: props[kCGImagePropertyPixelWidth] as? Int, height: props[kCGImagePropertyPixelHeight] as? Int,
+                         bytes: Int64(data.count), format: type.flatMap { UTType($0)?.preferredFilenameExtension?.uppercased() })
+        if let marked { return (marked.0, marked.1, info) }
         let key = [make ?? "", model ?? "", film ?? "", day].joined(separator: "|")
         let digest = Array(SHA256.hash(data: Data(key.utf8)))
         let id = UUID(uuid: (digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
                              digest[8], digest[9], digest[10], digest[11], digest[12], digest[13], digest[14], digest[15]))
-        return (id, nums.first, Guess(film: film, make: make, model: model, date: date, frameCount: nums.count > 1 ? nums[1] : nil))
+        return (id, nums.first, info)
     }
 
     /// 이 앱(아이폰·웹·갤럭시)이 남긴 롤 표식 "filmchest:<id>:<번호>".
