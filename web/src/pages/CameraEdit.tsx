@@ -2,15 +2,15 @@ import { prepareCameraPhoto } from '../core/cutout'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { db, rememberCamera } from '../db'
 import { cameraPhotoBlob, deleteCameraPhoto, saveCameraPhoto } from '../photoStore'
-import type { BodyStyle, Camera, FilmFormat, GearAccessory } from '../core/types'
+import type { BodyStyle, Camera, FilmFormat } from '../core/types'
 import { formatInfo, styleName, uid } from '../core/types'
 import { brandsMatching, catalog, catalogMatch, catalogName, inferStyle, kindText, modelsMatching, type CatalogCamera } from '../core/cameras'
 import { profileFor } from '../core/profiles'
 import { Model3D } from '../ui/Viewers'
 import { Sheet, toInputDate, useObjectURL } from '../ui/common'
-import { AccessoryFields, TagField } from '../ui/gearExtras'
+import { TagField } from '../ui/gearExtras'
 import { groupPrice } from '../core/optics'
-import { PurchaseFields, rememberSeller, useUsedSellers } from './Gear'
+import { AccessoryLinkFields, PurchaseFields, rememberSeller, useUsedSellers } from './Gear'
 import { features } from '../core/features'
 
 const BODY_COLOR = '#1C1C1E'
@@ -44,7 +44,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
   const [photoScale, setPhotoScale] = useState(camera?.photoScale ?? 1)
   const [offset, setOffset] = useState({ x: camera?.photoOffsetX ?? 0, y: camera?.photoOffsetY ?? 0 })
   const [tags, setTags] = useState<string[]>(camera?.tags ?? [])
-  const [accessories, setAccessories] = useState<GearAccessory[]>(camera?.accessories ?? [])
+  const [accessoryIds, setAccessoryIds] = useState<string[]>(camera?.accessoryIds ?? [])
   // 끌어서 옮기기 · 두 손가락으로 확대
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const gesture = useRef<{ dist: number; scale: number } | null>(null)
@@ -150,7 +150,8 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
       photoOffsetX: photo && offset.x ? offset.x : undefined,
       photoOffsetY: photo && offset.y ? offset.y : undefined,
       tags,
-      accessories: accessories.filter((a) => a.name.trim()),
+      accessories: undefined,
+      accessoryIds,
       battery: battery.trim() || undefined,
       batteryAt,
       prewind,
@@ -287,6 +288,8 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
         {known && <p className="footnote">✓ {kindText(known)}로 자동 설정했어요.</p>}
       </div>
 
+      <TagField tags={tags} setTags={setTags} />
+
       <div className="section">
         <h2>렌즈</h2>
         <div className="group">
@@ -322,8 +325,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
 
       <PurchaseFields date={purchasedAt} setDate={setPurchasedAt} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller}
         used={usedSellers} />
-      <AccessoryFields items={accessories} setItems={setAccessories} bodyPrice={price} />
-      <TagField tags={tags} setTags={setTags} />
+      <AccessoryLinkFields ids={accessoryIds} setIds={setAccessoryIds} bodyPrice={price} />
 
       {features.meter && <div className="section">
         <h2>필름 감기</h2>

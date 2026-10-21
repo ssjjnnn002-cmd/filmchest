@@ -6,11 +6,12 @@ import type { Roll, RollStatus } from '../core/types'
 import { statusName } from '../core/types'
 import { Icon, PageHeader, dateUnknown, rollFilmName, rollStart } from '../ui/common'
 import { RollCard, RollRow } from '../ui/RollRow'
+import { tagSections } from '../ui/gearExtras'
 import { getPref, setPref } from '../platform'
 import { ProjectStrip } from './Projects'
 
-type Grouping = 'month' | 'quarter' | 'half' | 'year'
-const groupingName: Record<Grouping, string> = { month: '월', quarter: '분기', half: '반기', year: '년' }
+type Grouping = 'month' | 'quarter' | 'half' | 'year' | 'tag'
+const groupingName: Record<Grouping, string> = { month: '월', quarter: '분기', half: '반기', year: '년', tag: '태그' }
 
 function periodKey(g: Grouping, ms: number) {
   const d = new Date(ms)
@@ -41,6 +42,7 @@ export function Rolls() {
   const [cameraId, setCameraId] = useState('')
   const [status, setStatus] = useState<RollStatus | ''>('')
   const [search, setSearch] = useState('')
+  const [tag, setTag] = useState('')
 
   const cameraName = (r: Roll) => {
     const c = cameras.find((x) => x.id === r.cameraId)
@@ -53,21 +55,27 @@ export function Rolls() {
     if (filmId && r.filmId !== filmId) return false
     if (cameraId && r.cameraId !== cameraId) return false
     if (status && r.status !== status) return false
+    if (tag && !r.tags?.includes(tag)) return false
     if (search) {
       const text = [rollFilmName(r), cameraName(r), r.lab, r.note, ...r.locations.map((l) => `${l.name} ${l.memo ?? ''}`), ...(r.tags ?? [])].join(' ').toLowerCase()
       if (!text.includes(search.toLowerCase())) return false
     }
     return true
-  }), [rolls, favoritesOnly, filmId, cameraId, status, search, cameras])
+  }), [rolls, favoritesOnly, filmId, cameraId, status, tag, search, cameras])
 
   const groups = useMemo(() => {
+    if (grouping === 'tag') {
+      // 태그마다 한 묶음 (태그가 여럿이면 여러 묶음), 태그 없는 롤은 맨 아래
+      const newest = (list: Roll[]) => [...list].sort((a, b) => rollStart(b) - rollStart(a))
+      return tagSections(filtered, true).map((sec) => ({ key: sec.title ?? '', title: sec.title ?? '', rolls: newest(sec.items) }))
+    }
     const m = new Map<number, Roll[]>()
     for (const r of filtered) {
       const k = dateUnknown(r) ? 0 : periodKey(grouping, rollStart(r))
       m.set(k, [...(m.get(k) ?? []), r])
     }
     return [...m.entries()].sort((a, b) => b[0] - a[0])
-      .map(([k, list]) => ({ key: k, title: periodTitle(grouping, k), rolls: list.sort((a, b) => rollStart(b) - rollStart(a)) }))
+      .map(([k, list]) => ({ key: String(k), title: periodTitle(grouping, k), rolls: list.sort((a, b) => rollStart(b) - rollStart(a)) }))
   }, [filtered, grouping])
 
   const filmOptions = useMemo(() => {
@@ -76,9 +84,10 @@ export function Rolls() {
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
   }, [rolls])
   const cameraOptions = cameras.filter((c) => (rolls ?? []).some((r) => r.cameraId === c.id))
-  const filtering = favoritesOnly || filmId || cameraId || status
+  const tagOptions = useMemo(() => [...new Set((rolls ?? []).filter(kept).flatMap((r) => r.tags ?? []))].sort((a, b) => a.localeCompare(b)), [rolls])
+  const filtering = favoritesOnly || filmId || cameraId || status || tag
 
-  const reset = () => { setFavoritesOnly(false); setFilmId(''); setCameraId(''); setStatus('') }
+  const reset = () => { setFavoritesOnly(false); setFilmId(''); setCameraId(''); setStatus(''); setTag('') }
 
   return (
     <>
@@ -98,7 +107,7 @@ export function Rolls() {
           <input type="search" placeholder="필름, 카메라, 장소, 메모, 태그" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="검색" />
         </label>
         <div className="segmented slide" role="tablist" aria-label="보기 단위"
-          style={{ '--i': (Object.keys(groupingName) as Grouping[]).indexOf(grouping), '--n': 4 } as React.CSSProperties}>
+          style={{ '--i': (Object.keys(groupingName) as Grouping[]).indexOf(grouping), '--n': 5 } as React.CSSProperties}>
           {(Object.keys(groupingName) as Grouping[]).map((g) => (
             <button key={g} className={g === grouping ? 'on' : ''} onClick={() => { setGrouping(g); setPref('rollGrouping', g) }}>{groupingName[g]}</button>
           ))}
@@ -107,6 +116,7 @@ export function Rolls() {
           <button className={`chip ${favoritesOnly ? 'active' : ''}`} onClick={() => setFavoritesOnly(!favoritesOnly)}><Icon name="star" size={16} /> 즐겨찾기</button>
           <ChipSelect label="필름" value={filmId} onChange={setFilmId} options={filmOptions} />
           <ChipSelect label="카메라" value={cameraId} onChange={setCameraId} options={cameraOptions.map((c) => [c.id, `${c.brand} ${c.model}`])} />
+          {tagOptions.length > 0 && <ChipSelect label="태그" value={tag} onChange={setTag} options={tagOptions.map((t) => [t, `#${t}`])} />}
           <ChipSelect label="진행 상태" value={status} onChange={(v) => setStatus(v as RollStatus | '')}
             options={(Object.keys(statusName) as RollStatus[]).map((s) => [s, statusName[s]])} />
           {filtering && <button className="chip" onClick={reset}>초기화 ✕</button>}

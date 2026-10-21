@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll, storageEstimate } from '../db'
 import { backupFileName, exportAll, importAll } from '../core/backup'
-import { backupToDrive, disconnectDrive, driveAvailable, driveConnected, driveIntervalDays, driveLastBackup, driveToken, restoreFromDrive } from '../core/drive'
+import { CloudBackup, cloudStatus } from './CloudBackup'
+import { Spending } from './Spending'
 import { restorePhotos } from '../core/restore'
 import { filmById } from '../core/films'
-import { Confirm, Sheet, bytesText } from '../ui/common'
+import { Confirm, Icon, Sheet, bytesText } from '../ui/common'
 import { PrivacyPolicy } from './Privacy'
 import { applyTheme, getPref, inClaudeHost, refreshApp, saveFileNow, setPref } from '../platform'
 
@@ -17,7 +18,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [confirm, setConfirm] = useState(false)
   const [privacy, setPrivacy] = useState(false)
   const [note, setNote] = useState<string>()
-  const [, setRev] = useState(0)
+  const [cloud, setCloud] = useState(false)
+  const [spending, setSpending] = useState(false)
   const deleted = useLiveQuery(async () => (await db.rolls.toArray()).filter((r) => r.deletedAt), []) ?? []
   const deletedCameras = useLiveQuery(async () => (await db.cameras.toArray()).filter((c) => c.deletedAt), []) ?? []
   useEffect(() => { storageEstimate().then(setUsage); void purgeOldRolls(); void purgeOldCameras() }, [])
@@ -100,8 +102,15 @@ export function Settings({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="section">
+        <div className="group">
+          <button className="row" onClick={() => setSpending(true)}><span className="grow">장비에 쓴 돈</span><Icon name="chev" size={18} /></button>
+        </div>
+      </div>
+
+      <div className="section">
         <h2>백업</h2>
         <div className="group">
+          <button className="row" onClick={() => setCloud(true)}><span className="grow">클라우드 백업</span><span className="value">{cloudStatus()}</span><Icon name="chev" size={18} /></button>
           <button className="row" onClick={async () => saveFileNow(backupFileName, await exportAll())}>백업 파일로 저장</button>
           <label className="row">백업 불러오기
             <input type="file" accept="application/json,.json" hidden onChange={async (e) => {
@@ -119,41 +128,6 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </div>
         <p className="footnote">장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 이미 있는 항목은 합치고 지우지 않아요.</p>
       </div>
-
-      {driveAvailable && (
-        <div className="section">
-          <h2>구글 드라이브 자동 백업</h2>
-          <div className="group">
-            {driveConnected() ? (
-              <>
-                <label className="row static">
-                  <span className="grow">자동 백업</span>
-                  <select className="input" style={{ width: 'auto', textAlign: 'right' }} value={String(driveIntervalDays())}
-                    onChange={(e) => { setPref('driveDays', e.target.value); setRev((n) => n + 1) }}>
-                    <option value="0">끔</option>
-                    <option value="1">매일</option>
-                    <option value="7">매주</option>
-                  </select>
-                </label>
-                <button className="row" onClick={async () => {
-                  try { await backupToDrive(); setNote('드라이브에 백업했어요.') } catch (err) { setNote((err as Error).message) }
-                  setRev((n) => n + 1)
-                }}>지금 백업</button>
-                <button className="row" onClick={async () => {
-                  try { const c = await restoreFromDrive(); setNote(`카메라 ${c.cameras}대, 롤 ${c.rolls}개를 불러왔어요.`) } catch (err) { setNote((err as Error).message) }
-                }}>드라이브에서 불러오기</button>
-                <button className="row" style={{ color: 'var(--warn)' }} onClick={() => { disconnectDrive(); setRev((n) => n + 1) }}>연결 끊기</button>
-              </>
-            ) : (
-              <button className="row accent" onClick={async () => {
-                try { await driveToken('consent'); await backupToDrive(); setNote('드라이브에 백업했어요.') } catch (err) { setNote((err as Error).message) }
-                setRev((n) => n + 1)
-              }}>구글 드라이브 연결</button>
-            )}
-          </div>
-          <p className="footnote">{driveLastBackup() ? `마지막 백업 ${new Date(driveLastBackup()!).toLocaleString('ko-KR')}. ` : ''}내 드라이브에 '{backupFileName}' 파일 하나를 덮어써요. 스캔 사진은 빠져요.</p>
-        </div>
-      )}
 
       <div className="section">
         <h2>사진으로 롤 복구</h2>
@@ -218,6 +192,8 @@ export function Settings({ onClose }: { onClose: () => void }) {
             onClose()
           }} />
       )}
+      {cloud && <CloudBackup onClose={() => setCloud(false)} />}
+      {spending && <Spending onClose={() => setSpending(false)} />}
     </Sheet>
   )
 }

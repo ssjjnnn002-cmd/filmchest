@@ -1,10 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import type { GearAccessory } from '../core/types'
-import { priceText, priceValue, uid } from '../core/types'
-import { groupPrice } from '../core/optics'
-import { getPref } from '../platform'
+import { defaultAccessoryKinds, uid } from '../core/types'
+import { getPref, setPref } from '../platform'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
 
 const cleanTag = (raw: string) => raw.trim().replace(/^#+/, '').trim()
@@ -63,7 +61,7 @@ export function TagField({ tags, setTags }: { tags: string[]; setTags: (t: strin
           </div>
         )}
         <div className="field">
-          <input className="input" style={{ textAlign: 'left' }} placeholder="태그 추가" value={text}
+          <input className="input left" placeholder="태그 추가" value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(text) } }} />
           {text.trim() && <button type="button" className="btn small" onClick={() => add(text)}>추가</button>}
@@ -111,32 +109,51 @@ export function TagFilter({ tags, value, onChange }: { tags: string[]; value?: s
   )
 }
 
-const accessoryNames = ['그립', '소프트 셔터 버튼', '스트랩', '스트랩 고리', '렌즈 후드', '케이스']
+/** 액세서리 유형: 기본 + 사용자가 더한 것 */
+export function accessoryKinds(): string[] {
+  let added: string[] = []
+  try { added = JSON.parse(getPref('accessoryKinds', '[]')) } catch { /* 없음 */ }
+  return [...defaultAccessoryKinds, ...added.filter((k) => !defaultAccessoryKinds.includes(k))]
+}
+export function addAccessoryKind(raw: string) {
+  const name = raw.trim()
+  if (!name || accessoryKinds().includes(name)) return
+  let added: string[] = []
+  try { added = JSON.parse(getPref('accessoryKinds', '[]')) } catch { /* 없음 */ }
+  setPref('accessoryKinds', JSON.stringify([...added, name]))
+}
 
-/** 악세서리 이름·가격 + 본체 포함 합계 */
-export function AccessoryFields({ items, setItems, bodyPrice }: { items: GearAccessory[]; setItems: (v: GearAccessory[]) => void; bodyPrice: string }) {
-  const total = priceValue(bodyPrice) + items.reduce((n, a) => n + priceValue(a.price), 0)
-  const patch = (id: string, p: Partial<GearAccessory>) => setItems(items.map((a) => (a.id === id ? { ...a, ...p } : a)))
+/** 태그별로 묶기. 태그가 여럿이면 여러 묶음에, 태그 없는 것은 맨 아래. 묶지 않으면 제목 없는 한 묶음 */
+export function tagSections<T extends { tags?: string[] }>(items: T[], grouped: boolean): { title?: string; items: T[] }[] {
+  if (!grouped) return [{ items }]
+  const all = [...new Set(items.flatMap((x) => x.tags ?? []))].sort((a, b) => a.localeCompare(b))
+  const out: { title?: string; items: T[] }[] = all.map((t) => ({ title: `#${t}`, items: items.filter((x) => x.tags?.includes(t)) }))
+  const none = items.filter((x) => !x.tags?.length)
+  if (none.length) out.push({ title: '태그 없음', items: none })
+  return out
+}
+
+/** 블록 안 태그 한 줄. 없어도 자리를 지켜 블록 높이가 같다 */
+export function TagLine({ tags }: { tags?: string[] }) {
   return (
-    <div className="section">
-      <h2>악세서리</h2>
-      <div className="group">
-        {items.map((a) => (
-          <div key={a.id} className="field">
-            <input className="input" style={{ textAlign: 'left' }} placeholder="이름" value={a.name} onChange={(e) => patch(a.id, { name: e.target.value })} />
-            <input className="input" style={{ maxWidth: 120 }} placeholder="가격" inputMode="numeric" value={a.price ?? ''}
-              onChange={(e) => patch(a.id, { price: groupPrice(e.target.value) || undefined })} />
-            <button type="button" className="chip-x" aria-label={`${a.name || '악세서리'} 지우기`} onClick={() => setItems(items.filter((x) => x.id !== a.id))}>×</button>
-          </div>
-        ))}
-        <div className="suggest" style={{ paddingTop: 12 }}>
-          {accessoryNames.map((n) => <button key={n} type="button" className="chip" onClick={() => setItems([...items, { id: uid(), name: n }])}>+ {n}</button>)}
-          <button type="button" className="chip" onClick={() => setItems([...items, { id: uid(), name: '' }])}>+ 직접 입력</button>
-        </div>
-        {total > 0 && (
-          <div className="field"><label>본체 + 악세서리</label><div><b>{priceText(total)}</b></div></div>
-        )}
-      </div>
-    </div>
+    <span className="tag-line" style={{ visibility: tags?.length ? 'visible' : 'hidden' }}>
+      {tags?.length ? tags.map((t) => `#${t}`).join(' ') : '#'}
+    </span>
   )
+}
+
+/** 예전에 카메라 안에 적어 둔 액세서리를 액세서리 탭 장비로 옮긴다 */
+export async function migrateAccessories() {
+  const cams = await db.cameras.toArray()
+  for (const c of cams) {
+    if (!c.accessories?.length) continue
+    const ids = [...(c.accessoryIds ?? [])]
+    for (const a of c.accessories) {
+      if (!a.name.trim()) continue
+      const id = uid()
+      await db.filters.put({ id, kind: accessoryKinds().includes(a.name) ? a.name : '기타', name: a.name, price: a.price, createdAt: Date.now() })
+      ids.push(id)
+    }
+    await db.cameras.update(c.id, { accessories: undefined, accessoryIds: ids })
+  }
 }

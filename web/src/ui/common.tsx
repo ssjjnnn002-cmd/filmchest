@@ -46,6 +46,7 @@ const icons: Record<string, IconDef> = {
   film: { d: 'M5 3.5h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z M7.5 3.5v17 M16.5 3.5v17 M3 8h4.5 M3 12h4.5 M3 16h4.5 M16.5 8H21 M16.5 12H21 M16.5 16H21' },
   inbox: { d: 'M3 13.5 5.3 6.8A1.5 1.5 0 0 1 6.7 5.8H9 M15 5.8h2.3a1.5 1.5 0 0 1 1.4 1L21 13.5V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M3 13.5h5l1 2h6l1-2h5 M12 3v8 M9 8l3 3 3-3' },
   stack: { d: 'M9.3 2.8h5.4v2.4H9.3z M7.6 5.2h8.8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7.6a2 2 0 0 1-2-2v-12a2 2 0 0 1 2-2z M5.6 9.5h12.8 M5.6 17h12.8' },
+  group: { d: 'M4 4.5h16v4H4z M4 10.5h16v4H4z M4 16.5h10v3.5H4z' },
   plus: { d: 'M12 4.8v14.4 M4.8 12h14.4', width: 2.1 },
   gear: { fill: true, d: gearPath() },
   grid: { d: `${roundSq(4, 4, 6.8, 1.8)} ${roundSq(13.2, 4, 6.8, 1.8)} ${roundSq(4, 13.2, 6.8, 1.8)} ${roundSq(13.2, 13.2, 6.8, 1.8)}` },
@@ -332,8 +333,8 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
 }
 
 /** 페이지 안 확인 창 (브라우저 confirm()은 쓸 수 없는 환경이 있어서) */
-export function Confirm({ message, action = '삭제', onConfirm, onCancel }: {
-  message: string; action?: string; onConfirm: () => void; onCancel: () => void
+export function Confirm({ message, action = '삭제', safe, onConfirm, onCancel }: {
+  message: string; action?: string; safe?: boolean; onConfirm: () => void; onCancel: () => void
 }) {
   return createPortal(
     <div className="alert-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}>
@@ -341,7 +342,7 @@ export function Confirm({ message, action = '삭제', onConfirm, onCancel }: {
         <p>{message}</p>
         <div className="actions">
           <button className="btn" onClick={onCancel}>취소</button>
-          <button className="btn" style={{ color: 'var(--danger)' }} onClick={onConfirm}>{action}</button>
+          <button className="btn" style={{ color: safe ? 'var(--safelight)' : 'var(--danger)', fontWeight: 600 }} onClick={onConfirm}>{action}</button>
         </div>
       </div>
     </div>,

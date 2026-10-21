@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import type { Roll } from '../core/types'
 import { formatInfo } from '../core/types'
+import { TagLine } from './gearExtras'
 import { Canister, cameraName, rollCameraFormat, StatusBadge, dateRangeText, rollFilm, rollFilmName, sortedLocations, useObjectURL } from './common'
 
 export function RollRow({ roll }: { roll: Roll }) {
@@ -17,7 +18,8 @@ export function RollRow({ roll }: { roll: Roll }) {
           {roll.favorite && <span className="star" aria-label="즐겨찾기">★</span>}
         </div>
         <div className="sub truncate">{[cameraName(camera, roll), dateRangeText(roll)].join(' · ')}</div>
-        {places && <div className="sub truncate">{places}</div>}
+        <div className="sub truncate">{places || '\u00a0'}</div>
+        <TagLine tags={roll.tags} />
       </div>
     </div>
   )
@@ -39,6 +41,7 @@ export function RollCard({ roll, onClick }: { roll: Roll; onClick: () => void })
       </div>
       <div className="sub truncate">{cameraName(camera, roll)}</div>
       <div className="sub">{dateRangeText(roll)}{formatInfo[rollCameraFormat(camera, roll)].is120 ? ` · ${formatInfo[rollCameraFormat(camera, roll)].name}` : ''}</div>
+      <TagLine tags={roll.tags} />
     </button>
   )
 }

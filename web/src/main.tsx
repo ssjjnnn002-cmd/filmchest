@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { startDriveAutoBackup } from './core/drive'
+import { startFolderAutoBackup } from './core/folderBackup'
 import { liveQuery } from 'dexie'
 import { App } from './App'
 import { db } from './db'
@@ -41,6 +42,7 @@ liveQuery(() => db.customFilms.toArray()).subscribe((rows) => setCustomFilms(row
 await db.customFilms.toArray().then(setCustomFilms).catch(() => {})
 
 startDriveAutoBackup()
+startFolderAutoBackup()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

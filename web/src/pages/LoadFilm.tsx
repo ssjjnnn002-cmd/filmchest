@@ -201,7 +201,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
               </span>
             </div>
             <label className="toggle">
-              <span>첫 촬영일 추가</span>
+              <span>오늘을 촬영일로 설정하기</span>
               <input type="checkbox" className="switch" checked={today} onChange={(e) => setToday(e.target.checked)} />
             </label>
             {today && (

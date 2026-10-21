@@ -58,6 +58,8 @@ export function RollDetail({ id }: { id: string }) {
           </GlassGroup>
         } />
 
+      <TagField tags={roll.tags ?? []} setTags={(tags) => db.rolls.update(id, { tags })} />
+
       <div style={{ display: 'flex', gap: 16, alignItems: 'center', margin: '0 4px 8px' }}>
         <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={104} />
         <div style={{ display: 'grid', gap: 3, minWidth: 0, justifyItems: 'start' }}>
@@ -178,7 +180,6 @@ export function RollDetail({ id }: { id: string }) {
       </div>
 
       <RollProjects roll={roll} />
-      <TagField tags={roll.tags ?? []} setTags={(tags) => db.rolls.update(id, { tags })} />
 
       <div className="section">
         <h2>메모</h2>

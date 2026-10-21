@@ -8,7 +8,7 @@ import { filmById } from '../core/films'
 import { CameraCover, Canister, GlassGroup, Icon, PageHeader, rollFilmName } from '../ui/common'
 import { CameraEdit } from './CameraEdit'
 import { GearAdd, GearBoard, type GearKind } from './Gear'
-import { TagFilter } from '../ui/gearExtras'
+import { TagFilter, TagLine, migrateAccessories, tagSections } from '../ui/gearExtras'
 import { Settings } from './Settings'
 import { getPref, setPref } from '../platform'
 import { cameraPhotoURL } from '../photoStore'
@@ -36,6 +36,10 @@ export function Library() {
   const [gear, setGear] = useState<GearKind | 'camera'>('camera')
   const [gearAdd, setGearAdd] = useState(false)
   const [tag, setTag] = useState<string>()
+  const [search, setSearch] = useState('')
+  const [grouped, setGrouped] = useState(getPref('gearGrouped', '' as string) === '1')
+  const query = search.trim().toLowerCase()
+  useEffect(() => { void migrateAccessories() }, [])
   const lensTags = useLiveQuery(async () => (await db.lenses.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
   const filterTags = useLiveQuery(async () => (await db.filters.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
   const [settings, setSettings] = useState(false)
@@ -70,6 +74,7 @@ export function Library() {
     .map((id) => byId.get(id))
     .filter((c): c is Camera => !!c)
     .filter((c) => editing || !tag || (c.tags ?? []).includes(tag))
+    .filter((c) => editing || !query || [c.brand, c.model, c.nickname, c.mount, c.fixedLens, ...(c.tags ?? [])].some((t) => t?.toLowerCase().includes(query)))
 
   const toggleLayout = () => {
     const next = layout === 'grid' ? 'list' : 'grid'
@@ -238,16 +243,31 @@ export function Library() {
 
       {!editing && (
         <div className="segmented" role="tablist" aria-label="장비" style={{ margin: '4px 0 12px' }}>
-          {([['camera', '카메라'], ['lens', '렌즈'], ['filter', '필터'], ['film', '필름']] as const).map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={gear === id} className={gear === id ? 'on' : ''} onClick={() => { setGear(id); setTag(undefined) }}>{label}</button>
+          {([['camera', '카메라'], ['lens', '렌즈'], ['filter', '액세서리'], ['film', '필름']] as const).map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={gear === id} className={gear === id ? 'on' : ''} onClick={() => { setGear(id); setTag(undefined); setSearch('') }}>{label}</button>
           ))}
+        </div>
+      )}
+      {!editing && (
+        <div className="gear-tools">
+          <label className="search">
+            <Icon name="search" size={18} />
+            <input type="search" placeholder={`${({ camera: '카메라', lens: '렌즈', filter: '액세서리', film: '필름' } as const)[gear]} 검색`} value={search}
+              onChange={(e) => setSearch(e.target.value)} aria-label="장비 검색" />
+          </label>
+          {gear !== 'film' && (
+            <button type="button" className={`icon-toggle ${grouped ? 'on' : ''}`} aria-pressed={grouped} aria-label="태그별로 묶기" title="태그별로 묶기"
+              onClick={() => { setGrouped(!grouped); setPref('gearGrouped', grouped ? '' : '1') }}>
+              <Icon name="group" size={20} />
+            </button>
+          )}
         </div>
       )}
       {!editing && gear !== 'film' && (
         <TagFilter tags={gear === 'camera' ? (cameras ?? []).flatMap((c) => c.tags ?? []) : gear === 'lens' ? lensTags : filterTags} value={tag} onChange={setTag} />
       )}
 
-      {gear !== 'camera' && !editing && <GearBoard kind={gear} layout={layout} tag={tag} />}
+      {gear !== 'camera' && !editing && <GearBoard kind={gear} layout={layout} tag={tag} search={search} grouped={grouped} />}
 
       {gear === 'camera' && cameras && cameras.length === 0 && (
         <div className="empty">
@@ -272,9 +292,23 @@ export function Library() {
             <Icon name="right" />
           </button>
 
-          <div ref={containerRef} className={`${layout === 'grid' ? 'grid' : 'group'} ${editing ? 'editing' : ''}`}>
-            {shown.map(item)}
-          </div>
+          {shown.length === 0 && <div className="empty"><b>맞는 카메라가 없어요</b></div>}
+          {grouped && !editing
+            ? tagSections(shown, true).map((sec) => (
+              <div key={sec.title}>
+                <h3 className="group-title">{sec.title} · {sec.items.length}</h3>
+                <div className={layout === 'grid' ? 'grid' : 'group'}>
+                  {sec.items.map((c) => layout === 'grid'
+                    ? <div key={c.id} className="reorder-item"><div className="reorder-inner"><CameraCard camera={c} roll={loadedFor(c)} /></div></div>
+                    : <CameraRow key={c.id} camera={c} roll={loadedFor(c)} />)}
+                </div>
+              </div>
+            ))
+            : (
+              <div ref={containerRef} className={`${layout === 'grid' ? 'grid' : 'group'} ${editing ? 'editing' : ''}`}>
+                {shown.map(item)}
+              </div>
+            )}
         </div>
       )}
 
@@ -355,6 +389,7 @@ function CameraCard({ camera, roll }: { camera: Camera; roll?: Roll }) {
         <b className="truncate">{camera.model}</b>
         <span className="sub">{camera.brand}</span>{' '}
         {batteryDue(camera) && <span className="battery-due">배터리 교체</span>}
+        <TagLine tags={camera.tags} />
       </div>
       <hr />
       {roll ? (
@@ -377,10 +412,10 @@ function CameraRow({ camera, roll }: { camera: Camera; roll?: Roll }) {
         <div style={{ width: 68 }}><CameraCover camera={camera} height={52} /></div>
         <div className="grow">
           <b className="truncate" style={{ display: 'block', fontWeight: 600 }}>{camera.brand} {camera.model}</b>
-          {roll
-            ? <span className="sub" style={{ color: 'var(--safelight)' }}>{rollFilmName(roll)}</span>
-            : <span className="sub">비어 있음</span>}
-          {batteryDue(camera) && <div className="battery-due">배터리 교체할 때가 됐어요</div>}
+          <span className="sub truncate" style={roll ? { color: 'var(--safelight)' } : undefined}>
+            {roll ? rollFilmName(roll) : '비어 있음'}{batteryDue(camera) && <span className="battery-due"> · 배터리 교체</span>}
+          </span>
+          <TagLine tags={camera.tags} />
         </div>
       </button>
       {roll

@@ -692,3 +692,15 @@ a.row.accent { color: var(--safelight); }
 .row .plain { border: 0; background: none; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; display: flex; }
 .icon-btn { border: 0; background: var(--fill, rgba(0,0,0,.06)); width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); cursor: pointer; flex: none; }
 .row.danger { color: #e5484d; }
+
+/* 블록 높이는 모두 같게: 가장 높은 블록에 맞춘다 */
+.grid { grid-auto-rows: 1fr; }
+.tag-line { display: block; font-size: 12px; font-weight: 600; color: var(--safelight); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; line-height: 1.4; }
+.gear-tools { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
+.gear-tools .search { flex: 1; margin: 0; }
+.icon-toggle { width: 40px; height: 40px; border-radius: 12px; border: 0; display: grid; place-items: center; background: var(--card); color: var(--safelight); cursor: pointer; flex-shrink: 0; }
+.icon-toggle.on { background: var(--safelight); color: #fff; }
+.group-title { font-size: 14px; font-weight: 600; color: var(--muted); margin: 14px 4px 8px; }
+.reserve-2 { min-height: calc(2 * 1.25em); }
+.grow > .sub.reserve-2 { min-height: calc(2 * 1.35em); }
+.field > .input.left, .field > .input.left::placeholder { text-align: left; }
