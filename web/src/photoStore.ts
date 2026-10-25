@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore, useState } from 'react'
 import { db } from './db'
 import type { Camera } from './core/types'
 
@@ -176,4 +176,15 @@ export function useCameraPhoto(id?: string, enabled = true) {
     void cameraPhotoURL(id)
   }, [id, enabled, url, rev])
   return url
+}
+
+/** 배경을 지운 PNG인지 (그냥 사진이면 바둑판 카드 위쪽·양옆을 꽉 채운다). 모르면 undefined */
+const cutouts = new Map<string, boolean>()
+export function usePhotoIsCutout(id: string, enabled: boolean) {
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!enabled || cutouts.has(id)) return
+    void cameraPhotoBlob(id).then((b) => { if (b) { cutouts.set(id, b.type === 'image/png'); setTick((n) => n + 1) } })
+  }, [id, enabled])
+  return enabled ? cutouts.get(id) : undefined
 }

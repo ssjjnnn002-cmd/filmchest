@@ -15,6 +15,7 @@ import { useTheme } from '../theme'
 import { seedExample } from '../seed'
 import { CameraEdit } from './CameraEdit'
 import { GearAdd, GearBoard, type GearKind } from './Gear'
+import { usePhotoIsCutout } from '../files'
 import { GroupTitle, TagFilter, TagLine, migrateAccessories, tagSections } from '../gearExtras'
 import { Settings } from './Settings'
 
@@ -288,13 +289,17 @@ function ReorderItem({ id, first, editing, placeholder, grid, width, onLayout, o
 
 function CameraCard({ camera, roll, editing }: { camera: Camera; roll?: Roll; editing?: boolean }) {
   const c = useTheme()
+  // 그냥 사진(배경 안 지운 사진)이면 카드 위쪽·양옆을 꽉 채운다
+  const bleed = usePhotoIsCutout(camera.id, !!(camera.hasPhoto || camera.photo)) === false
   const nav = useNav()
   const open = () => nav.push({ type: 'camera', id: camera.id })
   return (
-    <View style={{ backgroundColor: c.card, borderRadius: 22, padding: 16, gap: 10, minWidth: 0,
+    <View style={{ backgroundColor: c.card, borderRadius: 22, padding: 16, gap: 10, minWidth: 0, overflow: 'hidden',
       shadowColor: '#28201a', shadowOpacity: c.dark ? 0.4 : 0.06, shadowRadius: 20, shadowOffset: { width: 0, height: 6 }, elevation: 1 }}>
-      <Pressable disabled={editing} onPress={open} style={{ height: 120, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-        <CameraCover camera={camera} />
+      <Pressable disabled={editing} onPress={open} style={bleed
+        ? { height: 136, marginHorizontal: -16, marginTop: -16, overflow: 'hidden' }
+        : { height: 120, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        {bleed ? <CameraCover camera={camera} height={136} fill /> : <CameraCover camera={camera} />}
       </Pressable>
       <Pressable disabled={editing} onPress={open} style={{ minWidth: 0 }}>
         <Text numberOfLines={1} style={{ fontSize: 19, fontWeight: '700', color: c.ink }}>{camera.model}</Text>
@@ -322,11 +327,13 @@ function CameraCard({ camera, roll, editing }: { camera: Camera; roll?: Roll; ed
 
 function CameraRow({ camera, roll, editing }: { camera: Camera; roll?: Roll; editing?: boolean }) {
   const c = useTheme()
+  // 그냥 사진(배경 안 지운 사진)이면 카드 위쪽·양옆을 꽉 채운다
+  const bleed = usePhotoIsCutout(camera.id, !!(camera.hasPhoto || camera.photo)) === false
   const nav = useNav()
   return (
     <View style={{ minHeight: 52, paddingVertical: 12, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <Pressable disabled={editing} onPress={() => nav.push({ type: 'camera', id: camera.id })} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 }}>
-        <View style={{ width: 68 }}><CameraCover camera={camera} height={52} /></View>
+        <View style={{ width: 68, borderRadius: 8, overflow: 'hidden' }}><CameraCover camera={camera} height={52} fill={bleed} /></View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text numberOfLines={1} style={{ fontSize: 17, fontWeight: '600', color: c.ink }}>{camera.brand} {camera.model}</Text>
           <Text numberOfLines={1} style={{ fontSize: 14, color: roll ? c.safelight : c.muted }}>

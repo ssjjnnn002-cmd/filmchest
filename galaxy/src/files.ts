@@ -1,6 +1,6 @@
 // 기기 파일 (웹의 Blob·OPFS 자리). 카메라 사진, 스캔 원본, 썸네일을 앱 문서 폴더에 둔다.
 import { Directory, File, Paths } from 'expo-file-system'
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 
 export function folder(name: string) {
   const dir = new Directory(Paths.document, name)
@@ -90,4 +90,19 @@ export function b64ToBytes(b64: string) {
   const out = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
   return out
+}
+
+// 배경을 지운 PNG인지 (그냥 사진이면 바둑판 카드 위쪽·양옆을 꽉 채운다)
+const cutoutCache = new Map<string, boolean>()
+export function usePhotoIsCutout(id: string, enabled: boolean) {
+  const key = `${id}:${enabled ? revision : 0}`
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!enabled || cutoutCache.has(key)) return
+    void cameraPhotoBytes(id).then((b) => {
+      cutoutCache.set(key, !!b && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47)
+      setTick((n) => n + 1)
+    }).catch(() => {})
+  }, [key, id, enabled])
+  return cutoutCache.get(key)
 }

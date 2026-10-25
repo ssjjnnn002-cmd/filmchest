@@ -299,23 +299,23 @@ function DrawnCanister({ film, format, size }: { film: FilmStock; format: FilmFo
 }
 
 /** 카메라 대표 모습: 기기 파일로 둔 사진 → 기본 3D 모형 정지 이미지 */
-export function CameraCover({ camera, height = 110 }: { camera: Camera; height?: number }) {
+export function CameraCover({ camera, height = 110, fill }: { camera: Camera; height?: number; fill?: boolean }) {
   const wantPhoto = !!(camera.hasPhoto || camera.photo)
   const photo = useCameraPhoto(camera.id, wantPhoto)
   const hash = modelHash(profileFor(camera.brand, camera.model, camera.style))
   const model = modelShots[hash] ?? modelShots[modelHash(profileFor('', '', camera.style))]
   if (photo) {
-    return <CoverPhoto uri={photo} height={height} camera={camera} />
+    return <CoverPhoto uri={photo} height={height} camera={camera} fill={fill} />
   }
   if (model) return <Image source={model} resizeMode="contain" style={{ width: '100%', height }} />
   return <View style={{ height, alignItems: 'center', justifyContent: 'center' }}><Spinner /></View>
 }
 
-function CoverPhoto({ uri, height, camera }: { uri: string; height: number; camera: Camera }) {
+function CoverPhoto({ uri, height, camera, fill }: { uri: string; height: number; camera: Camera; fill?: boolean }) {
   const [w, setW] = useState(0)
   return (
     <View style={{ width: '100%', height, overflow: 'hidden' }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
-      <Image source={{ uri }} resizeMode="contain" style={{ width: '100%', height,
+      <Image source={{ uri }} resizeMode={fill ? 'cover' : 'contain'} style={{ width: '100%', height,
         transform: [{ translateX: (camera.photoOffsetX ?? 0) * w }, { translateY: (camera.photoOffsetY ?? 0) * height }, { scale: camera.photoScale ?? 1 }] }} />
     </View>
   )

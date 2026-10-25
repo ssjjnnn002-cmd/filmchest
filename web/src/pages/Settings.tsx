@@ -20,6 +20,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [note, setNote] = useState<string>()
   const [cloud, setCloud] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
+  const [purge, setPurge] = useState<(() => Promise<unknown>) | null>(null)
   const [spending, setSpending] = useState(false)
   const deleted = useLiveQuery(async () => (await db.rolls.toArray()).filter((r) => r.deletedAt), []) ?? []
   const deletedCameras = useLiveQuery(async () => (await db.cameras.toArray()).filter((c) => c.deletedAt), []) ?? []
@@ -173,7 +174,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 <div className="row" key={roll.id}>
                   <span className="grow">{filmById(roll.filmId)?.name ?? '필름 알 수 없음'}</span>
                   <button className="btn ghost" onClick={() => { void restoreRoll(roll.id) }}>되돌리기</button>
-                  <button className="btn ghost" style={{ color: '#c0392b' }} onClick={() => { void deleteRoll(roll.id, true) }}>지금 지우기</button>
+                  <button className="btn ghost" style={{ color: '#c0392b' }} onClick={() => setPurge(() => () => deleteRoll(roll.id, true))}>지금 지우기</button>
                 </div>
               ))}
             </div>
@@ -188,7 +189,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 <div className="row" key={camera.id}>
                   <span className="grow">{camera.brand} {camera.model}</span>
                   <button className="btn ghost" onClick={() => { void restoreCamera(camera.id) }}>되돌리기</button>
-                  <button className="btn ghost" style={{ color: '#c0392b' }} onClick={() => { void purgeCamera(camera.id) }}>지금 지우기</button>
+                  <button className="btn ghost" style={{ color: '#c0392b' }} onClick={() => setPurge(() => () => purgeCamera(camera.id))}>지금 지우기</button>
                 </div>
               ))}
             </div>
@@ -203,6 +204,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </Sheet>
       )}
       {cloud && <CloudBackup onClose={() => setCloud(false)} />}
+      {purge && <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={async () => { const run = purge; setPurge(null); await run() }} />}
     </Sheet>
   )
 }

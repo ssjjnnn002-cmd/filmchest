@@ -14,7 +14,10 @@ export const driveAvailable = !!clientId
 type TokenClient = { requestAccessToken(o?: { prompt?: string }): void; callback: (r: { access_token?: string; expires_in?: number; error?: string }) => void }
 declare global { interface Window { google?: { accounts: { oauth2: { initTokenClient(o: Record<string, unknown>): TokenClient } } } } }
 
-let token: { value: string; until: number } | undefined
+// 받은 구글 허가는 만료 전까지 기억해 둔다 (새로 고쳐도 다시 묻지 않게)
+let token: { value: string; until: number } | undefined = (() => {
+  try { const t = JSON.parse(sessionStorage.getItem('driveToken') ?? 'null'); return t && t.until > Date.now() ? t : undefined } catch { return undefined }
+})()
 let client: TokenClient | undefined
 
 function loadScript() {
@@ -40,6 +43,7 @@ export async function driveToken(prompt = ''): Promise<string> {
     client.callback = (r) => {
       if (!r.access_token) return reject(new Error(r.error ?? '연결하지 못했어요'))
       token = { value: r.access_token, until: Date.now() + (r.expires_in ?? 3600) * 1000 }
+      try { sessionStorage.setItem('driveToken', JSON.stringify(token)) } catch { /* 저장 못 함 */ }
       setPref('driveConnected', '1')
       resolve(r.access_token)
     }
@@ -54,6 +58,7 @@ export function disconnectDrive() {
   for (const k of ['driveConnected', 'driveFileId', 'driveRoot', 'driveKey']) setPref(k, '')
   setPref('driveRollFolders', '{}'); setPref('driveFrames', '{}')
   token = undefined
+  try { sessionStorage.removeItem('driveToken') } catch { /* 없음 */ }
 }
 export const hasDriveToken = () => !!token && token.until > Date.now() + 60_000
 
@@ -201,25 +206,16 @@ export function driveDue() {
   return Date.now() - (driveLastBackup() ?? 0) > days * 86_400_000 - 3_600_000
 }
 
-/** 앱을 쓰는 동안 때가 되면 올린다. 권한이 끊겼으면 다음 누름에서 조용히 다시 받는다. */
+/** 연결해 둔 구글 허가가 살아 있는 동안(최대 1시간) 창 없이 맞춘다.
+ *  로그인 창은 사용자가 버튼을 누를 때만 연다 (자동으로 열면 브라우저가 팝업 차단을 묻는다). */
 export function startDriveAutoBackup() {
   if (!driveAvailable) return
-  const tryNow = () => { if (driveDue() && hasDriveToken()) void backupToDrive().catch(() => {}) }
-  // 앱을 열거나 다시 볼 때: 다른 기기에서 고친 기록이 있으면 합친다 (구글 연결이 살아 있을 때)
-  let pulledOnce = false
+  // 구글 로그인 도구를 미리 받아 둔다: 버튼을 누른 순간 바로 창을 열어야 팝업으로 막히지 않는다
+  if (driveConnected()) void loadScript().catch(() => {})
   const pull = () => { if (driveConnected() && hasDriveToken()) void pullFromDrive().catch(() => {}) }
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pull() })
-  document.addEventListener('pointerdown', () => {
-    if (pulledOnce || !driveConnected()) return
-    pulledOnce = true
-    void driveToken('').then(() => pullFromDrive()).catch(() => {})
-  }, { capture: true, once: false })
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') tryNow() })
-  const onTap = () => {
-    if (!driveDue()) return
-    if (hasDriveToken()) { tryNow(); return }
-    document.removeEventListener('pointerdown', onTap, true)
-    void driveToken('').then(() => backupToDrive()).catch(() => {})
-  }
-  document.addEventListener('pointerdown', onTap, true)
+  pull()
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') pull()
+    else if (driveDue() && hasDriveToken()) void backupToDrive().catch(() => {})
+  })
 }

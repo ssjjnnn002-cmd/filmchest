@@ -8,7 +8,7 @@ import { lensesFor } from '../core/lenses'
 import { filmFits, filterDiameters, filterKinds, groupPrice, lensSpec, parseLens } from '../core/optics'
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
 import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
-import { deleteCameraPhoto, readBytes, saveCameraPhoto, useCameraPhoto } from '../files'
+import { deleteCameraPhoto, readBytes, saveCameraPhoto, useCameraPhoto, usePhotoIsCutout } from '../files'
 import { Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Group, Row, Section, Segmented, Select, Sub } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { getPref, useLiveQuery } from '../store'
@@ -142,7 +142,7 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false }: {
   const empty = kind === 'lens' ? ['렌즈가 없어요', '가진 렌즈를 등록해 보세요.']
     : kind === 'filter' ? ['액세서리가 없어요', '필터, 그립, 스트랩처럼 가진 장비를 등록해 보세요.']
     : ['필름 재고가 없어요', '가진 롤을 등록해 보세요.']
-  const card = { backgroundColor: c.cell, borderRadius: 22, padding: 14, gap: 6, width: '48%' as const }
+  const card = { backgroundColor: c.cell, borderRadius: 22, padding: 14, gap: 6, width: '48%' as const, overflow: 'hidden' as const }
   const row = { padding: 14, flexDirection: 'row' as const, gap: 12, alignItems: 'center' as const }
   // 줄 수를 정해 두어 블록 높이가 모두 같다
   const title = (t: string) => <Text style={{ fontWeight: '700', color: c.ink, fontSize: 16, lineHeight: 21, height: grid ? 42 : 21 }} numberOfLines={grid ? 2 : 1}>{t}</Text>
@@ -205,11 +205,21 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false }: {
   )
 }
 
+/** 장비 사진. 바둑판: 그냥 사진이면 카드 위쪽·양옆 끝까지 채운다(높이는 다른 카드와 같게). 목록: 고정 크기 + 둥근 모서리 */
 function GearImage({ id, hasPhoto, tall }: { id: string; hasPhoto?: boolean; tall: boolean }) {
   const uri = useCameraPhoto(id, !!hasPhoto)
+  const cutout = usePhotoIsCutout(id, !!uri)
+  if (!tall) {
+    return uri
+      ? <Image source={{ uri }} style={{ width: 68, height: 52, borderRadius: 8 }} resizeMode={cutout === false ? 'cover' : 'contain'} />
+      : <View style={{ width: 68, height: 52, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 28, opacity: 0.3 }}>◎</Text></View>
+  }
+  if (uri && cutout === false) {
+    return <Image source={{ uri }} style={{ height: 124, marginHorizontal: -14, marginTop: -14 }} resizeMode="cover" />
+  }
   return uri
-    ? <Image source={{ uri }} style={{ width: '100%', height: tall ? 110 : 52 }} resizeMode="contain" />
-    : <View style={{ height: tall ? 110 : 52, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 28, opacity: 0.3 }}>◎</Text></View>
+    ? <Image source={{ uri }} style={{ width: '100%', height: 110 }} resizeMode="contain" />
+    : <View style={{ height: 110, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 28, opacity: 0.3 }}>◎</Text></View>
 }
 
 export function GearAdd({ kind, onClose }: { kind: GearKind; onClose: () => void }) {

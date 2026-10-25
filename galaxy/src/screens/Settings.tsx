@@ -29,6 +29,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [note, setNote] = useState<string>()
   const [cloud, setCloud] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
+  const [purge, setPurge] = useState<(() => Promise<unknown>) | null>(null)
   const [spending, setSpending] = useState(false)
   const [update, setUpdate] = useState(() => (installedBuilt() ? new Date(installedBuilt() * 1000).toLocaleDateString('ko-KR') : ''))
   const deleted = useLiveQuery(async () => (await db.rolls.toArray()).filter((r) => r.deletedAt), []) ?? []
@@ -128,7 +129,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 <Row key={roll.id} static>
                   <RowText>{filmById(roll.filmId)?.name ?? '필름 알 수 없음'}</RowText>
                   <Btn label="되돌리기" kind="ghost" onPress={() => { void restoreRoll(roll.id) }} />
-                  <Btn label="지금 지우기" kind="danger" onPress={() => { void deleteRoll(roll.id, true) }} />
+                  <Btn label="지금 지우기" kind="danger" onPress={() => setPurge(() => () => deleteRoll(roll.id, true))} />
                 </Row>
               ))}
             </Group>
@@ -141,7 +142,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 <Row key={camera.id} static>
                   <RowText>{camera.brand} {camera.model}</RowText>
                   <Btn label="되돌리기" kind="ghost" onPress={() => { void restoreCamera(camera.id) }} />
-                  <Btn label="지금 지우기" kind="danger" onPress={() => { void purgeCamera(camera.id) }} />
+                  <Btn label="지금 지우기" kind="danger" onPress={() => setPurge(() => () => purgeCamera(camera.id))} />
                 </Row>
               ))}
             </Group>
@@ -160,6 +161,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </Sheet>
       ) : null}
       {cloud ? <CloudBackup onClose={() => setCloud(false)} /> : null}
+      {purge ? <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={async () => { const run = purge; setPurge(null); await run() }} /> : null}
     </Sheet>
   )
 }

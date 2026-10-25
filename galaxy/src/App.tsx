@@ -91,6 +91,8 @@ export function App() {
   // 하루 한 번 기록 백업 파일을 써 두고(안드로이드가 구글 드라이브로 올림), 새로 설치해 비어 있으면 되살린다
   useEffect(() => {
     startLocalAutoBackup()
+    // 예전 불러오기로 둘이 된 장비·롤(대소문자만 다른 id)을 하나로 합친다
+    void import('./core/backupMerge').then((m) => m.dedupeCaseIds(db as unknown as Parameters<typeof m.dedupeCaseIds>[0])).catch(() => {})
     void import('./drive').then((d) => d.startDrivePull())
     void restoredBackupUri().then(async (uri) => {
       if (!uri) return

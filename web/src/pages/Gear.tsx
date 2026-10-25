@@ -9,7 +9,7 @@ import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core
 import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
 import { getPref } from '../platform'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
-import { deleteCameraPhoto, saveCameraPhoto, useCameraPhoto } from '../photoStore'
+import { deleteCameraPhoto, saveCameraPhoto, useCameraPhoto, usePhotoIsCutout } from '../photoStore'
 import { Canister, Confirm, Icon, Sheet } from '../ui/common'
 import { CustomFilmEdit } from './CustomFilmEdit'
 import { TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../ui/gearExtras'
@@ -218,10 +218,14 @@ export function GearAdd({ kind, onClose }: { kind: GearKind; onClose: () => void
   return <FilmEdit onClose={onClose} />
 }
 
+/** 장비 사진. 바둑판: 그냥 사진이면 카드 위쪽·양옆 끝까지 채운다. 목록: 고정 크기 + 둥근 모서리 */
 function GearPhoto({ id, hasPhoto, grid }: { id: string; hasPhoto?: boolean; grid: boolean }) {
   const url = useCameraPhoto(id, !!hasPhoto)
+  const bleed = usePhotoIsCutout(id, !!url) === false
+  // 자리(110px)는 다른 카드와 같게 비워 두고, 사진은 카드 맨 위·양옆 끝에 붙인다
+  if (url && grid && bleed) return <span style={{ height: 110, display: 'block' }}><img src={url} alt="" className="card-bleed" /></span>
   return url
-    ? <img src={url} alt="" style={{ width: grid ? '100%' : 68, height: grid ? 110 : 52, objectFit: 'contain' }} />
+    ? <img src={url} alt="" style={{ width: grid ? '100%' : 68, height: grid ? 110 : 52, objectFit: bleed ? 'cover' : 'contain', borderRadius: grid ? 0 : 8, flexShrink: 0 }} />
     : <span style={{ width: grid ? '100%' : 68, height: grid ? 110 : 52, display: 'grid', placeItems: 'center' }}><Icon name="camera" size={28} /></span>
 }
 

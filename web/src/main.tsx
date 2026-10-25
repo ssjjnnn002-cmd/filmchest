@@ -43,6 +43,8 @@ await db.customFilms.toArray().then(setCustomFilms).catch(() => {})
 
 startDriveAutoBackup()
 startFolderAutoBackup()
+// 예전 불러오기로 둘이 된 장비·롤(대소문자만 다른 id)을 하나로 합친다
+void import('./core/backupMerge').then(async (m) => m.dedupeCaseIds((await import('./db')).db as unknown as Parameters<typeof m.dedupeCaseIds>[0])).catch(() => {})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

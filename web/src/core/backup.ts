@@ -1,6 +1,7 @@
 import { db } from '../db'
 import { cameraPhotoBlob, saveCameraPhoto } from '../photoStore'
 import { importGear } from './gear'
+import { dedupeCaseIds, idCanon, remapRow } from './backupMerge'
 
 /** 스캔 사진을 뺀 기록 전체 (장비 사진은 포함) */
 const tables = ['cameras', 'lenses', 'filters', 'filmLots', 'customFilms', 'rolls', 'projects'] as const
@@ -41,19 +42,23 @@ export async function importAll(file: Blob): Promise<{ cameras: number; rolls: n
     const gear = await importGear(file)   // 예전 장비 파일
     return { cameras: gear.cameras, rolls: 0 }
   }
+  // 대소문자만 다른 id(아이폰은 대문자)는 같은 장비·롤로 본다
+  const canon = idCanon(await Promise.all(tables.map((t) => (db[t] as unknown as { toArray(): Promise<Record<string, unknown>[]> }).toArray())))
   for (const t of tables) {
     const rows = json.data?.[t]
     if (!Array.isArray(rows) || !rows.length) continue
     const table = db[t] as unknown as { get(id: string): Promise<Record<string, unknown> | undefined>; put(row: unknown): Promise<unknown> }
-    for (const row of rows) {
+    for (const raw of rows) {
+      const row = remapRow(raw, canon) as Record<string, unknown> & { id: string }
       const old = await table.get(row.id)
       // 사진 없이 저장된 줄이라 기존 Blob 필드(썸네일 등)는 남긴다
       await table.put({ ...(old ?? {}), ...row })
     }
   }
   for (const [id, b64] of Object.entries((json.photos ?? {}) as Record<string, string>)) {
-    await saveCameraPhoto(id, fromB64(b64)).catch(() => {})
+    await saveCameraPhoto(String(canon(id)), fromB64(b64)).catch(() => {})
   }
+  await dedupeCaseIds(db as unknown as Parameters<typeof dedupeCaseIds>[0])
   return { cameras: json.data?.cameras?.length ?? 0, rolls: json.data?.rolls?.length ?? 0 }
 }
 

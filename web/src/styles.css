@@ -704,3 +704,10 @@ a.row.accent { color: var(--safelight); }
 .reserve-2 { min-height: calc(2 * 1.25em); }
 .grow > .sub.reserve-2 { min-height: calc(2 * 1.35em); }
 .field > .input.left, .field > .input.left::placeholder { text-align: left; }
+
+/* 그냥 사진은 바둑판 카드 위쪽·양옆 끝까지 (배경 지운 사진은 그대로 가운데) */
+.card { overflow: hidden; }
+.card .cover.bleed { height: 136px; margin: -16px -16px 0; display: block; }
+.card .cover.bleed img { max-height: none; }
+.card { position: relative; }
+.card-bleed { position: absolute; top: 0; left: 0; right: 0; width: 100%; max-width: none; height: 126px; object-fit: cover; }
