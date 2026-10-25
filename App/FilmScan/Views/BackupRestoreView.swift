@@ -10,6 +10,8 @@ struct BackupRestoreView: View {
     @State private var showImport = false
     @State private var restoreItems: [PhotosPickerItem] = []
     @State private var note: String?
+    @State private var purgeRoll: RollItem?
+    @State private var purgeCamera: CameraItem?
     @Query(sort: \RollItem.loadedAt, order: .reverse) private var rolls: [RollItem]
     @Query(sort: \CameraItem.sortOrder) private var cameras: [CameraItem]
     private var trashed: [RollItem] { rolls.filter { $0.deletedAt != nil } }
@@ -72,7 +74,7 @@ struct BackupRestoreView: View {
                     // 목록 한 줄에 버튼이 둘이면 한 번 눌러도 둘 다 눌린다 → 각각 따로 눌리게
                     Button("되돌리기") { roll.deletedAt = nil }
                         .buttonStyle(.borderless)
-                    Button("지금 지우기", role: .destructive) { context.delete(roll) }
+                    Button("지금 지우기", role: .destructive) { purgeRoll = roll }
                         .buttonStyle(.borderless)
                 }
             }
@@ -92,10 +94,7 @@ struct BackupRestoreView: View {
                     Spacer()
                     Button("되돌리기") { camera.deletedAt = nil }
                         .buttonStyle(.borderless)
-                    Button("지금 지우기", role: .destructive) {
-                        for roll in camera.rolls ?? [] { roll.rememberCamera() }
-                        context.delete(camera)
-                    }
+                    Button("지금 지우기", role: .destructive) { purgeCamera = camera }
                     .buttonStyle(.borderless)
                 }
             }
@@ -137,6 +136,20 @@ struct BackupRestoreView: View {
             Button("확인", role: .cancel) { note = nil }
         } message: {
             Text(note ?? "")
+        }
+        .confirmationDialog("완전히 지울까요?", isPresented: Binding(get: { purgeRoll != nil || purgeCamera != nil },
+                                                               set: { if !$0 { purgeRoll = nil; purgeCamera = nil } }),
+                            titleVisibility: .visible) {
+            Button("지우기", role: .destructive) {
+                if let roll = purgeRoll { context.delete(roll) }
+                if let camera = purgeCamera {
+                    for roll in camera.rolls ?? [] { roll.rememberCamera() }
+                    context.delete(camera)
+                }
+                purgeRoll = nil; purgeCamera = nil
+            }
+        } message: {
+            Text("이 작업은 되돌릴 수 없습니다.")
         }
         .navigationTitle("백업 및 복구")
         #if os(iOS)

@@ -124,7 +124,7 @@ enum DataBackup {
             let t = find(cams, { let x = CameraItem(brand: c.brand, model: c.model); x.id = c.id; return x }) { $0.id == c.id }
             t.brand = c.brand; t.model = c.model; t.nickname = c.nickname; t.formatRaw = c.formatRaw; t.mount = c.mount
             t.fixedLensName = c.fixedLensName; if let p = c.photo { t.photo = p }; t.photoScale = c.photoScale
-            t.photoOffsetX = c.photoOffsetX; t.photoOffsetY = c.photoOffsetY; t.tags = c.tags; t.accessories = c.accessories
+            t.photoOffsetX = c.photoOffsetX; t.photoOffsetY = c.photoOffsetY; t.tags = c.tags; t.accessories = c.accessoryIDs?.isEmpty == false ? [] : c.accessories
             t.bodyStyleRaw = c.bodyStyleRaw; t.bodyStyleManual = c.bodyStyleManual; t.batteryType = c.batteryType
             t.batteryReplacedAt = c.batteryReplacedAt; t.prewind = c.prewind; t.createdAt = c.createdAt; t.sortOrder = c.sortOrder
             t.purchasedAt = c.purchasedAt; t.price = c.price; t.seller = c.seller; t.lensesChosen = c.lensesChosen
