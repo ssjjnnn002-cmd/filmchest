@@ -212,18 +212,20 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
           )}
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <label className="btn soft small" style={{ cursor: 'pointer' }}>
-              {photo ? '사진 바꾸기' : '사진으로 등록'}
-              <input type="file" accept="image/png,image/*" hidden onChange={(e) => {
-                const f = e.target.files?.[0]
-                e.target.value = ''
-                if (!f) return
-                setOriginal(f)
-                setPhotoScale(1)
-                void usePhoto(f, removeBg)
-              }} />
-            </label>
-            {photo && <button className="btn small danger" onClick={() => { setPhoto(undefined); setOriginal(undefined) }}>사진 지우고 기본 모형 쓰기</button>}
+            {([['사진 찍기', true], ['앨범에서 사진 고르기', false]] as const).map(([label, camera]) => (
+              <label key={label} className="btn soft small" style={{ cursor: 'pointer' }}>
+                {label}
+                <input type="file" accept="image/*" capture={camera ? 'environment' : undefined} hidden onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  e.target.value = ''
+                  if (!f) return
+                  setOriginal(f)
+                  setPhotoScale(1)
+                  void usePhoto(f, removeBg)
+                }} />
+              </label>
+            ))}
+            {photo && <button className="btn small danger" onClick={() => { setPhoto(undefined); setOriginal(undefined) }}>사진 지우기</button>}
           </div>
           {photo && (
             <div className="group inner-group">
@@ -237,7 +239,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
               </label>
             </div>
           )}
-          <p className="footnote" style={{ margin: 0 }}>흰 배경처럼 단색 배경은 자동으로 지워요. 사진이 없으면 모델에 맞는 기본 모형으로 보여요.</p>
+          <p className="footnote" style={{ margin: 0 }}>사진은 그대로 써요. 배경을 지우려면 사진을 고른 뒤 배경 지우기를 켜 주세요. 사진이 없으면 모델에 맞는 기본 모형으로 보여요.</p>
         </div>
       </div>
 

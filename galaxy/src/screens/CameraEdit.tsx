@@ -136,8 +136,11 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
   const modelHits = modelsMatching(brand, model)
   const modelList = [...modelHits.filter((k) => k === known), ...modelHits.filter((k) => k !== known)].slice(0, 24)
 
-  const pickPhoto = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 })
+  const pickPhoto = async (camera: boolean) => {
+    if (camera && !(await ImagePicker.requestCameraPermissionsAsync()).granted) return
+    const res = camera
+      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 })
     if (res.canceled || !res.assets[0]) return
     const a = res.assets[0]
     const data = bytesToB64(await readBytes(a.uri))
@@ -227,8 +230,9 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
           )}
 
           <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-            <Btn label={photo ? '사진 바꾸기' : '사진으로 등록'} kind="soft" size="small" onPress={pickPhoto} />
-            {photo ? <Btn label="사진 지우고 기본 모형 쓰기" kind="danger" size="small" onPress={() => { setPhoto(undefined); setOriginal(undefined) }} /> : null}
+            <Btn label="사진 찍기" kind="soft" size="small" onPress={() => { void pickPhoto(true) }} />
+            <Btn label="앨범에서 사진 고르기" kind="soft" size="small" onPress={() => { void pickPhoto(false) }} />
+            {photo ? <Btn label="사진 지우기" kind="danger" size="small" onPress={() => { setPhoto(undefined); setOriginal(undefined) }} /> : null}
           </View>
           {photo ? (
             <View style={{ backgroundColor: c.fill, borderRadius: 16 }}>
@@ -237,7 +241,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
                 onChange={(v) => { if (!original || processing) return; setRemoveBg(v); void usePhoto(original, v) }} />
             </View>
           ) : null}
-          <Text style={{ fontSize: 13, color: c.muted, lineHeight: 18 }}>흰 배경처럼 단색 배경은 자동으로 지워요. 사진이 없으면 모델에 맞는 기본 모형으로 보여요.</Text>
+          <Text style={{ fontSize: 13, color: c.muted, lineHeight: 18 }}>사진은 그대로 써요. 배경을 지우려면 사진을 고른 뒤 배경 지우기를 켜 주세요. 사진이 없으면 모델에 맞는 기본 모형으로 보여요.</Text>
         </Group>
       </Section>
 
