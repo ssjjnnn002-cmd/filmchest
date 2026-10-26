@@ -99,8 +99,15 @@ export function usePhotoIsCutout(id: string, enabled: boolean) {
   const [, setTick] = useState(0)
   useEffect(() => {
     if (!enabled || cutoutCache.has(key)) return
-    void cameraPhotoBytes(id).then((b) => {
-      cutoutCache.set(key, !!b && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47)
+    void cameraPhotoBytes(id).then(async (b) => {
+      const png = !!b && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47
+      // PNG로 저장돼도 배경이 그대로일 수 있어 가장자리가 투명한지 본다 (웹 도구)
+      let cut = png
+      if (png && b) {
+        const { webTool } = await import('./webTools')
+        cut = await webTool<boolean>('isCutout', { data: bytesToB64(b), type: 'image/png' }).catch(() => true)
+      }
+      cutoutCache.set(key, cut)
       setTick((n) => n + 1)
     }).catch(() => {})
   }, [key, id, enabled])

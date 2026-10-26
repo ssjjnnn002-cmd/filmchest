@@ -108,3 +108,16 @@ function contentBox({ data, width: w, height: h }: ImageData) {
   const x = Math.max(0, minX - pad), y = Math.max(0, minY - pad)
   return { x, y, w: Math.min(w, maxX + pad + 1) - x, h: Math.min(h, maxY + pad + 1) - y }
 }
+
+/** 배경을 지운 사진인지: 가장자리가 실제로 투명한지 본다 (PNG로 저장돼도 배경이 그대로면 false) */
+export async function isCutoutBlob(blob: Blob): Promise<boolean> {
+  const bmp = await createImageBitmap(blob)
+  const scale = Math.min(1, 160 / Math.max(bmp.width, bmp.height))
+  const c = document.createElement('canvas')
+  c.width = Math.max(1, Math.round(bmp.width * scale))
+  c.height = Math.max(1, Math.round(bmp.height * scale))
+  const g = c.getContext('2d')!
+  g.drawImage(bmp, 0, 0, c.width, c.height)
+  bmp.close()
+  return hasTransparentEdge(g.getImageData(0, 0, c.width, c.height))
+}

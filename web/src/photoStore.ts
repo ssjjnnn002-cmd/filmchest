@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore, useState } from 'react'
 import { db } from './db'
+import { isCutoutBlob } from './core/cutout'
 import type { Camera } from './core/types'
 
 // 카메라 사진은 카메라 기록(순서, 배터리)과 떨어진 파일로 둔다.
@@ -184,7 +185,12 @@ export function usePhotoIsCutout(id: string, enabled: boolean) {
   const [, setTick] = useState(0)
   useEffect(() => {
     if (!enabled || cutouts.has(id)) return
-    void cameraPhotoBlob(id).then((b) => { if (b) { cutouts.set(id, b.type === 'image/png'); setTick((n) => n + 1) } })
+    void cameraPhotoBlob(id).then(async (b) => {
+      if (!b) return
+      // 웹은 배경을 안 지운 사진도 PNG로 저장하므로, 형식이 아니라 가장자리가 투명한지로 본다
+      cutouts.set(id, b.type === 'image/png' ? await isCutoutBlob(b).catch(() => true) : false)
+      setTick((n) => n + 1)
+    })
   }, [id, enabled])
   return enabled ? cutouts.get(id) : undefined
 }

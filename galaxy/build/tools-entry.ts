@@ -1,5 +1,5 @@
 // 갤럭시 숨은 WebView에서 도는 웹 그림 도구 (캔버스가 필요한 웹 core 코드를 그대로 쓴다)
-import { prepareCameraPhoto } from '../../web/src/core/cutout'
+import { isCutoutBlob, prepareCameraPhoto } from '../../web/src/core/cutout'
 import { canisterURL } from '../../web/src/core/canister'
 import { renderContactSheet } from '../../web/src/core/contactSheet'
 import { renderFramePrint } from '../../web/src/core/framePrint'
@@ -23,6 +23,9 @@ const canvasToB64 = (c: HTMLCanvasElement, type: string, q?: number) => new Prom
   c.toBlob((b) => (b ? blobToB64(b).then(resolve, reject) : reject(new Error('blob'))), type, q))
 
 const tools: Record<string, (a: any) => Promise<unknown>> = {
+  async isCutout({ data, type }) {
+    return isCutoutBlob(b64ToBlob(data, type))
+  },
   async cutout({ data, type, remove }) {
     const r = await prepareCameraPhoto(b64ToBlob(data, type), remove)
     return { data: await blobToB64(r.blob), removed: r.removed }
