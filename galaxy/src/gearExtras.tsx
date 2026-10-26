@@ -8,6 +8,7 @@ import { Chip, Chips, Group, Row, Section } from './kit'
 import { getPref, setPref, useLiveQuery } from './store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from './suggest'
 import { useTheme } from './theme'
+import { Icon } from './icons'
 
 const cleanTag = (raw: string) => raw.trim().replace(/^#+/, '').trim()
 
@@ -173,3 +174,22 @@ export function OptionalDate({ label, value, onChange, max }: { label: string; v
   )
 }
 
+
+/** 사진 고르기 줄 메뉴 (아이폰·웹과 같은 모양): 사진 찍기 · 앨범에서 사진 고르기 · 사진 지우기 */
+export function PhotoRows({ onCamera, onAlbum, onClear, inset = 12 }: { onCamera: () => void; onAlbum: () => void; onClear?: () => void; inset?: number }) {
+  const c = useTheme()
+  const row = (icon: string, label: string, color: string, onPress: () => void) => (
+    <Pressable key={label} onPress={onPress} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 18,
+      borderTopWidth: 0.5, borderTopColor: c.sep, backgroundColor: pressed ? c.fill : undefined })}>
+      <Icon name={icon} size={22} color={color} />
+      <Text style={{ fontSize: 17, color }}>{label}</Text>
+    </Pressable>
+  )
+  return (
+    <View style={{ marginHorizontal: -inset, marginBottom: -inset }}>
+      {row('camera', '사진 찍기', c.safelight, onCamera)}
+      {row('photos', '앨범에서 사진 고르기', c.safelight, onAlbum)}
+      {onClear ? row('trash', '사진 지우기', c.danger, onClear) : null}
+    </View>
+  )
+}

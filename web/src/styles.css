@@ -711,3 +711,8 @@ a.row.accent { color: var(--safelight); }
 .card .cover.bleed img { max-height: none; }
 .card { position: relative; }
 .card-bleed { position: absolute; top: 0; left: 0; right: 0; width: 100%; max-width: none; height: 126px; object-fit: cover; }
+
+/* 사진 고르기 줄 메뉴: 칸 양끝까지, 줄마다 구분선 (아이폰 앱과 같은 모양) */
+.photo-actions { margin: 0 -12px -12px; }
+.photo-actions > .row { width: 100%; border-top: .5px solid var(--sep); border-radius: 0; gap: 12px; cursor: pointer; }
+.photo-empty { height: 160px; display: grid; place-items: center; color: var(--muted); }

@@ -13,6 +13,7 @@ import { webTool } from '../webTools'
 import { Btn, Chip, DateInput, Field, Footnote, Group, RangeSlider, Row, RowText, Section, Segmented, Select, Spinner, Sub, Toggle } from '../kit'
 import { Sheet, SheetBtn } from '../overlay'
 import { groupPrice } from '../core/optics'
+import { PhotoRows } from '../gearExtras'
 import { AccessoryLinkFields, PurchaseFields, rememberSeller, useUsedSellers } from './Gear'
 import { useTheme } from '../theme'
 import { OptionalDate, TagField } from '../gearExtras'
@@ -229,11 +230,6 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
             </View>
           )}
 
-          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-            <Btn label="사진 찍기" kind="soft" size="small" onPress={() => { void pickPhoto(true) }} />
-            <Btn label="앨범에서 사진 고르기" kind="soft" size="small" onPress={() => { void pickPhoto(false) }} />
-            {photo ? <Btn label="사진 지우기" kind="danger" size="small" onPress={() => { setPhoto(undefined); setOriginal(undefined) }} /> : null}
-          </View>
           {photo ? (
             <View style={{ backgroundColor: c.fill, borderRadius: 16 }}>
               <Toggle label="배경 지우기" value={removeBg}
@@ -241,8 +237,10 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
                 onChange={(v) => { if (!original || processing) return; setRemoveBg(v); void usePhoto(original, v) }} />
             </View>
           ) : null}
-          <Text style={{ fontSize: 13, color: c.muted, lineHeight: 18 }}>사진은 그대로 써요. 배경을 지우려면 사진을 고른 뒤 배경 지우기를 켜 주세요. 사진이 없으면 모델에 맞는 기본 모형으로 보여요.</Text>
+          <PhotoRows onCamera={() => { void pickPhoto(true) }} onAlbum={() => { void pickPhoto(false) }}
+            onClear={photo ? () => { setPhoto(undefined); setOriginal(undefined) } : undefined} />
         </Group>
+        <Text style={{ fontSize: 13, color: c.muted, lineHeight: 18, marginTop: 6, marginHorizontal: 16 }}>{photo ? '사진은 그대로 써요. 배경을 지우려면 배경 지우기를 켜 주세요.' : '사진이 없으면 고른 형태의 기본 모형으로 보여요.'}</Text>
       </Section>
 
       <Section title="카메라" right={<Pressable onPress={() => setShowCatalog(true)}><Text style={{ color: c.safelight, fontSize: 15, fontWeight: '600' }}>목록에서 고르기</Text></Pressable>}

@@ -9,6 +9,7 @@ import { profileFor } from '../core/profiles'
 import { Model3D } from '../ui/Viewers'
 import { Sheet, toInputDate, useObjectURL } from '../ui/common'
 import { TagField } from '../ui/gearExtras'
+import { PhotoActions } from '../ui/PhotoActions'
 import { groupPrice } from '../core/optics'
 import { AccessoryLinkFields, PurchaseFields, rememberSeller, useUsedSellers } from './Gear'
 import { features } from '../core/features'
@@ -71,6 +72,11 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     pointers.current.delete(e.pointerId)
     gesture.current = null
+  }
+  const useFile = (f: File) => {
+    setOriginal(f)
+    setPhotoScale(1)
+    void usePhoto(f, removeBg)
   }
   const usePhoto = async (file: Blob, remove: boolean) => {
     setProcessing(true)
@@ -211,22 +217,6 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {([['사진 찍기', true], ['앨범에서 사진 고르기', false]] as const).map(([label, camera]) => (
-              <label key={label} className="btn soft small" style={{ cursor: 'pointer' }}>
-                {label}
-                <input type="file" accept="image/*" capture={camera ? 'environment' : undefined} hidden onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  e.target.value = ''
-                  if (!f) return
-                  setOriginal(f)
-                  setPhotoScale(1)
-                  void usePhoto(f, removeBg)
-                }} />
-              </label>
-            ))}
-            {photo && <button className="btn small danger" onClick={() => { setPhoto(undefined); setOriginal(undefined) }}>사진 지우기</button>}
-          </div>
           {photo && (
             <div className="group inner-group">
               <label className="toggle">
@@ -239,8 +229,9 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
               </label>
             </div>
           )}
-          <p className="footnote" style={{ margin: 0 }}>사진은 그대로 써요. 배경을 지우려면 사진을 고른 뒤 배경 지우기를 켜 주세요. 사진이 없으면 모델에 맞는 기본 모형으로 보여요.</p>
+          <PhotoActions onFile={useFile} onClear={photo ? () => { setPhoto(undefined); setOriginal(undefined) } : undefined} />
         </div>
+        <p className="footnote">{photo ? '사진은 그대로 써요. 배경을 지우려면 배경 지우기를 켜 주세요.' : '사진이 없으면 고른 형태의 기본 모형으로 보여요.'}</p>
       </div>
 
       <div className="section">

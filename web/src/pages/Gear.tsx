@@ -12,6 +12,7 @@ import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
 import { deleteCameraPhoto, saveCameraPhoto, useCameraPhoto, usePhotoIsCutout } from '../photoStore'
 import { Canister, Confirm, Icon, Sheet } from '../ui/common'
 import { CustomFilmEdit } from './CustomFilmEdit'
+import { PhotoActions } from '../ui/PhotoActions'
 import { TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../ui/gearExtras'
 
 export type GearKind = 'lens' | 'filter' | 'film'
@@ -117,20 +118,13 @@ function PhotoField({ id, hasPhoto, blob, setBlob, cleared, setCleared }: {
     setCleared(false)
     setBlob(file)
   }
+  // 카메라 탭의 외관 칸과 같은 모양: 넓은 미리보기 + 작은 버튼 한 줄
   return (
     <div className="section">
       <h2>사진</h2>
-      <div className="group" style={{ padding: 12, display: 'grid', gap: 8, justifyItems: 'center' }}>
-        {src ? <img src={src} alt="" style={{ maxHeight: 160, objectFit: 'contain' }} /> : <Icon name="camera" size={42} />}
-        <label className="btn">
-          사진 찍기
-          <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => take(e.target.files?.[0])} />
-        </label>
-        <label className="btn">
-          앨범에서 사진 고르기
-          <input type="file" accept="image/*" hidden onChange={(e) => take(e.target.files?.[0])} />
-        </label>
-        {src && <button type="button" className="btn" onClick={() => { setBlob(undefined); setCleared(true) }}>사진 지우기</button>}
+      <div className="group" style={{ padding: 12, display: 'grid', gap: 12 }}>
+        {src ? <div className="photo-preview"><img src={src} alt="" /></div> : <div className="photo-empty"><Icon name="camera" size={42} /></div>}
+        <PhotoActions onFile={take} onClear={src ? () => { setBlob(undefined); setCleared(true) } : undefined} />
       </div>
     </div>
   )

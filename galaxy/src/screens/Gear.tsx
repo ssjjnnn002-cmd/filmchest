@@ -14,8 +14,9 @@ import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { getPref, useLiveQuery } from '../store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
 import { useTheme } from '../theme'
+import { Icon } from '../icons'
 import { CustomFilmEdit } from './CustomFilmEdit'
-import { GroupTitle, OptionalDate, TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../gearExtras'
+import { PhotoRows, GroupTitle, OptionalDate, TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../gearExtras'
 
 export type GearKind = 'lens' | 'filter' | 'film'
 const storageName: Record<FilmStorage, string> = { fridge: '냉장고', freezer: '냉동고', drawer: '서랍', room: '상온' }
@@ -93,6 +94,7 @@ function PhotoBlock({ id, hasPhoto, uri, setUri, cleared, setCleared }: {
   cleared: boolean
   setCleared: (v: boolean) => void
 }) {
+  const c = useTheme()
   const saved = useCameraPhoto(id ?? '', !!hasPhoto && !uri && !cleared)
   const src = uri || saved
   const pick = async (camera: boolean) => {
@@ -109,11 +111,12 @@ function PhotoBlock({ id, hasPhoto, uri, setUri, cleared, setCleared }: {
   }
   return (
     <Section title="사진">
-      <Group style={{ padding: 12, gap: 8, alignItems: 'center' }}>
-        {src ? <Image source={{ uri: src }} style={{ width: 180, height: 140 }} resizeMode="contain" /> : <Text style={{ fontSize: 28, opacity: 0.35 }}>◎</Text>}
-        <Btn label="사진 찍기" onPress={() => pick(true)} />
-        <Btn label="앨범에서 사진 고르기" onPress={() => pick(false)} />
-        {!!src && <Btn label="사진 지우기" onPress={() => { setUri(undefined); setCleared(true) }} />}
+      <Group style={{ padding: 12, gap: 12 }}>
+        {src
+          ? <Image source={{ uri: src }} style={{ width: '100%', height: 220, borderRadius: 16 }} resizeMode="contain" />
+          : <View style={{ height: 160, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera" size={42} color={c.muted} /></View>}
+        <PhotoRows onCamera={() => { void pick(true) }} onAlbum={() => { void pick(false) }}
+          onClear={src ? () => { setUri(undefined); setCleared(true) } : undefined} />
       </Group>
     </Section>
   )
