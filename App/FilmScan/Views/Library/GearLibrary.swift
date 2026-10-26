@@ -452,6 +452,7 @@ struct GearPhotoEditor: View {
     var symbol: String = "photo"
     @State private var pickerItem: PhotosPickerItem?
     @State private var showCamera = false
+    @State private var cameraUnavailable = false
     @State private var lifting = false
     @State private var liftFailed = false
     @State private var canLift = false
@@ -478,8 +479,9 @@ struct GearPhotoEditor: View {
             }
             .listRowSeparator(.hidden)
             #if os(iOS)
-            if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                Button("사진 찍기", systemImage: "camera") { showCamera = true }
+            // 늘 보인다. 카메라를 못 쓰는 때(맥 iPhone 미러링 등)는 안내만 띄운다
+            Button("사진 찍기", systemImage: "camera") {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) { showCamera = true } else { cameraUnavailable = true }
             }
             #endif
             PhotosPicker(selection: $pickerItem, matching: .images) {
@@ -513,6 +515,11 @@ struct GearPhotoEditor: View {
             Task { await usePhoto(try? await item.loadTransferable(type: Data.self)) }
         }
         #if os(iOS)
+        .alert("카메라를 쓸 수 없어요", isPresented: $cameraUnavailable) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("맥의 iPhone 미러링 중에는 카메라가 열리지 않아요. 휴대폰에서 직접 눌러 주세요.")
+        }
         .fullScreenCover(isPresented: $showCamera) {
             SystemCameraPicker { data in
                 showCamera = false
