@@ -444,7 +444,15 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
     const rank = (stock: { id: string }) => [(recent.indexOf(stock.id) < 0 ? 999 : recent.indexOf(stock.id)), (popularFilms.indexOf(stock.id) < 0 ? 999 : popularFilms.indexOf(stock.id))] as const
     return list.sort((a, b) => rank(a)[0] - rank(b)[0] || rank(a)[1] - rank(b)[1])
   }, [rolls, format, custom])
-  const visible = showAll ? stocks : stocks.slice(0, 6)
+  // 고른 필름은 접혀 있어도 늘 보이게 (수정할 때 다시 찾지 않도록)
+  const visible = useMemo(() => {
+    if (showAll) return stocks
+    const top = stocks.slice(0, 6)
+    const picked = stocks.find((s) => s.id === filmId)
+    if (picked && !top.includes(picked)) top[Math.min(5, top.length - 1)] = picked
+    return top
+  }, [stocks, showAll, filmId])
+  const pickedCustom = custom.find((r) => r.id === filmId)
   const save = async () => {
     const data: FilmLot = {
       id: lot?.id ?? uid(), filmId, format,
@@ -475,6 +483,11 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
               <Text style={{ color: '#ff6b1f', fontWeight: '600' }}>직접 추가</Text>
             </Pressable>
           </View>
+          {pickedCustom ? (
+            <Row onPress={() => setCustomEdit(pickedCustom)} style={{ justifyContent: 'center' }}>
+              <Text style={{ fontSize: 17, color: '#ff6b1f' }}>{pickedCustom.name} 수정</Text>
+            </Row>
+          ) : null}
           <Row onPress={() => setShowAll(!showAll)}><Text style={{ color: '#ff6b1f' }}>{showAll ? '접기' : `더보기 (${stocks.length}종)`}</Text></Row>
         </Group>
       </Section>
@@ -494,7 +507,7 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
       {lot && <Group><Row onPress={() => setConfirm(true)}><Text style={{ color: '#ff453a' }}>재고 삭제</Text></Row></Group>}
       {confirm && lot && <Confirm message="이 재고를 삭제할까요?" onCancel={() => setConfirm(false)}
         onConfirm={async () => { await db.filmLots.delete(lot.id); onClose() }} />}
-      {customEdit && <CustomFilmEdit row={customEdit === 'new' ? undefined : customEdit} onClose={(id) => { if (id) setFilmId(id); setCustomEdit(null) }} />}
+      {customEdit && <CustomFilmEdit row={customEdit === 'new' ? undefined : customEdit} onClose={(id) => { if (id !== undefined) setFilmId(id); setCustomEdit(null) }} />}
     </Sheet>
   )
 }
