@@ -12,6 +12,8 @@ import { applyTheme, getPref, inClaudeHost, refreshApp, saveFileNow, setPref } f
 
 const themes: [string, string][] = [['system', '기기 설정'], ['light', '라이트'], ['dark', '다크']]
 
+const APK_URL = 'https://github.com/ssjjnnn002-cmd/filmchest/releases/download/android/filmchest.apk'
+
 export function Settings({ onClose }: { onClose: () => void }) {
   const [theme, setTheme] = useState<string>(getPref('theme', 'system'))
   const [usage, setUsage] = useState<{ used: number; quota: number }>()
@@ -25,13 +27,13 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const deleted = useLiveQuery(async () => (await db.rolls.toArray()).filter((r) => r.deletedAt), []) ?? []
   const deletedCameras = useLiveQuery(async () => (await db.cameras.toArray()).filter((c) => c.deletedAt), []) ?? []
   useEffect(() => { storageEstimate().then(setUsage); void purgeOldRolls(); void purgeOldCameras() }, [])
-  // 안드로이드 앱 파일이 올라가 있을 때만 내려받기를 보여 준다
+  // 안드로이드 앱 파일이 올라가 있을 때만 내려받기를 보여 준다 (APK는 깃허브 릴리스, apk.json만 여기)
   const [apk, setApk] = useState(false)
   useEffect(() => {
     // 아이폰, 클로드 화면, 이미 설치된 앱 안에서는 숨긴다
     const installed = matchMedia('(display-mode: standalone)').matches || document.referrer.startsWith('android-app://')
     if (inClaudeHost() || installed || /iPhone|iPad|iPod/.test(navigator.userAgent)) return
-    fetch('/filmchest.apk', { method: 'HEAD' }).then((r) => setApk(r.ok && !(r.headers.get('content-type') ?? '').includes('html'))).catch(() => {})
+    fetch('/apk.json').then((r) => setApk(r.ok && (r.headers.get('content-type') ?? '').includes('json'))).catch(() => {})
   }, [])
 
   const choose = (t: string) => { setTheme(t); setPref('theme', t); applyTheme(t) }
@@ -61,7 +63,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
         <div className="section">
           <h2>안드로이드 앱</h2>
           <div className="group">
-            <a className="row accent" href="/filmchest.apk" download="필름함.apk">
+            <a className="row accent" href={APK_URL}>
               <span className="grow">안드로이드 앱 내려받기</span>
               <span className="value">APK</span>
             </a>
