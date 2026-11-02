@@ -1,3 +1,4 @@
+import Dexie from 'dexie'
 // 구글 드라이브에 백업 파일 하나를 올리고 덮어쓴다 (drive.file 권한: 이 앱이 만든 파일만 본다)
 import { getPref, setPref } from '../platform'
 import { db } from '../db'
@@ -99,7 +100,8 @@ export async function backupToDrive(force = false) {
 /** 드라이브 웹에서 '필름함' 폴더 (아직 모르면 내 드라이브) */
 export const driveFolderUrl = () => { const id = getPref('driveRoot', '' as string); return id ? `https://drive.google.com/drive/folders/${id}` : 'https://drive.google.com/drive/my-drive' }
 
-export const drivePhotosOn = () => getPref('drivePhotos', '1' as string) === '1'
+/** 스캔 사진도 늘 함께 올린다 */
+export const drivePhotosOn = () => true
 type Progress = (done: number, total: number) => void
 let syncing: Promise<number> | undefined
 
@@ -215,10 +217,19 @@ export function startDriveAutoBackup() {
   if (!driveAvailable) return
   // 구글 로그인 도구를 미리 받아 둔다: 버튼을 누른 순간 바로 창을 열어야 팝업으로 막히지 않는다
   if (driveConnected()) void loadScript().catch(() => {})
-  const pull = () => { if (driveConnected() && hasDriveToken()) void pullFromDrive().catch(() => {}) }
+  const live = () => driveConnected() && hasDriveToken()
+  const pull = () => { if (live() && document.visibilityState === 'visible') void pullFromDrive().catch(() => {}) }
   pull()
+  // 보고 있는 동안 1분마다 다른 기기(아이폰·갤럭시)에서 고친 기록을 받아 온다
+  window.setInterval(pull, 60_000)
+  // 기록이 바뀌면 잠깐 기다렸다가 기록과 사진을 올린다 (바뀐 게 없으면 건너뛴다)
+  let timer: number | undefined
+  Dexie.on('storagemutated', () => {
+    window.clearTimeout(timer)
+    timer = window.setTimeout(() => { if (live()) void backupToDrive().catch(() => {}) }, 4000)
+  })
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') pull()
-    else if (driveDue() && hasDriveToken()) void backupToDrive().catch(() => {})
+    else if (live()) void backupToDrive().catch(() => {})
   })
 }

@@ -1,4 +1,10 @@
+import JSZip from 'jszip'
 import { db } from '../db'
+import type { Frame } from './types'
+import { rollFolderName } from './driveApi'
+import { rotatedBlob } from './importer'
+import { restorePhotos } from './restore'
+import { rollTitle } from '../ui/common'
 import { cameraPhotoBlob, saveCameraPhoto } from '../photoStore'
 import { importGear } from './gear'
 import { dedupeCaseIds, idCanon, remapRow } from './backupMerge'
@@ -68,4 +74,43 @@ export async function backupKey(blob: Blob) {
   let h = 5381
   for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0
   return `${text.length}-${h.toString(36)}`
+}
+
+export const photoBackupFileName = '필름함 백업 (사진 포함).zip'
+
+/** 기록 + 스캔 사진을 zip 하나로. 사진은 롤마다 폴더에 넣고, 불러올 때 사진 속 표식으로 다시 롤에 붙인다 */
+export async function exportWithPhotos(onProgress?: (done: number, total: number) => void): Promise<Blob> {
+  const zip = new JSZip()
+  zip.file(backupFileName, await exportAll())
+  const rolls = (await db.rolls.toArray()).filter((r) => !r.deletedAt)
+  const todo: { folder: string; frame: Frame }[] = []
+  for (const roll of rolls) {
+    const camera = roll.cameraId ? await db.cameras.get(roll.cameraId) : undefined
+    const folder = rollFolderName(rollTitle(roll, camera), roll.days[0]?.startedAt ?? roll.loadedAt)
+    for (const frame of await db.frames.where('rollId').equals(roll.id).toArray()) todo.push({ folder, frame })
+  }
+  onProgress?.(0, todo.length)
+  for (const [i, { folder, frame }] of todo.entries()) {
+    const original = await db.originals.get(frame.id)
+    if (original) {
+      const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase().replace('jpeg', 'jpg')
+      zip.file(`사진/${folder}/${String(frame.index).padStart(2, '0')}.${ext}`, await rotatedBlob(original.blob, frame.rotation))
+    }
+    onProgress?.(i + 1, todo.length)
+  }
+  // 사진은 이미 압축돼 있어 다시 압축하지 않는다 (빠르게)
+  return zip.generateAsync({ type: 'blob', compression: 'STORE' })
+}
+
+/** 백업 파일 불러오기: 기록만 있는 .json, 사진까지 든 .zip 둘 다 */
+export async function importBackupFile(file: Blob): Promise<{ cameras: number; rolls: number; photos: number }> {
+  const head = new Uint8Array(await file.slice(0, 2).arrayBuffer())
+  if (head[0] !== 0x50 || head[1] !== 0x4b) return { ...(await importAll(file)), photos: 0 }   // PK = zip
+  const zip = await JSZip.loadAsync(file)
+  const json = zip.file(backupFileName)
+  const counts = json ? await importAll(new Blob([await json.async('uint8array')], { type: 'application/json' })) : { cameras: 0, rolls: 0 }
+  const images = zip.file(/^사진\/.+\.(jpe?g|png|tiff?|heic)$/i)
+  const files = await Promise.all(images.map(async (f) => new File([await f.async('blob')], f.name.split('/').pop() ?? f.name, { type: f.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg' })))
+  const restored = files.length ? await restorePhotos(files) : undefined
+  return { ...counts, photos: restored?.frames ?? 0 }
 }

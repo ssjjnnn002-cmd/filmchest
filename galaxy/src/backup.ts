@@ -2,11 +2,18 @@
 import { AppState, Linking } from 'react-native'
 import * as Sharing from 'expo-sharing'
 import { File } from 'expo-file-system'
+import JSZip from 'jszip'
 import { db } from './data'
+import type { Frame } from './core/types'
+import { rollFolderName } from './core/driveApi'
+import { rollTitle } from './core/display'
+import { rotatedFile } from './scan'
+import { restorePhotos } from './restore'
+import type { PickedFile } from './pick'
 import { b64ToBytes, bytesToB64, cameraPhotoBytes, folder, readBytes, saveCameraPhoto, writeBytes } from './files'
 import { importGear } from './gear'
 import { dedupeCaseIds, idCanon, remapRow } from './core/backupMerge'
-import { getPref, setPref } from './store'
+import { getPref, setPref, subscribe } from './store'
 
 const tables = ['cameras', 'lenses', 'filters', 'filmLots', 'customFilms', 'rolls', 'projects'] as const
 export const backupFileName = '필름함 백업.json'
@@ -64,6 +71,12 @@ export async function writeLocalBackup() {
 }
 
 export function startLocalAutoBackup() {
+  // 연결한 클라우드 파일: 기록이 바뀌면 잠깐 기다렸다가 덮어쓴다
+  let timer: ReturnType<typeof setTimeout> | undefined
+  subscribe(() => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => { if (cloudUri()) void writeCloud().catch(() => {}) }, 4000)
+  })
   AppState.addEventListener('change', (s) => {
     if (s !== 'background') return
     if (cloudDue()) void writeCloud().catch(() => {})
@@ -150,4 +163,49 @@ export async function restoredBackupUri() {
   const cams = await db.cameras.toArray()
   const rolls = await db.rolls.toArray()
   return cams.length === 0 && rolls.length === 0 ? f.uri : undefined
+}
+
+export const photoBackupFileName = '필름함 백업 (사진 포함).zip'
+
+/** 기록 + 스캔 사진을 zip 하나로 (웹과 같은 모양). 불러올 때 사진 속 표식으로 다시 롤에 붙인다 */
+export async function exportWithPhotos(onProgress?: (done: number, total: number) => void): Promise<Uint8Array> {
+  const zip = new JSZip()
+  zip.file(backupFileName, await exportAll())
+  const rolls = (await db.rolls.toArray()).filter((r) => !r.deletedAt)
+  const todo: { folder: string; frame: Frame }[] = []
+  for (const roll of rolls) {
+    const camera = roll.cameraId ? await db.cameras.get(roll.cameraId) : undefined
+    const name = rollFolderName(rollTitle(roll, camera), roll.days[0]?.startedAt ?? roll.loadedAt)
+    for (const frame of await db.frames.where('rollId').equals(roll.id).toArray()) todo.push({ folder: name, frame })
+  }
+  onProgress?.(0, todo.length)
+  for (const [i, { folder: name, frame }] of todo.entries()) {
+    const original = await db.originals.get(frame.id)
+    if (original) {
+      const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase().replace('jpeg', 'jpg')
+      const uri = await rotatedFile(original.blob, frame.rotation, frame.id)
+      zip.file(`사진/${name}/${String(frame.index).padStart(2, '0')}.${ext}`, await readBytes(uri))
+    }
+    onProgress?.(i + 1, todo.length)
+  }
+  return zip.generateAsync({ type: 'uint8array', compression: 'STORE' })
+}
+
+/** 백업 파일 불러오기: 기록만 있는 .json, 사진까지 든 .zip 둘 다 */
+export async function importBackupFile(uri: string): Promise<{ cameras: number; rolls: number; photos: number }> {
+  const bytes = await readBytes(uri)
+  if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) return { ...(await importAll(uri)), photos: 0 }   // PK = zip
+  const zip = await JSZip.loadAsync(bytes)
+  const json = zip.file(backupFileName)
+  let counts = { cameras: 0, rolls: 0 }
+  if (json) counts = await importAll(writeBytes('restore', backupFileName, await json.async('uint8array')))
+  const images = zip.file(/^사진\/.+\.(jpe?g|png|tiff?|heic)$/i)
+  const files: PickedFile[] = []
+  for (const [i, f] of images.entries()) {
+    const name = `${i}-${f.name.split('/').pop() ?? 'scan.jpg'}`
+    files.push({ uri: writeBytes('restore', name, await f.async('uint8array')), name, mimeType: name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg' })
+  }
+  const restored = files.length ? await restorePhotos(files) : undefined
+  for (const f of files) { try { new File(f.uri).delete() } catch { /* 이미 없음 */ } }
+  return { ...counts, photos: restored?.frames ?? 0 }
 }

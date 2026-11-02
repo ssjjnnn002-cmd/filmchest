@@ -120,6 +120,21 @@ enum PhotoLibrary {
         }
     }
 
+    /// 사진 앱에 저장된 사진 파일 그대로 (돌린 것까지 반영된 지금 모습). 드라이브에 올릴 때
+    static func fileData(assetID: String) async -> (data: Data, modified: Date?)? {
+        guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject else { return nil }
+        let options = PHImageRequestOptions()
+        options.isNetworkAccessAllowed = true
+        options.deliveryMode = .highQualityFormat
+        options.version = .current
+        let data: Data? = await withCheckedContinuation { c in
+            PHImageManager.default().requestImageDataAndOrientation(for: asset, options: options) { data, _, _, _ in
+                c.resume(returning: data)
+            }
+        }
+        return data.map { ($0, asset.modificationDate) }
+    }
+
     /// 사진 앱에 저장된 원본에서 큰 이미지를 읽는다 (확대해서 볼 때)
     static func image(assetID: String, maxPixel: Int) async -> CGImage? {
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject else { return nil }

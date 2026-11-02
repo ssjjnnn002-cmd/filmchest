@@ -245,3 +245,26 @@ extension RollImporter {
         return changed
     }
 }
+
+extension RollImporter {
+    /// 사진 파일 속 날짜·위치·카메라 정보를 지금 롤 기록으로 다시 쓴 사본 (드라이브에 올릴 때). 못 쓰면 nil
+    @MainActor
+    static func withCurrentInfo(_ data: Data, frame: FrameItem, roll: RollItem) -> Data? {
+        let snapshot = roll.snapshot()
+        let count = max(roll.frameCount ?? 0, frame.index)
+        let timeline = FrameTimeline.build(roll: snapshot.roll, frameCount: count)
+        guard frame.index >= 1, frame.index <= timeline.count else { return nil }
+        let info = timeline[frame.index - 1]
+        let meta = FrameMetadata(frame: frame.index, frameCount: count, date: snapshot.dateUnknown ? nil : info.date, timeZone: info.timeZone,
+                                 location: info.location, camera: snapshot.camera, lens: snapshot.lens(at: frame.index),
+                                 film: snapshot.film, shotISO: snapshot.roll.shotISO,
+                                 labName: snapshot.roll.labName, scannerName: roll.scannerName,
+                                 rollID: snapshot.roll.id, exposure: snapshot.exposures[frame.index - roll.meterOffset])
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("drive-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let src = dir.appendingPathComponent("in.jpg"), out = dir.appendingPathComponent("out.jpg")
+        guard (try? data.write(to: src)) != nil, (try? MetadataWriter.write(source: src, destination: out, metadata: meta)) != nil else { return nil }
+        return try? Data(contentsOf: out)
+    }
+}

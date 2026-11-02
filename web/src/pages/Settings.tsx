@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll, storageEstimate } from '../db'
-import { backupFileName, exportAll, importAll } from '../core/backup'
+import { backupFileName, exportAll, exportWithPhotos, importBackupFile, photoBackupFileName } from '../core/backup'
 import { isOldSite } from '../core/move'
 import { lastBackupAt, markFileBackup } from '../core/backupNudge'
 import { useBackupRefresh } from '../ui/BackupNudge'
@@ -36,6 +36,8 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   // 안드로이드에서만 내려받기를 보여 준다 (파일은 깃허브 릴리스에 있다)
   const [apk, setApk] = useState(false)
   const [moveGuide, setMoveGuide] = useState(false)
+  const [saveChoice, setSaveChoice] = useState(false)
+  const [saving, setSaving] = useState<string>()
   useEffect(() => {
     // 아이폰, 클로드 화면, 이미 설치된 앱 안에서는 숨긴다
     const installed = matchMedia('(display-mode: standalone)').matches || document.referrer.startsWith('android-app://')
@@ -145,23 +147,23 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
             <h2>백업</h2>
             <div className="group">
               <button className="row" onClick={() => setCloud(true)}><span className="grow">클라우드 백업</span><span className="value">{cloudStatus()}</span><Icon name="chev" size={18} /></button>
-              <button className="row" onClick={async () => { await saveFileNow(backupFileName, await exportAll()); markFileBackup() }}>백업 파일로 저장</button>
+              <button className="row" onClick={() => setSaveChoice(true)}>백업 파일로 저장</button>
               {!isOldSite && <button className="row" onClick={() => setMoveGuide(true)}>예전 주소(vercel.app) 기록 옮기기</button>}
               <label className="row">백업 불러오기
-                <input type="file" accept="application/json,.json" hidden onChange={async (e) => {
+                <input type="file" accept="application/json,.json,application/zip,.zip" hidden onChange={async (e) => {
                   const file = e.target.files?.[0]
                   e.target.value = ''
                   if (!file) return
                   try {
-                    const counts = await importAll(file)
-                    setNote(`카메라 ${counts.cameras}대, 롤 ${counts.rolls}개를 불러왔어요.`)
+                    const counts = await importBackupFile(file)
+                    setNote(`카메라 ${counts.cameras}대, 롤 ${counts.rolls}개${counts.photos ? `, 사진 ${counts.photos}장` : ''}을 불러왔어요.`)
                   } catch {
                     setNote('백업 파일을 읽지 못했어요.')
                   }
                 }} />
               </label>
             </div>
-            <p className="footnote">{lastBackupText()} 장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 이미 있는 항목은 합치고 지우지 않아요.</p>
+            <p className="footnote">{lastBackupText()} 저장할 때 스캔 사진도 넣을지 골라요. 불러오면 같은 항목은 덮어써서 늘어나지 않아요.</p>
           </div>
 
           <div className="section">
@@ -214,6 +216,24 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
       {cloud && <CloudBackup onClose={() => setCloud(false)} />}
       {purge && <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={async () => { const run = purge; setPurge(null); await run() }} />}
       {moveGuide && <MoveGuide onClose={() => setMoveGuide(false)} />}
+      {saveChoice && (
+        <Sheet title="백업 파일로 저장" onClose={() => setSaveChoice(false)}>
+          <div className="section">
+            <div className="group">
+              <button className="row" disabled={!!saving} onClick={async () => {
+                await saveFileNow(backupFileName, await exportAll()); markFileBackup(); setSaveChoice(false)
+              }}><span className="grow">기록만<span className="sub">장비·필름·롤 기록 · 작은 파일</span></span></button>
+              <button className="row" disabled={!!saving} onClick={async () => {
+                try {
+                  const zip = await exportWithPhotos((done, total) => setSaving(`사진 ${done}/${total}`))
+                  await saveFileNow(photoBackupFileName, zip); markFileBackup(); setSaveChoice(false)
+                } finally { setSaving(undefined) }
+              }}><span className="grow">사진까지<span className="sub">스캔 사진도 함께 · zip · 큰 파일</span></span>{saving && <span className="value">{saving}</span>}</button>
+            </div>
+            <p className="footnote">사진까지 저장한 zip을 불러오면 사진도 롤에 다시 붙어요.</p>
+          </div>
+        </Sheet>
+      )}
     </Sheet>
   )
 }

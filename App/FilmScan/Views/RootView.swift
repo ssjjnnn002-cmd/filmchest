@@ -8,9 +8,26 @@ struct RootView: View {
     @Query private var rolls: [RollItem]
     @Environment(\.scenePhase) private var scenePhase
     @State private var showIntro = true
+    /// 기록이 바뀌면 잠깐 기다렸다가 드라이브·폴더에 올린다 (연달아 고칠 땐 한 번만)
+    @State private var syncTask: Task<Void, Never>?
+    /// 앱을 보고 있는 동안 다른 기기(웹·갤럭시)에서 고친 기록을 가끔 받아 온다
+    @State private var pullTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     private var loadedCount: Int { rolls.filter { $0.deletedAt == nil && $0.status == .loaded }.count }
     private var pendingCount: Int { rolls.filter { $0.deletedAt == nil && ($0.status == .finished || $0.status == .atLab) }.count }
+
+    /// 바뀐 기록을 올린다: 파일 앱 폴더, 구글 드라이브 기록, 스캔 사진 (바뀐 게 없으면 건너뛴다)
+    private func syncNow(delay: Double) {
+        syncTask?.cancel()
+        syncTask = Task {
+            if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
+            guard !Task.isCancelled else { return }
+            _ = try? AutoBackup.run(context)
+            guard GoogleAuth.isConnected else { return }
+            try? await DriveSync.push(context)
+            await DrivePhotos.sync(context)
+        }
+    }
 
     var body: some View {
         @Bindable var router = router
@@ -96,12 +113,14 @@ struct RootView: View {
         }
         // 확장이 앱을 열지 못했을 때를 대비해, 앱이 앞으로 올 때 대기함을 확인한다
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background { AutoBackup.runIfDue(context); DriveSync.onBackground(context) }
+            if phase == .background { syncNow(delay: 0) }
             if phase == .active { DriveSync.onActive(context) }
             if phase == .active, router.importRequest == nil, router.incoming == nil, router.incomingPhotos == nil {
                 router.receiveFiles(Store.takeAllFromInbox())
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in syncNow(delay: 4) }
+        .onReceive(pullTimer) { _ in if scenePhase == .active { DriveSync.onActive(context) } }
         .overlay {
             if showIntro {
                 IntroView { showIntro = false }

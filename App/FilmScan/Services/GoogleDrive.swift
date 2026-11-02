@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import AuthenticationServices
 import CryptoKit
+import Photos
 import Security
 import FilmScanCore
 
@@ -201,6 +202,16 @@ enum DriveClient {
     }
 
     static func download(_ id: String) async throws -> Data { try await call("\(api)/\(id)?alt=media") }
+
+    /// 폴더 찾기, 없으면 만들기
+    static func folder(_ name: String, parent: String) async throws -> String {
+        if let id = try await find(name, parent: parent, folder: true) { return id }
+        let d = try await call(api, method: "POST", json: ["name": name, "mimeType": folderMime, "parents": [parent]])
+        guard let id = (try JSONSerialization.jsonObject(with: d) as? [String: Any])?["id"] as? String else {
+            throw DriveError.message("드라이브에 폴더를 만들지 못했어요")
+        }
+        return id
+    }
 
     static var folderURL: URL {
         let id = UserDefaults.standard.string(forKey: "filmscan.driveRoot") ?? ""
@@ -489,5 +500,75 @@ enum DriveSync {
     static func onBackground(_ context: ModelContext) {
         guard GoogleAuth.isConnected else { return }
         Task { try? await push(context) }
+    }
+}
+
+// MARK: - 스캔 사진도 드라이브로 (웹·갤럭시와 같은 자리: 필름함/날짜 롤 이름/01.jpg)
+
+enum DrivePhotos {
+    private static let sentKey = "filmscan.driveFrames"        // "롤id-컷": "파일id|사진 앱 수정 시각"
+    private static let folderKey = "filmscan.driveRollFolders"  // 롤id: 폴더id
+    @MainActor private static var running = false
+
+    /// 아직 안 올렸거나, 돌리거나 날짜·위치가 바뀐 사진만 올린다. 실패는 조용히 다음 번에 다시
+    @MainActor
+    static func sync(_ context: ModelContext) async {
+        guard GoogleAuth.isConnected, !running else { return }
+        running = true
+        defer { running = false }
+        var sent = UserDefaults.standard.dictionary(forKey: sentKey) as? [String: String] ?? [:]
+        var folders = UserDefaults.standard.dictionary(forKey: folderKey) as? [String: String] ?? [:]
+        let rolls = ((try? context.fetch(FetchDescriptor<RollItem>())) ?? []).filter { $0.deletedAt == nil && $0.status == .imported }
+        guard !rolls.isEmpty, let root = try? await DriveClient.rootFolder() else { return }
+        let day = DateFormatter()
+        day.dateFormat = "yyyy-MM-dd"
+        for roll in rolls {
+            let frames = (roll.frames ?? []).filter { $0.assetIdentifier != nil }.sorted { $0.index < $1.index }
+            for frame in frames {
+                guard let assetID = frame.assetIdentifier else { continue }
+                let key = "\(roll.id.uuidString.lowercased())-\(frame.index)"
+                let modified = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject?.modificationDate
+                let stamp = String(Int(modified?.timeIntervalSince1970 ?? 0))
+                if let prev = sent[key], prev.hasSuffix("|\(stamp)") { continue }
+                guard let file = await PhotoLibrary.fileData(assetID: assetID) else { continue }
+                // 사진 앱의 날짜·위치를 고쳐도 파일 속 정보는 그대로라, 올릴 때 지금 기록으로 다시 쓴다
+                let data = RollImporter.withCurrentInfo(file.data, frame: frame, roll: roll) ?? file.data
+                do {
+                    var folder = folders[roll.id.uuidString]
+                    if folder == nil {
+                        let start = roll.shootingDays.map(\.startedAt).min() ?? roll.loadedAt
+                        let name = "\(day.string(from: start)) \(roll.albumTitle)".replacingOccurrences(of: "/", with: "-")
+                        folder = try await DriveClient.folder(String(name.prefix(120)), parent: root)
+                        folders[roll.id.uuidString] = folder
+                        UserDefaults.standard.set(folders, forKey: folderKey)
+                    }
+                    guard let folder else { continue }
+                    let name = String(format: "%02d.jpg", frame.index)
+                    var id = sent[key]?.components(separatedBy: "|").first
+                    if id == nil { id = try await DriveClient.find(name, parent: folder, folder: false) }
+                    if id == nil { id = try await DriveClient.createFile(name, parent: folder, mime: "image/jpeg") }
+                    guard let id, !id.isEmpty else { continue }
+                    do {
+                        try await DriveClient.upload(id, data, mime: "image/jpeg")
+                    } catch {
+                        // 드라이브에서 폴더나 파일을 지운 경우: 다음 번에 새로 만든다
+                        folders[roll.id.uuidString] = nil
+                        sent[key] = nil
+                        UserDefaults.standard.set(folders, forKey: folderKey)
+                        UserDefaults.standard.set(sent, forKey: sentKey)
+                        continue
+                    }
+                    sent[key] = "\(id)|\(stamp)"
+                    UserDefaults.standard.set(sent, forKey: sentKey)
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    static func forget() {
+        UserDefaults.standard.removeObject(forKey: sentKey)
+        UserDefaults.standard.removeObject(forKey: folderKey)
     }
 }

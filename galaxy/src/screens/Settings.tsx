@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Text, View } from 'react-native'
 import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll } from '../data'
 import { getPref, useLiveQuery } from '../store'
-import { backupFileName, exportAll, importAll, localBackupAt, writeLocalBackup } from '../backup'
+import { backupFileName, exportAll, exportWithPhotos, importBackupFile, localBackupAt, photoBackupFileName, writeLocalBackup } from '../backup'
 import { lastBackupAt, markFileBackup } from '../core/backupNudge'
 import { useBackupRefresh } from '../BackupNudge'
 import { restorePhotos } from '../restore'
@@ -35,6 +35,8 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   const [note, setNote] = useState<string>()
   const [cloud, setCloud] = useState(false)
   const [backupOpen, setBackupOpen] = useState(openBackup)
+  const [saveChoice, setSaveChoice] = useState(false)
+  const [saving, setSaving] = useState<string>()
   const [purge, setPurge] = useState<(() => Promise<unknown>) | null>(null)
   const [spending, setSpending] = useState(false)
   const [update, setUpdate] = useState(() => (installedBuilt() ? new Date(installedBuilt() * 1000).toLocaleDateString('ko-KR') : ''))
@@ -112,18 +114,37 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           }} />
       ) : null}
       {spending ? <Stats onClose={() => setSpending(false)} /> : null}
+      {saveChoice ? (
+        <Sheet title="백업 파일로 저장" onClose={() => setSaveChoice(false)}>
+          <Section foot="사진까지 저장한 zip을 불러오면 사진도 롤에 다시 붙어요.">
+            <Group>
+              <Row onPress={async () => {
+                if (saving) return
+                await writeLocalBackup(); await saveFileNow(backupFileName, await exportAll(), 'application/json'); markFileBackup(); setSaveChoice(false)
+              }}><RowText sub="장비·필름·롤 기록 · 작은 파일">기록만</RowText></Row>
+              <Row value={saving} onPress={async () => {
+                if (saving) return
+                try {
+                  const zip = await exportWithPhotos((d, t) => setSaving(`사진 ${d}/${t}`))
+                  await saveFileNow(photoBackupFileName, zip, 'application/zip'); markFileBackup(); setSaveChoice(false)
+                } finally { setSaving(undefined) }
+              }}><RowText sub="스캔 사진도 함께 · zip · 큰 파일">사진까지</RowText></Row>
+            </Group>
+          </Section>
+        </Sheet>
+      ) : null}
       {backupOpen ? (
         <Sheet title="백업 및 복구" onClose={() => setBackupOpen(false)} left={<span />} right={<SheetBtn label="완료" accent onPress={() => setBackupOpen(false)} />}>
           <Section title="백업" foot={`${lastBackupText()} 장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 웹앱 백업 파일도 불러올 수 있어요.`}>
             <Group>
               <Row chev value={cloudStatus()} onPress={() => setCloud(true)}><RowText>클라우드 백업</RowText></Row>
-              <Row onPress={async () => { await writeLocalBackup(); await saveFileNow(backupFileName, await exportAll(), 'application/json'); markFileBackup() }}>백업 파일로 저장</Row>
+              <Row onPress={() => setSaveChoice(true)}>백업 파일로 저장</Row>
               <Row onPress={async () => {
                 const [file] = await pickFiles(['application/json', 'text/plain', '*/*'], false)
                 if (!file) return
                 try {
-                  const counts = await importAll(file.uri)
-                  setNote(`카메라 ${counts.cameras}대, 롤 ${counts.rolls}개를 불러왔어요.`)
+                  const counts = await importBackupFile(file.uri)
+                  setNote(`카메라 ${counts.cameras}대, 롤 ${counts.rolls}개${counts.photos ? `, 사진 ${counts.photos}장` : ''}을 불러왔어요.`)
                 } catch {
                   setNote('백업 파일을 읽지 못했어요.')
                 }

@@ -23,7 +23,7 @@ struct BackupRestoreView: View {
             NavigationLink {
                 CloudBackupView()
             } label: {
-                LabeledContent("클라우드 백업", value: AutoBackup.folderName == nil ? "연결 안 됨" : "연결됨 · \(AutoBackup.cloudName ?? "폴더")")
+                LabeledContent("클라우드 백업", value: CloudStatus.text)
             }
             Button("백업 파일로 저장") {
                 if let data = try? DataBackup.data(from: context) {

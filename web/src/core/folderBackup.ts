@@ -1,3 +1,4 @@
+import Dexie from 'dexie'
 // 컴퓨터의 클라우드 동기화 폴더(구글 드라이브·OneDrive·Dropbox·iCloud Drive 앱 폴더)에 백업 파일을 덮어쓴다.
 // 크롬·엣지 같은 브라우저에서만 된다 (폴더 고르기 API). 권한은 웹앱 안에서 '허용'을 눌러 받는다.
 import { getPref, setPref } from '../platform'
@@ -105,12 +106,14 @@ export async function disconnectFolder() {
   setPref('folderCloud', ''); setPref('folderName', '')
 }
 
+/** 기록이 바뀌면 잠깐 기다렸다가 폴더의 백업 파일에 덮어쓴다 (바뀐 게 없으면 건너뛴다) */
 export function startFolderAutoBackup() {
   if (!folderAvailable) return
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'hidden' || !folderName()) return
-    const days = folderDays()
-    if (days <= 0 || Date.now() - (folderLast() ?? 0) < days * 86_400_000 - 3_600_000) return
-    void backupToFolder().catch(() => {})
-  })
+  let timer: number | undefined
+  const later = () => {
+    window.clearTimeout(timer)
+    timer = window.setTimeout(() => { if (folderName()) void backupToFolder().catch(() => {}) }, 4000)
+  }
+  Dexie.on('storagemutated', later)
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && folderName()) void backupToFolder().catch(() => {}) })
 }

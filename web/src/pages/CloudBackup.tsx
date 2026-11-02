@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Icon, Sheet } from '../ui/common'
-import { setPref } from '../platform'
 import { backupFileName } from '../core/backup'
-import { driveFolderUrl, backupToDrive, pullFromDrive, restorePhotosFromDrive, syncPhotosToDrive, drivePhotosOn, disconnectDrive, driveAvailable, driveConnected, driveIntervalDays, driveLastBackup, driveToken } from '../core/drive'
+import { driveFolderUrl, backupToDrive, pullFromDrive, restorePhotosFromDrive, disconnectDrive, driveAvailable, driveConnected, driveLastBackup, driveToken, hasDriveToken } from '../core/drive'
 import {
-  allowFolder, backupToFolder, restoreFromFolder, disconnectFolder, folderAvailable, folderCloud, folderDays, folderLast, folderName, folderPermission, pickFolder, verifyFolder,
+  allowFolder, backupToFolder, restoreFromFolder, disconnectFolder, folderAvailable, folderCloud, folderLast, folderName, folderPermission, pickFolder, verifyFolder,
 } from '../core/folderBackup'
 
 const clouds = [
@@ -57,51 +56,28 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
           {folder && (
             <>
               <button className="row" onClick={() => run(async () => { const f = await verifyFolder(); if (f) throw new Error(f) }, `${folderCloud() ?? '폴더'}에 저장하고 다시 읽었어요. 연결돼 있어요.`)}>연결 확인</button>
-              <button className="row" onClick={() => run(() => backupToFolder(true), `'${backupFileName}'을 저장했어요.`)}>지금 백업</button>
               <button className="row" onClick={() => { if (confirm('클라우드 백업으로 기록을 되살릴까요? 지금 있는 기록은 지우지 않고 합쳐요.')) void run(async () => { const n = await restoreFromFolder(); setMsg({ text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요.`, ok: true }) }, '') }}>클라우드 백업에서 복구</button>
-              <label className="row static">
-                <span className="grow">자동 백업</span>
-                <select className="input" style={{ width: 'auto', textAlign: 'right' }} value={String(folderDays())}
-                  onChange={(e) => { setPref('folderDays', e.target.value); refresh() }}>
-                  <option value="0">끔</option><option value="1">매일</option><option value="7">매주</option>
-                </select>
-              </label>
               <button className="row danger" onClick={() => run(disconnectFolder, '연결을 끊었어요. 올린 파일은 그대로예요.')}>연결 끊기</button>
             </>
           )}
           {drive && (
             <>
-              <button className="row" onClick={() => run(() => backupToDrive(true), '구글 드라이브에 저장했어요. 연결돼 있어요.')}>연결 확인 · 지금 백업</button>
+              {hasDriveToken()
+                ? <div className="row static"><span className="grow">자동으로 맞추는 중<span className="sub">바뀌면 바로 올리고, 1분마다 다른 기기 기록을 받아요</span></span></div>
+                : <button className="row accent" onClick={() => run(async () => { await driveToken(); await pullFromDrive(); await backupToDrive() }, '다시 연결했어요. 이제 자동으로 맞춰요.')}>
+                    <span className="grow">다시 연결<span className="sub">웹은 구글 허가가 1시간마다 끝나요. 누르면 다시 자동으로 맞춰요</span></span></button>}
               <a className="row" href={driveFolderUrl()} target="_blank" rel="noreferrer"><span className="grow">드라이브에서 백업 폴더 열기</span><Icon name="chev" size={18} /></a>
-              <label className="toggle">
-                <span>스캔 사진도 올리기<span className="sub" style={{ display: 'block' }}>필름함 폴더 안에 롤마다 폴더를 만들어요</span></span>
-                <input type="checkbox" className="switch" checked={drivePhotosOn()} onChange={(e) => { setPref('drivePhotos', e.target.checked ? '1' : '0'); refresh() }} />
-              </label>
-              {drivePhotosOn() && (
-                <button className="row" disabled={!!progress} onClick={() => run(async () => {
-                  const n = await syncPhotosToDrive((d, total) => setProgress(total ? `${d} / ${total}장 올리는 중` : ''))
-                  setProgress('')
-                  setMsg({ text: n ? `사진 ${n}장을 올렸어요.` : '새로 올릴 사진이 없어요.', ok: true })
-                }, '')}>{progress || '사진 지금 올리기'}</button>
-              )}
               <button className="row" disabled={!!progress} onClick={() => { if (confirm('드라이브에 올린 사진을 내려받아 롤에 다시 붙일까요? 기록 백업을 먼저 복구하면 필름·카메라 정보까지 함께 돌아와요.')) void run(async () => {
                 const n = await restorePhotosFromDrive((d, total) => setProgress(total ? `${d} / ${total}장 받는 중` : ''))
                 setProgress('')
                 setMsg({ text: `롤 ${n.rolls}개, 사진 ${n.frames}장을 되살렸어요.`, ok: true })
               }, '') }}>드라이브에서 사진 복구</button>
               <button className="row" onClick={() => { if (confirm('드라이브의 최신 기록 파일로 장비·롤 정보를 되살릴까요? 지금 있는 기록은 지우지 않고 합쳐요.')) void run(async () => { const n = await pullFromDrive(true); setMsg(n ? { text: `카메라 ${n.cameras}대, 롤 ${n.rolls}개를 되살렸어요.`, ok: true } : { text: '드라이브에 기록 파일이 아직 없어요.', ok: false }) }, '') }}>드라이브에서 장비·기록 복구 (최신 파일)</button>
-              <label className="row static">
-                <span className="grow">자동 백업</span>
-                <select className="input" style={{ width: 'auto', textAlign: 'right' }} value={String(driveIntervalDays())}
-                  onChange={(e) => { setPref('driveDays', e.target.value); refresh() }}>
-                  <option value="0">끔</option><option value="1">매일</option><option value="7">매주</option>
-                </select>
-              </label>
               <button className="row danger" onClick={() => { disconnectDrive(); refresh() }}>연결 끊기</button>
             </>
           )}
         </div>
-        <p className="footnote">웹앱을 닫거나 다른 탭으로 갈 때 정한 주기가 지났고 바뀐 기록이 있으면 '{backupFileName}' 하나에 덮어써요. 스캔 사진은 빠져요.</p>
+        <p className="footnote">{drive ? `기록과 스캔 사진을 드라이브 '필름함' 폴더에 올려요. 장비 기록은 '${backupFileName}' 하나에 덮어써서 여러 번 불러와도 늘어나지 않아요.` : `기록이 바뀌면 '${backupFileName}' 하나에 덮어써요. 스캔 사진은 빠져요.`}</p>
       </div>
 
       {driveAvailable && !drive && (

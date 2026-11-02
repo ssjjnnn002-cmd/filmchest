@@ -11,7 +11,7 @@ import { backupFileName, exportAll, importAll } from './backup'
 import { folder, writeBytes } from './files'
 import { rotatedFile } from './scan'
 import { restorePhotos } from './restore'
-import { getPref, setPref } from './store'
+import { getPref, setPref, subscribe } from './store'
 
 /** 구글 클라우드에 등록한 웹용 클라이언트 ID (안드로이드용은 패키지 이름·서명으로 구글이 알아본다) */
 const WEB_CLIENT_ID = '940262391554-kgu48knnnogdglo9h3qp8pbc5qi4s8en.apps.googleusercontent.com'
@@ -22,7 +22,8 @@ export const driveConnected = () => getPref('driveConnected', '' as string) === 
 export const driveAccount = () => getPref('driveAccount', '' as string) || undefined
 export const driveLast = () => Number(getPref('driveLast', '0')) || undefined
 export const driveDays = () => Number(getPref('driveDays', '1'))
-export const drivePhotosOn = () => getPref('drivePhotos', '1' as string) === '1'
+/** 스캔 사진도 늘 함께 올린다 */
+export const drivePhotosOn = () => true
 
 async function token(interactive: boolean) {
   if (!configured) { GoogleSignin.configure({ webClientId: WEB_CLIENT_ID, scopes: [SCOPE] }); configured = true }
@@ -174,9 +175,17 @@ export async function pullFromDrive(force = false, interactive = true) {
 
 /** 앱을 열거나 다시 볼 때 (로그인 창 없이, 실패는 조용히) */
 export function startDrivePull() {
-  const pull = () => { if (driveConnected()) void pullFromDrive(false, false).catch(() => {}) }
+  const pull = () => { if (driveConnected() && AppState.currentState === 'active') void pullFromDrive(false, false).catch(() => {}) }
   pull()
   AppState.addEventListener('change', (s) => { if (s === 'active') pull() })
+  // 보고 있는 동안 1분마다 다른 기기(아이폰·웹)에서 고친 기록을 받아 온다
+  setInterval(pull, 60_000)
+  // 기록이 바뀌면 잠깐 기다렸다가 기록과 사진을 올린다 (바뀐 게 없으면 건너뛴다)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  subscribe(() => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => { if (driveConnected()) void backupToDrive(false, false).catch(() => {}) }, 4000)
+  })
 }
 
 export async function restoreFromDrive() {

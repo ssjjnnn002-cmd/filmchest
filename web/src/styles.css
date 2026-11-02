@@ -715,3 +715,33 @@ a.row.accent { color: var(--safelight); }
   .intro-line { stroke-dashoffset: 0; animation: none !important; }
   .intro-hole { opacity: 1; animation: none !important; }
 }
+
+/* 통계: 숫자 타일 · 월별 막대 · 컬러/흑백 · 순위 막대 (막대는 한 가지 색, 글씨는 글자 색) */
+.stat-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0 18px; }
+.stat-tile { background: var(--card); border-radius: var(--radius); padding: 14px 12px; display: grid; gap: 2px; }
+.stat-tile b { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.stat-tile span { font-size: 13px; color: var(--muted); }
+.stat-card { padding: 14px 14px 12px; }
+.month-chart { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; height: 120px; align-items: end; }
+.month-col { height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; cursor: default; }
+.month-value { font-size: 12px; font-weight: 600; color: var(--ink); min-height: 16px; }
+.month-bar { width: 100%; max-width: 18px; min-height: 2px; background: var(--safelight); border-radius: 4px 4px 0 0; }
+.month-col:hover .month-bar { filter: brightness(1.15); }
+.month-labels { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin-top: 6px; border-top: 1px solid var(--sep); padding-top: 6px; }
+.month-labels span { font-size: 11px; color: var(--muted); text-align: center; white-space: nowrap; }
+.split-bar { display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden; }
+.split-bar .split-color { background: var(--safelight); }
+.split-bar .split-bw { background: var(--muted); }
+.split-legend { display: flex; gap: 16px; margin-top: 10px; font-size: 14px; color: var(--muted); }
+.split-legend b { color: var(--ink); font-weight: 600; }
+.split-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.split-legend i.split-color { background: var(--safelight); }
+.split-legend i.split-bw { background: var(--muted); }
+.rank-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+.rank-row + .rank-row { border-top: .5px solid var(--sep); }
+.rank-icon { width: 34px; display: grid; place-items: center; flex-shrink: 0; }
+.rank-main { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.rank-name { font-size: 15px; color: var(--ink); }
+.rank-track { height: 6px; background: var(--fill); border-radius: 4px; overflow: hidden; }
+.rank-bar { display: block; height: 100%; background: var(--safelight); border-radius: 4px; }
+.rank-value { font-size: 15px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }

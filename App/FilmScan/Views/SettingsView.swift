@@ -78,7 +78,7 @@ struct SettingsView: View {
                     NavigationLink {
                         BackupRestoreView()
                     } label: {
-                        LabeledContent("백업 및 복구", value: AutoBackup.folderName == nil ? "연결 안 됨" : "연결됨 · \(AutoBackup.cloudName ?? "폴더")")
+                        LabeledContent("백업 및 복구", value: CloudStatus.text)
                     }
                 }
 

@@ -5,7 +5,6 @@ import UniformTypeIdentifiers
 /// 클라우드 백업: 어느 클라우드에 둘지 고르고, 연결 상태와 연결 확인
 struct CloudBackupView: View {
     @Environment(\.modelContext) private var context
-    @AppStorage(AutoBackup.intervalKey) private var backupDays = 1
     @State private var picking = false
     @State private var pendingCloud: String?
     @State private var message: (text: String, ok: Bool)?
@@ -43,9 +42,6 @@ struct CloudBackupView: View {
                     if let last = DriveSync.lastSync {
                         LabeledContent("마지막으로 맞춤", value: last.formatted(date: .abbreviated, time: .shortened))
                     }
-                    Button("지금 올리기", systemImage: "arrow.up.doc") {
-                        driveRun("드라이브에 올렸어요. 연결돼 있어요.") { try await DriveSync.push(context, force: true) }
-                    }
                     Button("드라이브에서 장비·기록 복구 (최신 파일)", systemImage: "arrow.down.doc") {
                         driveRun(nil) {
                             if let c = try await DriveSync.pull(context, force: true) {
@@ -58,20 +54,21 @@ struct CloudBackupView: View {
                         UIApplication.shared.open(DriveClient.folderURL)
                         #endif
                     }
-                    Button("연결 끊기", role: .destructive) { GoogleAuth.signOut(); revision += 1 }
+                    Button("연결 끊기", role: .destructive) { GoogleAuth.signOut(); DrivePhotos.forget(); revision += 1 }
                 } else {
                     Button("구글 드라이브 연결", systemImage: "person.crop.circle.badge.checkmark") {
                         driveRun("구글 드라이브에 연결했어요. 웹·갤럭시와 같은 기록을 써요.") {
                             try await GoogleAuth.signIn()
                             _ = try await DriveSync.pull(context, force: true)
                             try await DriveSync.push(context, force: true)
+                            await DrivePhotos.sync(context)
                         }
                     }
                 }
             } header: {
                 Text("구글 드라이브 (웹·갤럭시와 함께)")
             } footer: {
-                Text("구글 계정으로 연결하면 드라이브의 '필름함' 폴더에 장비·필름·롤 기록을 올리고, 웹앱·갤럭시와 같은 파일을 함께 써요. 앱을 열 때 다른 기기에서 고친 기록을 합치고, 나갈 때 바뀐 기록을 올려요. 사진은 올리지 않아요.")
+                Text("드라이브의 '필름함' 폴더에 장비·필름·롤 기록과 스캔 사진을 올려요. 바뀌면 바로 올리고, 앱을 보는 동안 웹앱·갤럭시에서 고친 기록을 받아 와요. 장비 기록은 파일 하나에 덮어써서 여러 번 불러와도 늘어나지 않아요.")
             }
 
             Section {
@@ -80,7 +77,7 @@ struct CloudBackupView: View {
                         .font(.title2)
                         .foregroundStyle(connected ? Theme.safelight : .secondary)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(connected ? "연결됨 · \(AutoBackup.cloudName ?? "폴더")" : "연결 안 됨").font(.headline)
+                        Text(connected ? "연결됨 · \(AutoBackup.cloudName ?? "폴더")" : "폴더 연결 안 됨").font(.headline)
                         if let folder = AutoBackup.folderName { Text("폴더: \(folder)").font(.caption).foregroundStyle(.secondary) }
                         if let last = AutoBackup.lastBackup {
                             Text("마지막 백업 \(last.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary)
@@ -106,31 +103,17 @@ struct CloudBackupView: View {
                         }
                         revision += 1
                     }
-                    Button("지금 백업", systemImage: "arrow.up.doc") {
-                        do {
-                            try AutoBackup.run(context, force: true)
-                            message = ("'\(DataBackup.fileName)'을 올렸어요.", true)
-                        } catch {
-                            message = ("백업하지 못했어요. 연결 확인을 눌러 보세요.", false)
-                        }
-                        revision += 1
-                    }
                     #if os(iOS)
                     if let open = AutoBackup.folderOpenURL {
                         Button("백업 폴더 열기", systemImage: "folder") { UIApplication.shared.open(open) }
                     }
                     #endif
                     Button("클라우드 백업에서 복구", systemImage: "arrow.down.doc") { confirmRestore = true }
-                    Picker("자동 백업", selection: $backupDays) {
-                        Text("끔").tag(0)
-                        Text("매일").tag(1)
-                        Text("매주").tag(7)
-                    }
                 }
             } header: {
-                Text("파일 앱 폴더")
+                Text(GoogleAuth.isConnected ? "파일 앱 폴더 (더 두고 싶을 때)" : "파일 앱 폴더")
             } footer: {
-                Text("앱을 닫을 때(홈 화면으로 나갈 때) 정한 주기가 지났고 바뀐 기록이 있으면 '\(DataBackup.fileName)' 하나에 덮어써요. 스캔 사진은 빠져요.")
+                Text("기록이 바뀌면 '\(DataBackup.fileName)' 하나에 덮어써요. 스캔 사진은 빠져요.")
             }
 
             Section {
@@ -146,8 +129,10 @@ struct CloudBackupView: View {
                                 Text(cloud.help).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            if connected && AutoBackup.cloudName == cloud.name {
-                                Image(systemName: "checkmark").foregroundStyle(Theme.safelight)
+                            if (connected && AutoBackup.cloudName == cloud.name) || (cloud.name == "구글 드라이브" && GoogleAuth.isConnected) {
+                                Label("연결됨", systemImage: "checkmark.circle.fill")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Theme.safelight)
                             }
                         }
                     }
@@ -209,5 +194,14 @@ struct CloudBackupView: View {
                 revision += 1
             }
         }
+    }
+}
+
+/// 설정·백업 화면에 보이는 클라우드 연결 상태 (구글 계정 연결과 파일 앱 폴더 중 하나라도)
+enum CloudStatus {
+    static var text: String {
+        if GoogleAuth.isConnected { return "연결됨 · 구글 드라이브" }
+        if AutoBackup.folderName != nil { return "연결됨 · \(AutoBackup.cloudName ?? "폴더")" }
+        return "연결 안 됨"
     }
 }
