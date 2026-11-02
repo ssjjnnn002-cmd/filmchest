@@ -35,19 +35,18 @@
           "value": "public, max-age=0, must-revalidate"
         }
       ]
-    },
+    }
+  ],
+  "redirects": [
     {
       "source": "/filmchest.apk",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "application/vnd.android.package-archive"
-        },
-        {
-          "key": "Content-Disposition",
-          "value": "attachment; filename=filmchest.apk"
-        }
-      ]
+      "destination": "https://github.com/ssjjnnn002-cmd/filmchest/releases/latest/download/filmchest.apk",
+      "permanent": false
+    },
+    {
+      "source": "/apk.json",
+      "destination": "https://github.com/ssjjnnn002-cmd/filmchest/releases/latest/download/apk.json",
+      "permanent": false
     }
   ]
 }
