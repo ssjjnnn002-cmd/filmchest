@@ -73,9 +73,13 @@ function NewSiteWelcome() {
   }
   if (asked || empty !== true) return null
   return (
-    <Sheet title="예전 기록 불러오기" onClose={close} right={<button className="btn ghost" onClick={close}><b>닫기</b></button>}>
+    <Sheet title="예전 기록 불러오기" onClose={close}>
       <div className="section">
-        <p className="footnote">필름함 주소가 {oldHost}에서 {newHost}로 바뀌었어요. 예전 주소에서 쓰던 기록이 있다면 불러오세요.</p>
+        <p className="footnote">
+          필름함 주소가 {oldHost}에서 {newHost}로 변경되었습니다.
+          서버 사용량 한도 초과로 예전 주소는 11월 30일까지 일시 중단된 상태입니다.
+          이용에 불편을 드려 죄송합니다.
+        </p>
         <div className="group">
           {driveAvailable && <button className="row accent" onClick={() => run(async () => { await driveToken('consent'); return restoreFromDrive() })}>구글 드라이브에서 불러오기</button>}
           <label className="row accent">백업 파일 불러오기
@@ -88,7 +92,17 @@ function NewSiteWelcome() {
           <button className="row" onClick={close}>처음 써요</button>
         </div>
         {note && <p className="footnote">{note}</p>}
-        <p className="footnote">백업이 없다면: 예전 주소가 다시 열리면({oldHost}) 그곳에서 '기록 옮기고 새 주소로 가기'를 누르세요. 사진까지 한 번에 옮겨져요.</p>
+      </div>
+      <div className="section">
+        <h2>백업 파일이 없는 경우</h2>
+        <p className="footnote">
+          11월 30일 이후 예전 주소({oldHost})에 접속해 '기록 옮기고 새 주소로 가기'를 눌러 주세요.
+          기록과 사진이 새 주소로 그대로 옮겨집니다.
+        </p>
+        <p className="footnote" style={{ color: 'var(--danger)' }}>
+          기록은 예전 주소를 사용하던 브라우저 안에만 저장되어 있습니다.
+          옮기기 전까지 해당 브라우저의 방문 기록, 쿠키, 사이트 데이터를 삭제하지 마세요. 삭제하면 복구할 수 없습니다.
+        </p>
       </div>
     </Sheet>
   )
