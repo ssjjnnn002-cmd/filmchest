@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useReducer, useState } from 'react'
 import { Text, View } from 'react-native'
 import { db } from './data'
 import { useLiveQuery } from './store'
-import { backupNudge, snoozeBackupNudge } from './core/backupNudge'
+import { backupNudge, onBackupChange, snoozeBackupNudge } from './core/backupNudge'
 import { Btn, Group } from './kit'
 import { Icon } from './icons'
 import { useTheme } from './theme'
 
 /** 기록이 이 기기에만 있을 때: 기기 밖으로 백업한 적이 없거나 오래됐으면 한 번 알려 준다 (웹과 같게) */
 export function BackupNudge({ onBackup }: { onBackup: () => void }) {
+  useBackupRefresh()
   const c = useTheme()
   const rolls = useLiveQuery(() => db.rolls.count(), []) ?? 0
   const [hidden, setHidden] = useState(false)
@@ -29,4 +30,10 @@ export function BackupNudge({ onBackup }: { onBackup: () => void }) {
       </View>
     </Group>
   )
+}
+
+/** 백업하면 다시 그린다 ('마지막 백업' 문구·알림 카드) */
+export function useBackupRefresh() {
+  const [, bump] = useReducer((n: number) => n + 1, 0)
+  useEffect(() => onBackupChange(bump), [])
 }

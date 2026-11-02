@@ -1,6 +1,7 @@
 // 컴퓨터의 클라우드 동기화 폴더(구글 드라이브·OneDrive·Dropbox·iCloud Drive 앱 폴더)에 백업 파일을 덮어쓴다.
 // 크롬·엣지 같은 브라우저에서만 된다 (폴더 고르기 API). 권한은 웹앱 안에서 '허용'을 눌러 받는다.
 import { getPref, setPref } from '../platform'
+import { notifyBackup } from './backupNudge'
 import { backupFileName, backupKey, exportAll, importAll } from './backup'
 
 type Perm = 'granted' | 'denied' | 'prompt'
@@ -61,13 +62,13 @@ export async function backupToFolder(force = false) {
   if (await dir.queryPermission({ mode: 'readwrite' }) !== 'granted') throw new Error('권한을 허용해 주세요')
   const blob = await exportAll()
   const key = await backupKey(blob)
-  if (!force && key === getPref('folderKey', '' as string)) { setPref('folderLast', String(Date.now())); return }
+  if (!force && key === getPref('folderKey', '' as string)) { setPref('folderLast', String(Date.now())); notifyBackup(); return }
   const file = await dir.getFileHandle(backupFileName, { create: true })
   const w = await file.createWritable()
   await w.write(blob)
   await w.close()
   setPref('folderKey', key)
-  setPref('folderLast', String(Date.now()))
+  setPref('folderLast', String(Date.now())); notifyBackup()
 }
 
 /** 연결 확인: 작은 파일을 쓰고 다시 읽은 뒤 지운다 */

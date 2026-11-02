@@ -7,6 +7,7 @@ import { FOLDER, ROOT_NAME, createFile, downloadUrl, ensureFolder, findByName, l
 import { rotatedBlob } from './importer'
 import { restorePhotos } from './restore'
 import { rollTitle } from '../ui/common'
+import { notifyBackup } from './backupNudge'
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
 export const driveAvailable = !!clientId
@@ -79,7 +80,7 @@ export async function backupToDrive(force = false) {
   const blob = await exportAll()
   const key = await backupKey(blob)
   let id = getPref('driveFileId', '' as string)
-  if (!force && id && key === getPref('driveKey', '' as string)) { setPref('driveLast', String(Date.now())); void syncPhotosToDrive().catch(() => {}); return }
+  if (!force && id && key === getPref('driveKey', '' as string)) { setPref('driveLast', String(Date.now())); notifyBackup(); void syncPhotosToDrive().catch(() => {}); return }
   const root = await rootFolder(t)
   if (!id) id = (await findByName(t, backupFileName, root)) ?? (await createFile(t, backupFileName, root, 'application/json'))
   let res = await putBlob(t, id, blob)
@@ -91,7 +92,7 @@ export async function backupToDrive(force = false) {
   setPref('driveFileId', id)
   setPref('driveKey', key)
   setPref('drivePulledAt', String(Date.now()))
-  setPref('driveLast', String(Date.now()))
+  setPref('driveLast', String(Date.now())); notifyBackup()
   void syncPhotosToDrive().catch(() => {})
 }
 

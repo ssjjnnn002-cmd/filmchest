@@ -30,8 +30,11 @@ struct BackupNudgeCard: View {
     @Query private var rolls: [RollItem]
     @State private var hidden = false
     @State private var showBackup = false
+    /// 백업 화면을 닫으면 다시 계산한다 (백업했으면 카드가 사라진다)
+    @State private var refresh = 0
 
     var body: some View {
+        let _ = refresh
         if !hidden, let state = BackupNudgeRule.state(hasData: !rolls.isEmpty) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 12) {
@@ -57,7 +60,7 @@ struct BackupNudgeCard: View {
             .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemGroupedBackground)))
             .padding(.horizontal)
             .padding(.bottom, 8)
-            .sheet(isPresented: $showBackup) {
+            .sheet(isPresented: $showBackup, onDismiss: { refresh += 1 }) {
                 NavigationStack {
                     BackupRestoreView()
                         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("완료") { showBackup = false } } }

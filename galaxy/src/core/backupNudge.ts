@@ -9,8 +9,13 @@ export const BACKUP_STALE_DAYS = 14
 /** '나중에'를 누르면 이만큼 다시 묻지 않는다 */
 const SNOOZE_DAYS = 7
 
+// 백업하면 '마지막 백업' 문구와 알림 카드가 바로 바뀌게 알린다
+const listeners = new Set<() => void>()
+export function onBackupChange(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn) } }
+export const notifyBackup = () => listeners.forEach((fn) => fn())
+
 /** 백업 파일로 저장했을 때 부른다 */
-export const markFileBackup = () => setPref('fileBackupAt', String(Date.now()))
+export function markFileBackup() { setPref('fileBackupAt', String(Date.now())); notifyBackup() }
 
 /** 기기 밖으로 나간 마지막 백업 (드라이브, 폴더, 파일 저장 중 가장 최근) */
 export function lastBackupAt(): number | undefined {
@@ -28,4 +33,4 @@ export function backupNudge(hasData: boolean, now = Date.now()): 'never' | numbe
   return days >= BACKUP_STALE_DAYS ? days : null
 }
 
-export const snoozeBackupNudge = () => setPref('backupNudgeAt', String(Date.now()))
+export function snoozeBackupNudge() { setPref('backupNudgeAt', String(Date.now())); notifyBackup() }

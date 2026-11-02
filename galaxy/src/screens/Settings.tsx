@@ -5,6 +5,7 @@ import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCam
 import { getPref, useLiveQuery } from '../store'
 import { backupFileName, exportAll, importAll, localBackupAt, writeLocalBackup } from '../backup'
 import { lastBackupAt, markFileBackup } from '../core/backupNudge'
+import { useBackupRefresh } from '../BackupNudge'
 import { restorePhotos } from '../restore'
 import { CloudBackup, cloudStatus } from './CloudBackup'
 import { Stats } from './Stats'
@@ -25,6 +26,7 @@ const themes: [string, string][] = [['system', '기기 설정'], ['light', '라�
 export const lastBackupText = () => { const t = lastBackupAt(); return t ? `마지막 백업 ${new Date(t).toLocaleString('ko-KR')}.` : '아직 기기 밖에 백업하지 않았어요.' }
 
 export function Settings({ onClose, openBackup = false }: { onClose: () => void; openBackup?: boolean }) {
+  useBackupRefresh()
   const c = useTheme()
   const [theme, setTheme] = useState<string>(getPref<string>('theme', 'system'))
   const [usage, setUsage] = useState<{ used: number; quota: number }>()

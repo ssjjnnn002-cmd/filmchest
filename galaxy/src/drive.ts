@@ -1,5 +1,6 @@
 // 갤럭시: 구글 계정으로 로그인해 드라이브 '필름함' 폴더에 기록 백업과 롤별 사진 폴더를 올린다 (웹 core/drive.ts와 같은 구조)
 import { GoogleSignin } from '@react-native-google-signin/google-signin'
+import { notifyBackup } from './core/backupNudge'
 import * as FS from 'expo-file-system/legacy'
 import { AppState, Linking } from 'react-native'
 import { db } from './data'
@@ -93,7 +94,7 @@ export async function backupToDrive(force = false, interactive = true) {
     setPref('driveKey', k)
     setPref('drivePulledAt', String(Date.now()))
   }
-  setPref('driveLast', String(Date.now()))
+  setPref('driveLast', String(Date.now())); notifyBackup()
   void syncPhotosToDrive(undefined, interactive).catch(() => {})
 }
 
