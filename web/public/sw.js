@@ -4,7 +4,7 @@
 const APP = 'filmchest-app'
 self.addEventListener('install', (e) => e.waitUntil((async () => {
   const cache = await caches.open(APP)
-  await cache.addAll(['./', './app.js', './style.css', './manifest.webmanifest', './icon-192.png']).catch(() => {})
+  await cache.addAll(['./', './app.js', './style.css', './manifest.webmanifest', './icon-192.png?v=2']).catch(() => {})
   await self.skipWaiting()
 })()))
 self.addEventListener('fetch', (e) => {
