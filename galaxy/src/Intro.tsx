@@ -59,7 +59,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
       <Pressable onPress={() => finishRef.current()} accessibilityLabel="필름함" style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <View style={{ alignItems: 'center' }}>
           {/* 아이콘(docs/icon/filmchest-icon.svg)과 같은 선 */}
-          <Svg width={168} height={163} viewBox="262 262 500 484">
+          <Svg width={168} height={163} viewBox="249 266 500 484">
             <G fill="none" stroke={ORANGE} strokeWidth={33} strokeLinejoin="round" strokeLinecap="round">
               <AnimatedRect x={292} y={356} width={232} height={360} rx={40} {...dash(can, LEN.can)} />
               <AnimatedPath d="M364 356V316Q364 292 388 292H428Q452 292 452 316V356" {...dash(cap, LEN.cap)} />

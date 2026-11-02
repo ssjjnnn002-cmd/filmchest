@@ -40,12 +40,12 @@
   "redirects": [
     {
       "source": "/filmchest.apk",
-      "destination": "https://github.com/ssjjnnn002-cmd/filmchest/releases/latest/download/filmchest.apk",
+      "destination": "https://filmchest.pages.dev/filmchest.apk",
       "permanent": false
     },
     {
       "source": "/apk.json",
-      "destination": "https://github.com/ssjjnnn002-cmd/filmchest/releases/latest/download/apk.json",
+      "destination": "https://filmchest.pages.dev/apk.json",
       "permanent": false
     }
   ]

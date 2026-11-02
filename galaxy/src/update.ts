@@ -2,8 +2,8 @@
 import { Linking } from 'react-native'
 import { APK_BUILT } from './apkBuild'
 
-// 가장 최근 릴리스의 파일 (scripts/upload-apk.sh가 올린다)
-const LATEST = 'https://github.com/ssjjnnn002-cmd/filmchest/releases/latest/download'
+// 웹 주소에 같이 올린 최신 APK (scripts/build-android.sh가 나눠 두고, 웹 배포로 올라간다)
+const LATEST = 'https://filmchest.pages.dev'
 
 export async function checkUpdate(): Promise<{ newer: boolean; built?: number }> {
   const res = await fetch(`${LATEST}/apk.json?t=${Date.now()}`)

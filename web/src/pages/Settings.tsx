@@ -78,7 +78,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         <div className="section">
           <h2>안드로이드 앱</h2>
           <div className="group">
-            <a className="row accent" href="https://github.com/ssjjnnn002-cmd/filmchest/releases/latest/download/filmchest.apk">
+            <a className="row accent" href="/filmchest.apk">
               <span className="grow">안드로이드 앱 내려받기</span>
               <span className="value">APK</span>
             </a>

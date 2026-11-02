@@ -1,5 +1,6 @@
 #!/bin/zsh
-# 갤럭시용 필름함 앱(Expo)을 서명해 galaxy/build/filmchest.apk 로 만들고 깃허브 릴리스에 올린다 (scripts/upload-apk.sh).
+# 갤럭시용 필름함 앱(Expo)을 서명해 galaxy/build/filmchest.apk 로 만들고, 웹 배포에 실리도록 web/public/apk/ 에 나눠 둔다.
+# 웹 주소 /filmchest.apk 가 조각을 이어 붙여 내보낸다 (web/functions/filmchest.apk.js). 웹을 배포해야 갤럭시에서 보인다.
 # 서명 키: ~/tools/filmchest.keystore (비밀번호 ~/tools/filmchest-keystore-password.txt). 잃어버리면 기존 앱 위에 업데이트 설치가 안 된다.
 set -e
 cd "$(dirname "$0")/.."
@@ -19,4 +20,12 @@ $BT/apksigner sign --ks ~/tools/filmchest.keystore --ks-key-alias filmchest --ks
 rm -f galaxy/build/filmchest.apk.idsig
 printf '{"built": %s}\n' "$BUILT" > galaxy/build/apk.json
 echo "✓ galaxy/build/filmchest.apk"
-./scripts/upload-apk.sh
+# Cloudflare Pages는 파일 하나에 25MB까지라 20MB씩 나눈다
+rm -rf web/public/apk && mkdir -p web/public/apk
+split -b 20m -a 1 -d galaxy/build/filmchest.apk web/public/apk/part
+for f in web/public/apk/part?; do mv "$f" "$f.bin"; done
+PARTS=$(ls web/public/apk/part*.bin | wc -l | tr -d ' ')
+SIZE=$(stat -f%z galaxy/build/filmchest.apk)
+printf '{"parts": %s, "size": %s}\n' "$PARTS" "$SIZE" > web/public/apk/parts.json
+cp galaxy/build/apk.json web/public/apk.json
+echo "✓ web/public/apk/ ($PARTS 조각) — 웹을 배포하면 올라가요"

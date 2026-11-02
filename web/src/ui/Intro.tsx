@@ -17,7 +17,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
   return (
     <div className={`intro ${leaving ? 'leaving' : ''}`} onClick={() => done.current()} role="img" aria-label="필름함">
       <div className="intro-stage">
-        <svg className="intro-mark" viewBox="262 262 500 484" aria-hidden="true">
+        <svg className="intro-mark" viewBox="249 266 500 484" aria-hidden="true">
           <g fill="none" stroke="currentColor" strokeWidth="33" strokeLinejoin="round" strokeLinecap="round">
             <rect className="intro-line can" x="292" y="356" width="232" height="360" rx="40" pathLength={1} />
             <path className="intro-line cap" d="M364 356V316Q364 292 388 292H428Q452 292 452 316V356" pathLength={1} />

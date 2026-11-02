@@ -29,3 +29,6 @@ build/
 
 # 갤럭시 WebView 번들 원본 (빌드 결과 아님)
 !galaxy/build/
+
+# 갤럭시 APK 조각 (빌드할 때 생긴다)
+web/public/apk/

@@ -18,6 +18,7 @@ struct IntroView: View {
             Color(red: 0.078, green: 0.078, blue: 0.078).ignoresSafeArea()   // #141414
             mark.frame(width: 168, height: 163)
         }
+        .ignoresSafeArea()   // 상태 막대·홈 막대를 빼지 않은 화면 한가운데 (시작 화면과 같은 자리)
         .opacity(opacity)
         .contentShape(Rectangle())
         .onTapGesture { finish() }
@@ -77,7 +78,7 @@ struct IntroView: View {
 private struct IconGlyph: Shape {
     enum Part { case can, cap, leader }
     var part: Part
-    static let box = CGRect(x: 262, y: 262, width: 500, height: 484)
+    static let box = CGRect(x: 249, y: 266, width: 500, height: 484)   // 아이콘과 같은 가운데 (499, 508)
     static let holes = [CGPoint(x: 563, y: 463), CGPoint(x: 613, y: 463), CGPoint(x: 663, y: 463), CGPoint(x: 563, y: 577)]
 
     func path(in rect: CGRect) -> Path {
