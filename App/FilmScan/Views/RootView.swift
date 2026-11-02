@@ -116,7 +116,8 @@ struct RootView: View {
         // 확장이 앱을 열지 못했을 때를 대비해, 앱이 앞으로 올 때 대기함을 확인한다
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { syncNow(delay: 0) }
-            if phase == .active { DriveSync.onActive(context) }
+            // 열 때: 다른 기기 기록을 받고, 아직 안 올린 기록·사진을 올린다
+            if phase == .active { DriveSync.onActive(context); syncNow(delay: 3) }
             if phase == .active, router.importRequest == nil, router.incoming == nil, router.incomingPhotos == nil {
                 router.receiveFiles(Store.takeAllFromInbox())
             }

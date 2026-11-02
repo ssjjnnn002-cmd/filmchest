@@ -43,8 +43,14 @@ export async function dedupeCaseIds(db: Record<string, TableLike>) {
     for (const list of groups.values()) {
       if (list.length < 2) continue
       const keep = list.find((r) => used.has(String(r.id))) ?? list[0]
-      // 빈 칸은 다른 쪽 정보로 채워 둔다
-      const merged = Object.assign({}, ...list.filter((r) => r !== keep), keep)
+      // 내용은 정보가 더 많은 쪽을 기준으로 하고, 빈 칸만 다른 쪽에서 채운다
+      // (사진으로 되살린 빈 롤 '필름 알 수 없음'이 진짜 기록을 덮지 않게)
+      const empty = (v: unknown) => v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)
+      const filled = (r: Row) => Object.values(r).filter((v) => !empty(v)).length
+      const [base, ...rest] = [...list].sort((a, b) => filled(b) - filled(a))
+      const merged: Row = { ...base }
+      for (const r of rest) for (const [k, v] of Object.entries(r)) if (empty(merged[k]) && !empty(v)) merged[k] = v
+      merged.id = keep.id
       await db[t].put(merged)
       for (const r of list) if (r !== keep) { replaced.set(String(r.id), String(keep.id)); await db[t].delete(String(r.id)) }
     }

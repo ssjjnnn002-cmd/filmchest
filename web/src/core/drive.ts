@@ -62,6 +62,7 @@ export const driveLastBackup = () => Number(getPref('driveLast', '0')) || undefi
 export const driveIntervalDays = () => Number(getPref('driveDays', '1'))
 export function disconnectDrive() {
   for (const k of ['driveConnected', 'driveAccount', 'driveFileId', 'driveRoot', 'driveKey']) setPref(k, '')
+  setPref('drivePulledPhotos', '{}')
   notifyBackup()
   setPref('driveRollFolders', '{}'); setPref('driveFrames', '{}')
   token = undefined
@@ -223,7 +224,7 @@ export function startDriveAutoBackup() {
   // 구글 로그인 도구를 미리 받아 둔다: 버튼을 누른 순간 바로 창을 열어야 팝업으로 막히지 않는다
   if (driveConnected()) void loadScript().catch(() => {})
   const live = () => driveConnected() && hasDriveToken()
-  const pull = () => { if (live() && document.visibilityState === 'visible') void pullFromDrive().catch(() => {}) }
+  const pull = () => { if (live() && document.visibilityState === 'visible') void pullFromDrive().catch(() => {}).then(() => pullPhotosFromDrive()).catch(() => {}) }
   pull()
   // 보고 있는 동안 1분마다 다른 기기(아이폰·갤럭시)에서 고친 기록을 받아 온다
   window.setInterval(pull, 60_000)
@@ -252,4 +253,39 @@ export async function signInWithGoogle(onStep?: (text: string) => void) {
   onStep?.('올리는 중…')
   await backupToDrive(true)
   return { cameras: counts?.cameras ?? 0, rolls: counts?.rolls ?? 0, photos }
+}
+
+let pullingPhotos: Promise<number> | undefined
+/** 다른 기기(아이폰·갤럭시)가 드라이브에 올린 스캔 사진을 받아 롤에 붙인다.
+ *  이 기기가 올린 폴더와 이미 받은 파일은 건너뛴다. 사진이 비어 있는 롤이 있을 때만 찾아본다. */
+export function pullPhotosFromDrive(onProgress?: Progress): Promise<number> {
+  pullingPhotos ??= (async () => {
+    try {
+      const rolls = (await db.rolls.toArray()).filter((r) => !r.deletedAt && r.status === 'imported')
+      let empty = 0
+      for (const r of rolls) if ((await db.frames.where('rollId').equals(r.id).count()) === 0) empty += 1
+      if (!empty) return 0
+      const t = await driveToken()
+      const root = await rootFolder(t)
+      const mine = new Set(Object.values(JSON.parse(getPref('driveRollFolders', '{}')) as Record<string, string>))
+      const got: Record<string, 1> = JSON.parse(getPref('drivePulledPhotos', '{}'))
+      const items: { id: string; name: string; mimeType: string }[] = []
+      for (const f of (await listChildren(t, root)).filter((x) => x.mimeType === FOLDER && !mine.has(x.id))) {
+        items.push(...(await listChildren(t, f.id)).filter((x) => x.mimeType.startsWith('image/') && !got[x.id]))
+      }
+      onProgress?.(0, items.length)
+      const files: File[] = []
+      for (const [i, it] of items.entries()) {
+        const res = await fetch(downloadUrl(it.id), { headers: { Authorization: `Bearer ${t}` } })
+        if (res.ok) { const b = await res.blob(); files.push(new File([b], it.name, { type: b.type || 'image/jpeg' })); got[it.id] = 1 }
+        onProgress?.(i + 1, items.length)
+      }
+      if (files.length) await restorePhotos(files)
+      setPref('drivePulledPhotos', JSON.stringify(got))
+      return files.length
+    } finally {
+      pullingPhotos = undefined
+    }
+  })()
+  return pullingPhotos
 }

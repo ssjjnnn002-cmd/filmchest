@@ -24,6 +24,7 @@ async function thumbOf(blob: Blob) {
 
 /** 이 앱이 저장한 사진의 표식으로 롤을 다시 만든다. */
 export async function restorePhotos(files: File[]) {
+  const known = new Map((await db.rolls.toArray()).map((r) => [r.id.toLowerCase(), r.id]))
   const groups = new Map<string, { frame: number; blob: Blob; info: ReturnType<typeof readPhotoInfo> }[]>()
   // 표식이 없는 사진: 사진 정보로 짐작한 롤 (같은 카메라·필름·날짜끼리)
   const guessed = new Map<string, Partial<Roll>>()
@@ -32,7 +33,8 @@ export async function restorePhotos(files: File[]) {
     const data = new Uint8Array(await file.arrayBuffer())
     const blob = new Blob([data], { type: file.type || 'image/jpeg' })
     const mark = readFilmchestMark(data)
-    let rollId = mark?.rollId
+    // 아이폰은 롤 id를 대문자로 적는다: 이 기기에 있는 같은 롤(소문자 id)에 붙인다
+    let rollId = mark ? (known.get(mark.rollId.toLowerCase()) ?? mark.rollId) : undefined
     let frame = mark?.frame
     if (!mark) {
       const g = guessRollFromMeta(data)
