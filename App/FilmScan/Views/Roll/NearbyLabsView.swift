@@ -114,7 +114,7 @@ struct NearbyLabsView: View {
 
     /// 카카오 로컬 검색 (필름함 서버를 거친다)
     static func kakao(near p: GeoPoint) async -> [Lab] {
-        guard let url = URL(string: "https://filmchest.vercel.app/api/labs?lat=\(p.latitude)&lng=\(p.longitude)") else { return [] }
+        guard let url = URL(string: "https://filmchest.pages.dev/api/labs?lat=\(p.latitude)&lng=\(p.longitude)") else { return [] }
         struct Response: Decodable {
             struct Item: Decodable {
                 let name: String; let address: String?; let phone: String?

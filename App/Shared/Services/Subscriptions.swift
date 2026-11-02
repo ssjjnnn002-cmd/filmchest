@@ -35,7 +35,7 @@ final class Subscriptions {
     /// 첫 출시는 구독 없이 전부 무료. 나중에 true로 바꾸면 12롤 이후 월 구독이 다시 켜진다.
     static let subscriptionEnabled = false
     static let productID = "kr.filmchest.app.plus.monthly"
-    static let privacyURL = URL(string: "https://filmchest.vercel.app/privacy")!
+    static let privacyURL = URL(string: "https://filmchest.pages.dev/privacy")!
     static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
 
     private(set) var product: Product?

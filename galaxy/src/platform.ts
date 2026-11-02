@@ -29,7 +29,7 @@ export async function storageEstimate() {
 import * as Location from 'expo-location'
 import type { GeoPoint, WeatherNote } from './core/types'
 
-const SITE = 'https://filmchest.vercel.app'
+const SITE = 'https://filmchest.pages.dev'
 
 export interface Place {
   name: string
@@ -56,7 +56,7 @@ export async function currentPoint(timeoutMs = 8000): Promise<GeoPoint | undefin
 }
 
 const NOMINATIM = 'https://nominatim.openstreetmap.org'
-const nominatimHeaders = { 'User-Agent': 'Filmchest/1.0 (filmchest.vercel.app)' }
+const nominatimHeaders = { 'User-Agent': 'Filmchest/1.0 (filmchest.pages.dev)' }
 
 export const placeSearchAvailable = () => true
 

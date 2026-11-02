@@ -17,6 +17,7 @@ import { PhotoImportFlow } from './pages/PhotoSplit'
 import { isZipFile } from './core/zip'
 import { uid } from './core/types'
 import { Intro } from './ui/Intro'
+import { MoveNotice } from './ui/MoveNotice'
 
 export type Tab = 'library' | 'shooting' | 'pending' | 'rolls'
 type Screen = { type: 'camera'; id: string } | { type: 'roll'; id: string }
@@ -288,6 +289,7 @@ export function App() {
       )}
       {toastNode}
       {intro && <Intro onDone={() => setIntro(false)} />}
+      {!intro && <MoveNotice />}
     </NavContext.Provider>
   )
 }

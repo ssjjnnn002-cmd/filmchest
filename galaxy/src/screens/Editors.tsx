@@ -390,7 +390,7 @@ function NearbyLabs({ onPick, onClose }: { onPick: (name: string) => void; onClo
     <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: '#0b0b0c' }}>
         {ready ? (
-          <WebView source={{ uri: 'https://filmchest.vercel.app/labs.html' }} geolocationEnabled originWhitelist={['*']}
+          <WebView source={{ uri: 'https://filmchest.pages.dev/labs.html' }} geolocationEnabled originWhitelist={['*']}
             style={{ flex: 1, backgroundColor: '#0b0b0c' }}
             onMessage={(e) => {
               try {
