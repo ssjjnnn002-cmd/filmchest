@@ -42,7 +42,8 @@ function OldSiteNotice() {
 }
 
 function NewSiteWelcome() {
-  const [receiving, setReceiving] = useState(() => new URLSearchParams(location.search).has('move'))
+  // 예전 주소가 연 창일 때만 기다린다 (주소만 붙여 열었거나 새로 고친 경우는 바로 넘어간다)
+  const [receiving, setReceiving] = useState(() => new URLSearchParams(location.search).has('move') && !!window.opener)
   const [asked, setAsked] = useState(() => getPref('moveAsked', '' as string) === '1')
   const [note, setNote] = useState('')
   const [guide, setGuide] = useState(false)
@@ -50,6 +51,10 @@ function NewSiteWelcome() {
 
   useEffect(() => {
     receiveFromOldSite(() => { setPref('moveAsked', '1'); setReceiving(false); setAsked(true); setNote('예전 주소의 기록을 옮겼어요.') })
+    if (new URLSearchParams(location.search).has('move') && !window.opener) history.replaceState(null, '', '/')
+    // 2분 안에 못 받으면 기다림을 푼다 (예전 주소 창을 닫은 경우)
+    const t = window.setTimeout(() => setReceiving((r) => { if (r) setNote('기록을 받지 못했어요. 예전 주소에서 다시 눌러 주세요.'); return false }), 120_000)
+    return () => window.clearTimeout(t)
   }, [])
 
   const close = () => { setPref('moveAsked', '1'); setAsked(true) }

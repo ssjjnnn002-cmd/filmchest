@@ -8,7 +8,7 @@ import { formatInfo, uid } from '../core/types'
 import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films'
 import { lensesFor } from '../core/lenses'
 import { Btn, CameraCover, Canister, Chip, DateInput, Field, Footnote, Group, Row, Section, Select, Toggle } from '../kit'
-import { Sheet, SheetBtn } from '../overlay'
+import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { currentPlace, locationAvailable, weatherAt } from '../platform'
 import { useTheme } from '../theme'
 import { CustomFilmEdit } from './CustomFilmEdit'
@@ -61,6 +61,10 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const loaded = rolls.find((r) => kept(r) && r.cameraId === cameraId && r.status === 'loaded')
   const mountLenses = camera?.mount ? allLenses.filter((l) => l.mount.toLowerCase() === camera.mount!.toLowerCase()) : []
   const film = filmById(filmId)
+  // 재고에 유통기한이 지난 이 필름이 있으면 장착 전에 한 번 묻는다 (아이폰과 같게)
+  const lots = useLiveQuery(() => db.filmLots.toArray(), []) ?? []
+  const expired = !!film && lots.some((l) => l.filmId === film.id && !!l.expiresAt && l.expiresAt < Date.now())
+  const [confirmExpired, setConfirmExpired] = useState(false)
 
   // 최근 쓴 순 → 기록이 없으면 많이 쓰는 필름 순
   const stocks = useMemo(() => {
@@ -116,7 +120,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
 
   return (
     <Sheet title="필름 장착하기" onClose={() => onClose()}
-      right={<SheetBtn label="장착" accent disabled={!camera || !film || !lensReady} onPress={load} />}>
+      right={<SheetBtn label="장착" accent disabled={!camera || !film || !lensReady} onPress={() => expired ? setConfirmExpired(true) : load()} />}>
       <Section title="카메라" foot={loaded ? "지금 장착된 필름은 '촬영 완료'로 바뀌어요." : undefined} warn>
         {cameras?.length === 0 ? <Footnote>먼저 내 장비에서 카메라를 추가해 주세요.</Footnote> : null}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2, paddingTop: 2, paddingBottom: 4 }}>
@@ -211,6 +215,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
           </Group>
         </Section>
       ) : null}
+      {confirmExpired ? <Confirm message="유통기한이 지난 필름이에요." action="그래도 장착" safe onCancel={() => setConfirmExpired(false)} onConfirm={() => { setConfirmExpired(false); void load() }} /> : null}
       {customEdit ? (
         <CustomFilmEdit row={customEdit === 'new' ? undefined : customRows.find((r) => r.id === customEdit)}
           onClose={(saved) => { setCustomEdit(null); if (saved !== undefined) setFilmId(saved || undefined) }} />

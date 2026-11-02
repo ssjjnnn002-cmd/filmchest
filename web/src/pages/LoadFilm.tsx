@@ -6,7 +6,7 @@ import { formatInfo, uid } from '../core/types'
 import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films'
 import { CustomFilmEdit } from './CustomFilmEdit'
 import { lensesFor } from '../core/lenses'
-import { CameraCover, Canister, Sheet, toInputDate } from '../ui/common'
+import { CameraCover, Canister, Confirm, Sheet, toInputDate } from '../ui/common'
 import { currentPlace, locationAvailable, weatherAt } from '../platform'
 
 export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: string; onClose: (loaded?: Roll) => void }) {
@@ -56,6 +56,10 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const loaded = rolls.find((r) => kept(r) && r.cameraId === cameraId && r.status === 'loaded')
   const mountLenses = camera?.mount ? allLenses.filter((l) => l.mount.toLowerCase() === camera.mount!.toLowerCase()) : []
   const film = filmById(filmId)
+  // 재고에 유통기한이 지난 이 필름이 있으면 장착 전에 한 번 묻는다 (아이폰과 같게)
+  const lots = useLiveQuery(() => db.filmLots.toArray(), []) ?? []
+  const expired = !!film && lots.some((l) => l.filmId === film.id && !!l.expiresAt && l.expiresAt < Date.now())
+  const [confirmExpired, setConfirmExpired] = useState(false)
 
   // 최근 쓴 순 → 기록이 없으면 많이 쓰는 필름 순
   const stocks = useMemo(() => {
@@ -105,7 +109,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
 
   return (
     <Sheet title="필름 장착하기" onClose={() => onClose()}
-      right={<button className="btn ghost" disabled={!camera || !film || !lensReady} onClick={load}><b>장착</b></button>}>
+      right={<button className="btn ghost" disabled={!camera || !film || !lensReady} onClick={() => expired ? setConfirmExpired(true) : load()}><b>장착</b></button>}>
       <div className="section">
         <h2>카메라</h2>
         {cameras?.length === 0 && <p className="footnote">먼저 내 장비에서 카메라를 추가해 주세요.</p>}
@@ -215,6 +219,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
           {today && isToday && <p className="footnote">{locationAvailable() ? '지금 시각과 현재 위치를 첫 촬영일로 기록해요.' : '지금 시각을 첫 촬영일로 기록해요. 장소는 롤 화면에서 넣을 수 있어요.'}</p>}
         </div>
       )}
+      {confirmExpired && <Confirm message="유통기한이 지난 필름이에요." action="그래도 장착" safe onCancel={() => setConfirmExpired(false)} onConfirm={() => { setConfirmExpired(false); void load() }} />}
       {customEdit && (
         <CustomFilmEdit row={customEdit === 'new' ? undefined : customRows.find((r) => r.id === customEdit)}
           onClose={(saved) => { setCustomEdit(null); if (saved !== undefined) setFilmId(saved || undefined) }} />
