@@ -176,6 +176,8 @@ struct LoadFilmView: View {
                     }
                 } header: {
                     Text(showAllFilms ? "필름" : "필름 · 최근 사용")
+                } footer: {
+                    if let film, stockCount(film.id) > 0 { Text("재고 \(stockCount(film.id))롤 · 장착하면 1롤 빼요") }
                 }
 
                 if let film {
@@ -268,6 +270,10 @@ struct LoadFilmView: View {
         .buttonStyle(.plain)
     }
 
+    private func stockCount(_ filmID: String) -> Int {
+        lots.filter { $0.filmStockID == filmID }.reduce(0) { $0 + max(0, $1.count) }
+    }
+
     private func load() async {
         guard let camera, let film else { return }
         await Subscriptions.shared.refreshEntitlement()
@@ -286,6 +292,14 @@ struct LoadFilmView: View {
 
         let roll = RollItem(camera: camera, lens: lens, filmStockID: film.id, shotISO: shotISO)
         context.insert(roll)
+        // 재고가 있으면 1롤 뺀다 (웹·갤럭시와 같은 규칙: 포맷이 맞는 것, 유통기한이 이른 것 먼저)
+        if let lot = lots.filter({ $0.filmStockID == film.id && $0.count > 0 }).sorted(by: { a, b in
+            let fa = a.format == camera.format ? 0 : 1, fb = b.format == camera.format ? 0 : 1
+            if fa != fb { return fa < fb }
+            return (a.expiresAt ?? .distantFuture) < (b.expiresAt ?? .distantFuture)
+        }).first {
+            lot.count -= 1
+        }
         Subscriptions.shared.noteRollCreated(in: context)
 
         if startToday {

@@ -93,9 +93,10 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
     return () => window.removeEventListener('keydown', k)
   }, [])
 
+  // 훅은 return보다 먼저 (사진이 없다가 생기면 훅 수가 달라져 화면이 멈춘다)
+  const roll = useLiveQuery(() => (frame ? db.rolls.get(frame.rollId) : undefined), [frame?.rollId])
   if (!frame) return null
   const fav = live?.favorite ?? frame.favorite
-  const roll = useLiveQuery(() => db.rolls.get(frame.rollId), [frame.rollId])
   const shot = meterShotAt(roll?.meterShots, frame.index, roll?.meterOffset ?? 0)
   const isCover = (roll?.coverIndex ?? 1) === frame.index
   return (
@@ -240,7 +241,7 @@ export function ContactSheetView({ roll, frames, onClose }: { roll: Roll; frames
         <button className="btn primary block" disabled={!url || !canMake} onClick={() => setExporting(true)}>밀착 인화지로 만들기</button>
       </div>
       {exporting && (
-        <Sheet title="밀착 인화지로 만들기" shield onClose={() => setExporting(false)} right={<button className="btn ghost" onClick={() => setExporting(false)}><b>완료</b></button>}>
+        <Sheet title="밀착 인화지로 만들기" shield onClose={() => setExporting(false)} left={<span />} right={<button className="btn ghost" onClick={() => setExporting(false)}><b>완료</b></button>}>
           <div className="section">
             <div className="group">
               <label className="toggle"><span>제목 넣기</span>

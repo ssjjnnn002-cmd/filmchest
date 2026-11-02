@@ -154,7 +154,7 @@ function ProjectDetail({ id, onClose }: { id: string; onClose: () => void }) {
       </div></div>
       {editing && <ProjectEdit project={project} onClose={() => setEditing(false)} />}
       {adding && (
-        <Sheet title="롤 담기" onClose={() => setAdding(false)} right={<button className="btn ghost" onClick={() => setAdding(false)}><b>완료</b></button>}>
+        <Sheet title="롤 담기" onClose={() => setAdding(false)} left={<span />} right={<button className="btn ghost" onClick={() => setAdding(false)}><b>완료</b></button>}>
           <div className="group">
             {rolls.filter(kept).sort((a, b) => rollStart(b) - rollStart(a)).map((r) => {
               const on = project.rollIds.includes(r.id)
@@ -193,7 +193,7 @@ export function RollProjects({ roll }: { roll: Roll }) {
         <button className="row accent" onClick={() => setPicking(true)}><Icon name="plus" /> {mine.length ? '프로젝트 바꾸기' : '프로젝트에 담기'}</button>
       </div>
       {picking && (
-        <Sheet title="프로젝트에 담기" onClose={() => setPicking(false)} right={<button className="btn ghost" onClick={() => setPicking(false)}><b>완료</b></button>}>
+        <Sheet title="프로젝트에 담기" onClose={() => setPicking(false)} left={<span />} right={<button className="btn ghost" onClick={() => setPicking(false)}><b>완료</b></button>}>
           <div className="group">
             {projects.map((p) => {
               const on = p.rollIds.includes(roll.id)

@@ -32,7 +32,7 @@ export function Spending({ onClose }: { onClose: () => void }) {
     </div>
   )
   return (
-    <Sheet title="장비에 쓴 돈" onClose={onClose} right={<button className="btn ghost" onClick={onClose}><b>완료</b></button>}>
+    <Sheet title="장비에 쓴 돈" onClose={onClose} left={<span />} right={<button className="btn ghost" onClick={onClose}><b>완료</b></button>}>
       <div className="section">
         <div className="group" style={{ padding: '14px 18px' }}>
           <span className="sub">여태까지 쓴 돈</span>

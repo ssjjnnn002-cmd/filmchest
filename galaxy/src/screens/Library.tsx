@@ -1,5 +1,6 @@
 // 웹 pages/Library.tsx
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { BackupNudge } from '../BackupNudge'
 import { Animated, Easing, LayoutAnimation, Pressable, Text, Vibration, View, type LayoutRectangle } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { db, kept } from '../data'
@@ -39,7 +40,7 @@ export function Library() {
   const lensTags = useLiveQuery(async () => (await db.lenses.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
   const filterTags = useLiveQuery(async () => (await db.filters.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
   const [gearAdd, setGearAdd] = useState(false)
-  const [settings, setSettings] = useState(false)
+  const [settings, setSettings] = useState<boolean | 'backup'>(false)
   const [layout, setLayout] = useState<string>(getPref('libraryLayout', 'grid'))
   // 순서 편집 중: 카드가 흔들리고, 눌러도 들어가지 않는다.
   const [editing, setEditing] = useState(false)
@@ -156,6 +157,7 @@ export function Library() {
           { icon: 'plus', label: gear === 'camera' ? '카메라 추가' : `${gear === 'lens' ? '렌즈' : gear === 'filter' ? '액세서리' : '필름'} 추가`, onPress: () => gear === 'camera' ? setAdding(true) : setGearAdd(true) },
         ]} />}>
 
+      {!editing ? <BackupNudge onBackup={() => setSettings('backup')} /> : null}
       {!editing && (
         <View style={{ marginBottom: 12 }}>
           <Segmented value={gear} options={[['camera', '카메라'], ['lens', '렌즈'], ['filter', '액세서리'], ['film', '필름']]} onChange={(g) => { setGear(g); setTag(undefined); setSearch('') }} />
@@ -235,7 +237,7 @@ export function Library() {
 
       {adding ? <CameraEdit onClose={() => setAdding(false)} /> : null}
       {gearAdd && gear !== 'camera' ? <GearAdd kind={gear} onClose={() => setGearAdd(false)} /> : null}
-      {settings ? <Settings onClose={() => setSettings(false)} /> : null}
+      {settings ? <Settings openBackup={settings === 'backup'} onClose={() => setSettings(false)} /> : null}
     </Page>
   )
 }

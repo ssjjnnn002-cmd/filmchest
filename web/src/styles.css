@@ -717,3 +717,8 @@ a.row.accent { color: var(--safelight); }
 .photo-actions > .row { width: 100%; border-top: .5px solid var(--sep); border-radius: 0; gap: 12px; cursor: pointer; }
 .photo-empty { height: 160px; display: grid; place-items: center; color: var(--muted); }
 .move-steps { margin: 0 4px 14px; padding-left: 22px; display: grid; gap: 10px; line-height: 1.5; }
+.nudge { margin-bottom: 12px; }
+.nudge .row.static { align-items: flex-start; gap: 12px; color: var(--text); }
+.nudge .row.static > svg { color: var(--safelight); margin-top: 2px; flex-shrink: 0; }
+.nudge .sub { display: block; margin-top: 2px; }
+.nudge-actions { display: flex; justify-content: flex-end; gap: 4px; padding: 0 8px 8px; }

@@ -72,7 +72,7 @@ function NewSiteWelcome() {
   }
   if (note && asked) {
     return (
-      <Sheet title="기록 옮기기" onClose={() => setNote('')} right={<button className="btn ghost" onClick={() => setNote('')}><b>완료</b></button>}>
+      <Sheet title="기록 옮기기" onClose={() => setNote('')} left={<span />} right={<button className="btn ghost" onClick={() => setNote('')}><b>완료</b></button>}>
         <p className="footnote">{note}</p>
       </Sheet>
     )

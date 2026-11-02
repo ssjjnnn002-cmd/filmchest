@@ -113,7 +113,7 @@ export function FramePrint({ roll, frames, onClose }: { roll: Roll; frames: Fram
           <Btn label="저장" kind="primary" size="large" block disabled={!uri} onPress={() => setExporting(true)} />
         </View>
         {exporting ? (
-          <Sheet title="프레임 만들기" onClose={() => setExporting(false)} right={<SheetBtn label="완료" accent onPress={() => setExporting(false)} />}>
+          <Sheet title="프레임 만들기" onClose={() => setExporting(false)} left={<span />} right={<SheetBtn label="완료" accent onPress={() => setExporting(false)} />}>
             <View style={{ gap: 10, marginTop: 8 }}>
               <Btn label="갤러리에 저장" icon="download" kind="primary" block disabled={!uri} onPress={async () => {
                 if (!uri) return

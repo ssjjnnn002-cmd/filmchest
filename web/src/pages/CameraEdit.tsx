@@ -76,9 +76,9 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
   const useFile = (f: File) => {
     setOriginal(f)
     setPhotoScale(1)
-    void usePhoto(f, removeBg)
+    void applyPhoto(f, removeBg)
   }
-  const usePhoto = async (file: Blob, remove: boolean) => {
+  const applyPhoto = async (file: Blob, remove: boolean) => {
     setProcessing(true)
     setOffset({ x: 0, y: 0 })
     try {
@@ -225,7 +225,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
                   {original && !processing && removeBg && !bgRemoved && <span className="sub" style={{ display: 'block' }}>단색 배경이 아니라 그대로 두었어요</span>}
                 </span>
                 <input type="checkbox" className="switch" checked={removeBg} disabled={!original || processing}
-                  onChange={(e) => { setRemoveBg(e.target.checked); if (original) void usePhoto(original, e.target.checked) }} />
+                  onChange={(e) => { setRemoveBg(e.target.checked); if (original) void applyPhoto(original, e.target.checked) }} />
               </label>
             </div>
           )}

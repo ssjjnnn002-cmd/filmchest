@@ -78,7 +78,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
     },
     onPanResponderRelease: () => { start.current = null },
   }), [])
-  const usePhoto = async (file: { data: string; type: string }, remove: boolean) => {
+  const applyPhoto = async (file: { data: string; type: string }, remove: boolean) => {
     setProcessing(true)
     try {
       const r = await webTool<{ data: string; removed: boolean }>('cutout', { data: file.data, type: file.type, remove })
@@ -148,7 +148,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
     const file = { data, type: a.mimeType ?? 'image/jpeg' }
     setOriginal(file)
     setPhotoScale(1)
-    void usePhoto(file, removeBg)
+    void applyPhoto(file, removeBg)
   }
 
   const save = async () => {
@@ -234,7 +234,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
             <View style={{ backgroundColor: c.fill, borderRadius: 16 }}>
               <Toggle label="배경 지우기" value={removeBg}
                 sub={original && !processing && removeBg && !bgRemoved ? '단색 배경이 아니라 그대로 두었어요' : undefined}
-                onChange={(v) => { if (!original || processing) return; setRemoveBg(v); void usePhoto(original, v) }} />
+                onChange={(v) => { if (!original || processing) return; setRemoveBg(v); void applyPhoto(original, v) }} />
             </View>
           ) : null}
           <PhotoRows onCamera={() => { void pickPhoto(true) }} onAlbum={() => { void pickPhoto(false) }}

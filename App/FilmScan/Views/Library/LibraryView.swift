@@ -70,6 +70,7 @@ struct LibraryView: View {
 
     var body: some View {
         ScrollView {
+            if !editing { BackupNudgeCard() }
             if !editing {
                 Picker("장비", selection: $gear) {
                     ForEach(GearTab.allCases) { Text($0.title).tag($0) }

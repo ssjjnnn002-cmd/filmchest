@@ -310,7 +310,7 @@ export function ContactSheetView({ roll, frames, onClose }: { roll: Roll; frames
           <Btn label="밀착 인화지로 만들기" kind="primary" block disabled={!uri || !canMake} onPress={() => setExporting(true)} />
         </View>
         {exporting ? (
-          <Sheet title="밀착 인화지로 만들기" onClose={() => setExporting(false)} right={<SheetBtn label="완료" accent onPress={() => setExporting(false)} />}>
+          <Sheet title="밀착 인화지로 만들기" onClose={() => setExporting(false)} left={<span />} right={<SheetBtn label="완료" accent onPress={() => setExporting(false)} />}>
             <Section foot={roll.note ? '롤 메모로 제목을 채웠어요.' : undefined}>
               <Group>
                 <Toggle label="제목 넣기" value={useTitle} onChange={setUseTitle} />

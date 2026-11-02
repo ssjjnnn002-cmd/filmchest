@@ -37,7 +37,7 @@ export function Spending({ onClose }: { onClose: () => void }) {
     </Section>
   ) : null
   return (
-    <Sheet title="장비에 쓴 돈" onClose={onClose} right={<SheetBtn label="완료" accent onPress={onClose} />}>
+    <Sheet title="장비에 쓴 돈" onClose={onClose} left={<span />} right={<SheetBtn label="완료" accent onPress={onClose} />}>
       <Group style={{ padding: 18 }}>
         <Sub>여태까지 쓴 돈</Sub>
         <Text style={{ fontSize: 34, fontWeight: '800', color: c.ink }}>{priceText(gearSum + filmSum)}</Text>

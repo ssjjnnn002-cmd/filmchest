@@ -4,6 +4,7 @@ import { Text, View } from 'react-native'
 import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll } from '../data'
 import { getPref, useLiveQuery } from '../store'
 import { backupFileName, exportAll, importAll, localBackupAt, writeLocalBackup } from '../backup'
+import { lastBackupAt, markFileBackup } from '../core/backupNudge'
 import { restorePhotos } from '../restore'
 import { CloudBackup, cloudStatus } from './CloudBackup'
 import { Stats } from './Stats'
@@ -20,7 +21,10 @@ import { applyTheme, useTheme } from '../theme'
 
 const themes: [string, string][] = [['system', '기기 설정'], ['light', '라이트'], ['dark', '다크']]
 
-export function Settings({ onClose }: { onClose: () => void }) {
+/** 기기 밖에 남긴 마지막 백업 (기기 안 자동 백업은 앱을 지우면 함께 지워져서 빼고 센다) */
+export const lastBackupText = () => { const t = lastBackupAt(); return t ? `마지막 백업 ${new Date(t).toLocaleString('ko-KR')}.` : '아직 기기 밖에 백업하지 않았어요.' }
+
+export function Settings({ onClose, openBackup = false }: { onClose: () => void; openBackup?: boolean }) {
   const c = useTheme()
   const [theme, setTheme] = useState<string>(getPref<string>('theme', 'system'))
   const [usage, setUsage] = useState<{ used: number; quota: number }>()
@@ -28,7 +32,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const [privacy, setPrivacy] = useState(false)
   const [note, setNote] = useState<string>()
   const [cloud, setCloud] = useState(false)
-  const [backupOpen, setBackupOpen] = useState(false)
+  const [backupOpen, setBackupOpen] = useState(openBackup)
   const [purge, setPurge] = useState<(() => Promise<unknown>) | null>(null)
   const [spending, setSpending] = useState(false)
   const [update, setUpdate] = useState(() => (installedBuilt() ? new Date(installedBuilt() * 1000).toLocaleDateString('ko-KR') : ''))
@@ -39,9 +43,16 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const choose = (t: string) => { setTheme(t); applyTheme(t) }
 
   return (
-    <Sheet title="설정" onClose={onClose} right={<SheetBtn label="완료" accent onPress={onClose} />}>
+    <Sheet title="설정" onClose={onClose} left={<span />} right={<SheetBtn label="완료" accent onPress={onClose} />}>
       <Section title="화면">
         <Segmented value={theme} options={themes} onChange={choose} />
+      </Section>
+
+      <Section foot={lastBackupText()}>
+        <Group>
+          <Row chev onPress={() => setSpending(true)}><RowText>통계</RowText></Row>
+          <Row chev value={cloudStatus()} onPress={() => setBackupOpen(true)}><RowText>백업 및 복구</RowText></Row>
+        </Group>
       </Section>
 
       <Section title="저장" foot="기록과 사진은 이 기기의 필름함 앱 안에만 저장돼요. 서버로 올라가지 않아서 다른 기기나 다른 사람에게는 보이지 않아요. 앱을 지우면 함께 지워지니, 중요한 롤은 사진을 내려받아 두세요.">
@@ -50,7 +61,6 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </Group>
       </Section>
 
-      <Group><Row chev value={cloudStatus()} onPress={() => setBackupOpen(true)}><RowText>백업 및 복구</RowText></Row></Group>
 
       <Section title="안내">
         <Group>
@@ -61,6 +71,13 @@ export function Settings({ onClose }: { onClose: () => void }) {
       <Section title="버전" foot="앱 버전은 아이폰, 갤럭시, 웹이 같습니다.">
         <Group>
           <Row static value={APP_VERSION}><RowText>앱 버전</RowText></Row>
+          <Row chev value={update} onPress={async () => {
+            try {
+              const u = await checkUpdate()
+              if (u.newer) { setUpdate('새 버전 있음'); void downloadUpdate(); setNote('새 버전을 내려받아요. 다 받으면 알림을 눌러 설치하세요. 기록은 그대로 남아요.') }
+              else { setUpdate('최신 버전'); setNote('지금 최신 버전이에요.') }
+            } catch { setNote('업데이트를 확인하지 못했어요. 인터넷 연결을 확인해 주세요.') }
+          }}><RowText>업데이트 확인</RowText></Row>
         </Group>
       </Section>
 
@@ -94,11 +111,11 @@ export function Settings({ onClose }: { onClose: () => void }) {
       ) : null}
       {spending ? <Stats onClose={() => setSpending(false)} /> : null}
       {backupOpen ? (
-        <Sheet title="백업 및 복구" onClose={() => setBackupOpen(false)} right={<SheetBtn label="완료" accent onPress={() => setBackupOpen(false)} />}>
-          <Section title="백업" foot={`${localBackupAt() ? `마지막 백업 ${new Date(localBackupAt()!).toLocaleString('ko-KR')}. ` : ''}장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 웹앱 백업 파일도 불러올 수 있어요.`}>
+        <Sheet title="백업 및 복구" onClose={() => setBackupOpen(false)} left={<span />} right={<SheetBtn label="완료" accent onPress={() => setBackupOpen(false)} />}>
+          <Section title="백업" foot={`${lastBackupText()} 장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 웹앱 백업 파일도 불러올 수 있어요.`}>
             <Group>
               <Row chev value={cloudStatus()} onPress={() => setCloud(true)}><RowText>클라우드 백업</RowText></Row>
-              <Row onPress={async () => { await writeLocalBackup(); await saveFileNow(backupFileName, await exportAll(), 'application/json') }}>백업 파일로 저장</Row>
+              <Row onPress={async () => { await writeLocalBackup(); await saveFileNow(backupFileName, await exportAll(), 'application/json'); markFileBackup() }}>백업 파일로 저장</Row>
               <Row onPress={async () => {
                 const [file] = await pickFiles(['application/json', 'text/plain', '*/*'], false)
                 if (!file) return
@@ -148,16 +165,6 @@ export function Settings({ onClose }: { onClose: () => void }) {
             </Group>
           </Section>
 
-          <Group>
-            <Row chev onPress={() => setSpending(true)}><RowText>통계</RowText></Row>
-            <Row chev value={update} onPress={async () => {
-              try {
-                const u = await checkUpdate()
-                if (u.newer) { setUpdate('새 버전 있음'); void downloadUpdate(); setNote('새 버전을 내려받아요. 다 받으면 알림을 눌러 설치하세요. 기록은 그대로 남아요.') }
-                else { setUpdate('최신 버전'); setNote('지금 최신 버전이에요.') }
-              } catch { setNote('업데이트를 확인하지 못했어요. 인터넷 연결을 확인해 주세요.') }
-            }}><RowText>업데이트 확인</RowText></Row>
-          </Group>
         </Sheet>
       ) : null}
       {cloud ? <CloudBackup onClose={() => setCloud(false)} /> : null}

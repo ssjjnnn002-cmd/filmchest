@@ -124,7 +124,7 @@ export function FramePrint({ roll, frames, onClose }: { roll: Roll; frames: Fram
         <button className="btn primary block large" disabled={!blob} onClick={() => setExporting(true)}>저장</button>
       </div>
       {exporting && (
-        <Sheet title="프레임 만들기" onClose={() => setExporting(false)} right={<button className="btn ghost" onClick={() => setExporting(false)}><b>완료</b></button>}>
+        <Sheet title="프레임 만들기" onClose={() => setExporting(false)} left={<span />} right={<button className="btn ghost" onClick={() => setExporting(false)}><b>완료</b></button>}>
           <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
             <button className="btn primary block" disabled={!blob} onClick={saveGallery}><Icon name="download" /> 갤러리에 저장</button>
             <button className="btn block" disabled={!blob} onClick={saveAsFile}>파일로 저장</button>

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { BackupNudge } from '../ui/BackupNudge'
 import { db, kept } from '../db'
 import { useNav } from '../App'
 import type { Camera, Roll } from '../core/types'
@@ -43,7 +44,7 @@ export function Library() {
   useEffect(() => { void migrateAccessories() }, [])
   const lensTags = useLiveQuery(async () => (await db.lenses.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
   const filterTags = useLiveQuery(async () => (await db.filters.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
-  const [settings, setSettings] = useState(false)
+  const [settings, setSettings] = useState<boolean | 'backup'>(false)
   const [layout, setLayout] = useState<string>(getPref('libraryLayout', 'grid'))
   // 순서 편집 중: 카드가 흔들리고, 눌러도 들어가지 않는다. 화면 배치는 그대로 둔다(끄는 카드가 어긋나지 않게).
   const [editing, setEditing] = useState(false)
@@ -242,6 +243,7 @@ export function Library() {
             </GlassGroup>
           )} />
 
+      {!editing && <BackupNudge onBackup={() => setSettings('backup')} />}
       {!editing && (
         <div className="segmented" role="tablist" aria-label="장비" style={{ margin: '4px 0 12px' }}>
           {([['camera', '카메라'], ['lens', '렌즈'], ['filter', '액세서리'], ['film', '필름']] as const).map(([id, label]) => (
@@ -323,7 +325,7 @@ export function Library() {
 
       {adding && <CameraEdit onClose={() => setAdding(false)} />}
       {gearAdd && gear !== 'camera' && <GearAdd kind={gear} onClose={() => setGearAdd(false)} />}
-      {settings && <Settings onClose={() => setSettings(false)} />}
+      {settings && <Settings openBackup={settings === 'backup'} onClose={() => setSettings(false)} />}
     </>
   )
 }

@@ -403,7 +403,7 @@ export function AccessoryLinkFields({ ids, setIds, bodyPrice }: { ids: string[];
       </div>
       <p className="footnote">내 장비의 액세서리 탭에 등록한 것에서 골라요.</p>
       {picking && (
-        <Sheet title="액세서리 고르기" onClose={() => setPicking(false)} right={<button className="btn ghost" onClick={() => setPicking(false)}><b>완료</b></button>}>
+        <Sheet title="액세서리 고르기" onClose={() => setPicking(false)} left={<span />} right={<button className="btn ghost" onClick={() => setPicking(false)}><b>완료</b></button>}>
           <div className="group" style={{ marginTop: 8 }}>
             <button type="button" className="row accent" onClick={() => setAdding(true)}><Icon name="plus" /> 새 액세서리 추가</button>
           </div>

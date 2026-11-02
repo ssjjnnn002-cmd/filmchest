@@ -29,6 +29,7 @@ struct BackupRestoreView: View {
                 if let data = try? DataBackup.data(from: context) {
                     gearDoc = GearDocument(data: data)
                     showExport = true
+                    BackupNudgeRule.markFileBackup()
                 }
             }
             Button("백업 불러오기") { showImport = true }

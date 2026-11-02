@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll, storageEstimate } from '../db'
 import { backupFileName, exportAll, importAll } from '../core/backup'
 import { isOldSite } from '../core/move'
+import { lastBackupAt, markFileBackup } from '../core/backupNudge'
 import { MoveGuide } from '../ui/MoveNotice'
 import { CloudBackup, cloudStatus } from './CloudBackup'
 import { Stats } from './Stats'
@@ -14,14 +15,17 @@ import { applyTheme, getPref, inClaudeHost, refreshApp, saveFileNow, setPref } f
 
 const themes: [string, string][] = [['system', '기기 설정'], ['light', '라이트'], ['dark', '다크']]
 
-export function Settings({ onClose }: { onClose: () => void }) {
+/** 기기 밖에 남긴 마지막 백업 */
+export const lastBackupText = () => { const t = lastBackupAt(); return t ? `마지막 백업 ${new Date(t).toLocaleString('ko-KR')}.` : '아직 기기 밖에 백업하지 않았어요.' }
+
+export function Settings({ onClose, openBackup = false }: { onClose: () => void; openBackup?: boolean }) {
   const [theme, setTheme] = useState<string>(getPref('theme', 'system'))
   const [usage, setUsage] = useState<{ used: number; quota: number }>()
   const [confirm, setConfirm] = useState(false)
   const [privacy, setPrivacy] = useState(false)
   const [note, setNote] = useState<string>()
   const [cloud, setCloud] = useState(false)
-  const [backupOpen, setBackupOpen] = useState(false)
+  const [backupOpen, setBackupOpen] = useState(openBackup)
   const [purge, setPurge] = useState<(() => Promise<unknown>) | null>(null)
   const [spending, setSpending] = useState(false)
   const deleted = useLiveQuery(async () => (await db.rolls.toArray()).filter((r) => r.deletedAt), []) ?? []
@@ -40,12 +44,20 @@ export function Settings({ onClose }: { onClose: () => void }) {
   const choose = (t: string) => { setTheme(t); setPref('theme', t); applyTheme(t) }
 
   return (
-    <Sheet title="설정" onClose={onClose} right={<button className="btn ghost" onClick={onClose}><b>완료</b></button>}>
+    <Sheet title="설정" onClose={onClose} left={<span />} right={<button className="btn ghost" onClick={onClose}><b>완료</b></button>}>
       <div className="section">
         <h2>화면</h2>
         <div className="segmented slide" style={{ '--i': Math.max(0, themes.findIndex(([k]) => k === theme)), '--n': themes.length } as React.CSSProperties}>
           {themes.map(([k, n]) => <button key={k} className={k === theme ? 'on' : ''} onClick={() => choose(k)}>{n}</button>)}
         </div>
+      </div>
+
+      <div className="section">
+        <div className="group">
+          <button className="row" onClick={() => setSpending(true)}><span className="grow">통계</span><Icon name="chev" size={18} /></button>
+          <button className="row" onClick={() => setBackupOpen(true)}><span className="grow">백업 및 복구</span><span className="value">{cloudStatus()}</span><Icon name="chev" size={18} /></button>
+        </div>
+        <p className="footnote">{lastBackupText()}</p>
       </div>
 
       <div className="section">
@@ -76,11 +88,6 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </div>
       )}
 
-      <div className="section">
-        <div className="group">
-          <button className="row" onClick={() => setBackupOpen(true)}><span className="grow">백업 및 복구</span><span className="value">{cloudStatus()}</span><Icon name="chev" size={18} /></button>
-        </div>
-      </div>
 
       <div className="section">
         <h2>안내</h2>
@@ -131,12 +138,12 @@ export function Settings({ onClose }: { onClose: () => void }) {
       )}
       {spending && <Stats onClose={() => setSpending(false)} />}
       {backupOpen && (
-        <Sheet title="백업 및 복구" onClose={() => setBackupOpen(false)} right={<button className="btn ghost" onClick={() => setBackupOpen(false)}><b>완료</b></button>}>
+        <Sheet title="백업 및 복구" onClose={() => setBackupOpen(false)} left={<span />} right={<button className="btn ghost" onClick={() => setBackupOpen(false)}><b>완료</b></button>}>
           <div className="section">
             <h2>백업</h2>
             <div className="group">
               <button className="row" onClick={() => setCloud(true)}><span className="grow">클라우드 백업</span><span className="value">{cloudStatus()}</span><Icon name="chev" size={18} /></button>
-              <button className="row" onClick={async () => saveFileNow(backupFileName, await exportAll())}>백업 파일로 저장</button>
+              <button className="row" onClick={async () => { await saveFileNow(backupFileName, await exportAll()); markFileBackup() }}>백업 파일로 저장</button>
               {!isOldSite && <button className="row" onClick={() => setMoveGuide(true)}>예전 주소(vercel.app) 기록 옮기기</button>}
               <label className="row">백업 불러오기
                 <input type="file" accept="application/json,.json" hidden onChange={async (e) => {
@@ -152,7 +159,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 }} />
               </label>
             </div>
-            <p className="footnote">장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 이미 있는 항목은 합치고 지우지 않아요.</p>
+            <p className="footnote">{lastBackupText()} 장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 이미 있는 항목은 합치고 지우지 않아요.</p>
           </div>
 
           <div className="section">
@@ -200,11 +207,6 @@ export function Settings({ onClose }: { onClose: () => void }) {
             <p className="footnote">지운 카메라는 24시간 동안 여기 남아요. 필름에 적힌 카메라 정보는 카메라를 지워도 그대로예요.</p>
           </div>
 
-          <div className="section">
-            <div className="group">
-              <button className="row" onClick={() => setSpending(true)}><span className="grow">통계</span><Icon name="chev" size={18} /></button>
-            </div>
-          </div>
         </Sheet>
       )}
       {cloud && <CloudBackup onClose={() => setCloud(false)} />}

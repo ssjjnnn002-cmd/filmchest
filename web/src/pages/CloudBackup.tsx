@@ -38,7 +38,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
     refresh()
   }
   return (
-    <Sheet title="클라우드 백업" onClose={onClose} right={<button className="btn ghost" onClick={onClose}><b>완료</b></button>}>
+    <Sheet title="클라우드 백업" onClose={onClose} left={<span />} right={<button className="btn ghost" onClick={onClose}><b>완료</b></button>}>
       <div className="section">
         <h2>상태</h2>
         <div className="group">

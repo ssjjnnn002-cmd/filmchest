@@ -38,7 +38,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
     refresh()
   }
   return (
-    <Sheet title="클라우드 백업" onClose={onClose} right={<SheetBtn label="완료" accent onPress={onClose} />}>
+    <Sheet title="클라우드 백업" onClose={onClose} left={<span />} right={<SheetBtn label="완료" accent onPress={onClose} />}>
       <Section title="구글 드라이브" foot="내 드라이브에 '필름함' 폴더를 만들고, 기록 백업과 롤마다 사진 폴더를 올려요. 이 앱이 만든 파일만 볼 수 있어요. 앱을 나갈 때 주기가 지났고 바뀐 게 있으면 올려요.">
         <Group>
           {msg ? <Row static><Text style={{ color: msg.ok ? '#30a46c' : c.danger, fontSize: 15 }}>{msg.ok ? '✓ ' : '✕ '}{msg.text}</Text></Row> : null}

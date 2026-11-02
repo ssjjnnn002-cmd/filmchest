@@ -32,7 +32,7 @@ export function Stats({ onClose }: { onClose: () => void }) {
     </div>
   )
   return (
-    <Sheet title="통계" onClose={onClose} right={<button className="btn ghost" onClick={onClose}><b>완료</b></button>}>
+    <Sheet title="통계" onClose={onClose} left={<span />} right={<button className="btn ghost" onClick={onClose}><b>완료</b></button>}>
       <div className="section">
         <div className="group">
           <div className="row static"><span className="grow">총 롤</span><span className="value">{rolls.length}</span></div>

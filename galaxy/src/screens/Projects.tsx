@@ -172,7 +172,7 @@ function ProjectDetail({ id, onClose }: { id: string; onClose: () => void }) {
       </Group></Section>
       {editing ? <ProjectEdit project={project} onClose={() => setEditing(false)} /> : null}
       {adding ? (
-        <Sheet title="롤 담기" onClose={() => setAdding(false)} right={<SheetBtn label="완료" accent onPress={() => setAdding(false)} />}>
+        <Sheet title="롤 담기" onClose={() => setAdding(false)} left={<span />} right={<SheetBtn label="완료" accent onPress={() => setAdding(false)} />}>
           <Group>
             {rolls.filter(kept).sort((a, b) => rollStart(b) - rollStart(a)).map((r) => (
               <Row key={r.id} onPress={() => setInProject(project.id, r.id)}>
@@ -212,7 +212,7 @@ export function RollProjects({ roll }: { roll: Roll }) {
         <Row onPress={() => setPicking(true)}><Icon name="plus" size={20} color={c.safelight} /><RowText color={c.safelight}>{mine.length ? '프로젝트 바꾸기' : '프로젝트에 담기'}</RowText></Row>
       </Group>
       {picking ? (
-        <Sheet title="프로젝트에 담기" onClose={() => setPicking(false)} right={<SheetBtn label="완료" accent onPress={() => setPicking(false)} />}>
+        <Sheet title="프로젝트에 담기" onClose={() => setPicking(false)} left={<span />} right={<SheetBtn label="완료" accent onPress={() => setPicking(false)} />}>
           <Group>
             {projects.map((p) => (
               <Row key={p.id} onPress={() => setInProject(p.id, roll.id)}>

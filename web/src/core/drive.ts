@@ -135,7 +135,7 @@ export function syncPhotosToDrive(onProgress?: Progress): Promise<number> {
         const name = `${String(frame.index).padStart(2, '0')}.${ext}`
         let id = sent[frame.id]?.split(':')[0]
         if (!id) id = (await findByName(t, name, folder)) ?? (await createFile(t, name, folder, blob.type || 'image/jpeg'))
-        let res = await putBlob(t, id, blob)
+        const res = await putBlob(t, id, blob)
         if (res.status === 404) {
           delete folders[roll.id]
           throw new Error('드라이브에서 폴더가 지워졌어요. 다시 올려 주세요.')

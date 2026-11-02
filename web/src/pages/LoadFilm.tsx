@@ -4,6 +4,7 @@ import { db, kept } from '../db'
 import type { Roll } from '../core/types'
 import { formatInfo, uid } from '../core/types'
 import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films'
+import { hasExpiredLot, lotToUse, stockCount } from '../core/filmStock'
 import { CustomFilmEdit } from './CustomFilmEdit'
 import { lensesFor } from '../core/lenses'
 import { CameraCover, Canister, Confirm, Sheet, toInputDate } from '../ui/common'
@@ -58,7 +59,8 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const film = filmById(filmId)
   // 재고에 유통기한이 지난 이 필름이 있으면 장착 전에 한 번 묻는다 (아이폰과 같게)
   const lots = useLiveQuery(() => db.filmLots.toArray(), []) ?? []
-  const expired = !!film && lots.some((l) => l.filmId === film.id && !!l.expiresAt && l.expiresAt < Date.now())
+  const expired = !!film && hasExpiredLot(lots, film.id)
+  const stock = film ? stockCount(lots, film.id) : 0
   const [confirmExpired, setConfirmExpired] = useState(false)
 
   // 최근 쓴 순 → 기록이 없으면 많이 쓰는 필름 순
@@ -99,6 +101,9 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
       days: today ? [{ id: uid(), startedAt: start, startFrame: 1 }] : [], locations: [], favorite: false, isArchive: false,
     }
     await db.rolls.add(roll)
+    // 재고가 있으면 1롤 뺀다
+    const lot = lotToUse(lots, film.id, camera.format)
+    if (lot) await db.filmLots.update(lot.id, { count: lot.count - 1 })
     onClose(roll)
     // 위치는 창을 닫은 뒤 채운다
     if (today && isToday && locationAvailable()) {
@@ -189,6 +194,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
             {showAll ? '접기' : `더보기 (${stocks.length}종)`}
           </button>
         </div>
+        {stock > 0 && <p className="footnote">재고 {stock}롤 · 장착하면 1롤 빼요</p>}
       </div>
 
       {film && (

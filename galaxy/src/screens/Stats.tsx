@@ -35,7 +35,7 @@ export function Stats({ onClose }: { onClose: () => void }) {
     </Section>
   )
   return (
-    <Sheet title="통계" onClose={onClose} right={<SheetBtn label="완료" accent onPress={onClose} />}>
+    <Sheet title="통계" onClose={onClose} left={<span />} right={<SheetBtn label="완료" accent onPress={onClose} />}>
       <Group>
         <Row static value={String(rolls.length)}><RowText>총 롤</RowText></Row>
         <Row static value={String(photos)}><RowText>총 사진</RowText></Row>
