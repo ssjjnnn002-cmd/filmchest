@@ -1,0 +1,6 @@
+// 앱 소개 페이지 (filmchest-home). 배포: cd site && npx --yes wrangler@4.156.1 deploy
+{
+  "name": "filmchest-home",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./public" }
+}
