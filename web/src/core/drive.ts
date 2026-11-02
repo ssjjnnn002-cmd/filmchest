@@ -47,6 +47,9 @@ export async function driveToken(prompt = ''): Promise<string> {
       token = { value: r.access_token, until: Date.now() + (r.expires_in ?? 3600) * 1000 }
       try { sessionStorage.setItem('driveToken', JSON.stringify(token)) } catch { /* 저장 못 함 */ }
       setPref('driveConnected', '1')
+      // 로그인한 계정 이름 (드라이브 권한만으로 읽을 수 있다)
+      if (!driveAccount()) void fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', { headers: { Authorization: `Bearer ${r.access_token}` } })
+        .then((x) => x.json()).then((j) => { if (j?.user?.emailAddress) { setPref('driveAccount', j.user.emailAddress); notifyBackup() } }).catch(() => {})
       resolve(r.access_token)
     }
     client.requestAccessToken({ prompt })
@@ -54,10 +57,12 @@ export async function driveToken(prompt = ''): Promise<string> {
 }
 
 export const driveConnected = () => getPref('driveConnected', '' as string) === '1'
+export const driveAccount = () => getPref('driveAccount', '' as string) || undefined
 export const driveLastBackup = () => Number(getPref('driveLast', '0')) || undefined
 export const driveIntervalDays = () => Number(getPref('driveDays', '1'))
 export function disconnectDrive() {
-  for (const k of ['driveConnected', 'driveFileId', 'driveRoot', 'driveKey']) setPref(k, '')
+  for (const k of ['driveConnected', 'driveAccount', 'driveFileId', 'driveRoot', 'driveKey']) setPref(k, '')
+  notifyBackup()
   setPref('driveRollFolders', '{}'); setPref('driveFrames', '{}')
   token = undefined
   try { sessionStorage.removeItem('driveToken') } catch { /* 없음 */ }
@@ -232,4 +237,19 @@ export function startDriveAutoBackup() {
     if (document.visibilityState === 'visible') pull()
     else if (live()) void backupToDrive().catch(() => {})
   })
+}
+
+/** 구글로 시작하기: 연결 → 드라이브의 기록 받기 → (이 기기에 사진이 없으면) 사진 받기 → 이 기기 기록 올리기 */
+export async function signInWithGoogle(onStep?: (text: string) => void) {
+  await driveToken('consent')
+  onStep?.('기록 받는 중…')
+  const counts = await pullFromDrive(true)
+  let photos = 0
+  if (counts?.rolls && (await db.frames.count()) === 0) {
+    const r = await restorePhotosFromDrive((done, total) => onStep?.(total ? `사진 ${done}/${total} 받는 중…` : '사진 찾는 중…'))
+    photos = r.frames
+  }
+  onStep?.('올리는 중…')
+  await backupToDrive(true)
+  return { cameras: counts?.cameras ?? 0, rolls: counts?.rolls ?? 0, photos }
 }

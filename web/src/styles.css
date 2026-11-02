@@ -745,3 +745,6 @@ a.row.accent { color: var(--safelight); }
 .rank-track { height: 6px; background: var(--fill); border-radius: 4px; overflow: hidden; }
 .rank-bar { display: block; height: 100%; background: var(--safelight); border-radius: 4px; }
 .rank-value { font-size: 15px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+.welcome { display: grid; justify-items: center; gap: 14px; padding: 12px 8px 20px; text-align: center; }
+.welcome img { border-radius: 20px; }
+.welcome p { margin: 0; line-height: 1.6; color: var(--ink); }

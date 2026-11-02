@@ -13,6 +13,9 @@ struct SettingsView: View {
     @Query(sort: \LensItem.createdAt) private var lenses: [LensItem]
     @Query(sort: \RollItem.loadedAt, order: .reverse) private var rolls: [RollItem]
     @State private var showPaywall = false
+    @State private var showLogin = false
+    @State private var confirmLogout = false
+    @State private var accountRevision = 0
     @State private var note: String?
     @AppStorage(AppSettings.Key.meterOffset, store: AppSettings.defaults) private var meterOffset = AppSettings.meterDefault
     @State private var profiles: [MeterProfile] = []
@@ -32,6 +35,19 @@ struct SettingsView: View {
                         ForEach(AppearanceMode.allCases) { Text($0.displayName).tag($0) }
                     }
                     .pickerStyle(.segmented)
+                }
+
+                Section("계정") {
+                    let _ = accountRevision
+                    if GoogleAuth.isConnected {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(GoogleAuth.account ?? "구글 계정")
+                            Text("기록과 사진을 내 구글 드라이브에 맞춰요").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Button("로그아웃", role: .destructive) { confirmLogout = true }
+                    } else {
+                        Button("구글로 로그인") { showLogin = true }.tint(Theme.safelight)
+                    }
                 }
 
                 Section {
@@ -95,6 +111,10 @@ struct SettingsView: View {
             .formStyle(.grouped)
             .filmKeyboard()
             .sheet(isPresented: $showPaywall) { PaywallView() }
+            .sheet(isPresented: $showLogin, onDismiss: { accountRevision += 1 }) { WelcomeView() }
+            .confirmationDialog("로그아웃할까요? 이 기기의 기록과 드라이브의 파일은 그대로 남아요.", isPresented: $confirmLogout, titleVisibility: .visible) {
+                Button("로그아웃", role: .destructive) { GoogleAuth.signOut(); DrivePhotos.forget(); accountRevision += 1 }
+            }
             .alert("복구", isPresented: Binding(get: { note != nil }, set: { if !$0 { note = nil } })) {
                 Button("확인", role: .cancel) { note = nil }
             } message: {

@@ -18,6 +18,10 @@ import { isZipFile } from './core/zip'
 import { uid } from './core/types'
 import { Intro } from './ui/Intro'
 import { MoveNotice } from './ui/MoveNotice'
+import { Welcome } from './ui/Welcome'
+import { driveAvailable, driveConnected } from './core/drive'
+import { isOldSite } from './core/move'
+import { getPref, inClaudeHost } from './platform'
 
 export type Tab = 'library' | 'shooting' | 'pending' | 'rolls'
 type Screen = { type: 'camera'; id: string } | { type: 'roll'; id: string }
@@ -100,6 +104,8 @@ export function App() {
     lq?.setConsumer(async (p) => take(await Promise.all(p.files.map((h) => h.getFile()))))
   }, [])
   const [intro, setIntro] = useState(true)
+  // 처음 켤 때 한 번: 구글로 시작하기 (이미 연결했거나, 예전 주소·Claude 화면에서는 묻지 않는다)
+  const [welcome, setWelcome] = useState(() => driveAvailable && !driveConnected() && !isOldSite && !inClaudeHost() && getPref('welcomeSeen', '' as string) !== '1')
 
   const setQueue = (next: ZipJob[], active: string | null) => {
     zipQueueRef.current = next
@@ -289,7 +295,7 @@ export function App() {
       )}
       {toastNode}
       {intro && <Intro onDone={() => setIntro(false)} />}
-      {!intro && <MoveNotice />}
+      {!intro && (welcome ? <Welcome onDone={() => setWelcome(false)} /> : <MoveNotice />)}
     </NavContext.Provider>
   )
 }

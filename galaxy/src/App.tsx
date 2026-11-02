@@ -1,5 +1,8 @@
 // 웹 App.tsx와 같은 뼈대: 탭 4개, 탭마다 쌓이는 화면, 필름 장착·스캔 가져오기·zip 대기열.
 import { importAll, restoredBackupUri, startLocalAutoBackup } from './backup'
+import { Welcome } from './Welcome'
+import { getPref } from './store'
+import { driveConnected } from './drive'
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Animated, BackHandler, Easing, Pressable, Text, View } from 'react-native'
 import { BlurView } from 'expo-blur'
@@ -120,6 +123,8 @@ export function App() {
     return onIncoming((files) => setIncoming(files))
   }, [])
   const [intro, setIntro] = useState(true)
+  // 처음 켤 때 한 번: 구글로 시작하기 (이미 연결했으면 묻지 않는다)
+  const [welcome, setWelcome] = useState(() => !driveConnected() && getPref('welcomeSeen', '' as string) !== '1')
 
   const setQueue = (next: ZipJob[], active: string | null) => {
     zipQueueRef.current = next
@@ -277,6 +282,7 @@ export function App() {
       <WebToolsHost />
       {toastNode}
       {intro && <Intro onDone={() => setIntro(false)} />}
+      {!intro && welcome ? <Welcome onDone={() => setWelcome(false)} /> : null}
     </NavContext.Provider>
   )
 }

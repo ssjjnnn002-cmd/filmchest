@@ -8,6 +8,8 @@ struct RootView: View {
     @Query private var rolls: [RollItem]
     @Environment(\.scenePhase) private var scenePhase
     @State private var showIntro = true
+    @State private var showWelcome = false
+    @AppStorage("filmscan.welcomeSeen") private var welcomeSeen = false
     /// 기록이 바뀌면 잠깐 기다렸다가 드라이브·폴더에 올린다 (연달아 고칠 땐 한 번만)
     @State private var syncTask: Task<Void, Never>?
     /// 앱을 보고 있는 동안 다른 기기(웹·갤럭시)에서 고친 기록을 가끔 받아 온다
@@ -120,10 +122,15 @@ struct RootView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in syncNow(delay: 4) }
+        .sheet(isPresented: $showWelcome) { WelcomeView() }
         .onReceive(pullTimer) { _ in if scenePhase == .active { DriveSync.onActive(context) } }
         .overlay {
             if showIntro {
-                IntroView { showIntro = false }
+                IntroView {
+                    showIntro = false
+                    // 처음 켤 때 한 번: 구글로 시작하기 (이미 연결했으면 묻지 않는다)
+                    if !welcomeSeen && !GoogleAuth.isConnected { showWelcome = true }
+                }
                     .transition(.opacity)
             }
         }

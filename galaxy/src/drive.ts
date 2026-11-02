@@ -222,3 +222,18 @@ export function driveDue() {
   const days = driveDays()
   return driveConnected() && days > 0 && Date.now() - (driveLast() ?? 0) > days * 86_400_000 - 3_600_000
 }
+
+/** 구글로 시작하기: 연결 → 드라이브의 기록 받기 → (이 기기에 사진이 없으면) 사진 받기 → 이 기기 기록 올리기 */
+export async function signInWithGoogle(onStep?: (text: string) => void) {
+  await token(true)
+  onStep?.('기록 받는 중…')
+  const counts = await pullFromDrive(true, true)
+  let photos = 0
+  if (counts?.rolls && (await db.frames.count()) === 0) {
+    const r = await restorePhotosFromDrive((done, total) => onStep?.(total ? `사진 ${done}/${total} 받는 중…` : '사진 찾는 중…'))
+    photos = r.frames
+  }
+  onStep?.('올리는 중…')
+  await backupToDrive(true)
+  return { cameras: counts?.cameras ?? 0, rolls: counts?.rolls ?? 0, photos }
+}

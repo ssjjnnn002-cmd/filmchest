@@ -6,6 +6,8 @@ import { isOldSite } from '../core/move'
 import { lastBackupAt, markFileBackup } from '../core/backupNudge'
 import { useBackupRefresh } from '../ui/BackupNudge'
 import { MoveGuide } from '../ui/MoveNotice'
+import { Welcome } from '../ui/Welcome'
+import { disconnectDrive, driveAccount, driveAvailable, driveConnected } from '../core/drive'
 import { CloudBackup, cloudStatus } from './CloudBackup'
 import { Stats } from './Stats'
 import { restorePhotos } from '../core/restore'
@@ -37,6 +39,8 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   const [apk, setApk] = useState(false)
   const [moveGuide, setMoveGuide] = useState(false)
   const [saveChoice, setSaveChoice] = useState(false)
+  const [login, setLogin] = useState(false)
+  const [logout, setLogout] = useState(false)
   const [saving, setSaving] = useState<string>()
   useEffect(() => {
     // 아이폰, 클로드 화면, 이미 설치된 앱 안에서는 숨긴다
@@ -55,6 +59,18 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           {themes.map(([k, n]) => <button key={k} className={k === theme ? 'on' : ''} onClick={() => choose(k)}>{n}</button>)}
         </div>
       </div>
+
+      {driveAvailable && !inClaudeHost() && (
+        <div className="section">
+          <h2>계정</h2>
+          <div className="group">
+            {driveConnected() ? <>
+              <div className="row static"><span className="grow">{driveAccount() ?? '구글 계정'}<span className="sub">기록과 사진을 내 구글 드라이브에 맞춰요</span></span></div>
+              <button className="row danger" onClick={() => setLogout(true)}>로그아웃</button>
+            </> : <button className="row accent" onClick={() => setLogin(true)}>구글로 로그인</button>}
+          </div>
+        </div>
+      )}
 
       <div className="section">
         <div className="group">
@@ -216,6 +232,9 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
       {cloud && <CloudBackup onClose={() => setCloud(false)} />}
       {purge && <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={async () => { const run = purge; setPurge(null); await run() }} />}
       {moveGuide && <MoveGuide onClose={() => setMoveGuide(false)} />}
+      {login && <Welcome onDone={() => setLogin(false)} />}
+      {logout && <Confirm message="로그아웃할까요? 이 기기의 기록과 드라이브의 파일은 그대로 남아요." action="로그아웃"
+        onCancel={() => setLogout(false)} onConfirm={() => { disconnectDrive(); setLogout(false) }} />}
       {saveChoice && (
         <Sheet title="백업 파일로 저장" onClose={() => setSaveChoice(false)}>
           <div className="section">

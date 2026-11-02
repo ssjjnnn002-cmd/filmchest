@@ -1,5 +1,8 @@
 // 웹 pages/Settings.tsx
 import { useEffect, useState } from 'react'
+import { Welcome } from '../Welcome'
+import { disconnectDrive, driveAccount, driveConnected } from '../drive'
+import { notifyBackup } from '../core/backupNudge'
 import { Text, View } from 'react-native'
 import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll } from '../data'
 import { getPref, useLiveQuery } from '../store'
@@ -36,6 +39,8 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   const [cloud, setCloud] = useState(false)
   const [backupOpen, setBackupOpen] = useState(openBackup)
   const [saveChoice, setSaveChoice] = useState(false)
+  const [login, setLogin] = useState(false)
+  const [logout, setLogout] = useState(false)
   const [saving, setSaving] = useState<string>()
   const [purge, setPurge] = useState<(() => Promise<unknown>) | null>(null)
   const [spending, setSpending] = useState(false)
@@ -50,6 +55,15 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
     <Sheet title="설정" onClose={onClose} left={<span />} right={<SheetBtn label="완료" accent onPress={onClose} />}>
       <Section title="화면">
         <Segmented value={theme} options={themes} onChange={choose} />
+      </Section>
+
+      <Section title="계정">
+        <Group>
+          {driveConnected() ? [
+            <Row key="a" static><RowText sub="기록과 사진을 내 구글 드라이브에 맞춰요">{driveAccount() ?? '구글 계정'}</RowText></Row>,
+            <Row key="o" onPress={() => setLogout(true)}><RowText color={c.danger}>로그아웃</RowText></Row>,
+          ] : <Row onPress={() => setLogin(true)}><Text style={{ color: c.safelight, fontSize: 17 }}>구글로 로그인</Text></Row>}
+        </Group>
       </Section>
 
       <Section foot={lastBackupText()}>
@@ -114,6 +128,9 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           }} />
       ) : null}
       {spending ? <Stats onClose={() => setSpending(false)} /> : null}
+      {login ? <Welcome onDone={() => setLogin(false)} /> : null}
+      {logout ? <Confirm message="로그아웃할까요? 이 기기의 기록과 드라이브의 파일은 그대로 남아요." action="로그아웃"
+        onCancel={() => setLogout(false)} onConfirm={async () => { await disconnectDrive(); setLogout(false); notifyBackup() }} /> : null}
       {saveChoice ? (
         <Sheet title="백업 파일로 저장" onClose={() => setSaveChoice(false)}>
           <Section foot="사진까지 저장한 zip을 불러오면 사진도 롤에 다시 붙어요.">
