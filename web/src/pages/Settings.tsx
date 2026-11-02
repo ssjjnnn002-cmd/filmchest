@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll, storageEstimate } from '../db'
 import { backupFileName, exportAll, importAll } from '../core/backup'
+import { isOldSite } from '../core/move'
+import { MoveGuide } from '../ui/MoveNotice'
 import { CloudBackup, cloudStatus } from './CloudBackup'
 import { Stats } from './Stats'
 import { restorePhotos } from '../core/restore'
@@ -27,6 +29,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
   useEffect(() => { storageEstimate().then(setUsage); void purgeOldRolls(); void purgeOldCameras() }, [])
   // 안드로이드에서만 내려받기를 보여 준다 (파일은 깃허브 릴리스에 있다)
   const [apk, setApk] = useState(false)
+  const [moveGuide, setMoveGuide] = useState(false)
   useEffect(() => {
     // 아이폰, 클로드 화면, 이미 설치된 앱 안에서는 숨긴다
     const installed = matchMedia('(display-mode: standalone)').matches || document.referrer.startsWith('android-app://')
@@ -134,6 +137,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
             <div className="group">
               <button className="row" onClick={() => setCloud(true)}><span className="grow">클라우드 백업</span><span className="value">{cloudStatus()}</span><Icon name="chev" size={18} /></button>
               <button className="row" onClick={async () => saveFileNow(backupFileName, await exportAll())}>백업 파일로 저장</button>
+              {!isOldSite && <button className="row" onClick={() => setMoveGuide(true)}>예전 주소(vercel.app) 기록 옮기기</button>}
               <label className="row">백업 불러오기
                 <input type="file" accept="application/json,.json" hidden onChange={async (e) => {
                   const file = e.target.files?.[0]
@@ -205,6 +209,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
       )}
       {cloud && <CloudBackup onClose={() => setCloud(false)} />}
       {purge && <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={async () => { const run = purge; setPurge(null); await run() }} />}
+      {moveGuide && <MoveGuide onClose={() => setMoveGuide(false)} />}
     </Sheet>
   )
 }

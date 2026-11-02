@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { NEW_SITE, OLD_SITE, isOldSite, receiveFromOldSite, sendToNewSite } from '../core/move'
 import { importAll } from '../core/backup'
 import { driveAvailable, driveToken, restoreFromDrive } from '../core/drive'
 import { getPref, setPref } from '../platform'
-import { Sheet } from './common'
+import { Sheet, useToast } from './common'
 
 const newHost = NEW_SITE.replace('https://', '')
 const oldHost = OLD_SITE.replace('https://', '')
@@ -45,6 +45,7 @@ function NewSiteWelcome() {
   const [receiving, setReceiving] = useState(() => new URLSearchParams(location.search).has('move'))
   const [asked, setAsked] = useState(() => getPref('moveAsked', '' as string) === '1')
   const [note, setNote] = useState('')
+  const [guide, setGuide] = useState(false)
   const empty = useLiveQuery(async () => (await db.cameras.count()) + (await db.rolls.count()) === 0, [])
 
   useEffect(() => {
@@ -71,6 +72,7 @@ function NewSiteWelcome() {
       </Sheet>
     )
   }
+  if (guide) return <MoveGuide onClose={() => setGuide(false)} />
   if (asked || empty !== true) return null
   return (
     <Sheet title="예전 기록 불러오기" onClose={close}>
@@ -89,6 +91,7 @@ function NewSiteWelcome() {
               if (file) void run(() => importAll(file))
             }} />
           </label>
+          <button className="row accent" onClick={() => setGuide(true)}>백업 없이 지금 옮기기</button>
           <button className="row" onClick={close}>처음 써요</button>
         </div>
         {note && <p className="footnote">{note}</p>}
@@ -104,6 +107,58 @@ function NewSiteWelcome() {
           옮기기 전까지 해당 브라우저의 방문 기록, 쿠키, 사이트 데이터를 삭제하지 마세요. 삭제하면 복구할 수 없습니다.
         </p>
       </div>
+    </Sheet>
+  )
+}
+
+// 예전 주소에서 누를 북마크: 새 주소의 move-out.js를 그 주소 위에서 불러온다
+const bookmarklet = `javascript:(function(){var s=document.createElement('script');s.src='${NEW_SITE}/move-out.js?'+Date.now();document.body.appendChild(s)})()`
+const device = /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'ios' : /Android/.test(navigator.userAgent) ? 'android' : 'pc'
+
+/** 백업 없이 예전 주소의 기록을 옮기는 법: 북마크 하나 만들고 예전 주소에서 누르기 */
+export function MoveGuide({ onClose }: { onClose: () => void }) {
+  const [toastNode, toast] = useToast()
+  const drag = useRef<HTMLAnchorElement>(null)
+  // 리액트는 javascript: 주소를 막아서 직접 넣는다
+  useEffect(() => { drag.current?.setAttribute('href', bookmarklet) }, [])
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(bookmarklet); toast('복사했어요') } catch { toast('복사하지 못했어요') }
+  }
+  const steps: Record<typeof device, string[]> = {
+    ios: [
+      '아래 \'코드 복사\'를 눌러요.',
+      '사파리 아래쪽 공유 버튼 → \'북마크 추가\' → 이름을 \'필름함 옮기기\'로 저장해요.',
+      '책 모양 북마크 버튼 → \'편집\' → \'필름함 옮기기\'를 눌러 주소를 모두 지우고 붙여 넣어요.',
+      '아래 \'예전 주소 열기\'를 눌러요. 오류 화면이 떠도 괜찮아요.',
+      '그 화면에서 북마크 → \'필름함 옮기기\'를 누르고, 뜨는 \'기록 옮기기\'를 눌러요.',
+    ],
+    android: [
+      '아래 \'코드 복사\'를 눌러요.',
+      '크롬 오른쪽 위 ⋮ → ☆ 를 눌러 북마크하고, \'수정\'을 눌러요.',
+      '이름은 \'필름함 옮기기\', 주소는 모두 지우고 붙여 넣은 뒤 저장해요.',
+      '아래 \'예전 주소 열기\'를 눌러요. 오류 화면이 떠도 괜찮아요.',
+      '주소창에 \'필름함 옮기기\'를 쳐서 아래 뜨는 북마크(☆)를 누르고, 뜨는 \'기록 옮기기\'를 눌러요.',
+    ],
+    pc: [
+      '아래 \'필름함 옮기기\' 버튼을 브라우저 위쪽 북마크바로 끌어다 놓아요. (북마크바가 안 보이면 Ctrl+Shift+B, 맥은 ⌘+Shift+B)',
+      '아래 \'예전 주소 열기\'를 눌러요. 오류 화면이 떠도 괜찮아요.',
+      '그 화면에서 북마크바의 \'필름함 옮기기\'를 누르고, 뜨는 \'기록 옮기기\'를 눌러요.',
+    ],
+  }
+  return (
+    <Sheet title="백업 없이 옮기기" onClose={onClose}>
+      <div className="section">
+        <p className="footnote">예전에 필름함을 쓰던 기기, 그 브라우저에서 해 주세요.</p>
+        <ol className="move-steps">{steps[device].map((t, i) => <li key={i}>{t}</li>)}</ol>
+        <div className="group">
+          {device === 'pc'
+            ? <a ref={drag} className="row accent" onClick={(e) => { e.preventDefault(); toast('누르지 말고 북마크바로 끌어다 놓아요') }}>필름함 옮기기</a>
+            : <button className="row accent" onClick={copy}>코드 복사</button>}
+          <a className="row accent" href={OLD_SITE} target="_blank" rel="noopener">예전 주소 열기</a>
+        </div>
+        <p className="footnote">기록과 사진이 새 주소로 옮겨지면 새 창에 '기록을 옮겼어요'가 떠요.</p>
+      </div>
+      {toastNode}
     </Sheet>
   )
 }
