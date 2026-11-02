@@ -99,8 +99,8 @@ function NewSiteWelcome() {
       <div className="section">
         <h2>백업 파일이 없는 경우</h2>
         <p className="footnote">
-          11월 30일 이후 예전 주소({oldHost})에 접속해 '기록 옮기고 새 주소로 가기'를 눌러 주세요.
-          기록과 사진이 새 주소로 그대로 옮겨집니다.
+          위의 '백업 없이 지금 옮기기'를 눌러 안내에 따라 진행해 주세요. 기록과 사진이 새 주소로 그대로 옮겨집니다.
+          11월 30일 이후에는 예전 주소({oldHost})에 접속해 '기록 옮기고 새 주소로 가기' 버튼만 눌러도 됩니다.
         </p>
         <p className="footnote" style={{ color: 'var(--danger)' }}>
           기록은 예전 주소를 사용하던 브라우저 안에만 저장되어 있습니다.
