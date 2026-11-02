@@ -1,7 +1,7 @@
 // 웹앱(web/src/core)의 순수 로직 파일을 갤럭시(galaxy/src/core)로 그대로 복사한다.
 // 갤럭시는 웹앱과 똑같이 동작해야 해서, 화면에 쓰는 데이터 규칙은 웹 파일 하나만 고친다.
 //   node scripts/sync-galaxy-core.mjs
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -80,7 +80,9 @@ ${common.slice(start).trim()}
   files.push('seed')
 }
 // 3D 모형 보기: 웹 model3d.ts로 WebView용 스크립트를 묶는다
-{
+// (웹 도구(esbuild)가 없는 곳, 예를 들어 깃허브 자동 검사의 갤럭시 칸에서는 건너뛴다)
+if (!existsSync(join(root, 'web/node_modules/.bin/esbuild'))) console.log('esbuild 없음: 3D·도구 묶음은 건너뜀')
+else {
   const out = execFileSync(join(root, 'web/node_modules/.bin/esbuild'), [join(root, 'galaxy/build/viewer3d-entry.ts'), '--bundle', '--format=iife', '--minify', '--target=es2020'],
     { cwd: join(root, 'web'), maxBuffer: 64 * 1024 * 1024, env: { ...process.env, NODE_PATH: join(root, 'web/node_modules') } }).toString()
   writeFileSync(join(root, 'galaxy/src/viewer3dJs.ts'), `// 자동 생성: galaxy/build/viewer3d-entry.ts + web model3d (node scripts/sync-galaxy-core.mjs)\nexport const viewer3dJs = ${JSON.stringify(out)}\n`)
