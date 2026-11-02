@@ -1,7 +1,7 @@
 import JSZip from 'jszip'
 import { db } from '../db'
 import type { Camera, Frame, Lens, Original, Roll } from './types'
-import { uid } from './types'
+import { lensIdAt, uid } from './types'
 import { buildTimeline } from './timeline'
 import type { ScanSet } from './zip'
 import { formatFamily } from './zip'
@@ -149,4 +149,50 @@ export async function rollZip(roll: { id: string }): Promise<Blob> {
     zip.file(`${String(f.index).padStart(2, '0')}.${ext}`, await rotatedBlob(o.blob, f.rotation))
   }
   return zip.generateAsync({ type: 'blob', compression: 'STORE' })
+}
+
+/** 촬영일·장소를 고친 뒤: 저장해 둔 사진 속 날짜·위치 정보를 새 기록으로 다시 쓴다.
+ *  드라이브에 올린 사진은 다음 백업 때 새 정보의 사진으로 바뀐다. 바꾼 장 수를 돌려준다. */
+export async function refreshRollPhotoMeta(rollId: string): Promise<number> {
+  const roll = await db.rolls.get(rollId)
+  if (!roll || roll.status !== 'imported') return 0
+  const frames = await db.frames.where('rollId').equals(rollId).toArray()
+  if (!frames.length) return 0
+  const camera = roll.cameraId ? await db.cameras.get(roll.cameraId) : undefined
+  const lenses = new Map((await db.lenses.toArray()).map((l) => [l.id, l]))
+  const count = Math.max(roll.frameCount ?? 0, ...frames.map((f) => f.index))
+  const timeline = buildTimeline(roll, count)
+  const dateUnknown = roll.isArchive && roll.days.length === 0
+  const film = filmById(roll.filmId)
+  const now = Date.now()
+  let changed = 0
+  for (const fr of frames) {
+    const original = await db.originals.get(fr.id)
+    const info = timeline[fr.index - 1]
+    if (!original || !info) continue
+    const lensId = lensIdAt(roll, fr.index)
+    const lens = lensId ? lenses.get(lensId) : undefined
+    const data = writeMeta(new Uint8Array(await original.blob.arrayBuffer()), {
+      frame: fr.index,
+      frameCount: count,
+      date: dateUnknown ? undefined : info.date,
+      locationName: info.location?.name || undefined,
+      memo: info.location?.memo,
+      point: info.location?.point,
+      cameraBrand: camera?.brand ?? roll.cameraBrand,
+      cameraModel: camera?.model ?? roll.cameraModel,
+      lens: lens ? `${lens.brand} ${lens.model}`.trim() : camera?.fixedLens ?? roll.cameraFixedLens,
+      film,
+      iso: roll.shotISO ?? film?.iso,
+      lab: roll.lab,
+      scanner: roll.scanner,
+      rollId: roll.id,
+      exposure: meterShotAt(roll.meterShots, fr.index, roll.meterOffset ?? 0),
+      replace: true,
+    })
+    await db.originals.put({ ...original, blob: new Blob([data], { type: original.blob.type || 'image/jpeg' }) })
+    await db.frames.update(fr.id, { takenAt: dateUnknown ? fr.takenAt : info.date, locationName: info.location?.name, metaAt: now })
+    changed += 1
+  }
+  return changed
 }

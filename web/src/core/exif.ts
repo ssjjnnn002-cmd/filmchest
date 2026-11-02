@@ -25,6 +25,8 @@ export interface FrameMeta {
   rollId?: string
   /** 노출계에서 이 칸에 남겨 둔 설정. 칸 번호가 같은 장에만 넣는다. */
   exposure?: Pick<MeterShot, 'aperture' | 'shutter' | 'comp' | 'flash' | 'mode'>
+  /** 다시 쓸 때: 새 기록에 위치가 없으면 예전 GPS를 지운다 */
+  replace?: boolean
 }
 
 export function caption(m: FrameMeta) {
@@ -166,6 +168,7 @@ export function writeMeta(data: Uint8Array, m: FrameMeta): Uint8Array {
   ex['0th'][I.XPKeywords] = ucs2(keywords(m).join(';'))
   // 롤 표식은 사진 앱·다른 앱이 지우기 어려운 EXIF 사용자 설명에도 남긴다 (복구용)
   if (m.rollId) ex.Exif[E.UserComment] = `ASCII\0\0\0filmchest:${m.rollId}:${m.frame}`
+  if (m.replace) ex.GPS = {}
   if (m.point) {
     ex.GPS[G.GPSLatitudeRef] = m.point.latitude >= 0 ? 'N' : 'S'
     ex.GPS[G.GPSLatitude] = toDMS(m.point.latitude)

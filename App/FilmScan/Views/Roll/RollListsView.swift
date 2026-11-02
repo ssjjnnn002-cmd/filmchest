@@ -225,14 +225,22 @@ struct PendingView: View {
 
             Section("현상 맡김 · \(atLab.count)") {
                 ForEach(atLab) { roll in
-                    NavigationLink(value: roll) { RollRow(roll: roll) }
-                        .swipeActions { Button("불러오기") { router.pickZip(for: roll) }.tint(Theme.safelight) }
+                    HStack(spacing: 10) {
+                        NavigationLink(value: roll) { RollRow(roll: roll) }
+                        Button("불러오기") { router.pickZip(for: roll) }
+                            .buttonStyle(.borderedProminent).tint(Theme.safelight).controlSize(.small)
+                    }
+                    .swipeActions { Button("불러오기") { router.pickZip(for: roll) }.tint(Theme.safelight) }
                 }
             }
             Section("촬영 완료 · \(finished.count)") {
                 ForEach(finished) { roll in
-                    NavigationLink(value: roll) { RollRow(roll: roll) }
-                        .swipeActions { Button("현상 맡기기") { dropOff = roll }.tint(.blue) }
+                    HStack(spacing: 10) {
+                        NavigationLink(value: roll) { RollRow(roll: roll) }
+                        Button("현상소 고르기") { dropOff = roll }
+                            .buttonStyle(.bordered).tint(Theme.safelight).controlSize(.small)
+                    }
+                    .swipeActions { Button("현상소 고르기") { dropOff = roll }.tint(.blue) }
                 }
             }
         }

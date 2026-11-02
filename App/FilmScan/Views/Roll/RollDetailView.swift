@@ -29,6 +29,9 @@ struct RollDetailView: View {
 
     private func lensName(_ id: UUID) -> String { allLenses.first { $0.id == id }?.displayName ?? "렌즈 모름" }
     @State private var showDropOff = false
+    /// 사진 앱 정보 맞추기 결과 (잠깐 보여 준다)
+    @State private var photoNote: String?
+    @State private var photoTask: Task<Void, Never>?
     @State private var showContactSheet = false
     @State private var showFramePrint = false
     @State private var shotEdit: Int?
@@ -56,6 +59,27 @@ struct RollDetailView: View {
     var body: some View {
         List {
             header
+
+            // 다음에 할 일을 맨 위에 크게: 현상소 고르기 / 스캔 불러오기
+            if roll.status == .finished || roll.status == .atLab {
+                Section {
+                    Button {
+                        if roll.status == .atLab { router.pickZip(for: roll) } else { showDropOff = true }
+                    } label: {
+                        Label(roll.status == .atLab ? "스캔 불러오기" : "현상소 고르기",
+                              systemImage: roll.status == .atLab ? "square.and.arrow.down" : "shippingbox")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.safelight)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                } footer: {
+                    Text(roll.status == .atLab ? "현상소에서 받은 zip이나 사진을 골라요." : "고르면 스캔 대기로 넘어가요.")
+                }
+            }
 
             TagField(tags: Binding(get: { roll.tags }, set: { roll.tags = $0 }))
 
@@ -204,6 +228,18 @@ struct RollDetailView: View {
             }
         }
         .scrollContentBackground(.hidden)
+        // 촬영일·장소를 바꾸면 사진 앱에 저장한 사진의 날짜·위치도 따라 바꾼다
+        .onChange(of: photoInfoKey) { _, _ in refreshPhotoInfo(manual: false) }
+        .overlay(alignment: .bottom) {
+            if let photoNote {
+                Text(photoNote)
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.bottom, 24)
+                    .transition(.opacity)
+            }
+        }
         .background(Theme.paper)
         .navigationTitle(roll.filmName)
         .toolbar {
@@ -343,12 +379,36 @@ struct RollDetailView: View {
         case .loaded:
             Button("촬영 끝내기") { showDropOff = true }
         case .finished:
-            Button("현상 맡기기", systemImage: "shippingbox") { showDropOff = true }
+            Button("현상소 고르기", systemImage: "shippingbox") { showDropOff = true }
             Button("다시 촬영 중으로", systemImage: "arrow.uturn.backward") { roll.status = .loaded }
         case .atLab:
             Button("스캔 불러오기", systemImage: "doc.zipper") { router.pickZip(for: roll) }
         case .imported:
             Button("다시 불러오기", systemImage: "arrow.clockwise") { router.pickZip(for: roll) }
+            if (roll.frames ?? []).contains(where: { $0.assetIdentifier != nil }) {
+                Button("사진 앱 날짜·위치 다시 맞추기", systemImage: "arrow.triangle.2.circlepath") { refreshPhotoInfo(manual: true) }
+            }
+        }
+    }
+
+    /// 사진 날짜·위치를 정하는 기록만 모은 값 (날씨처럼 사진과 상관없는 변경에는 움직이지 않게)
+    private var photoInfoKey: String {
+        let days = roll.shootingDays.map { "\($0.startedAt.timeIntervalSince1970)/\($0.startFrame ?? 0)/\($0.timeZoneID)" }
+        let places = roll.locations.map { "\($0.startFrame)/\($0.name)/\($0.point?.latitude ?? 0),\($0.point?.longitude ?? 0)" }
+        return (days + ["|"] + places).joined(separator: ";")
+    }
+
+    private func refreshPhotoInfo(manual: Bool) {
+        guard roll.status == .imported, (roll.frames ?? []).contains(where: { $0.assetIdentifier != nil }) else { return }
+        photoTask?.cancel()
+        photoTask = Task {
+            // 여러 칸을 연달아 고칠 때는 다 고친 뒤 한 번만
+            if !manual { try? await Task.sleep(for: .seconds(1.5)) }
+            guard !Task.isCancelled else { return }
+            let n = await RollImporter.refreshPhotoInfo(for: roll)
+            withAnimation { photoNote = n > 0 ? "사진 앱 날짜·위치도 바꿨어요 (\(n)장)" : "사진 앱에서 사진을 찾지 못했어요" }
+            try? await Task.sleep(for: .seconds(2.5))
+            withAnimation { photoNote = nil }
         }
     }
 

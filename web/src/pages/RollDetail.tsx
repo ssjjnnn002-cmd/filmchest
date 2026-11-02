@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll } from '../db'
 import { useNav } from '../App'
@@ -13,10 +13,13 @@ import { TagField } from '../ui/gearExtras'
 import { FramePrint } from './FramePrint'
 import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
 import { ScanButton } from './Pending'
+import { driveConnected, hasDriveToken, syncPhotosToDrive } from '../core/drive'
+import { refreshRollPhotoMeta } from '../core/importer'
 
 export function RollDetail({ id }: { id: string }) {
   const nav = useNav()
   const roll = useLiveQuery(() => db.rolls.get(id), [id])
+  usePhotoMetaSync(roll, nav.toast)
   const frames = useLiveQuery(() => db.frames.where('rollId').equals(id).sortBy('index'), [id]) ?? []
   const camera = useLiveQuery(() => (roll?.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll?.cameraId])
   const lens = useLiveQuery(() => (roll?.lensId ? db.lenses.get(roll.lensId) : undefined), [roll?.lensId])
@@ -169,13 +172,14 @@ export function RollDetail({ id }: { id: string }) {
         <div className="action-stack">
           {roll.status === 'loaded' && <button className="btn primary" onClick={() => setDropOff(true)}>촬영 끝내기</button>}
           {roll.status === 'finished' && <>
-            <button className="btn soft" onClick={() => setDropOff(true)}>현상 맡기기</button>
+            <button className="btn soft" onClick={() => setDropOff(true)}>현상소 고르기</button>
             <button className="btn" onClick={() => db.rolls.update(id, { status: 'loaded' })}>다시 촬영 중으로</button>
           </>}
           {roll.status === 'atLab' && <>
             <ScanButton rollId={id} />
           </>}
           {roll.status === 'imported' && <ScanButton rollId={id} label="다시 불러오기" />}
+          {roll.status === 'imported' && <button className="btn" onClick={() => { void syncPhotoMeta(id, nav.toast) }}>사진 날짜·위치 다시 맞추기</button>}
         </div>
       </div>
 
@@ -247,4 +251,28 @@ function MeterPanel({ roll, format }: { roll: Roll; format: FilmFormat }) {
       </div>
     </>
   )
+}
+
+/** 촬영일·장소를 고치면 저장한 사진 속 날짜·위치도 새로 쓴다. 드라이브에 연결돼 있으면 새 정보의 사진으로 다시 올린다 */
+function usePhotoMetaSync(roll: Roll | undefined, toast: (m: string) => void) {
+  const key = roll?.status === 'imported'
+    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive])
+    : ''
+  const last = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (!key || !roll) return
+    if (last.current === undefined || last.current === key) { last.current = key; return }
+    last.current = key
+    // 여러 칸을 연달아 고칠 때는 다 고친 뒤 한 번만
+    const t = setTimeout(() => { void syncPhotoMeta(roll.id, toast) }, 1500)
+    return () => clearTimeout(t)
+  }, [key])
+}
+
+async function syncPhotoMeta(rollId: string, toast: (m: string) => void) {
+  const n = await refreshRollPhotoMeta(rollId)
+  if (!n) return
+  const drive = driveConnected() && hasDriveToken()
+  toast(drive ? `사진 정보도 바꿨어요 (${n}장). 드라이브에도 새로 올려요` : `사진 정보도 바꿨어요 (${n}장)`)
+  if (drive) void syncPhotosToDrive().catch(() => {})
 }

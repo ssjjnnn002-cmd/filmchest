@@ -186,7 +186,7 @@ struct PlaceEditView: View {
 }
 
 
-/// 현상 맡기기
+/// 현상소 고르기
 struct LabDropOffView: View {
     let roll: RollItem
 
@@ -208,7 +208,7 @@ struct LabDropOffView: View {
             }
             .formStyle(.grouped)
             .filmKeyboard()
-            .navigationTitle("현상 맡기기")
+            .navigationTitle("현상소 고르기")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

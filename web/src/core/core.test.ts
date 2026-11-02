@@ -89,6 +89,16 @@ describe.runIf(hasSample)('real lab zip', () => {
     expect(readMeta(out).dateTimeOriginal).toBe(readMeta(src).dateTimeOriginal)
     expect(readMeta(out).make).toBe('NORITSU KOKI')
   }, 60_000)
+
+  it('rewrites date and drops old GPS when the place is removed', async () => {
+    const result = await readZip(fs.readFileSync(samplePath))
+    const src = result.primary.files[2].data
+    const first = writeMeta(src, { frame: 3, frameCount: 39, date: Date.UTC(2026, 0, 1, 3), point: { latitude: 37.5, longitude: 126.9 } })
+    expect(readMeta(first).latRef).toBe('N')
+    const again = writeMeta(first, { frame: 3, frameCount: 39, date: Date.UTC(2026, 4, 5, 3), replace: true })
+    expect(readMeta(again).latRef).toBeUndefined()
+    expect(readMeta(again).dateTimeOriginal).not.toBe(readMeta(first).dateTimeOriginal)
+  }, 60_000)
 })
 
 const shot = (pos: number, order: number, extra: Partial<MeterShot> = {}): MeterShot => ({

@@ -217,3 +217,31 @@ extension RollItem {
         status = .imported
     }
 }
+
+extension RollImporter {
+    /// 촬영일·장소를 고친 뒤: 사진 앱에 저장한 이 롤 사진의 날짜·위치를 새 기록으로 바꾼다.
+    /// 사진을 새로 만들지 않고 같은 사진의 정보만 바꿔서, 앨범·즐겨찾기·편집은 그대로 남는다. 바꾼 장 수를 돌려준다.
+    @MainActor
+    static func refreshPhotoInfo(for roll: RollItem) async -> Int {
+        let frames = (roll.frames ?? []).filter { $0.assetIdentifier != nil && $0.index >= 1 }
+        guard !frames.isEmpty, (try? await PhotoLibrary.requestAccess()) != nil else { return 0 }
+        let snapshot = roll.snapshot()
+        let count = max(roll.frameCount ?? 0, frames.map(\.index).max() ?? 0)
+        let timeline = FrameTimeline.build(roll: snapshot.roll, frameCount: count)
+        var changed = 0
+        for frame in frames.sorted(by: { $0.index < $1.index }) {
+            guard frame.index <= timeline.count, let id = frame.assetIdentifier else { continue }
+            let info = timeline[frame.index - 1]
+            let date: Date? = snapshot.dateUnknown ? nil : info.date
+            let location = info.location?.point.map {
+                CLLocation(coordinate: CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude),
+                           altitude: $0.altitude ?? 0, horizontalAccuracy: 50, verticalAccuracy: -1, timestamp: info.date)
+            }
+            guard (try? await PhotoLibrary.update(assetID: id, date: date, location: location, addTo: nil)) != nil else { continue }
+            if let date { frame.takenAt = date }
+            frame.locationName = info.location?.name
+            changed += 1
+        }
+        return changed
+    }
+}

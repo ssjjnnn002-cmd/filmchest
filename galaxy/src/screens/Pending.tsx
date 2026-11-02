@@ -83,7 +83,7 @@ export function Pending() {
             {finished.map((r) => (
               <Row key={r.id} static>
                 <Pressable style={{ flex: 1, minWidth: 0 }} onPress={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /></Pressable>
-                <Btn label="맡기기" kind="soft" size="small" onPress={() => setDropOff(r)} />
+                <Btn label="현상소 고르기" kind="soft" size="small" onPress={() => setDropOff(r)} />
               </Row>
             ))}
           </Group>

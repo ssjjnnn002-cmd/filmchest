@@ -95,7 +95,7 @@ export function Pending() {
               <div key={r.id} className="row static">
                 <button className="grow" style={{ border: 0, background: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', minWidth: 0 }}
                   onClick={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /></button>
-                <button className="btn soft small" onClick={() => setDropOff(r)}>맡기기</button>
+                <button className="btn soft small" onClick={() => setDropOff(r)}>현상소 고르기</button>
               </div>
             ))}
           </div>

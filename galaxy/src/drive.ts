@@ -113,7 +113,9 @@ export function syncPhotosToDrive(onProgress?: Progress, interactive = true): Pr
       const todo: { roll: Roll; frame: Frame }[] = []
       for (const roll of (await db.rolls.toArray()).filter((r) => !r.deletedAt)) {
         for (const frame of await db.frames.where('rollId').equals(roll.id).toArray()) {
-          if (sent[frame.id]?.split(':')[1] !== String(frame.rotation ?? 0)) todo.push({ roll, frame })
+          const [, turn, meta = '0'] = sent[frame.id]?.split(':') ?? []
+          // 돌렸거나, 촬영일·장소를 고쳐 사진 속 정보를 다시 썼으면 다시 올린다
+          if (turn !== String(frame.rotation ?? 0) || meta !== String(frame.metaAt ?? 0)) todo.push({ roll, frame })
         }
       }
       onProgress?.(0, todo.length)
@@ -137,7 +139,7 @@ export function syncPhotosToDrive(onProgress?: Progress, interactive = true): Pr
           const status = await put(t, id, uri, mime)
           if (status === 404) { delete folders[roll.id]; setPref('driveRollFolders', JSON.stringify(folders)); throw new Error('드라이브에서 폴더가 지워졌어요. 다시 올려 주세요.') }
           if (status >= 300) throw new Error(`사진을 올리지 못했어요 (${status})`)
-          sent[frame.id] = `${id}:${frame.rotation ?? 0}`
+          sent[frame.id] = `${id}:${frame.rotation ?? 0}:${frame.metaAt ?? 0}`
           setPref('driveFrames', JSON.stringify(sent))
         }
         done += 1
