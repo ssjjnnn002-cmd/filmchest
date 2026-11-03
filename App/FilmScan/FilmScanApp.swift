@@ -4,11 +4,15 @@ import FilmScanCore
 
 @main
 struct FilmScanApp: App {
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #endif
     @State private var container = Store.makeContainer()
 
     init() {
         CanisterCache.prewarm()
         BackgroundUpload.register()
+        DriveUploader.shared.resume()
     }
 
     @State private var router = Router()

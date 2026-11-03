@@ -10,6 +10,7 @@ struct CloudBackupView: View {
     @State private var message: (text: String, ok: Bool)?
     @State private var photoProgress: (done: Int, total: Int, step: String)?
     @State private var driveMessage: (text: String, ok: Bool)?
+    @State private var pendingUploads = 0
     @State private var revision = 0
     @State private var confirmDisconnect = false
     @State private var confirmRestore = false
@@ -47,6 +48,12 @@ struct CloudBackupView: View {
                     if let c = DrivePhotos.counts {
                         LabeledContent("드라이브의 스캔 사진", value: c.onDrive == c.total ? "\(c.total)장 모두" : "\(c.onDrive) / \(c.total)장")
                     }
+                    if pendingUploads > 0 {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text("올리는 중 · \(pendingUploads)장 남음").monospacedDigit()
+                        }
+                    }
                     if let m = driveMessage {
                         Label(m.text, systemImage: m.ok ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                             .font(.footnote)
@@ -81,10 +88,14 @@ struct CloudBackupView: View {
                                 if let error {
                                     driveMessage = (error, false)
                                 } else if let c = DrivePhotos.counts {
+                                    let queued = DrivePhotos.lastQueued
                                     driveMessage = c.onDrive == c.total
-                                        ? ("스캔 사진 \(c.total)장이 모두 드라이브에 있어요." + (DrivePhotos.lastUploaded > 0 ? " \(DrivePhotos.lastUploaded)장을 새로 올렸어요." : ""), true)
+                                        ? ("스캔 사진 \(c.total)장이 모두 드라이브에 있어요.", true)
+                                        : queued > 0
+                                        ? ("\(queued)장을 올리고 있어요. 다른 앱으로 가거나 앱을 닫아도 계속 올라가요.", true)
                                         : ("드라이브에 \(c.onDrive) / \(c.total)장 있어요. 사진 앱에서 지워진 사진은 올릴 수 없어요.", false)
                                 }
+                                pendingUploads = await DriveUploader.shared.pendingCount()
                                 revision += 1
                             }
                         }
@@ -204,6 +215,14 @@ struct CloudBackupView: View {
             }
         }
         .navigationTitle("클라우드 백업")
+        // 백그라운드로 올라가는 사진: 남은 장 수를 보여 준다
+        .task {
+            while !Task.isCancelled {
+                let n = await DriveUploader.shared.pendingCount()
+                if n != pendingUploads { pendingUploads = n; revision += 1 }
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif

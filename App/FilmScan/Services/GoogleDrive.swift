@@ -215,16 +215,18 @@ enum DriveClient {
     }
 
     /// 폴더 안 항목 전부 (id, 이름, 종류)
-    static func children(_ parent: String) async throws -> [(id: String, name: String, mime: String)] {
+    static func children(_ parent: String) async throws -> [(id: String, name: String, mime: String, size: Int)] {
         let query = "'\(parent)' in parents and trashed = false".addingPercentEncoding(withAllowedCharacters: .alphanumerics)!
-        var out: [(id: String, name: String, mime: String)] = []
+        var out: [(id: String, name: String, mime: String, size: Int)] = []
         var page: String?
         repeat {
             let token = page.map { "&pageToken=\($0)" } ?? ""
-            let data = try await call("\(api)?q=\(query)&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000\(token)")
+            let data = try await call("\(api)?q=\(query)&fields=nextPageToken,files(id,name,mimeType,size)&pageSize=1000\(token)")
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             for f in (json?["files"] as? [[String: Any]]) ?? [] {
-                if let id = f["id"] as? String { out.append((id, f["name"] as? String ?? "", f["mimeType"] as? String ?? "")) }
+                if let id = f["id"] as? String {
+                    out.append((id, f["name"] as? String ?? "", f["mimeType"] as? String ?? "", Int(f["size"] as? String ?? "") ?? 0))
+                }
             }
             page = json?["nextPageToken"] as? String
         } while page != nil
@@ -545,8 +547,23 @@ enum DrivePhotos {
     private static let countKey = "filmscan.drivePhotoCount"    // [드라이브에 있는 장 수, 전체]
     @MainActor private static var running = false
     @MainActor private static var pulling = false
-    /// 마지막 확인에서 새로 올린 장 수
-    @MainActor static var lastUploaded = 0
+    /// 마지막 확인에서 iOS에 맡긴(올라가는 중인) 장 수
+    @MainActor static var lastQueued = 0
+
+    /// iOS가 사진 하나를 다 올렸을 때
+    @MainActor
+    static func uploaded(_ key: String, _ value: String) {
+        remember(key, value)
+        if let c = counts, c.onDrive < c.total { UserDefaults.standard.set([c.onDrive + 1, c.total], forKey: countKey) }
+    }
+
+    /// 올린 컷 기억하기 (백그라운드 업로드가 끝날 때도 부른다: 늘 지금 값을 읽고 그 한 칸만 바꾼다)
+    @MainActor
+    static func remember(_ key: String, _ value: String?) {
+        var sent = UserDefaults.standard.dictionary(forKey: sentKey) as? [String: String] ?? [:]
+        sent[key] = value
+        UserDefaults.standard.set(sent, forKey: sentKey)
+    }
 
     /// 다른 기기(웹·갤럭시)가 드라이브에 올린 스캔 사진을 받아 사진 앱에 저장하고 롤에 붙인다.
     /// 이 기기가 올린 폴더와 이미 받은 파일은 건너뛰고, 사진이 비어 있는 롤이 있을 때만 찾아본다.
@@ -594,7 +611,7 @@ enum DrivePhotos {
         }
         running = true
         defer { running = false }
-        var sent = UserDefaults.standard.dictionary(forKey: sentKey) as? [String: String] ?? [:]
+        let sent = UserDefaults.standard.dictionary(forKey: sentKey) as? [String: String] ?? [:]
         var folders = UserDefaults.standard.dictionary(forKey: folderKey) as? [String: String] ?? [:]
         let rolls = ((try? context.fetch(FetchDescriptor<RollItem>())) ?? []).filter { $0.deletedAt == nil && $0.status == .imported }
         let all = rolls.reduce(0) { $0 + ($1.frames ?? []).filter { $0.assetIdentifier != nil }.count }
@@ -602,7 +619,8 @@ enum DrivePhotos {
         guard let root = try? await DriveClient.rootFolder() else { return "드라이브에 연결하지 못했어요. 인터넷 연결을 확인해 주세요." }
         let day = DateFormatter()
         day.dateFormat = "yyyy-MM-dd"
-        var onDrive = 0, total = 0, done = 0, uploaded = 0
+        var onDrive = 0, total = 0, done = 0, queued = 0
+        let pending = await DriveUploader.shared.pendingKeys()
         progress?(0, all, "드라이브 확인 중")
         for roll in rolls {
             let frames = (roll.frames ?? []).filter { $0.assetIdentifier != nil }.sorted { $0.index < $1.index }
@@ -613,12 +631,17 @@ enum DrivePhotos {
             // 드라이브에서 폴더나 사진을 지웠을 수 있어 매번 실제로 있는지 본다 (지워졌으면 다시 올린다).
             // 기억해 둔 폴더는 id로 확인해서, 롤 이름이 바뀌어도 같은 폴더를 쓴다
             var folder = folders[roll.id.uuidString]
-            var files: [String: String] = [:]   // 파일 이름: id
+            var files: [String: String] = [:]   // 파일 이름: id (내용이 있는 것)
+            var empties: [String: String] = [:]
             progress?(done, all, "\(roll.albumTitle) 폴더 확인 중")
             do {
                 if let f = folder, try await !DriveClient.exists(f) { folder = nil }
                 if folder == nil { folder = try await DriveClient.find(folderName, parent: root, folder: true) }
-                if let f = folder { for c in try await DriveClient.children(f) where c.mime != DriveClient.folderMime { files[c.name] = c.id } }
+                if let f = folder {
+                    for c in try await DriveClient.children(f) where c.mime != DriveClient.folderMime && c.size > 0 { files[c.name] = c.id }
+                    // 만들기만 하고 아직 안 채운 빈 파일: 다시 만들지 않고 그 파일에 올린다
+                    for c in try await DriveClient.children(f) where c.mime != DriveClient.folderMime && c.size == 0 { empties[c.name] = c.id }
+                }
             } catch {
                 return "드라이브 폴더를 확인하지 못했어요. 잠시 뒤 다시 눌러 주세요."
             }
@@ -626,6 +649,7 @@ enum DrivePhotos {
                 defer { done += 1; progress?(done, all, "") }
                 guard let assetID = frame.assetIdentifier else { continue }
                 let key = "\(roll.id.uuidString.lowercased())-\(frame.index)"
+                if pending.contains(key) { queued += 1; continue }   // 이미 iOS가 올리는 중
                 let name = String(format: "%02d.jpg", frame.index)
                 let modified = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject?.modificationDate
                 let stamp = String(Int(modified?.timeIntervalSince1970 ?? 0))
@@ -634,7 +658,7 @@ enum DrivePhotos {
                     // 드라이브에 이미 있는 사진은 다시 올리지 않는다. 올린 뒤 사진 앱에서 돌리거나 정보를 고친 것만 다시 올린다
                     // (기억이 없거나 다른 기기가 올린 같은 컷이면 그 파일을 내 것으로 기억만 한다)
                     if prev?.first != onFile || prev?.last == stamp {
-                        sent[key] = "\(onFile)|\(stamp)"
+                        remember(key, "\(onFile)|\(stamp)")
                         onDrive += 1
                         continue
                     }
@@ -650,25 +674,20 @@ enum DrivePhotos {
                     guard let folder else { continue }
                     folders[roll.id.uuidString] = folder
                     UserDefaults.standard.set(folders, forKey: folderKey)
-                    var id = files[name]
+                    var id = files[name] ?? empties[name]
                     if id == nil { id = try await DriveClient.createFile(name, parent: folder, mime: "image/jpeg") }
                     guard let id, !id.isEmpty else { continue }
-                    progress?(done, all, "\(roll.albumTitle) \(frame.index)번 컷 올리는 중 (\(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)))")
-                    try await DriveClient.upload(id, data, mime: "image/jpeg")
-                    uploaded += 1
-                    files[name] = id
-                    sent[key] = "\(id)|\(stamp)"
-                    UserDefaults.standard.set(sent, forKey: sentKey)
-                    onDrive += 1
+                    progress?(done, all, "\(roll.albumTitle) \(frame.index)번 컷 보낼 준비")
+                    // 보내기는 iOS가 한다: 앱을 닫아도 계속 올라간다
+                    try await DriveUploader.shared.enqueue(data, fileID: id, key: key, stamp: stamp)
+                    queued += 1
                 } catch {
-                    UserDefaults.standard.set(sent, forKey: sentKey)
-                    return "사진을 올리다 멈췄어요 (\(done) / \(all)장 확인). 잠시 뒤 다시 눌러 주세요."
+                    return "사진을 보낼 준비를 하다 멈췄어요 (\(done) / \(all)장 확인). 잠시 뒤 다시 눌러 주세요."
                 }
             }
         }
-        UserDefaults.standard.set(sent, forKey: sentKey)
         UserDefaults.standard.set([onDrive, total], forKey: countKey)
-        lastUploaded = uploaded
+        lastQueued = queued
         return nil
     }
 
