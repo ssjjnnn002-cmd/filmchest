@@ -7,6 +7,8 @@ import { lensesFor } from '../core/lenses'
 import { filmFits, filterDiameters, filterKinds, groupPrice, lensSpec, parseLens } from '../core/optics'
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
 import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
+import { glassPresets, isLensFilter } from '../core/filterLook'
+import { FilterRing } from '../ui/FilterRing'
 import { getPref } from '../platform'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
 import { deleteCameraPhoto, saveCameraPhoto, useCameraPhoto, usePhotoIsCutout } from '../photoStore'
@@ -96,7 +98,9 @@ export function useUsedSellers() {
   ], [cameras, lenses, filters, lots])
 }
 
-function PhotoField({ id, hasPhoto, blob, setBlob, cleared, setCleared }: {
+function PhotoField({ id, hasPhoto, blob, setBlob, cleared, setCleared, placeholder }: {
+  /** 사진이 없을 때 보일 그림 (필터 링) */
+  placeholder?: React.ReactNode
   id?: string
   hasPhoto?: boolean
   blob?: Blob
@@ -123,7 +127,7 @@ function PhotoField({ id, hasPhoto, blob, setBlob, cleared, setCleared }: {
     <div className="section">
       <h2>사진</h2>
       <div className="group" style={{ padding: 12, display: 'grid', gap: 12 }}>
-        {src ? <div className="photo-preview"><img src={src} alt="" /></div> : <div className="photo-empty"><Icon name="camera" size={42} /></div>}
+        {src ? <div className="photo-preview"><img src={src} alt="" /></div> : <div className="photo-empty">{placeholder ?? <Icon name="camera" size={42} />}</div>}
         <PhotoActions onFile={take} onClear={src ? () => { setBlob(undefined); setCleared(true) } : undefined} />
       </div>
     </div>
@@ -161,7 +165,9 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false }: {
   )
   const filterCell = (f: GearFilter) => (
     <button key={f.id} className={grid ? 'card' : 'row'} onClick={() => setEdit(f.id)} style={{ textAlign: 'left' }}>
-      <GearPhoto id={f.id} hasPhoto={f.hasPhoto} grid={grid} />
+      {isLensFilter(f.kind)
+        ? <span style={{ width: grid ? '100%' : 68, height: grid ? 110 : 52, display: 'grid', placeItems: 'center', flexShrink: 0 }}><FilterRing name={f.name} glass={f.glass} size={grid ? 108 : 52} /></span>
+        : <GearPhoto id={f.id} hasPhoto={f.hasPhoto} grid={grid} />}
       <span className="grow">
         <b className={grid ? 'clamp-2 reserve-2' : 'truncate'}>{f.name || kindOf(f)}</b>
         <span className="sub truncate">{[kindOf(f), f.diameter ? `직경 ${f.diameter}mm` : '', f.price ? priceText(priceValue(f.price)) : ''].filter(Boolean).join(' · ')}</span>
@@ -213,14 +219,14 @@ export function GearAdd({ kind, onClose }: { kind: GearKind; onClose: () => void
 }
 
 /** 장비 사진. 바둑판: 그냥 사진이면 카드 위쪽·양옆 끝까지 채운다. 목록: 고정 크기 + 둥근 모서리 */
-function GearPhoto({ id, hasPhoto, grid }: { id: string; hasPhoto?: boolean; grid: boolean }) {
+function GearPhoto({ id, hasPhoto, grid, fallback }: { id: string; hasPhoto?: boolean; grid: boolean; fallback?: React.ReactNode }) {
   const url = useCameraPhoto(id, !!hasPhoto)
   const bleed = usePhotoIsCutout(id, !!url) === false
   // 자리(110px)는 다른 카드와 같게 비워 두고, 사진은 카드 맨 위·양옆 끝에 붙인다
   if (url && grid && bleed) return <span style={{ height: 110, display: 'block' }}><img src={url} alt="" className="card-bleed" /></span>
   return url
     ? <img src={url} alt="" style={{ width: grid ? '100%' : 68, height: grid ? 110 : 52, objectFit: bleed ? 'cover' : 'contain', borderRadius: grid ? 0 : 8, flexShrink: 0 }} />
-    : <span style={{ width: grid ? '100%' : 68, height: grid ? 110 : 52, display: 'grid', placeItems: 'center' }}><Icon name="camera" size={28} /></span>
+    : <span style={{ width: grid ? '100%' : 68, height: grid ? 110 : 52, display: 'grid', placeItems: 'center' }}>{fallback ?? <Icon name="camera" size={28} />}</span>
 }
 
 function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
@@ -314,6 +320,7 @@ export function FilterEdit({ filter, onClose, onSaved }: { filter?: GearFilter; 
   const [kinds, setKinds] = useState(() => { const k = accessoryKinds(); return filter && !k.includes(kindOf(filter)) ? [...k, kindOf(filter)] : k })
   const [name, setName] = useState(filter?.name ?? '')
   const [diameter, setDiameter] = useState(filter?.diameter ?? '')
+  const [glass, setGlass] = useState(filter?.glass)
   const [blob, setBlob] = useState<Blob>()
   const [cleared, setCleared] = useState(false)
   const [date, setDate] = useState(filter?.purchasedAt)
@@ -327,11 +334,13 @@ export function FilterEdit({ filter, onClose, onSaved }: { filter?: GearFilter; 
   const save = async () => {
     const data: GearFilter = {
       id: filter?.id ?? uid(), kind, name: name.trim(), diameter: isFilter ? diameter.replace(/[^\d.]/g, '') || undefined : undefined,
-      hasPhoto: cleared ? false : !!(blob || filter?.hasPhoto),
+      glass: isFilter ? glass : undefined,
+      hasPhoto: isFilter ? false : cleared ? false : !!(blob || filter?.hasPhoto),
       purchasedAt: date, price: groupPrice(price) || undefined, seller: seller.trim() || undefined, tags,
       createdAt: filter?.createdAt ?? Date.now(),
     }
-    if (blob) await saveCameraPhoto(data.id, blob)
+    if (isFilter) { if (filter?.hasPhoto) await deleteCameraPhoto(data.id) }
+    else if (blob) await saveCameraPhoto(data.id, blob)
     else if (cleared) await deleteCameraPhoto(data.id)
     await db.filters.put(data)
     rememberSeller(seller)
@@ -341,7 +350,10 @@ export function FilterEdit({ filter, onClose, onSaved }: { filter?: GearFilter; 
   return (
     <Sheet title={filter ? '액세서리 수정' : '액세서리 추가'} onClose={onClose}
       right={<button className="btn ghost" disabled={!name.trim()} onClick={save}><b>저장</b></button>}>
-      <PhotoField id={filter?.id} hasPhoto={filter?.hasPhoto} blob={blob} setBlob={setBlob} cleared={cleared} setCleared={setCleared} />
+      {/* 렌즈 필터는 사진 대신 늘 기본 그림 (유리 색만 고른다) */}
+      {isFilter
+        ? <div className="section"><div className="group filter-preview"><FilterRing name={name} glass={glass} size={190} /></div></div>
+        : <PhotoField id={filter?.id} hasPhoto={filter?.hasPhoto} blob={blob} setBlob={setBlob} cleared={cleared} setCleared={setCleared} />}
       <div className="section">
         <h2>액세서리</h2>
         <div className="group">
@@ -369,6 +381,22 @@ export function FilterEdit({ filter, onClose, onSaved }: { filter?: GearFilter; 
           </>}
         </div>
       </div>
+      {isFilter && (
+        <div className="section">
+          <h2>필터 모양</h2>
+          <div className="group glass-picker">
+            {glassPresets.filter((p) => p.kind !== 'star').map((p) => (
+              <button key={p.kind} type="button" className={(glass ?? 'clear') === p.kind ? 'on' : ''} onClick={() => setGlass(p.kind === 'clear' ? undefined : p.kind)}>
+                <FilterRing name="" glass={p.kind} size={44} /><span>{p.name}</span>
+              </button>
+            ))}
+            <label className={glass?.startsWith('#') ? 'on' : ''}>
+              <FilterRing name="" glass={glass?.startsWith('#') ? glass : '#8a5cd6'} size={44} /><span>직접</span>
+              <input type="color" value={glass?.startsWith('#') ? glass : '#8a5cd6'} onChange={(e) => setGlass(e.target.value)} />
+            </label>
+          </div>
+        </div>
+      )}
       <TagField tags={tags} setTags={setTags} />
       <PurchaseFields date={date} setDate={setDate} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller} used={used} />
       {filter && <div className="group"><button className="row danger" onClick={() => setConfirm(true)}>액세서리 삭제</button></div>}

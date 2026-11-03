@@ -124,6 +124,8 @@ export interface GearFilter {
   kind?: string
   name: string
   diameter?: string
+  /** 필터 그림 유리 색: 프리셋 이름(clear·nd·yellow…) 또는 #rrggbb. 없으면 이름으로 짐작 */
+  glass?: string
   hasPhoto?: boolean
   purchasedAt?: number
   price?: string

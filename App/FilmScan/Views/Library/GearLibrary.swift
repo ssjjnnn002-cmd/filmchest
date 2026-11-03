@@ -337,7 +337,11 @@ private struct FilterGearCard: View {
     let filter: FilterItem
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            GearPhotoThumb(data: filter.photo, symbol: filter.isFilter ? "camera.filters" : "shippingbox", card: true)
+            if filter.isFilter {
+                FilterRingView(glass: filter.glass).frame(height: 110).frame(maxWidth: .infinity)
+            } else {
+                GearPhotoThumb(data: filter.photo, symbol: "shippingbox", card: true)
+            }
             Text(filter.name.isEmpty ? filter.kindName : filter.name).font(.headline).lineLimit(2, reservesSpace: true)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             Text(filter.subLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -351,7 +355,10 @@ private struct FilterGearRow: View {
     let filter: FilterItem
     var body: some View {
         HStack(spacing: 14) {
-            GearPhotoThumb(data: filter.photo, symbol: filter.isFilter ? "camera.filters" : "shippingbox").frame(width: 68, height: 52).clipShape(RoundedRectangle(cornerRadius: 8))
+            Group {
+                if filter.isFilter { FilterRingView(glass: filter.glass) } else { GearPhotoThumb(data: filter.photo, symbol: "shippingbox") }
+            }
+            .frame(width: 68, height: 52).clipShape(RoundedRectangle(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 3) {
                 Text(filter.name.isEmpty ? filter.kindName : filter.name).font(.subheadline.weight(.semibold)).lineLimit(1)
                 Text(filter.subLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -556,6 +563,7 @@ struct FilterEditView: View {
     @State private var kind = AccessoryKinds.filter
     @State private var name = ""
     @State private var diameter = ""
+    @State private var glass: String?
     @State private var photo: Data?
     @State private var hasDate = false
     @State private var date = Date()
@@ -572,7 +580,12 @@ struct FilterEditView: View {
     var body: some View {
         NavigationStack {
             Form {
-                GearPhotoEditor(photo: $photo, symbol: isFilter ? "camera.filters" : "shippingbox")
+                // 렌즈 필터는 사진 대신 늘 기본 그림 (모양만 고른다)
+                if isFilter {
+                    Section { FilterRingView(glass: glass).frame(height: 190).frame(maxWidth: .infinity).padding(.vertical, 8) }
+                } else {
+                    GearPhotoEditor(photo: $photo, symbol: "shippingbox")
+                }
                 Section("액세서리") {
                     Picker("유형", selection: Binding(get: { kind }, set: { v in
                         if v == "__add" { addingKind = true } else { kind = v }
@@ -593,6 +606,7 @@ struct FilterEditView: View {
                         chipRow(filterDiameters.filter { $0 != diameter }) { diameter = $0 }
                     }
                 }
+                if isFilter { GlassPicker(glass: $glass) }
                 TagField(tags: $tags)
                 PurchaseFields(hasDate: $hasDate, date: $date, price: $price, seller: $seller)
                 if filter != nil {
@@ -625,6 +639,7 @@ struct FilterEditView: View {
                 if !kinds.contains(kind) { AccessoryKinds.add(kind); kinds = AccessoryKinds.all() }
                 name = filter.name
                 diameter = filter.diameter
+                glass = filter.glass
                 photo = filter.photo
                 hasDate = filter.purchasedAt != nil
                 date = filter.purchasedAt ?? Date()
@@ -660,7 +675,8 @@ struct FilterEditView: View {
         target.kind = kind
         target.name = name.trimmingCharacters(in: .whitespaces)
         target.diameter = isFilter ? diameter.filter { $0.isNumber || $0 == "." } : ""
-        target.photo = photo
+        target.glass = isFilter ? glass : nil
+        target.photo = isFilter ? nil : photo
         target.purchasedAt = hasDate ? date : nil
         target.price = PriceText.grouped(price).nilIfBlank
         target.seller = seller.nilIfBlank

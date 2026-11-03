@@ -52,7 +52,7 @@ struct LoadFilmView: View {
         return lenses.filter { $0.mount.caseInsensitiveCompare(mount) == .orderedSame }
     }
 
-    /// 최근에 쓴 필름을 앞으로
+    /// 추천 순서로 (재고 있는 것 → 많이 쓴 것)
     private var stocks: [FilmStock] {
         let format = camera?.format ?? .f135
         let recent = rolls.map(\.filmStockID)
@@ -60,9 +60,10 @@ struct LoadFilmView: View {
         let list = FilmStockCatalog.allIncludingCustom
             .filter { format == .halfFrame ? $0.formats.contains(.f135) : $0.formats.contains { $0.is120 == format.is120 } }
             .filter { search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search) }
-        // 최근 쓴 순 → 기록이 없으면 많이 쓰는 필름 순
-        func rank(_ s: FilmStock) -> (Int, Int) {
-            (recent.firstIndex(of: s.id) ?? .max, Self.popular.firstIndex(of: s.id) ?? .max)
+        // 추천 순서 (웹·갤럭시와 같음): 재고 있는 필름 먼저 → 그 안에서 많이 쓴 순 → 최근 쓴 순 → 기록이 없으면 많이 쓰는 필름 순
+        let used = Dictionary(recent.map { ($0, 1) }, uniquingKeysWith: +)
+        func rank(_ s: FilmStock) -> (Int, Int, Int, Int) {
+            (stockCount(s.id) > 0 ? 0 : 1, -(used[s.id] ?? 0), recent.firstIndex(of: s.id) ?? .max, Self.popular.firstIndex(of: s.id) ?? .max)
         }
         return list.sorted { rank($0) < rank($1) }
     }
@@ -175,7 +176,7 @@ struct LoadFilmView: View {
                             .frame(maxWidth: .infinity)
                     }
                 } header: {
-                    Text(showAllFilms ? "필름" : "필름 · 최근 사용")
+                    Text(showAllFilms ? "필름" : "필름 · 추천")
                 } footer: {
                     if let film, stockCount(film.id) > 0 { Text("재고 \(stockCount(film.id))롤 · 장착하면 1롤 빼요") }
                 }

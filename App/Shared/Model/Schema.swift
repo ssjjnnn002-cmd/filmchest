@@ -712,6 +712,8 @@ final class FilterItem {
     var kind: String = ""
     /// 필터 직경(mm). 40.5처럼 소수도 있다.
     var diameter: String = ""
+    /// 필터 그림 모양: clear(UV)·nd·polar… 또는 #rrggbb. 없으면 UV
+    var glass: String?
     @Attribute(.externalStorage) var photo: Data?
     var purchasedAt: Date?
     var price: String?

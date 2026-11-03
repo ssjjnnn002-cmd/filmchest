@@ -63,16 +63,19 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const stock = film ? stockCount(lots, film.id) : 0
   const [confirmExpired, setConfirmExpired] = useState(false)
 
-  // 최근 쓴 순 → 기록이 없으면 많이 쓰는 필름 순
+  // 추천 순서: 재고 있는 필름 먼저 → 그 안에서 많이 쓴 순 → 최근 쓴 순 → 기록이 없으면 많이 쓰는 필름 순
   const stocks = useMemo(() => {
     const fmt = camera?.format ?? '135'
     const recent = rolls.map((r) => r.filmId)
-    const rank = (id: string) => [recent.indexOf(id) < 0 ? 1e9 : recent.indexOf(id), popularFilms.indexOf(id) < 0 ? 1e9 : popularFilms.indexOf(id)]
+    const used = new Map<string, number>()
+    for (const id of recent) used.set(id, (used.get(id) ?? 0) + 1)
+    const at = (list: string[], id: string) => (list.indexOf(id) < 0 ? 1e9 : list.indexOf(id))
+    const rank = (id: string) => [stockCount(lots, id) > 0 ? 0 : 1, -(used.get(id) ?? 0), at(recent, id), at(popularFilms, id)]
     return allFilms()
       .filter((f) => (fmt === '135-half' ? f.formats.includes('135') : f.formats.some((x) => formatInfo[x].is120 === formatInfo[fmt].is120)))
       .filter((f) => !search || filmDisplayName(f).toLowerCase().includes(search.toLowerCase()))
-      .sort((a, b) => { const ra = rank(a.id), rb = rank(b.id); return ra[0] - rb[0] || ra[1] - rb[1] })
-  }, [camera, rolls, search, customRows])
+      .sort((a, b) => { const ra = rank(a.id), rb = rank(b.id); return ra[0] - rb[0] || ra[1] - rb[1] || ra[2] - rb[2] || ra[3] - rb[3] })
+  }, [camera, rolls, search, customRows, lots])
 
   const visible = useMemo(() => {
     if (showAll) return stocks
@@ -164,7 +167,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
       )}
 
       <div className="section">
-        <h2>{showAll ? '필름' : '필름 · 최근 사용'}</h2>
+        <h2>{showAll ? '필름' : '필름 · 추천'}</h2>
         <div className="group">
           {showAll && (
             <div className="field">

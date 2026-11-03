@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Image, Pressable, Text, TextInput, View } from 'react-native'
+import { glassPresets, isLensFilter } from '../core/filterLook'
+import { FilterRing } from '../FilterRing'
 import * as ImagePicker from 'expo-image-picker'
 import { db } from '../data'
 import type { CustomFilmRow } from '../core/films'
@@ -86,7 +88,9 @@ export function PurchaseFields({ date, setDate, price, setPrice, seller, setSell
   )
 }
 
-function PhotoBlock({ id, hasPhoto, uri, setUri, cleared, setCleared }: {
+function PhotoBlock({ id, hasPhoto, uri, setUri, cleared, setCleared, placeholder }: {
+  /** 사진이 없을 때 보일 그림 (필터 링) */
+  placeholder?: React.ReactNode
   id?: string
   hasPhoto?: boolean
   uri?: string
@@ -114,7 +118,7 @@ function PhotoBlock({ id, hasPhoto, uri, setUri, cleared, setCleared }: {
       <Group style={{ padding: 12, gap: 12 }}>
         {src
           ? <Image source={{ uri: src }} style={{ width: '100%', height: 220, borderRadius: 16 }} resizeMode="contain" />
-          : <View style={{ height: 160, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera" size={42} color={c.muted} /></View>}
+          : <View style={{ height: 160, alignItems: 'center', justifyContent: 'center' }}>{placeholder ?? <Icon name="camera" size={42} color={c.muted} />}</View>}
         <PhotoRows onCamera={() => { void pick(true) }} onAlbum={() => { void pick(false) }}
           onClear={src ? () => { setUri(undefined); setCleared(true) } : undefined} />
       </Group>
@@ -164,7 +168,11 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false }: {
   )
   const filterCell = (f: GearFilter) => (
     <Pressable key={f.id} onPress={() => setEdit(f.id)} style={grid ? card : row}>
-      <GearImage id={f.id} hasPhoto={f.hasPhoto} tall={grid} />
+      {isLensFilter(f.kind)
+        ? <View style={grid ? { height: 110, alignItems: 'center', justifyContent: 'center' } : { width: 68, height: 52, alignItems: 'center', justifyContent: 'center' }}>
+            <FilterRing name={f.name} glass={f.glass} size={grid ? 108 : 52} />
+          </View>
+        : <GearImage id={f.id} hasPhoto={f.hasPhoto} tall={grid} />}
       <View style={{ flex: grid ? undefined : 1, gap: 2 }}>
         {title(f.name || kindOf(f))}
         {sub([kindOf(f), f.diameter ? `직경 ${f.diameter}mm` : '', f.price ? priceText(priceValue(f.price)) : ''].filter(Boolean).join(' · '))}
@@ -209,20 +217,20 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false }: {
 }
 
 /** 장비 사진. 바둑판: 그냥 사진이면 카드 위쪽·양옆 끝까지 채운다(높이는 다른 카드와 같게). 목록: 고정 크기 + 둥근 모서리 */
-function GearImage({ id, hasPhoto, tall }: { id: string; hasPhoto?: boolean; tall: boolean }) {
+function GearImage({ id, hasPhoto, tall, fallback }: { id: string; hasPhoto?: boolean; tall: boolean; fallback?: (size: number) => React.ReactNode }) {
   const uri = useCameraPhoto(id, !!hasPhoto)
   const cutout = usePhotoIsCutout(id, !!uri)
   if (!tall) {
     return uri
       ? <Image source={{ uri }} style={{ width: 68, height: 52, borderRadius: 8 }} resizeMode={cutout === false ? 'cover' : 'contain'} />
-      : <View style={{ width: 68, height: 52, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 28, opacity: 0.3 }}>◎</Text></View>
+      : <View style={{ width: 68, height: 52, alignItems: 'center', justifyContent: 'center' }}>{fallback?.(50) ?? <Text style={{ fontSize: 28, opacity: 0.3 }}>◎</Text>}</View>
   }
   if (uri && cutout === false) {
     return <Image source={{ uri }} style={{ height: 124, marginHorizontal: -14, marginTop: -14 }} resizeMode="cover" />
   }
   return uri
     ? <Image source={{ uri }} style={{ width: '100%', height: 110 }} resizeMode="contain" />
-    : <View style={{ height: 110, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 28, opacity: 0.3 }}>◎</Text></View>
+    : <View style={{ height: 110, alignItems: 'center', justifyContent: 'center' }}>{fallback?.(100) ?? <Text style={{ fontSize: 28, opacity: 0.3 }}>◎</Text>}</View>
 }
 
 export function GearAdd({ kind, onClose }: { kind: GearKind; onClose: () => void }) {
@@ -313,6 +321,7 @@ export function FilterEdit({ filter, onClose, onSaved }: { filter?: GearFilter; 
   const [kinds, setKinds] = useState(() => { const k = accessoryKinds(); return filter && !k.includes(kindOf(filter)) ? [...k, kindOf(filter)] : k })
   const [name, setName] = useState(filter?.name ?? '')
   const [diameter, setDiameter] = useState(filter?.diameter ?? '')
+  const [glass, setGlass] = useState(filter?.glass)
   const [uri, setUri] = useState<string>()
   const [cleared, setCleared] = useState(false)
   const [date, setDate] = useState(filter?.purchasedAt)
@@ -326,11 +335,12 @@ export function FilterEdit({ filter, onClose, onSaved }: { filter?: GearFilter; 
   const save = async () => {
     const data: GearFilter = {
       id: filter?.id ?? uid(), kind, name: name.trim(), diameter: isFilter ? diameter.replace(/[^\d.]/g, '') || undefined : undefined,
-      hasPhoto: cleared ? false : !!(uri || filter?.hasPhoto),
+      glass: isFilter ? glass : undefined,
+      hasPhoto: isFilter ? false : cleared ? false : !!(uri || filter?.hasPhoto),
       purchasedAt: date, price: groupPrice(price) || undefined, seller: seller.trim() || undefined, tags,
       createdAt: filter?.createdAt ?? Date.now(),
     }
-    await storePhoto(data.id, uri, cleared)
+    await storePhoto(data.id, isFilter ? undefined : uri, isFilter ? !!filter?.hasPhoto : cleared)
     await db.filters.put(data)
     rememberSeller(seller)
     onSaved?.(data)
@@ -339,7 +349,10 @@ export function FilterEdit({ filter, onClose, onSaved }: { filter?: GearFilter; 
   return (
     <Sheet title={filter ? '액세서리 수정' : '액세서리 추가'} onClose={onClose}
       right={<SheetBtn label="저장" accent disabled={!name.trim()} onPress={save} />}>
-      <PhotoBlock id={filter?.id} hasPhoto={filter?.hasPhoto} uri={uri} setUri={setUri} cleared={cleared} setCleared={setCleared} />
+      {/* 렌즈 필터는 사진 대신 늘 기본 그림 (모양만 고른다) */}
+      {isFilter
+        ? <Group style={{ alignItems: 'center', paddingVertical: 16 }}><FilterRing name={name} glass={glass} size={190} /></Group>
+        : <PhotoBlock id={filter?.id} hasPhoto={filter?.hasPhoto} uri={uri} setUri={setUri} cleared={cleared} setCleared={setCleared} />}
       <Section title="액세서리">
         <Group>
           <Field label="유형"><Select value={kind} title="유형" options={[...kinds.map((k) => [k, k] as [string, string]), ['__add', '유형 추가…']]}
@@ -359,6 +372,7 @@ export function FilterEdit({ filter, onClose, onSaved }: { filter?: GearFilter; 
           {isFilter && <Chips>{filterDiameters.filter((item) => item !== diameter).map((item) => <Chip key={item} label={item} onPress={() => setDiameter(item)} />)}</Chips>}
         </Group>
       </Section>
+      {isFilter ? <GlassPicker name={name} glass={glass} setGlass={setGlass} /> : null}
       <TagField tags={tags} setTags={setTags} />
       <PurchaseFields date={date} setDate={setDate} price={price} setPrice={setPrice} seller={seller} setSeller={setSeller} used={used} />
       {filter && <Group><Row onPress={() => setConfirm(true)}><Text style={{ color: '#ff453a' }}>액세서리 삭제</Text></Row></Group>}
@@ -509,5 +523,30 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
         onConfirm={async () => { await db.filmLots.delete(lot.id); onClose() }} />}
       {customEdit && <CustomFilmEdit row={customEdit === 'new' ? undefined : customEdit} onClose={(id) => { if (id !== undefined) setFilmId(id); setCustomEdit(null) }} />}
     </Sheet>
+  )
+}
+
+/** 필터 모양 고르기 (웹과 같음): UV · ND · CPL … · 그 밖의 색. 고르지 않으면 UV */
+const customGlasses: [string, string][] = [['#8a5cd6', '보라'], ['#d65c9c', '분홍'], ['#5cc6d6', '하늘'], ['#9c6b3c', '갈색']]
+function GlassPicker({ glass, setGlass }: { name: string; glass?: string; setGlass: (g?: string) => void }) {
+  const c = useTheme()
+  const current = glass ?? 'clear'
+  const cell = (key: string, label: string, value: string | undefined) => {
+    const on = current === (value ?? 'clear')
+    return (
+      <Pressable key={key} onPress={() => setGlass(value)} style={{ width: '25%', alignItems: 'center', gap: 4, paddingVertical: 8, borderRadius: 12,
+        backgroundColor: on ? c.fill : undefined, borderWidth: on ? 2 : 0, borderColor: c.safelight }}>
+        <FilterRing name="" glass={value} size={44} />
+        <Text style={{ fontSize: 12, color: on ? c.ink : c.muted }}>{label}</Text>
+      </Pressable>
+    )
+  }
+  return (
+    <Section title="필터 모양">
+      <Group style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 6 }}>
+        {glassPresets.filter((p) => p.kind !== 'star').map((p) => cell(p.kind, p.name, p.kind === 'clear' ? undefined : p.kind))}
+        {customGlasses.map(([hex, label]) => cell(hex, label, hex))}
+      </Group>
+    </Section>
   )
 }

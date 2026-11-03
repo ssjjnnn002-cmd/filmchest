@@ -305,7 +305,7 @@ enum WebFormat {
         let filters: [[String: Any]] = all(FilterItem.self).map { f in
             if let p = f.photo { photos[id(f.id)] = p.base64EncodedString() }
             return clean([
-                "id": id(f.id), "kind": f.kind.nilIfBlank, "name": f.name, "diameter": f.diameter.nilIfBlank, "hasPhoto": f.photo != nil,
+                "id": id(f.id), "kind": f.kind.nilIfBlank, "name": f.name, "diameter": f.diameter.nilIfBlank, "glass": f.glass, "hasPhoto": f.photo != nil,
                 "purchasedAt": ms(f.purchasedAt), "price": f.price, "seller": f.seller, "tags": f.tags, "createdAt": ms(f.createdAt),
             ])
         }
@@ -388,7 +388,7 @@ enum WebFormat {
         for r in rows("filters") {
             guard let uid = uuid(r["id"]) else { continue }
             let f = filters.first { $0.id == uid } ?? { let x = FilterItem(name: ""); x.id = uid; context.insert(x); return x }()
-            f.kind = str(r, "kind") ?? ""; f.name = str(r, "name") ?? ""; f.diameter = str(r, "diameter") ?? ""
+            f.kind = str(r, "kind") ?? ""; f.name = str(r, "name") ?? ""; f.diameter = str(r, "diameter") ?? ""; f.glass = str(r, "glass")
             if let p = photo(r["id"] as? String ?? "") { f.photo = p }
             f.purchasedAt = date(r["purchasedAt"]); f.price = str(r, "price"); f.seller = str(r, "seller")
             f.tags = r["tags"] as? [String] ?? []; f.createdAt = date(r["createdAt"]) ?? f.createdAt
