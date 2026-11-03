@@ -3,6 +3,8 @@ import { isCutoutBlob, prepareCameraPhoto } from '../../web/src/core/cutout'
 import { canisterURL } from '../../web/src/core/canister'
 import { renderContactSheet } from '../../web/src/core/contactSheet'
 import { renderFramePrint } from '../../web/src/core/framePrint'
+import { lensSnapshot } from '../../web/src/core/model3d'
+import { lensSpec } from '../../web/src/core/lensSpecs'
 
 type RN = { ReactNativeWebView: { postMessage: (s: string) => void } }
 const post = (o: unknown) => (window as unknown as RN).ReactNativeWebView.postMessage(JSON.stringify(o))
@@ -32,6 +34,10 @@ const tools: Record<string, (a: any) => Promise<unknown>> = {
   },
   async canister({ stock, format, size }) {
     return canisterURL(stock, format, size)
+  },
+  /** 렌즈 기본 모형 그림 (웹 장비 탭과 같은 그림) */
+  async lensShot({ brand, model, mount }) {
+    return lensSnapshot(lensSpec(brand, model, mount))
   },
   /** 사진을 줄여 JPEG로 (썸네일) */
   async thumb({ data, type, max, quality }) {

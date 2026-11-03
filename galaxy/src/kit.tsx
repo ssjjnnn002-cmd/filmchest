@@ -299,6 +299,21 @@ function DrawnCanister({ film, format, size }: { film: FilmStock; format: FilmFo
   return uri ? <Image source={{ uri }} resizeMode="contain" style={{ width: size, height: size }} accessibilityLabel={film.name} /> : <View style={{ width: size, height: size }} />
 }
 
+/** 렌즈 기본 모형 그림 (사진이 없는 렌즈, 웹과 같은 그림) */
+const lensShots = new Map<string, string>()
+export function LensPicture({ brand, model, mount, width, height }: { brand: string; model: string; mount?: string; width: number | `${number}%`; height: number }) {
+  const key = `${brand}|${model}|${mount ?? ''}`
+  const [uri, setUri] = useState(lensShots.get(key))
+  useEffect(() => {
+    if (lensShots.has(key)) { setUri(lensShots.get(key)); return }
+    let live = true
+    webTool<string>('lensShot', { brand, model, mount: mount ?? '' }).then((u) => { lensShots.set(key, u); if (live) setUri(u) }).catch(() => {})
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+  return uri ? <Image source={{ uri }} resizeMode="contain" style={{ width, height }} accessibilityLabel="렌즈 그림" /> : <View style={{ width, height }} />
+}
+
 /** 카메라 대표 모습: 기기 파일로 둔 사진 → 기본 3D 모형 정지 이미지 */
 export function CameraCover({ camera, height = 110, fill }: { camera: Camera; height?: number; fill?: boolean }) {
   const wantPhoto = !!(camera.hasPhoto || camera.photo)

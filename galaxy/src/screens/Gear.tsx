@@ -11,7 +11,7 @@ import { filmFits, filterDiameters, filterKinds, groupPrice, lensSpec, parseLens
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
 import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
 import { deleteCameraPhoto, readBytes, saveCameraPhoto, useCameraPhoto, usePhotoIsCutout } from '../files'
-import { Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Group, Row, Section, Segmented, Select, Sub } from '../kit'
+import { Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Group, LensPicture, Row, Section, Segmented, Select, Sub } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { getPref, useLiveQuery } from '../store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
@@ -157,7 +157,8 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false }: {
   const box = (children: React.ReactNode) => <View style={grid ? { flexDirection: 'row', flexWrap: 'wrap', gap: 12 } : { backgroundColor: c.cell, borderRadius: 22 }}>{children}</View>
   const lensCell = (lens: Lens) => (
     <Pressable key={lens.id} onPress={() => setEdit(lens.id)} style={grid ? card : row}>
-      <GearImage id={lens.id} hasPhoto={lens.hasPhoto} tall={grid} />
+      <GearImage id={lens.id} hasPhoto={lens.hasPhoto} tall={grid}
+        fallback={(size) => <LensPicture brand={lens.brand} model={lens.model} mount={lens.mount} width={size === 50 ? 68 : '100%'} height={size === 50 ? 52 : 110} />} />
       <View style={{ flex: grid ? undefined : 1, gap: 2 }}>
         {title(lens.model || '렌즈')}
         {sub(grid ? lens.brand : [lens.brand, lensSpec(lens)].filter(Boolean).join(' · '))}
@@ -286,7 +287,8 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
   return (
     <Sheet title={lens ? '렌즈 수정' : '렌즈 추가'} onClose={onClose}
       right={<SheetBtn label="저장" accent disabled={!model.trim() || !mount.trim()} onPress={save} />}>
-      <PhotoBlock id={lens?.id} hasPhoto={lens?.hasPhoto} uri={uri} setUri={setUri} cleared={cleared} setCleared={setCleared} />
+      <PhotoBlock id={lens?.id} hasPhoto={lens?.hasPhoto} uri={uri} setUri={setUri} cleared={cleared} setCleared={setCleared}
+        placeholder={model.trim() ? <LensPicture brand={brand} model={model} mount={mount} width="100%" height={150} /> : undefined} />
       <Section title="렌즈">
         <Group>
           <Field label="마운트" value={mount} onChangeText={setMount} />
