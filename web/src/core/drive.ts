@@ -7,6 +7,7 @@ import { backupFileName, backupKey, exportAll, importAll } from './backup'
 import { FOLDER, ROOT_NAME, createFile, downloadUrl, ensureFolder, findByName, listChildren, mediaUrl, rollFolderName } from './driveApi'
 import { rotatedBlob } from './importer'
 import { restorePhotos } from './restore'
+import { readFilmchestMark } from './exif'
 import { rollTitle } from '../ui/common'
 import { notifyBackup } from './backupNudge'
 
@@ -267,17 +268,30 @@ export function pullPhotosFromDrive(onProgress?: Progress): Promise<number> {
       if (!empty) return 0
       const t = await driveToken()
       const root = await rootFolder(t)
-      const mine = new Set(Object.values(JSON.parse(getPref('driveRollFolders', '{}')) as Record<string, string>))
-      const got: Record<string, 1> = JSON.parse(getPref('drivePulledPhotos', '{}'))
+      // 받을 필요 없는 파일: 이 기기에 그 컷이 아직 있는 내 사진, 이미 받아서 그 컷이 남아 있는 사진.
+      // (기기에서 사진이 지워졌으면 다시 받는다. 폴더 단위로 건너뛰지 않는다: 같은 이름 폴더를 다른 기기와 함께 쓸 수 있다)
+      const all = await db.frames.toArray()
+      const have = new Set(all.map((f) => `${f.rollId.toLowerCase()}:${f.index}`))
+      const ids = new Set(all.map((f) => f.id))
+      const sent: Record<string, string> = JSON.parse(getPref('driveFrames', '{}'))
+      const mine = new Set(Object.entries(sent).filter(([frame]) => ids.has(frame)).map(([, v]) => v.split(':')[0]))
+      const got: Record<string, string | 1> = JSON.parse(getPref('drivePulledPhotos', '{}'))
+      const skip = (id: string) => mine.has(id) || (typeof got[id] === 'string' && (got[id] === '-' || have.has(got[id] as string)))
       const items: { id: string; name: string; mimeType: string }[] = []
-      for (const f of (await listChildren(t, root)).filter((x) => x.mimeType === FOLDER && !mine.has(x.id))) {
-        items.push(...(await listChildren(t, f.id)).filter((x) => x.mimeType.startsWith('image/') && !got[x.id]))
+      for (const f of (await listChildren(t, root)).filter((x) => x.mimeType === FOLDER)) {
+        items.push(...(await listChildren(t, f.id)).filter((x) => x.mimeType.startsWith('image/') && !skip(x.id)))
       }
       onProgress?.(0, items.length)
       const files: File[] = []
       for (const [i, it] of items.entries()) {
         const res = await fetch(downloadUrl(it.id), { headers: { Authorization: `Bearer ${t}` } })
-        if (res.ok) { const b = await res.blob(); files.push(new File([b], it.name, { type: b.type || 'image/jpeg' })); got[it.id] = 1 }
+        if (res.ok) {
+          const b = await res.blob()
+          const mark = readFilmchestMark(new Uint8Array(await b.arrayBuffer()))
+          const key = mark ? `${mark.rollId.toLowerCase()}:${mark.frame}` : '-'
+          got[it.id] = key
+          if (key === '-' || !have.has(key)) files.push(new File([b], it.name, { type: b.type || 'image/jpeg' }))
+        }
         onProgress?.(i + 1, items.length)
       }
       if (files.length) await restorePhotos(files)

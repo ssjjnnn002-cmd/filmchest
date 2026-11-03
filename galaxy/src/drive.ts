@@ -8,7 +8,8 @@ import type { Frame, Roll } from './core/types'
 import { FOLDER, ROOT_NAME, createFile, downloadUrl, ensureFolder, findByName, listChildren, mediaUrl, rollFolderName } from './core/driveApi'
 import { rollTitle } from './core/display'
 import { backupFileName, exportAll, importAll } from './backup'
-import { folder, writeBytes } from './files'
+import { folder, readBytes, writeBytes } from './files'
+import { readFilmchestMark } from './core/exif'
 import { rotatedFile } from './scan'
 import { restorePhotos } from './restore'
 import { getPref, setPref, subscribe } from './store'
@@ -250,17 +251,28 @@ export function pullPhotosFromDrive(): Promise<number> {
       if (!empty) return 0
       const t = await token(false)
       const root = await rootFolder(t)
-      const mine = new Set(Object.values(JSON.parse(getPref('driveRollFolders', '{}')) as Record<string, string>))
-      const got: Record<string, 1> = JSON.parse(getPref('drivePulledPhotos', '{}'))
+      // 받을 필요 없는 파일: 이 기기에 그 컷이 아직 있는 내 사진, 이미 받아서 그 컷이 남아 있는 사진 (웹과 같음)
+      const all = await db.frames.toArray()
+      const have = new Set(all.map((f) => `${f.rollId.toLowerCase()}:${f.index}`))
+      const ids = new Set(all.map((f) => f.id))
+      const sent: Record<string, string> = JSON.parse(getPref('driveFrames', '{}'))
+      const mine = new Set(Object.entries(sent).filter(([frame]) => ids.has(frame)).map(([, v]) => v.split(':')[0]))
+      const got: Record<string, string | 1> = JSON.parse(getPref('drivePulledPhotos', '{}'))
+      const skip = (id: string) => mine.has(id) || (typeof got[id] === 'string' && (got[id] === '-' || have.has(got[id] as string)))
       const items: { id: string; name: string; mimeType: string }[] = []
-      for (const f of (await listChildren(t, root)).filter((x) => x.mimeType === FOLDER && !mine.has(x.id))) {
-        items.push(...(await listChildren(t, f.id)).filter((x) => x.mimeType.startsWith('image/') && !got[x.id]))
+      for (const f of (await listChildren(t, root)).filter((x) => x.mimeType === FOLDER)) {
+        items.push(...(await listChildren(t, f.id)).filter((x) => x.mimeType.startsWith('image/') && !skip(x.id)))
       }
       const dir = folder('drive-restore').uri.replace(/\/?$/, '/')
       const files: { uri: string; name: string; mimeType: string }[] = []
       for (const it of items) {
         const r = await FS.downloadAsync(downloadUrl(it.id), `${dir}${it.id}-${it.name}`, { headers: { Authorization: `Bearer ${t}` } })
-        if (r.status < 300) { files.push({ uri: r.uri, name: it.name, mimeType: it.mimeType }); got[it.id] = 1 }
+        if (r.status >= 300) continue
+        const mark = readFilmchestMark(await readBytes(r.uri))
+        const key = mark ? `${mark.rollId.toLowerCase()}:${mark.frame}` : '-'
+        got[it.id] = key
+        if (key === '-' || !have.has(key)) files.push({ uri: r.uri, name: it.name, mimeType: it.mimeType })
+        else void FS.deleteAsync(r.uri, { idempotent: true })
       }
       if (files.length) await restorePhotos(files)
       setPref('drivePulledPhotos', JSON.stringify(got))

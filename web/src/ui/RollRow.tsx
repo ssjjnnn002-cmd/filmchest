@@ -27,7 +27,11 @@ export function RollRow({ roll }: { roll: Roll }) {
 
 export function RollCard({ roll, onClick }: { roll: Roll; onClick: () => void }) {
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
-  const first = useLiveQuery(() => db.frames.where('[rollId+index]').equals([roll.id, roll.coverIndex ?? 1]).first(), [roll.id, roll.coverIndex])
+  // 대표 사진, 없으면 첫 컷 (0번 컷부터 시작하거나 1번이 빠진 롤도)
+  const first = useLiveQuery(async () => {
+    const list = await db.frames.where('rollId').equals(roll.id).sortBy('index')
+    return list.find((f) => f.index === (roll.coverIndex ?? 1)) ?? list.find((f) => f.index >= 1) ?? list[0]
+  }, [roll.id, roll.coverIndex])
   const url = useObjectURL(first?.thumb)
   return (
     <button className="roll-card" onClick={onClick}>
