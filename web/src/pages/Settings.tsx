@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll, storageEstimate } from '../db'
+import { db, wipeLocal, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll, storageEstimate } from '../db'
 import { backupFileName, exportAll, exportWithPhotos, importBackupFile, photoBackupFileName } from '../core/backup'
 import { isOldSite } from '../core/move'
 import { lastBackupAt, markFileBackup } from '../core/backupNudge'
 import { useBackupRefresh } from '../ui/BackupNudge'
 import { MoveGuide } from '../ui/MoveNotice'
 import { Welcome } from '../ui/Welcome'
-import { disconnectDrive, driveAccount, driveAvailable, driveConnected } from '../core/drive'
+import { driveAccount, driveAvailable, driveConnected, signOutAndClear } from '../core/drive'
 import { CloudBackup, cloudStatus } from './CloudBackup'
 import { Stats } from './Stats'
 import { restorePhotos } from '../core/restore'
@@ -41,6 +41,8 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   const [saveChoice, setSaveChoice] = useState(false)
   const [login, setLogin] = useState(false)
   const [logout, setLogout] = useState(false)
+  const [logoutStep, setLogoutStep] = useState<string>()
+  const [logoutError, setLogoutError] = useState<string>()
   const [saving, setSaving] = useState<string>()
   useEffect(() => {
     // 아이폰, 클로드 화면, 이미 설치된 앱 안에서는 숨긴다
@@ -151,7 +153,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         <Confirm message="카메라, 렌즈, 롤, 저장한 사진을 모두 지울까요? 되돌릴 수 없어요." action="모두 지우기"
           onCancel={() => setConfirm(false)}
           onConfirm={async () => {
-            await Promise.all([db.cameras.clear(), db.lenses.clear(), db.rolls.clear(), db.frames.clear(), db.originals.clear(), db.zipQueue.clear()])
+            await wipeLocal()
             setConfirm(false)
             onClose()
           }} />
@@ -233,8 +235,21 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
       {purge && <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={async () => { const run = purge; setPurge(null); await run() }} />}
       {moveGuide && <MoveGuide onClose={() => setMoveGuide(false)} />}
       {login && <Welcome onDone={() => setLogin(false)} />}
-      {logout && <Confirm message="로그아웃할까요? 이 기기의 기록과 드라이브의 파일은 그대로 남아요." action="로그아웃"
-        onCancel={() => setLogout(false)} onConfirm={() => { disconnectDrive(); setLogout(false) }} />}
+      {logout && <Confirm message="로그아웃할까요? 기록과 사진을 드라이브에 올린 뒤 이 기기에서 지워요. 다시 로그인하면 받아 와요." action="로그아웃"
+        onCancel={() => setLogout(false)} onConfirm={async () => {
+          setLogout(false)
+          setLogoutStep('준비 중…')
+          try {
+            await signOutAndClear(setLogoutStep)
+            onClose()
+          } catch (e) {
+            setLogoutError(`드라이브에 다 올리지 못해서 로그아웃하지 않았어요. 기록은 이 기기에 그대로 있어요. (${e instanceof Error ? e.message : e})`)
+          } finally {
+            setLogoutStep(undefined)
+          }
+        }} />}
+      {logoutStep && <div className="alert-backdrop"><div className="alert" role="status"><p>{logoutStep}</p></div></div>}
+      {logoutError && <Confirm message={logoutError} action="확인" safe onCancel={() => setLogoutError(undefined)} onConfirm={() => setLogoutError(undefined)} />}
       {saveChoice && (
         <Sheet title="백업 파일로 저장" onClose={() => setSaveChoice(false)}>
           <div className="section">

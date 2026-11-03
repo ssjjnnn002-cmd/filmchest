@@ -157,3 +157,11 @@ function migrateOldTables() {
   rawSql.runSync("INSERT OR REPLACE INTO prefs (key, value) VALUES ('migratedToDocs', '1')")
 }
 migrateOldTables()
+
+/** 이 기기의 기록·사진을 모두 지운다 (로그아웃, 모든 기록 지우기). 웹 wipeLocal과 같음 */
+export async function wipeLocal() {
+  for (const f of await db.frames.toArray()) removeFile(f.thumb)
+  for (const o of await db.originals.toArray()) removeFile(o.blob)
+  for (const c of await db.cameras.toArray()) await deleteCameraPhoto(c.id).catch(() => {})
+  await Promise.all([db.cameras, db.lenses, db.rolls, db.frames, db.originals, db.zipQueue, db.customFilms, db.projects, db.filters, db.filmLots].map((t) => t.clear()))
+}

@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var showPaywall = false
     @State private var showLogin = false
     @State private var confirmLogout = false
+    @State private var logoutStep: String?
     @State private var accountRevision = 0
     @State private var note: String?
     @AppStorage(AppSettings.Key.meterOffset, store: AppSettings.defaults) private var meterOffset = AppSettings.meterDefault
@@ -50,8 +51,14 @@ struct SettingsView: View {
                     }
                 }
 
+                // 웹·갤럭시와 같은 자리: 계정 바로 아래 통계 · 백업 및 복구
                 Section {
                     NavigationLink("통계") { StatsView() }
+                    NavigationLink {
+                        BackupRestoreView()
+                    } label: {
+                        LabeledContent("백업 및 복구", value: CloudStatus.text)
+                    }
                 }
                 if Features.meter { meterSection }
 
@@ -89,16 +96,7 @@ struct SettingsView: View {
                     }
                 }
 
-
-                Section {
-                    NavigationLink {
-                        BackupRestoreView()
-                    } label: {
-                        LabeledContent("백업 및 복구", value: CloudStatus.text)
-                    }
-                }
-
-                Section {
+                Section("안내") {
                     NavigationLink("개인정보 처리방침") { PrivacyPolicyView() }
                 }
 
@@ -112,8 +110,32 @@ struct SettingsView: View {
             .filmKeyboard()
             .sheet(isPresented: $showPaywall) { PaywallView() }
             .sheet(isPresented: $showLogin, onDismiss: { accountRevision += 1 }) { WelcomeView() }
-            .confirmationDialog("로그아웃할까요? 이 기기의 기록과 드라이브의 파일은 그대로 남아요.", isPresented: $confirmLogout, titleVisibility: .visible) {
-                Button("로그아웃", role: .destructive) { GoogleAuth.signOut(); DrivePhotos.forget(); accountRevision += 1 }
+            .confirmationDialog("로그아웃할까요? 기록과 사진을 드라이브에 올린 뒤 이 기기에서 지워요. 다시 로그인하면 받아 와요. 사진 앱의 사진은 그대로예요.", isPresented: $confirmLogout, titleVisibility: .visible) {
+                Button("로그아웃", role: .destructive) {
+                    logoutStep = "준비 중…"
+                    Task {
+                        do {
+                            try await DriveSync.signOutAndClear(context) { logoutStep = $0 }
+                        } catch {
+                            note = "드라이브에 다 올리지 못해서 로그아웃하지 않았어요. 기록은 이 기기에 그대로 있어요. (\(error.localizedDescription))"
+                        }
+                        logoutStep = nil
+                        accountRevision += 1
+                    }
+                }
+            }
+            .overlay {
+                if let logoutStep {
+                    ZStack {
+                        Color.black.opacity(0.25).ignoresSafeArea()
+                        VStack(spacing: 12) {
+                            ProgressView()
+                            Text(logoutStep).monospacedDigit()
+                        }
+                        .padding(24)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+                    }
+                }
             }
             .alert("복구", isPresented: Binding(get: { note != nil }, set: { if !$0 { note = nil } })) {
                 Button("확인", role: .cancel) { note = nil }

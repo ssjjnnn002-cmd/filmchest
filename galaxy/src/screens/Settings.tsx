@@ -1,10 +1,10 @@
 // 웹 pages/Settings.tsx
 import { useEffect, useState } from 'react'
 import { Welcome } from '../Welcome'
-import { disconnectDrive, driveAccount, driveConnected } from '../drive'
+import { driveAccount, driveConnected, signOutAndClear } from '../drive'
 import { notifyBackup } from '../core/backupNudge'
 import { Text, View } from 'react-native'
-import { db, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll } from '../data'
+import { db, wipeLocal, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll } from '../data'
 import { getPref, useLiveQuery } from '../store'
 import { backupFileName, exportAll, exportWithPhotos, importBackupFile, localBackupAt, photoBackupFileName, writeLocalBackup } from '../backup'
 import { lastBackupAt, markFileBackup } from '../core/backupNudge'
@@ -41,6 +41,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   const [saveChoice, setSaveChoice] = useState(false)
   const [login, setLogin] = useState(false)
   const [logout, setLogout] = useState(false)
+  const [logoutStep, setLogoutStep] = useState<string>()
   const [saving, setSaving] = useState<string>()
   const [purge, setPurge] = useState<(() => Promise<unknown>) | null>(null)
   const [spending, setSpending] = useState(false)
@@ -122,15 +123,28 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         <Confirm message="카메라, 렌즈, 롤, 저장한 사진을 모두 지울까요? 되돌릴 수 없어요." action="모두 지우기"
           onCancel={() => setConfirm(false)}
           onConfirm={async () => {
-            await Promise.all([db.cameras.clear(), db.lenses.clear(), db.rolls.clear(), db.frames.clear(), db.originals.clear(), db.zipQueue.clear()])
+            await wipeLocal()
             setConfirm(false)
             onClose()
           }} />
       ) : null}
       {spending ? <Stats onClose={() => setSpending(false)} /> : null}
       {login ? <Welcome onDone={() => setLogin(false)} /> : null}
-      {logout ? <Confirm message="로그아웃할까요? 이 기기의 기록과 드라이브의 파일은 그대로 남아요." action="로그아웃"
-        onCancel={() => setLogout(false)} onConfirm={async () => { await disconnectDrive(); setLogout(false); notifyBackup() }} /> : null}
+      {logout ? <Confirm message="로그아웃할까요? 기록과 사진을 드라이브에 올린 뒤 이 기기에서 지워요. 다시 로그인하면 받아 와요." action="로그아웃"
+        onCancel={() => setLogout(false)} onConfirm={async () => {
+          setLogout(false)
+          setLogoutStep('준비 중…')
+          try {
+            await signOutAndClear(setLogoutStep)
+            notifyBackup()
+            onClose()
+          } catch (e) {
+            setNote(`드라이브에 다 올리지 못해서 로그아웃하지 않았어요. 기록은 이 기기에 그대로 있어요. (${e instanceof Error ? e.message : String(e)})`)
+          } finally {
+            setLogoutStep(undefined)
+          }
+        }} /> : null}
+      {logoutStep ? <Confirm message={logoutStep} busy onCancel={() => {}} onConfirm={() => {}} /> : null}
       {saveChoice ? (
         <Sheet title="백업 파일로 저장" onClose={() => setSaveChoice(false)}>
           <Section foot="사진까지 저장한 zip을 불러오면 사진도 롤에 다시 붙어요.">

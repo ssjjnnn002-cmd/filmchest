@@ -80,8 +80,10 @@ export function Sheet({ title, onClose, left, right, children, page, scroll = tr
 }
 
 /** 페이지 안 확인 창 (.alert) */
-export function Confirm({ message, action = '삭제', safe, onConfirm, onCancel }: {
+export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onCancel }: {
   message: string; action?: string; safe?: boolean; onConfirm: () => void; onCancel: () => void
+  /** 진행 중 알림: 버튼 없이 글만 */
+  busy?: boolean
 }) {
   const c = useTheme()
   const btn = (label: string, color: string, fn: () => void) => (
@@ -95,10 +97,12 @@ export function Confirm({ message, action = '삭제', safe, onConfirm, onCancel 
         <Pressable style={{ width: '100%', maxWidth: 320, borderRadius: 28, overflow: 'hidden', elevation: 16 }}>
           <BlurView intensity={40} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass, paddingTop: 22, paddingHorizontal: 18, paddingBottom: 16 }}>
             <Text style={{ color: c.ink, fontSize: 17, fontWeight: '600', textAlign: 'center', lineHeight: 23, marginBottom: 16 }}>{message}</Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {btn('취소', c.ink, onCancel)}
-              {btn(action, safe ? c.safelight : c.danger, onConfirm)}
-            </View>
+            {busy ? null : (
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                {btn('취소', c.ink, onCancel)}
+                {btn(action, safe ? c.safelight : c.danger, onConfirm)}
+              </View>
+            )}
           </BlurView>
         </Pressable>
       </Pressable>

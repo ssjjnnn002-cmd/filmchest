@@ -1,12 +1,12 @@
 import Dexie from 'dexie'
 // 구글 드라이브에 백업 파일 하나를 올리고 덮어쓴다 (drive.file 권한: 이 앱이 만든 파일만 본다)
 import { getPref, setPref } from '../platform'
-import { db } from '../db'
+import { db, wipeLocal } from '../db'
 import type { Frame, Roll } from './types'
 import { backupFileName, backupKey, exportAll, importAll } from './backup'
 import { FOLDER, ROOT_NAME, createFile, downloadUrl, ensureFolder, findByName, listChildren, mediaUrl, rollFolderName } from './driveApi'
 import { rotatedBlob } from './importer'
-import { restorePhotos } from './restore'
+import { repairThumbs, restorePhotos } from './restore'
 import { readFilmchestMark } from './exif'
 import { rollTitle } from '../ui/common'
 import { notifyBackup } from './backupNudge'
@@ -199,19 +199,35 @@ export async function restoreFromDrive() {
 
 /** 드라이브 '필름함' 폴더의 사진을 내려받아 롤에 다시 붙인다 (사진 속 표식·정보로) */
 export async function restorePhotosFromDrive(onProgress?: Progress) {
+  await repairThumbs()
   const t = await driveToken()
   const root = await rootFolder(t)
-  const files: File[] = []
   const folders = (await listChildren(t, root)).filter((f) => f.mimeType === FOLDER)
   const items: { id: string; name: string }[] = []
   for (const f of folders) items.push(...(await listChildren(t, f.id)).filter((x) => x.mimeType.startsWith('image/')))
+  const have = new Set((await db.frames.toArray()).map((f) => `${f.rollId.toLowerCase()}:${f.index}`))
+  const total = { rolls: 0, frames: 0 }
+  // 몇 장씩 받아 바로 붙인다 (한꺼번에 받으면 휴대폰 브라우저가 메모리가 모자라 멈춘다)
+  let batch: File[] = []
+  const flush = async () => {
+    if (!batch.length) return
+    const r = await restorePhotos(batch)
+    total.rolls += r.rolls; total.frames += r.frames
+    batch = []
+  }
   onProgress?.(0, items.length)
   for (const [i, it] of items.entries()) {
     const res = await fetch(downloadUrl(it.id), { headers: { Authorization: `Bearer ${t}` } })
-    if (res.ok) { const b = await res.blob(); files.push(new File([b], it.name, { type: b.type || 'image/jpeg' })) }
+    if (res.ok) {
+      const b = await res.blob()
+      const mark = readFilmchestMark(new Uint8Array(await b.arrayBuffer()))
+      if (!mark || !have.has(`${mark.rollId.toLowerCase()}:${mark.frame}`)) batch.push(new File([b], it.name, { type: b.type || 'image/jpeg' }))
+      if (batch.length >= 6) await flush()
+    }
     onProgress?.(i + 1, items.length)
   }
-  return restorePhotos(files)
+  await flush()
+  return total
 }
 
 export function driveDue() {
@@ -264,6 +280,7 @@ let pullingPhotos: Promise<number> | undefined
 export function pullPhotosFromDrive(onProgress?: Progress): Promise<number> {
   pullingPhotos ??= (async () => {
     try {
+      await repairThumbs()
       const rolls = (await db.rolls.toArray()).filter((r) => !r.deletedAt && r.status === 'imported')
       let empty = 0
       for (const r of rolls) if ((await db.frames.where('rollId').equals(r.id).count()) === 0) empty += 1
@@ -284,7 +301,8 @@ export function pullPhotosFromDrive(onProgress?: Progress): Promise<number> {
         items.push(...(await listChildren(t, f.id)).filter((x) => x.mimeType.startsWith('image/') && !skip(x.id)))
       }
       onProgress?.(0, items.length)
-      const files: File[] = []
+      let files: File[] = []
+      let count = 0
       for (const [i, it] of items.entries()) {
         const res = await fetch(downloadUrl(it.id), { headers: { Authorization: `Bearer ${t}` } })
         if (res.ok) {
@@ -293,15 +311,28 @@ export function pullPhotosFromDrive(onProgress?: Progress): Promise<number> {
           const key = mark ? `${mark.rollId.toLowerCase()}:${mark.frame}` : '-'
           got[it.id] = key
           if (key === '-' || !have.has(key)) files.push(new File([b], it.name, { type: b.type || 'image/jpeg' }))
+          // 몇 장씩 바로 붙인다 (휴대폰 브라우저 메모리)
+          if (files.length >= 6) { await restorePhotos(files); count += files.length; files = []; setPref('drivePulledPhotos', JSON.stringify(got)) }
         }
         onProgress?.(i + 1, items.length)
       }
-      if (files.length) await restorePhotos(files)
+      if (files.length) { await restorePhotos(files); count += files.length }
       setPref('drivePulledPhotos', JSON.stringify(got))
-      return files.length
+      return count
     } finally {
       pullingPhotos = undefined
     }
   })()
   return pullingPhotos
+}
+
+/** 로그아웃: 이 기기의 기록과 사진을 드라이브에 다 올린 뒤 이 기기에서 지운다. 올리지 못하면 지우지 않는다 */
+export async function signOutAndClear(onStep?: (text: string) => void) {
+  onStep?.('기록 올리는 중…')
+  await backupToDrive(true)
+  onStep?.('사진 올리는 중…')
+  await syncPhotosToDrive((done, total) => onStep?.(total ? `사진 올리는 중 ${done}/${total}` : '사진 올리는 중…'))
+  onStep?.('이 기기에서 지우는 중…')
+  await wipeLocal()
+  disconnectDrive()
 }

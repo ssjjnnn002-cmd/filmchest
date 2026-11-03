@@ -2,25 +2,8 @@ import { db, restoreRoll } from '../db'
 import { guessRollFromMeta, readFilmchestMark, readPhotoInfo, rollPatchFromPhotos } from './exif'
 import { allFilms, filmDisplayName } from './films'
 import { uid } from './types'
+import { thumbnail } from './importer'
 import type { Roll } from './types'
-
-async function thumbOf(blob: Blob) {
-  try {
-    const full = await createImageBitmap(blob)
-    const w = full.width
-    const h = full.height
-    const scale = Math.min(1, 1200 / Math.max(w, h))
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.round(w * scale)
-    canvas.height = Math.round(h * scale)
-    canvas.getContext('2d')!.drawImage(full, 0, 0, canvas.width, canvas.height)
-    full.close()
-    const thumb = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85))
-    return { thumb: thumb ?? undefined, w, h }
-  } catch {
-    return {}
-  }
-}
 
 /** 이 앱이 저장한 사진의 표식으로 롤을 다시 만든다. */
 export async function restorePhotos(files: File[]) {
@@ -73,7 +56,7 @@ export async function restorePhotos(files: File[]) {
     for (const item of items) {
       if (existing.has(item.frame)) continue
       const id = uid()
-      const { thumb, w, h } = await thumbOf(item.blob)
+      const { thumb, w, h } = await thumbnail(item.blob)
       await db.frames.add({
         id, rollId, index: item.frame, thumb, favorite: false, w, h, bytes: item.blob.size,
         takenAt: item.info.date, locationName: item.info.place,
@@ -86,4 +69,18 @@ export async function restorePhotos(files: File[]) {
     await db.rolls.update(rollId, { ...rollPatchFromPhotos(roll, added), frameCount: count, status: 'imported' })
   }
   return { rolls, frames }
+}
+
+/** 미리보기가 비어 있는 컷: 보관한 원본으로 다시 만든다 (예전에 아이폰 Safari에서 만들지 못한 것) */
+export async function repairThumbs() {
+  let fixed = 0
+  for (const f of await db.frames.filter((x) => !x.thumb).toArray()) {
+    const original = await db.originals.get(f.id)
+    if (!original) continue
+    const { thumb, w, h } = await thumbnail(original.blob)
+    if (!thumb) continue
+    await db.frames.update(f.id, { thumb, w: f.w ?? w, h: f.h ?? h })
+    fixed += 1
+  }
+  return fixed
 }

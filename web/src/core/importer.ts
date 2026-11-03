@@ -14,17 +14,24 @@ export interface ImportProgress {
   total: number
 }
 
-async function thumbnail(blob: Blob, max = 1200): Promise<{ thumb?: Blob; w?: number; h?: number }> {
+// 미리보기용 캔버스는 하나를 돌려 쓰고, 다 쓰면 크기를 0으로 줄여 메모리를 돌려준다.
+// (아이폰 Safari는 캔버스 메모리 한도가 작아서, 캔버스를 장마다 새로 만들면 몇십 장 뒤부터 미리보기가 비어 버린다)
+let thumbCanvas: HTMLCanvasElement | undefined
+
+/** 사진 미리보기 (긴 변 max) */
+export async function thumbnail(blob: Blob, max = 1200): Promise<{ thumb?: Blob; w?: number; h?: number }> {
   try {
     const full = await createImageBitmap(blob)
     const w = full.width, h = full.height
     const scale = Math.min(1, max / Math.max(w, h))
-    const canvas = document.createElement('canvas')
+    const canvas = (thumbCanvas ??= document.createElement('canvas'))
     canvas.width = Math.round(w * scale)
     canvas.height = Math.round(h * scale)
     canvas.getContext('2d')!.drawImage(full, 0, 0, canvas.width, canvas.height)
     full.close()
     const thumb = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', 0.85))
+    canvas.width = 0
+    canvas.height = 0
     return { thumb: thumb ?? undefined, w, h }
   } catch {
     return {} // 브라우저가 못 여는 형식(TIFF 등)

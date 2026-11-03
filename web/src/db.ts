@@ -185,3 +185,8 @@ export async function storageEstimate() {
     return undefined
   }
 }
+
+/** 이 기기의 기록·사진을 모두 지운다 (로그아웃, 모든 기록 지우기) */
+export async function wipeLocal() {
+  await Promise.all(db.tables.map((t) => t.clear()))
+}

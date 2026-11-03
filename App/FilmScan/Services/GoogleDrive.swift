@@ -524,6 +524,41 @@ enum DriveSync {
         return counts
     }
 
+    static func forget() {
+        for k in [fileKey, pushedKey, pulledKey, "filmscan.driveLast", "filmscan.driveRoot"] { UserDefaults.standard.removeObject(forKey: k) }
+    }
+
+    /// 로그아웃: 기록과 사진을 드라이브에 다 올린 뒤 이 기기의 기록을 지운다 (웹·갤럭시와 같음).
+    /// 올리지 못하면 지우지 않고 오류를 던진다. 사진 앱의 사진은 그대로 둔다
+    @MainActor
+    static func signOutAndClear(_ context: ModelContext, onStep: @escaping (String) -> Void) async throws {
+        onStep("기록 올리는 중…")
+        try await push(context, force: true)
+        onStep("사진 올리는 중…")
+        if let error = await DrivePhotos.sync(context, progress: { done, total, _ in onStep("사진 확인 중 \(done)/\(total)") }) {
+            throw DriveError.message(error)
+        }
+        while case let n = await DriveUploader.shared.pendingCount(), n > 0 {
+            onStep("사진 올리는 중 · \(n)장 남음")
+            try await Task.sleep(for: .seconds(1))
+        }
+        onStep("이 기기에서 지우는 중…")
+        // 먼저 연결을 끊는다: 지운 빈 기록이 드라이브·파일 앱 폴더 백업을 덮어쓰지 않게
+        GoogleAuth.signOut()
+        DrivePhotos.forget()
+        forget()
+        AutoBackup.clearFolder()
+        try context.delete(model: FrameItem.self)
+        try context.delete(model: RollItem.self)
+        try context.delete(model: ProjectItem.self)
+        try context.delete(model: LensItem.self)
+        try context.delete(model: FilterItem.self)
+        try context.delete(model: FilmLotItem.self)
+        try context.delete(model: CustomFilmItem.self)
+        try context.delete(model: CameraItem.self)
+        try context.save()
+    }
+
     /// 앱이 앞으로 올 때 / 뒤로 갈 때 (연결돼 있을 때만, 실패는 조용히)
     @MainActor
     static func onActive(_ context: ModelContext) {

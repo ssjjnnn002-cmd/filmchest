@@ -3,7 +3,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin'
 import { notifyBackup } from './core/backupNudge'
 import * as FS from 'expo-file-system/legacy'
 import { AppState, Linking } from 'react-native'
-import { db } from './data'
+import { db, wipeLocal } from './data'
 import type { Frame, Roll } from './core/types'
 import { FOLDER, ROOT_NAME, createFile, downloadUrl, ensureFolder, findByName, listChildren, mediaUrl, rollFolderName } from './core/driveApi'
 import { rollTitle } from './core/display'
@@ -284,4 +284,15 @@ export function pullPhotosFromDrive(): Promise<number> {
     }
   })()
   return pullingPhotos
+}
+
+/** 로그아웃: 이 기기의 기록과 사진을 드라이브에 다 올린 뒤 이 기기에서 지운다. 올리지 못하면 지우지 않는다 (웹과 같음) */
+export async function signOutAndClear(onStep?: (text: string) => void) {
+  onStep?.('기록 올리는 중…')
+  await backupToDrive(true)
+  onStep?.('사진 올리는 중…')
+  await syncPhotosToDrive((done, total) => onStep?.(total ? `사진 올리는 중 ${done}/${total}` : '사진 올리는 중…'))
+  onStep?.('이 기기에서 지우는 중…')
+  await wipeLocal()
+  await disconnectDrive()
 }
