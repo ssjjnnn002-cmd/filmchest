@@ -1,6 +1,7 @@
 // 자동 복사: web/src/ui/common.tsx 표시용 도우미 (node scripts/sync-galaxy-core.mjs). 여기서 고치지 말 것.
 import type { Camera, FilmFormat, Roll } from './types'
 import { filmById, filmDisplayName } from './films'
+import { getPref } from '../store'
 
 // --- 표시용 도우미
 
@@ -24,6 +25,10 @@ export const rollCameraFormat = (camera: Camera | undefined, roll: Roll): FilmFo
 
 export const rollFilm = (r: Roll) => filmById(r.filmId)
 export const rollFilmName = (r: Roll) => filmById(r.filmId) ? filmDisplayName(filmById(r.filmId)) : '필름 알 수 없음'
+/** 롤 이름: 붙인 제목, 없으면 필름 이름 */
+export const rollName = (r: Roll) => r.title?.trim() || rollFilmName(r)
+/** 설정 '롤 보관함에 메모 보이기' */
+export const showRollMemo = () => getPref<string>('showRollMemo', '0') === '1'
 export const dateUnknown = (r: Roll) => r.isArchive && r.days.length === 0
 export const sortedDays = (r: Roll) => [...r.days].sort((a, b) => a.startedAt - b.startedAt)
 export const sortedLocations = (r: Roll) => [...r.locations].sort((a, b) => a.startFrame - b.startFrame)

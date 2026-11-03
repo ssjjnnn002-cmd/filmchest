@@ -41,6 +41,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   const [saveChoice, setSaveChoice] = useState(false)
   const [login, setLogin] = useState(false)
   const [logout, setLogout] = useState(false)
+  const [memoShown, setMemoShown] = useState(getPref<string>('showRollMemo', '0') === '1')
   const [logoutStep, setLogoutStep] = useState<string>()
   const [logoutError, setLogoutError] = useState<string>()
   const [saving, setSaving] = useState<string>()
@@ -59,6 +60,13 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         <h2>화면</h2>
         <div className="segmented slide" style={{ '--i': Math.max(0, themes.findIndex(([k]) => k === theme)), '--n': themes.length } as React.CSSProperties}>
           {themes.map(([k, n]) => <button key={k} className={k === theme ? 'on' : ''} onClick={() => choose(k)}>{n}</button>)}
+        </div>
+      </div>
+
+      <div className="section">
+        <div className="group">
+          <label className="toggle"><span>롤 보관함에 메모 보이기</span>
+            <input type="checkbox" className="switch" checked={memoShown} onChange={(e) => { setMemoShown(e.target.checked); setPref('showRollMemo', e.target.checked ? '1' : '0') }} /></label>
         </div>
       </div>
 

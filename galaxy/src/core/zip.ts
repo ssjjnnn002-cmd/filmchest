@@ -1,5 +1,5 @@
-// 자동 복사: web/src/core/zip.ts (미리보기만 data URI). 여기서 고치지 말 것.
-import { bytesToB64 } from '../files'
+// 자동 복사: web/src/core/zip.ts (미리보기만 파일 경로·data URI). 여기서 고치지 말 것.
+import { bytesToB64, writeBytes } from '../files'
 import JSZip from 'jszip'
 
 /** 압축을 푼 스캔 이미지 한 장 */
@@ -95,7 +95,9 @@ export async function readZip(data: Blob | ArrayBuffer | Uint8Array): Promise<Sc
 }
 
 /** 가져오기 전에 보여줄 몇 장. 가능하면 JPG 묶음에서 고른다. */
-export async function previewZip(file: Uint8Array, limit = 8): Promise<{ paths: string[]; thumbs: string[] }> {
+/** 가져오기 전에 보여줄 사진 (limit 없으면 전부). 가능하면 JPG 묶음에서 고른다.
+ *  limit이 있으면(목록용 몇 장) data URI, 없으면 앱 임시 폴더에 풀어 둔 파일 경로 (전부를 data URI로 들고 있으면 메모리가 모자라다) */
+export async function previewZip(file: Uint8Array, limit?: number): Promise<{ paths: string[]; thumbs: string[] }> {
   const zip = await JSZip.loadAsync(file, { decodeFileName: (b) => decodeFileName(b as Uint8Array) })
   const entries = Object.values(zip.files).filter((e) => !e.dir && isScanImage(e.name))
   const groups = new Map<string, typeof entries>()
@@ -106,13 +108,13 @@ export async function previewZip(file: Uint8Array, limit = 8): Promise<{ paths: 
   }
   const jpg = [...groups.entries()].filter(([k]) => k.endsWith('|JPG')).sort((a, b) => b[1].length - a[1].length)[0]
   const chosen = (jpg?.[1] ?? [...groups.values()].sort((a, b) => b.length - a.length)[0] ?? [])
-    .slice().sort((a, b) => naturalCompare(a.name, b.name)).slice(0, limit)
+    .slice().sort((a, b) => naturalCompare(a.name, b.name)).slice(0, limit ?? Infinity)
   const thumbs: string[] = []
-  for (const e of chosen) {
+  const run = Date.now().toString(36)
+  for (const [i, e] of chosen.entries()) {
     const data = await e.async('uint8array')
-    const ext = extOf(e.name)
-    const type = ext === 'png' ? 'image/png' : 'image/jpeg'
-    thumbs.push(`data:${type};base64,${bytesToB64(data)}`)
+    const png = extOf(e.name) === 'png'
+    thumbs.push(limit ? `data:${png ? 'image/png' : 'image/jpeg'};base64,${bytesToB64(data)}` : writeBytes('zip-preview', `${run}-${i}.${png ? 'png' : 'jpg'}`, data))
   }
   return { paths: entries.map((e) => e.name), thumbs }
 }

@@ -10,6 +10,8 @@ struct RollDetailView: View {
     @Environment(\.openURL) private var openURL
 
     @State private var editingDay: ShootingDay?
+    @State private var editingTitle = false
+    @State private var titleDraft = ""
     @State private var addingDay = false
     @State private var editingPlace: LocationSegment?
     @State private var addingPlace = false
@@ -241,7 +243,14 @@ struct RollDetailView: View {
             }
         }
         .background(Theme.paper)
-        .navigationTitle(roll.filmName)
+        .navigationTitle(roll.displayTitle)
+        .alert("롤 제목", isPresented: $editingTitle) {
+            TextField(roll.filmName, text: $titleDraft)
+            Button("취소", role: .cancel) {}
+            Button("저장") { roll.customTitle = titleDraft.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank }
+        } message: {
+            Text("비워 두면 필름 이름으로 보여요.")
+        }
         .toolbar {
             ToolbarItem {
                 Button {
@@ -345,7 +354,21 @@ struct RollDetailView: View {
                 FilmCanisterView(stock: roll.film, format: roll.format).frame(width: 96, height: 96)
                 VStack(alignment: .leading, spacing: 5) {
                     StatusBadge(status: roll.status)
-                    Text(roll.filmName + (roll.shotISO.map { " @ ISO \($0)" } ?? "")).font(.title3.bold())
+                    HStack(spacing: 6) {
+                        Text(roll.hasCustomTitle ? roll.displayTitle : roll.filmName + (roll.shotISO.map { " @ ISO \($0)" } ?? "")).font(.title3.bold())
+                        Button {
+                            titleDraft = roll.customTitle ?? ""
+                            editingTitle = true
+                        } label: {
+                            Image(systemName: "pencil").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                                .frame(width: 28, height: 28).background(Color(.tertiarySystemFill), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("제목 바꾸기")
+                    }
+                    if roll.hasCustomTitle {
+                        Text(roll.filmName + (roll.shotISO.map { " @ ISO \($0)" } ?? "")).font(.subheadline)
+                    }
                     Text(roll.cameraName).font(.subheadline)
                     if let lens = roll.lens?.displayName ?? roll.fixedLensLabel {
                         Text(lens).font(.caption).foregroundStyle(.secondary)

@@ -358,23 +358,44 @@ struct ImportFlowView: View {
 
 struct RollRow: View {
     let roll: RollItem
+    @State private var cover: CGImage?
+    @AppStorage("filmscan.showRollMemo") private var showMemo = false
 
     var body: some View {
         HStack(spacing: 12) {
-            FilmCanisterView(stock: roll.film, format: roll.format).frame(width: 48, height: 48)
+            // 스캔이 있으면 대표 사진, 없으면 필름통 (필름 이름은 옆에 있다)
+            // 바둑판형 표지와 같은 가로 비율·모서리. 필름통도 같은 칸에 두어 글 시작이 맞는다
+            Group {
+                if let cover {
+                    Image(cgImage: cover).resizable().scaledToFill()
+                        .frame(width: 78, height: 52)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                } else {
+                    FilmCanisterView(stock: roll.film, format: roll.format).frame(width: 52, height: 52)
+                }
+            }
+            .frame(width: 78, height: 52)
+            .task(id: "\(roll.frames?.count ?? 0)|\(roll.coverFrameIndex ?? 0)") {
+                guard let data = roll.coverFrame?.thumbnail else { cover = nil; return }
+                cover = await Task.detached { ImageThumbnail.make(data: data, maxPixel: 160) }.value
+            }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    Text(roll.filmName).font(.subheadline.weight(.semibold)).lineLimit(1)
+                    Text(roll.displayTitle).font(.subheadline.weight(.semibold)).lineLimit(1)
                     StatusBadge(status: roll.status)
                     if roll.isFavorite {
                         Image(systemName: "star.fill").font(.caption).foregroundStyle(.yellow)
                     }
                 }
-                Text([roll.cameraLabel, roll.dateRangeText].compactMap { $0 }.joined(separator: " · "))
+                // 제목을 붙였으면 필름 이름은 아래 줄에 (웹·갤럭시와 같음)
+                Text([roll.hasCustomTitle ? roll.filmName : nil, roll.cameraLabel, roll.dateRangeText].compactMap { $0 }.joined(separator: " · "))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 // 장소·태그 줄은 비어 있어도 자리를 지켜서 모든 줄 높이가 같다
                 let place = roll.sortedLocations.map(\.name).joined(separator: ", ")
                 Text(place.isEmpty ? " " : place).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                if showMemo, let memo = roll.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank {
+                    Text(memo).font(.caption).italic().foregroundStyle(.secondary).lineLimit(1)
+                }
                 TagLine(tags: roll.tags)
             }
             Spacer(minLength: 0)

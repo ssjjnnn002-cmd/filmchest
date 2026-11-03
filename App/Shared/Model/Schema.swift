@@ -229,6 +229,8 @@ final class RollItem {
     var importedAt: Date?
     var frameCount: Int?
     var note: String?
+    /// 사용자가 붙인 롤 제목 (없으면 필름 이름)
+    var customTitle: String?
     var albumIdentifier: String?
     var isFavorite: Bool = false
     var tags: [String] = []
@@ -276,6 +278,9 @@ final class RollItem {
 
     var film: FilmStock? { FilmStockCatalog.stock(id: filmStockID) }
     var filmName: String { film?.displayName ?? (filmStockID.isEmpty ? "필름 알 수 없음" : filmStockID) }
+    /// 롤 이름: 붙인 제목, 없으면 필름 이름
+    var displayTitle: String { customTitle?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank ?? filmName }
+    var hasCustomTitle: Bool { customTitle?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank != nil }
     var recordedCameraName: String {
         [recordedCameraBrand, recordedCameraModel].filter { !$0.isEmpty }.joined(separator: " ")
     }

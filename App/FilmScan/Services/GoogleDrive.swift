@@ -327,7 +327,7 @@ enum WebFormat {
             "locations": r.locations.map { l in clean(["id": id(l.id), "startFrame": l.startFrame, "name": l.name,
                                                        "point": l.point.flatMap(encodable), "memo": l.memo, "weather": l.weather.flatMap(encodable)]) },
             "lab": r.labName, "droppedAt": ms(r.droppedOffAt), "scanner": r.scannerName, "importedAt": ms(r.importedAt),
-            "frameCount": r.frameCount, "note": r.note, "tags": r.tags, "favorite": r.isFavorite, "isArchive": r.isArchive,
+            "frameCount": r.frameCount, "note": r.note, "title": r.customTitle, "tags": r.tags, "favorite": r.isFavorite, "isArchive": r.isArchive,
             "coverIndex": r.coverFrameIndex, "scanW": r.scanPixelWidth, "scanH": r.scanPixelHeight, "scanFormat": r.scanFormat,
             "scanBytes": r.scanBytes,
         ]) }
@@ -439,7 +439,7 @@ enum WebFormat {
                                        weather: decodable(WeatherNote.self, l["weather"]))
             }
             x.labName = str(r, "lab"); x.droppedOffAt = date(r["droppedAt"]); x.scannerName = str(r, "scanner")
-            x.importedAt = date(r["importedAt"]); x.frameCount = int(r, "frameCount") ?? x.frameCount; x.note = str(r, "note")
+            x.importedAt = date(r["importedAt"]); x.frameCount = int(r, "frameCount") ?? x.frameCount; x.note = str(r, "note"); x.customTitle = str(r, "title")
             x.tags = r["tags"] as? [String] ?? []; x.isFavorite = r["favorite"] as? Bool ?? false; x.isArchive = r["isArchive"] as? Bool ?? false
             x.coverFrameIndex = int(r, "coverIndex"); x.scanPixelWidth = int(r, "scanW") ?? x.scanPixelWidth
             x.scanPixelHeight = int(r, "scanH") ?? x.scanPixelHeight; x.scanFormat = str(r, "scanFormat") ?? x.scanFormat

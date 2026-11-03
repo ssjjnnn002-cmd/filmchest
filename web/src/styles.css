@@ -345,6 +345,17 @@ select.input { appearance: none; -webkit-appearance: none; color: var(--muted); 
 .privacy p { font-size: 16px; line-height: 1.5; }
 .thumb-row { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 8px; }
 .thumb-row img { width: 92px; height: 68px; object-fit: cover; border-radius: 8px; background: #111; flex: none; }
+/* 기존 롤 가져오기 미리보기: 전부, 크게. 눌러서 한 장씩 */
+.thumb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 5px; margin-top: 8px; border-radius: 12px; background: #111; }
+.thumb-grid button { position: relative; aspect-ratio: 3 / 2; padding: 0; border: 0; border-radius: 6px; overflow: hidden; background: #1c1c1c; cursor: pointer; }
+.thumb-grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb-grid span { position: absolute; left: 4px; bottom: 4px; padding: 1px 6px; border-radius: 99px; background: rgb(0 0 0 / .5); color: #fff; font-size: 11px; font-weight: 600; }
+@media (min-width: 700px) { .thumb-grid { grid-template-columns: repeat(4, 1fr); } }
+.preview-pager { position: fixed; inset: 0; z-index: 1000; background: #000; display: flex; align-items: center; justify-content: center; }
+.preview-pager > img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.preview-top { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; color: #fff; }
+.preview-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 64px; border: 0; border-radius: 12px; background: rgb(255 255 255 / .12); color: #fff; font-size: 34px; cursor: pointer; }
+.preview-nav.prev { left: 10px; } .preview-nav.next { right: 10px; }
 .fullscreen.dark { background: #000; color: #fff; }
 .fullscreen.dark .glass-btn { --glass: rgb(40 40 40 / 0.6); --glass-line: rgb(255 255 255 / 0.1); color: #fff; }
 .fs-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; }
@@ -392,6 +403,9 @@ select.input { appearance: none; -webkit-appearance: none; color: var(--muted); 
 /* --- 롤 */
 .roll-row { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .roll-row img.can { width: 56px; height: 56px; flex-shrink: 0; }
+.roll-row img.roll-row-thumb { width: 84px; height: 56px; flex-shrink: 0; border-radius: 10px; object-fit: cover; background: var(--film-base, #1a1a1a); }
+/* 필름통만 있는 줄도 사진 칸과 같은 폭: 글 시작이 맞는다 */
+.roll-row img.can { margin: 0 14px; }
 .roll-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .roll-title b { font-size: 17px; font-weight: 600; }
 .star { color: #f5b700; }
@@ -748,3 +762,7 @@ a.row.accent { color: var(--safelight); }
 .welcome { display: grid; justify-items: center; gap: 14px; padding: 12px 8px 20px; text-align: center; }
 .welcome img { border-radius: 20px; }
 .welcome p { margin: 0; line-height: 1.6; color: var(--ink); }
+
+.icon-btn.small { width: 30px; height: 30px; box-shadow: none; background: var(--fill, rgba(0,0,0,.06)); color: var(--muted); }
+.icon-btn.small svg { width: 17px; height: 17px; }
+.roll-memo { font-style: italic; }

@@ -1,6 +1,6 @@
 // 웹 pages/ArchiveImport.tsx — 예전에 찍어 스캔본을 받아 둔 롤을 롤 보관함에 넣는다. 모르는 정보는 '알 수 없음'.
 import { useEffect, useState } from 'react'
-import { Image, ScrollView, View } from 'react-native'
+import { FlatList, Image, Modal, Pressable, Text, useWindowDimensions, View } from 'react-native'
 import { db } from '../data'
 import { useLiveQuery } from '../store'
 import { useNav } from '../App'
@@ -39,6 +39,7 @@ export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onS
   const [progress, setProgress] = useState<{ done: number; total: number }>()
   const [error, setError] = useState<string>()
   const [thumbs, setThumbs] = useState<string[]>([])
+  const [viewing, setViewing] = useState<number>()
 
   useEffect(() => {
     const file = presetFile ?? files.find((f) => isZipFile({ name: f.name, type: f.mimeType }))
@@ -106,10 +107,20 @@ export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onS
               ]}
             </Group>
             {thumbs.length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingTop: 4, paddingBottom: 8 }}>
-                {thumbs.map((src, i) => <Image key={i} source={{ uri: src }} style={{ width: 92, height: 68, borderRadius: 8, backgroundColor: '#111' }} resizeMode="cover" />)}
-              </ScrollView>
+              // 전부 보여 주고, 눌러서 한 장씩 크게 본다 (웹과 같음)
+              <View style={{ marginTop: 8 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, padding: 5, borderRadius: 12, backgroundColor: '#111' }}>
+                  {thumbs.map((src, i) => (
+                    <Pressable key={i} onPress={() => setViewing(i)} style={{ width: '32.4%', aspectRatio: 3 / 2, borderRadius: 6, overflow: 'hidden', backgroundColor: '#1c1c1c' }}>
+                      <Image source={{ uri: src }} style={{ width: '100%', height: '100%' }} resizeMode="cover" resizeMethod="resize" />
+                      <Text style={{ position: 'absolute', left: 4, bottom: 4, paddingHorizontal: 6, borderRadius: 99, overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff', fontSize: 11, fontWeight: '600' }}>{i + 1}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Footnote>사진 {thumbs.length}장</Footnote>
+              </View>
             ) : null}
+            {viewing !== undefined ? <PreviewPager uris={thumbs} start={viewing} onClose={() => setViewing(undefined)} /> : null}
           </Section>
           {presetFile ? <View style={{ alignItems: 'flex-start', marginTop: -8 }}><Btn label="나중에 이어하기" onPress={onClose} /></View> : null}
 
@@ -143,5 +154,27 @@ export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onS
         </>
       )}
     </Sheet>
+  )
+}
+
+/** 미리보기를 눌렀을 때: 한 장씩 크게, 옆으로 넘겨 본다 (웹 PreviewPager와 같음) */
+function PreviewPager({ uris, start, onClose }: { uris: string[]; start: number; onClose: () => void }) {
+  const { width, height } = useWindowDimensions()
+  const [page, setPage] = useState(start)
+  return (
+    <Modal visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <FlatList data={uris} horizontal pagingEnabled initialScrollIndex={start} keyExtractor={(_, i) => String(i)}
+          getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })} showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
+          renderItem={({ item }) => <Image source={{ uri: item }} style={{ width, height }} resizeMode="contain" />} />
+        <View style={{ position: 'absolute', top: 44, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{page + 1} / {uris.length}</Text>
+          <Pressable onPress={onClose} style={{ paddingHorizontal: 16, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>닫기</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   )
 }

@@ -8,6 +8,7 @@ import { filmById, filmDisplayName } from '../core/films'
 import { fallbackSnapshot, snapshot } from '../core/model3d'
 import { modelHash, profileFor } from '../core/profiles'
 import { canisterURL } from '../core/canister'
+import { getPref } from '../platform'
 import type { FilmFormat } from '../core/types'
 
 // --- 아이콘: iOS 시스템 아이콘 느낌(둥근 끝, 같은 굵기, 탭은 채운 모양)으로 새로 그린 것. currentColor.
@@ -59,6 +60,7 @@ const icons: Record<string, IconDef> = {
   heart: { d: 'M12 20.2s-7.8-4.6-7.8-10.4A4.4 4.4 0 0 1 12 7a4.4 4.4 0 0 1 7.8 2.8c0 5.8-7.8 10.4-7.8 10.4z' },
   heartFill: { d: 'M12 20.2s-7.8-4.6-7.8-10.4A4.4 4.4 0 0 1 12 7a4.4 4.4 0 0 1 7.8 2.8c0 5.8-7.8 10.4-7.8 10.4z', fill: true },
   pin: { d: 'M12 21.2s-6.6-6-6.6-11.4a6.6 6.6 0 0 1 13.2 0c0 5.4-6.6 11.4-6.6 11.4z M12 12.3a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8z' },
+  pencil: { d: 'M14.8 5.2l4 4 M4.5 19.5l1-4.2L15.6 5.2a1.4 1.4 0 0 1 2 0l1.2 1.2a1.4 1.4 0 0 1 0 2L8.7 18.5z' },
   trash: { d: 'M4.3 6.5h15.4 M9.4 6.5V5a1.6 1.6 0 0 1 1.6-1.6h2A1.6 1.6 0 0 1 14.6 5v1.5 M6.4 6.5l.85 12.3a1.9 1.9 0 0 0 1.9 1.8h5.7a1.9 1.9 0 0 0 1.9-1.8l.85-12.3 M10 10.3v6.2 M14 10.3v6.2' },
   more: { d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M7.8 12h.01 M12 12h.01 M16.2 12h.01', width: 2 },
   ellipsis: { d: 'M6 12h.01 M12 12h.01 M18 12h.01', width: 2.6 },
@@ -455,6 +457,10 @@ export const rollCameraFormat = (camera: Camera | undefined, roll: Roll): FilmFo
 
 export const rollFilm = (r: Roll) => filmById(r.filmId)
 export const rollFilmName = (r: Roll) => filmById(r.filmId) ? filmDisplayName(filmById(r.filmId)) : '필름 알 수 없음'
+/** 롤 이름: 붙인 제목, 없으면 필름 이름 */
+export const rollName = (r: Roll) => r.title?.trim() || rollFilmName(r)
+/** 설정 '롤 보관함에 메모 보이기' */
+export const showRollMemo = () => getPref<string>('showRollMemo', '0') === '1'
 export const dateUnknown = (r: Roll) => r.isArchive && r.days.length === 0
 export const sortedDays = (r: Roll) => [...r.days].sort((a, b) => a.startedAt - b.startedAt)
 export const sortedLocations = (r: Roll) => [...r.locations].sort((a, b) => a.startFrame - b.startFrame)

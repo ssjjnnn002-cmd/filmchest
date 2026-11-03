@@ -45,6 +45,9 @@ struct ArchiveImportView: View {
     @State private var fileURLs: [URL]
     @State private var showFiles = false
     @State private var thumbs: [CGImage] = []
+    /// 미리보기 칸마다 원본 (눌러서 크게 볼 때)
+    @State private var sources: [PreviewSource] = []
+    @State private var viewing: Int?
     @State private var didGuessFilm = false
 
     // 롤 정보 (nil/빈 값 = 알 수 없음)
@@ -172,68 +175,88 @@ struct ArchiveImportView: View {
     private var selectionSummary: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !thumbs.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(thumbs.indices, id: \.self) { i in
-                            Image(cgImage: thumbs[i]).resizable().scaledToFill()
-                                .frame(width: 60, height: 40).clipped()
+                // 전부 보여 주고, 눌러서 한 장씩 크게 본다
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 3), spacing: 4) {
+                    ForEach(thumbs.indices, id: \.self) { i in
+                        Button { viewing = i } label: {
+                            Color.clear
+                                .aspectRatio(3 / 2, contentMode: .fit)
+                                .overlay { Image(cgImage: thumbs[i]).resizable().scaledToFill() }
+                                .clipped()
+                                .overlay(alignment: .bottomLeading) {
+                                    Text("\(i + 1)").font(.caption2.weight(.semibold)).foregroundStyle(.white)
+                                        .padding(.horizontal, 5).padding(.vertical, 2)
+                                        .background(.black.opacity(0.45), in: Capsule()).padding(4)
+                                }
                         }
+                        .buttonStyle(.plain)
                     }
-                    .padding(5)
-                    .background(Theme.filmBase)
                 }
+                .padding(5)
+                .background(Theme.filmBase, in: RoundedRectangle(cornerRadius: 10))
             }
-            Text(!presetAssetIDs.isEmpty ? "사진 \(presetAssetIDs.count)장" : photoItems.isEmpty ? "파일 \(fileURLs.count)개" : "사진 \(photoItems.count)장")
+            Text(!presetAssetIDs.isEmpty ? "사진 \(presetAssetIDs.count)장" : photoItems.isEmpty ? (thumbs.isEmpty ? "파일 \(fileURLs.count)개" : "사진 \(thumbs.count)장") : "사진 \(photoItems.count)장")
                 .font(.subheadline).foregroundStyle(.secondary)
         }
+        #if os(iOS)
+        .fullScreenCover(isPresented: Binding(get: { viewing != nil }, set: { if !$0 { viewing = nil } })) {
+            PreviewPager(sources: sources, start: viewing ?? 0) { viewing = nil }
+        }
+        #else
+        .sheet(isPresented: Binding(get: { viewing != nil }, set: { if !$0 { viewing = nil } })) {
+            PreviewPager(sources: sources, start: viewing ?? 0) { viewing = nil }.frame(minWidth: 640, minHeight: 520)
+        }
+        #endif
     }
 
     // MARK: 동작
 
     private func loadThumbs() async {
         thumbs = []
+        sources = []
         if !presetAssetIDs.isEmpty {
-            var list: [CGImage] = []
-            for id in presetAssetIDs.prefix(10) {
-                if let img = await PhotoLibrary.image(assetID: id, maxPixel: 160) { list.append(img) }
-            }
-            thumbs = list
+            await loadAssets(presetAssetIDs)
         } else if !photoItems.isEmpty {
-            var list: [CGImage] = []
-            for item in photoItems.prefix(10) {
-                if let id = item.itemIdentifier, let img = await PhotoLibrary.image(assetID: id, maxPixel: 160) {
-                    list.append(img)
-                }
-            }
-            thumbs = list
+            await loadAssets(photoItems.compactMap(\.itemIdentifier))
         } else if let zip = fileURLs.first(where: { $0.pathExtension.lowercased() == "zip" }) {
             let url = zip
-            let preview = await Task.detached { () -> (images: [CGImage], filmID: String?) in
+            let peek = await Task.detached { () -> (samples: [URL], filmID: String?) in
                 let ok = url.startAccessingSecurityScopedResource()
                 defer { if ok { url.stopAccessingSecurityScopedResource() } }
-                guard let peek = try? ScanImporter.peek(zipURL: url) else { return ([], nil) }
-                let images = peek.samples.compactMap { ImageThumbnail.make(url: $0, maxPixel: 240) }
+                // 미리보기도 전부 (눌러서 크게 볼 수 있게 풀어 둔 파일을 쓴다)
+                guard let peek = try? ScanImporter.peek(zipURL: url, maxFrames: .max) else { return ([], nil) }
                 let folders = peek.paths.map { ($0 as NSString).deletingLastPathComponent }.filter { !$0.isEmpty }
-                let fromFolders = FilmStockCatalog.match(in: folders.joined(separator: "\n"))?.id
-                return (images, fromFolders)
+                return (peek.samples, FilmStockCatalog.match(in: folders.joined(separator: "\n"))?.id)
             }.value
-            thumbs = preview.images
             let fromTitle = FilmStockCatalog.match(in: sourceName ?? "")?.id
-            if !didGuessFilm, filmID.isEmpty, let id = fromTitle ?? preview.filmID {
+            if !didGuessFilm, filmID.isEmpty, let id = fromTitle ?? peek.filmID {
                 filmID = id
                 didGuessFilm = true
             }
+            await loadFiles(peek.samples, scoped: false)
         } else if !fileURLs.isEmpty {
-            let urls = fileURLs
             let images: Set<String> = ["jpg", "jpeg", "png", "heic", "heif", "tif", "tiff", "dng"]
-            thumbs = await Task.detached {
-                urls.prefix(10).compactMap { url -> CGImage? in
-                    guard images.contains(url.pathExtension.lowercased()) else { return nil }
-                    let ok = url.startAccessingSecurityScopedResource()
-                    defer { if ok { url.stopAccessingSecurityScopedResource() } }
-                    return ImageThumbnail.make(url: url, maxPixel: 160)
-                }
+            await loadFiles(fileURLs.filter { images.contains($0.pathExtension.lowercased()) }, scoped: true)
+        }
+    }
+
+    /// 몇 장씩 차례로 채운다 (36장이어도 앞쪽부터 바로 보인다)
+    private func loadFiles(_ urls: [URL], scoped: Bool) async {
+        for url in urls {
+            let img = await Task.detached { () -> CGImage? in
+                let ok = scoped && url.startAccessingSecurityScopedResource()
+                defer { if ok { url.stopAccessingSecurityScopedResource() } }
+                return ImageThumbnail.make(url: url, maxPixel: 360)
             }.value
+            guard !Task.isCancelled else { return }
+            if let img { thumbs.append(img); sources.append(.file(url, scoped: scoped)) }
+        }
+    }
+
+    private func loadAssets(_ ids: [String]) async {
+        for id in ids {
+            guard !Task.isCancelled else { return }
+            if let img = await PhotoLibrary.image(assetID: id, maxPixel: 360) { thumbs.append(img); sources.append(.asset(id)) }
         }
     }
 
@@ -334,5 +357,66 @@ struct ArchiveImportView: View {
             }
         }
         return result
+    }
+}
+
+/// 미리보기 한 칸의 원본
+enum PreviewSource {
+    case file(URL, scoped: Bool)
+    case asset(String)
+
+    func load(maxPixel: Int) async -> CGImage? {
+        switch self {
+        case .file(let url, let scoped):
+            return await Task.detached {
+                let ok = scoped && url.startAccessingSecurityScopedResource()
+                defer { if ok { url.stopAccessingSecurityScopedResource() } }
+                return ImageThumbnail.make(url: url, maxPixel: maxPixel)
+            }.value
+        case .asset(let id):
+            return await PhotoLibrary.image(assetID: id, maxPixel: maxPixel)
+        }
+    }
+}
+
+/// 미리보기를 눌렀을 때: 한 장씩 크게, 옆으로 넘겨 본다
+struct PreviewPager: View {
+    let sources: [PreviewSource]
+    let start: Int
+    var onClose: () -> Void
+    @State private var page = 0
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color.black.ignoresSafeArea()
+            TabView(selection: $page) {
+                ForEach(sources.indices, id: \.self) { i in
+                    PreviewPage(source: sources[i]).tag(i)
+                }
+            }
+            #if os(iOS)
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            #endif
+            HStack {
+                Text("\(page + 1) / \(sources.count)").font(.subheadline.weight(.semibold)).foregroundStyle(.white).monospacedDigit()
+                Spacer()
+                Button("닫기", action: onClose).buttonStyle(.borderedProminent).tint(.white.opacity(0.2))
+            }
+            .padding()
+        }
+        .onAppear { page = start }
+    }
+}
+
+private struct PreviewPage: View {
+    let source: PreviewSource
+    @State private var image: CGImage?
+
+    var body: some View {
+        Group {
+            if let image { Image(cgImage: image).resizable().scaledToFit() } else { ProgressView().tint(.white) }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task { image = await source.load(maxPixel: 2400) }
     }
 }

@@ -4,7 +4,7 @@ import { db, kept } from '../db'
 import { useNav } from '../App'
 import type { Roll } from '../core/types'
 import { lensIdAt } from '../core/types'
-import { previewZip, readFiles } from '../core/zip'
+import { previewThumbs, readFiles } from '../core/zip'
 import { importScans } from '../core/importer'
 import { Progress, Sheet, rollFilmName } from '../ui/common'
 import { ImportFlow } from './ImportFlow'
@@ -58,7 +58,7 @@ function useZipSamples(files: File[]) {
     const made: string[] = []
     void (async () => {
       for (let i = 0; i < files.length; i++) {
-        const thumbs = await previewZip(files[i], 6).then((p) => p.thumbs).catch(() => [] as string[])
+        const thumbs = await previewThumbs(files[i], 6).catch(() => [] as string[])
         made.push(...thumbs)
         if (cancel) return
         setSamples((s) => { const n = s.slice(); n[i] = thumbs; return n })

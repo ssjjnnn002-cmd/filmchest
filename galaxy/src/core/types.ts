@@ -188,6 +188,8 @@ export interface Roll {
   importedAt?: number
   frameCount?: number
   note?: string
+  /** 사용자가 붙인 롤 제목 (없으면 필름 이름) */
+  title?: string
   tags?: string[]
   favorite: boolean
   isArchive: boolean

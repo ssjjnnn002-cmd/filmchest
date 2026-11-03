@@ -66,6 +66,7 @@ export function Icon({ name, size = 20, color }: { name: string; size?: number; 
   const out = `// 자동 복사: web/src/ui/common.tsx 표시용 도우미 (node scripts/sync-galaxy-core.mjs). 여기서 고치지 말 것.
 import type { Camera, FilmFormat, Roll } from './types'
 import { filmById, filmDisplayName } from './films'
+import { getPref } from '../store'
 
 ${common.slice(start).trim()}
 `
@@ -110,9 +111,35 @@ else {
 // zip 읽기: 웹 zip.ts 그대로. 미리보기 그림만 data URI로, 낱장 파일 읽기(readFiles)는 갤럭시 scan.ts에서
 {
   let src = readFileSync(join(from, 'zip.ts'), 'utf8')
+  // 미리보기: 갤럭시는 Blob 대신 파일 경로. 전부 보여 줄 때는 임시 폴더에 풀어 두고, 몇 장(limit)만이면 data URI
+  const pStart = src.indexOf('/** zip 안 스캔 미리보기'), pEnd = src.indexOf('/** 낱장 파일들')
+  if (pStart < 0 || pEnd < 0) throw new Error('zip.ts previewZip을 못 찾음')
+  src = src.slice(0, pStart) + `/** 가져오기 전에 보여줄 사진 (limit 없으면 전부). 가능하면 JPG 묶음에서 고른다.
+ *  limit이 있으면(목록용 몇 장) data URI, 없으면 앱 임시 폴더에 풀어 둔 파일 경로 (전부를 data URI로 들고 있으면 메모리가 모자라다) */
+export async function previewZip(file: Uint8Array, limit?: number): Promise<{ paths: string[]; thumbs: string[] }> {
+  const zip = await JSZip.loadAsync(file, { decodeFileName: (b) => decodeFileName(b as Uint8Array) })
+  const entries = Object.values(zip.files).filter((e) => !e.dir && isScanImage(e.name))
+  const groups = new Map<string, typeof entries>()
+  for (const e of entries) {
+    const folder = e.name.includes('/') ? e.name.slice(0, e.name.lastIndexOf('/')) : ''
+    const key = \`\${folder}|\${formatFamily(e.name)}\`
+    groups.set(key, [...(groups.get(key) ?? []), e])
+  }
+  const jpg = [...groups.entries()].filter(([k]) => k.endsWith('|JPG')).sort((a, b) => b[1].length - a[1].length)[0]
+  const chosen = (jpg?.[1] ?? [...groups.values()].sort((a, b) => b.length - a.length)[0] ?? [])
+    .slice().sort((a, b) => naturalCompare(a.name, b.name)).slice(0, limit ?? Infinity)
+  const thumbs: string[] = []
+  const run = Date.now().toString(36)
+  for (const [i, e] of chosen.entries()) {
+    const data = await e.async('uint8array')
+    const png = extOf(e.name) === 'png'
+    thumbs.push(limit ? \`data:\${png ? 'image/png' : 'image/jpeg'};base64,\${bytesToB64(data)}\` : writeBytes('zip-preview', \`\${run}-\${i}.\${png ? 'png' : 'jpg'}\`, data))
+  }
+  return { paths: entries.map((e) => e.name), thumbs }
+}
+
+` + src.slice(pEnd)
   const swaps = [
-    ['export async function previewZip(file: Blob,', 'export async function previewZip(file: Uint8Array,'],
-    ['thumbs.push(URL.createObjectURL(new Blob([data], { type })))', 'thumbs.push(`data:${type};base64,${bytesToB64(data)}`)'],
     // 안드로이드 JS 엔진은 euc-kr·latin1 해독기가 없을 수 있다
     ["return new TextDecoder('latin1').decode(bytes)", "try { return new TextDecoder('latin1').decode(bytes) } catch { return String.fromCharCode(...bytes) }"],
   ]
@@ -123,7 +150,7 @@ else {
   const cut = src.indexOf('/** 낱장 파일들')
   if (cut < 0) throw new Error('zip.ts readFiles를 못 찾음')
   src = src.slice(0, cut).trimEnd() + '\n'
-  writeFileSync(join(to, 'zip.ts'), `// 자동 복사: web/src/core/zip.ts (미리보기만 data URI). 여기서 고치지 말 것.\nimport { bytesToB64 } from '../files'\n${src}`)
+  writeFileSync(join(to, 'zip.ts'), `// 자동 복사: web/src/core/zip.ts (미리보기만 파일 경로·data URI). 여기서 고치지 말 것.\nimport { bytesToB64, writeBytes } from '../files'\n${src}`)
   files.push('zip')
 }
 console.log('갤럭시 core 복사 완료:', files.join(', '))

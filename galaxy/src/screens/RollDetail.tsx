@@ -7,11 +7,11 @@ import { useLiveQuery } from '../store'
 import { useNav } from '../App'
 import { weatherText, type FilmFormat, type LocationSegment, type Roll, type ShootingDay } from '../core/types'
 import { exposureText, meterProgress, meterShotMeta, meterShotsByOrder } from '../core/meter'
-import { bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollTitle, sortedDays, sortedLocations } from '../core/display'
-import { Btn, Canister, Group, Progress, Row, RowText, Section, Segmented, StatusBadge, Sub } from '../kit'
+import { bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedDays, sortedLocations } from '../core/display'
+import { Btn, Canister, Field, Group, Progress, Row, RowText, Section, Segmented, StatusBadge, Sub } from '../kit'
 import { Icon } from '../icons'
 import { Page } from '../page'
-import { Confirm } from '../overlay'
+import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { RollGalleryButton } from '../GallerySave'
 import { useTheme } from '../theme'
 import { DayEdit, LabDropOff, LensChangeEdit, PlaceEdit } from './Editors'
@@ -38,6 +38,7 @@ export function RollDetail({ id }: { id: string }) {
   const [day, setDay] = useState<ShootingDay | 'new' | null>(null)
   const [place, setPlace] = useState<LocationSegment | 'new' | null>(null)
   const [dropOff, setDropOff] = useState(false)
+  const [titleEdit, setTitleEdit] = useState<string>()
   const [viewing, setViewing] = useState<number | null>(null)
   const [sheet, setSheet] = useState(false)
   const [framePrint, setFramePrint] = useState(false)
@@ -60,7 +61,7 @@ export function RollDetail({ id }: { id: string }) {
   const info = (label: string, value: string) => <Row key={label} static value={value}><RowText>{label}</RowText></Row>
 
   return (
-    <Page title={rollFilmName(roll)} onBack={nav.pop}
+    <Page title={rollName(roll)} onBack={nav.pop}
       actions={
         <View style={{ height: 44, borderRadius: 22, paddingHorizontal: 4, flexDirection: 'row', backgroundColor: c.glass, borderWidth: 0.5, borderColor: c.glassLine, elevation: 3 }}>
           <Pressable accessibilityLabel={roll.favorite ? '즐겨찾기 해제' : '즐겨찾기'} onPress={() => db.rolls.update(id, { favorite: !roll.favorite })}
@@ -82,7 +83,14 @@ export function RollDetail({ id }: { id: string }) {
         <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={104} />
         <View style={{ gap: 3, minWidth: 0, flex: 1, alignItems: 'flex-start' }}>
           <StatusBadge status={roll.status} />
-          <Text style={{ fontSize: 22, fontWeight: '700', color: c.ink }}>{rollFilmName(roll)}{roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%' }}>
+            <Text style={{ flexShrink: 1, fontSize: 22, fontWeight: '700', color: c.ink }}>{roll.title?.trim() || `${rollFilmName(roll)}${roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}`}</Text>
+            <Pressable onPress={() => setTitleEdit(roll.title ?? '')} accessibilityLabel="제목 바꾸기" hitSlop={8}
+              style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: c.fill, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="pencil" size={17} color={c.muted} />
+            </Pressable>
+          </View>
+          {roll.title?.trim() ? <Text style={{ fontSize: 17, color: c.ink }}>{rollFilmName(roll)}{roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}</Text> : null}
           <Text style={{ fontSize: 17, color: c.ink }}>{cameraName(camera, roll)}</Text>
           {lens || camera?.fixedLens || roll.cameraFixedLens ? (
             <Sub>
@@ -196,6 +204,16 @@ export function RollDetail({ id }: { id: string }) {
 
       {day ? <DayEdit roll={roll} day={day === 'new' ? undefined : day} onClose={() => setDay(null)} /> : null}
       {place ? <PlaceEdit roll={roll} segment={place === 'new' ? undefined : place} onClose={() => setPlace(null)} /> : null}
+      {titleEdit !== undefined ? (
+        <Sheet title="롤 제목" onClose={() => setTitleEdit(undefined)}
+          right={<SheetBtn label="저장" accent onPress={async () => { await db.rolls.update(id, { title: titleEdit.trim() || undefined }); setTitleEdit(undefined) }} />}>
+          <Section foot="비워 두면 필름 이름으로 보여요.">
+            <Group>
+              <Field label="제목" value={titleEdit} placeholder={rollFilmName(roll)} maxLength={60} autoFocus onChangeText={setTitleEdit} />
+            </Group>
+          </Section>
+        </Sheet>
+      ) : null}
       {dropOff ? <LabDropOff roll={roll} onClose={() => setDropOff(false)} /> : null}
       {viewing !== null ? <FrameViewer frames={frames} start={viewing} onClose={() => setViewing(null)} /> : null}
       {framePrint ? <FramePrint roll={roll} frames={frames} onClose={() => setFramePrint(false)} /> : null}

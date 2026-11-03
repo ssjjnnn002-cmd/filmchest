@@ -93,7 +93,8 @@ export async function readZip(data: Blob | ArrayBuffer | Uint8Array): Promise<Sc
 }
 
 /** 가져오기 전에 보여줄 몇 장. 가능하면 JPG 묶음에서 고른다. */
-export async function previewZip(file: Blob, limit = 8): Promise<{ paths: string[]; thumbs: string[] }> {
+/** zip 안 스캔 미리보기: 들어갈 사진 전부. 사진은 필요할 때 하나씩 꺼낸다 (전부 한꺼번에 풀면 휴대폰 메모리가 모자라다) */
+export async function previewZip(file: Blob): Promise<{ paths: string[]; items: { name: string; load: () => Promise<Blob> }[] }> {
   const zip = await JSZip.loadAsync(file, { decodeFileName: (b) => decodeFileName(b as Uint8Array) })
   const entries = Object.values(zip.files).filter((e) => !e.dir && isScanImage(e.name))
   const groups = new Map<string, typeof entries>()
@@ -104,15 +105,20 @@ export async function previewZip(file: Blob, limit = 8): Promise<{ paths: string
   }
   const jpg = [...groups.entries()].filter(([k]) => k.endsWith('|JPG')).sort((a, b) => b[1].length - a[1].length)[0]
   const chosen = (jpg?.[1] ?? [...groups.values()].sort((a, b) => b.length - a.length)[0] ?? [])
-    .slice().sort((a, b) => naturalCompare(a.name, b.name)).slice(0, limit)
-  const thumbs: string[] = []
-  for (const e of chosen) {
-    const data = await e.async('uint8array')
-    const ext = extOf(e.name)
-    const type = ext === 'png' ? 'image/png' : 'image/jpeg'
-    thumbs.push(URL.createObjectURL(new Blob([data], { type })))
-  }
-  return { paths: entries.map((e) => e.name), thumbs }
+    .slice().sort((a, b) => naturalCompare(a.name, b.name))
+  const items = chosen.map((e) => ({
+    name: e.name,
+    load: async () => new Blob([await e.async('uint8array')], { type: extOf(e.name) === 'png' ? 'image/png' : 'image/jpeg' }),
+  }))
+  return { paths: entries.map((e) => e.name), items }
+}
+
+/** 앞쪽 몇 장만 (여러 zip 목록처럼 작게 보여 줄 때). 쓰고 나면 URL.revokeObjectURL */
+export async function previewThumbs(file: Blob, limit = 6): Promise<string[]> {
+  const { items } = await previewZip(file)
+  const out: string[] = []
+  for (const it of items.slice(0, limit)) out.push(URL.createObjectURL(await it.load()))
+  return out
 }
 
 /** 낱장 파일들 (zip이 섞여 있으면 zip 우선) */

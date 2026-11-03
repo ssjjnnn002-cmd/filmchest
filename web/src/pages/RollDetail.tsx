@@ -6,7 +6,7 @@ import { weatherText, type FilmFormat, type LocationSegment, type Roll, type Sho
 import { features } from '../core/features'
 import { exposureText, meterProgress, meterShotMeta, meterShotsByOrder } from '../core/meter'
 import { RollGalleryButton } from '../ui/GallerySave'
-import { Canister, cameraName, Confirm, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollTitle, sortedDays, sortedLocations } from '../ui/common'
+import { Canister, cameraName, Confirm, Sheet, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedDays, sortedLocations } from '../ui/common'
 import { DayEdit, LabDropOff, LensChangeEdit, PlaceEdit } from './Editors'
 import { RollProjects } from './Projects'
 import { TagField } from '../ui/gearExtras'
@@ -29,6 +29,7 @@ export function RollDetail({ id }: { id: string }) {
   const [day, setDay] = useState<ShootingDay | 'new' | null>(null)
   const [place, setPlace] = useState<LocationSegment | 'new' | null>(null)
   const [dropOff, setDropOff] = useState(false)
+  const [titleEdit, setTitleEdit] = useState<string>()
   const [viewing, setViewing] = useState<number | null>(null)
   const [sheet, setSheet] = useState(false)
   const [framePrint, setFramePrint] = useState(false)
@@ -48,7 +49,7 @@ export function RollDetail({ id }: { id: string }) {
 
   return (
     <>
-      <PageHeader title={rollFilmName(roll)} onBack={nav.pop}
+      <PageHeader title={rollName(roll)} onBack={nav.pop}
         actions={
           <GlassGroup>
             <button aria-label={roll.favorite ? '즐겨찾기 해제' : '즐겨찾기'} style={{ color: roll.favorite ? '#f5b700' : 'var(--ink)' }}
@@ -67,7 +68,11 @@ export function RollDetail({ id }: { id: string }) {
         <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={104} />
         <div style={{ display: 'grid', gap: 3, minWidth: 0, justifyItems: 'start' }}>
           <StatusBadge status={roll.status} />
-          <h2 style={{ fontSize: 22, fontWeight: 700 }}>{rollFilmName(roll)}{roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <h2 style={{ fontSize: 22, fontWeight: 700 }}>{roll.title?.trim() || `${rollFilmName(roll)}${roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}`}</h2>
+            <button className="icon-btn small" onClick={() => setTitleEdit(roll.title ?? '')} aria-label="제목 바꾸기"><Icon name="pencil" size={17} /></button>
+          </div>
+          {roll.title?.trim() && <span>{rollFilmName(roll)}{roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}</span>}
           <span>{cameraName(camera, roll)}</span>
           {(lens || camera?.fixedLens || roll.cameraFixedLens) && (
             <span className="sub">
@@ -196,6 +201,19 @@ export function RollDetail({ id }: { id: string }) {
 
       {day && <DayEdit roll={roll} day={day === 'new' ? undefined : day} onClose={() => setDay(null)} />}
       {place && <PlaceEdit roll={roll} segment={place === 'new' ? undefined : place} onClose={() => setPlace(null)} />}
+      {titleEdit !== undefined && (
+        <Sheet title="롤 제목" onClose={() => setTitleEdit(undefined)}
+          right={<button className="btn ghost" onClick={async () => { await db.rolls.update(id, { title: titleEdit.trim() || undefined }); setTitleEdit(undefined) }}><b>저장</b></button>}>
+          <div className="group">
+            <div className="field">
+              <input className="input" autoFocus value={titleEdit} placeholder={rollFilmName(roll)} maxLength={60}
+                onChange={(e) => setTitleEdit(e.target.value)}
+                onKeyDown={async (e) => { if (e.key === 'Enter') { await db.rolls.update(id, { title: titleEdit.trim() || undefined }); setTitleEdit(undefined) } }} />
+            </div>
+          </div>
+          <p className="footnote">비워 두면 필름 이름으로 보여요.</p>
+        </Sheet>
+      )}
       {dropOff && <LabDropOff roll={roll} onClose={() => setDropOff(false)} />}
       {viewing !== null && <FrameViewer frames={frames} start={viewing} onClose={() => setViewing(null)} />}
       {framePrint && <FramePrint roll={roll} frames={frames} onClose={() => setFramePrint(false)} />}
