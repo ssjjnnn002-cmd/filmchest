@@ -15,6 +15,7 @@ import { useTheme } from '../theme'
 import { LabDropOff } from './Editors'
 import { ArchiveImport } from './ArchiveImport'
 import { isZipFile } from '../core/zip'
+import { SettingsButton } from './Settings'
 
 const scanTypes = ['application/zip', 'application/x-zip-compressed', 'application/octet-stream', 'image/*']
 
@@ -23,14 +24,13 @@ export function Pending() {
   const nav = useNav()
   const rolls = useLiveQuery(async () => (await db.rolls.where('status').anyOf(['finished', 'atLab']).reverse().sortBy('loadedAt')).filter(kept), []) ?? []
   const [dropOff, setDropOff] = useState<Roll>()
-  const [archive, setArchive] = useState(false)
-  const [choice, setChoice] = useState(false)
+  const archiveChoice = useArchiveChoice()
   const [clearQueue, setClearQueue] = useState(false)
   const atLab = rolls.filter((r) => r.status === 'atLab')
   const finished = rolls.filter((r) => r.status === 'finished')
 
   return (
-    <Page title="현상 스캔" actions={<GlassBtn icon="plus" label="기존 롤 가져오기" onPress={() => setChoice(true)} />}>
+    <Page title="현상 스캔" left={<SettingsButton />} actions={<GlassBtn icon="plus" label="기존 롤 가져오기" onPress={archiveChoice.open} />}>
 
       {nav.zipQueue.length > 0 ? (
         <Section title={`가져오기 대기열 · ${nav.zipQueue.length}`} foot="닫아도 여기 남아요. 줄을 누르면 이어서 입력해요."
@@ -91,23 +91,7 @@ export function Pending() {
       </Section>
 
       {dropOff ? <LabDropOff roll={dropOff} onClose={() => setDropOff(undefined)} /> : null}
-      {archive ? <ArchiveImport onClose={() => setArchive(false)} /> : null}
-      {choice ? (
-        <Sheet title="기존 롤 가져오기" onClose={() => setChoice(false)}>
-          <Group>
-            <Row onPress={() => { setChoice(false); setArchive(true) }}>
-              <View style={{ flex: 1 }}><Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>한 롤</Text><Sub>사진이나 zip 하나를 바로 입력해요</Sub></View>
-            </Row>
-            <Row onPress={async () => {
-              const files = await pickFiles(['application/zip', 'application/x-zip-compressed', 'application/octet-stream'])
-              setChoice(false)
-              if (files.length) nav.enqueueZipRolls(await keepZips(files))
-            }}>
-              <View style={{ flex: 1 }}><Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>여러 롤</Text><Sub>zip을 여러 개 고르면 대기열에서 차례로 입력해요</Sub></View>
-            </Row>
-          </Group>
-        </Sheet>
-      ) : null}
+      {archiveChoice.sheets}
     </Page>
   )
 }
@@ -127,4 +111,34 @@ export function ScanButton({ rollId, label = '스캔 불러오기', big }: { rol
       if (f.length) nav.importScans(f, rollId)
     }} />
   )
+}
+
+/** 기존 롤 가져오기 (한 롤 / 여러 롤). 현상 스캔·롤 보관함 오른쪽 위 + 에서 같은 창 (웹 ArchiveImportButton과 같음) */
+export function useArchiveChoice() {
+  const c = useTheme()
+  const nav = useNav()
+  const [archive, setArchive] = useState(false)
+  const [choice, setChoice] = useState(false)
+  const sheets = (
+    <>
+      {archive ? <ArchiveImport onClose={() => setArchive(false)} /> : null}
+      {choice ? (
+        <Sheet title="기존 롤 가져오기" onClose={() => setChoice(false)}>
+          <Group>
+            <Row onPress={() => { setChoice(false); setArchive(true) }}>
+              <View style={{ flex: 1 }}><Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>한 롤</Text><Sub>사진이나 zip 하나를 바로 입력해요</Sub></View>
+            </Row>
+            <Row onPress={async () => {
+              const files = await pickFiles(['application/zip', 'application/x-zip-compressed', 'application/octet-stream'])
+              setChoice(false)
+              if (files.length) nav.enqueueZipRolls(await keepZips(files))
+            }}>
+              <View style={{ flex: 1 }}><Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>여러 롤</Text><Sub>zip을 여러 개 고르면 대기열에서 차례로 입력해요</Sub></View>
+            </Row>
+          </Group>
+        </Sheet>
+      ) : null}
+    </>
+  )
+  return { open: () => setChoice(true), sheets }
 }

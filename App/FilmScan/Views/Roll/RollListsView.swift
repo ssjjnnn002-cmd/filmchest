@@ -35,6 +35,7 @@ struct ShootingView: View {
         .toolbar {
             ToolbarItem { Button("필름 장착하기", systemImage: "plus") { router.loadFilm() } }
         }
+        .settingsButton()
     }
 }
 
@@ -299,6 +300,7 @@ struct PendingView: View {
                 Button("기존 롤 가져오기", systemImage: "plus") { showChoice = true }
             }
         }
+        .settingsButton()
     }
 
     private func enqueue(_ urls: [URL]) {
@@ -341,6 +343,7 @@ struct PendingView: View {
 /// 롤 보관함: 전체 기록 + 필터
 struct RollsView: View {
     @Environment(\.modelContext) private var context
+    @Environment(Router.self) private var router
     @Query(sort: \RollItem.loadedAt, order: .reverse) private var rolls: [RollItem]
     @State private var search = ""
     @State private var favoritesOnly = false
@@ -351,6 +354,9 @@ struct RollsView: View {
     @State private var status: RollStatus?
     @State private var deleting: RollItem?
     @State private var filing: RollItem?
+    @State private var showChoice = false
+    @State private var showArchive = false
+    @State private var showMultiZip = false
     @AppStorage("rollsLayout") private var layout: LayoutMode = .list
 
     private var filtered: [RollItem] {
@@ -412,6 +418,34 @@ struct RollsView: View {
                         withAnimation { layout = layout.toggled }
                     }
                 }
+                // 현상 스캔과 같은 '기존 롤 가져오기'
+                ToolbarItem {
+                    Button("기존 롤 가져오기", systemImage: "plus") { showChoice = true }
+                }
+            }
+            .settingsButton()
+            .sheet(isPresented: $showChoice) {
+                ImportChoiceSheet(
+                    onOne: {
+                        showChoice = false
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(450))
+                            showArchive = true
+                        }
+                    },
+                    onMany: {
+                        showChoice = false
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(450))
+                            showMultiZip = true
+                        }
+                    }
+                )
+            }
+            .sheet(isPresented: $showArchive) { ArchiveImportView(onSaved: { router.showRoll($0) }) }
+            // 여러 롤: 대기열에 넣고 현상 스캔에서 차례로 입력
+            .fileImporter(isPresented: $showMultiZip, allowedContentTypes: [.zip], allowsMultipleSelection: true) { result in
+                if case .success(let urls) = result { router.enqueueArchive(urls) }
             }
             .searchable(text: $search, prompt: "필름, 카메라, 장소, 현상소, 메모, 태그")
             .background(Theme.paper)
@@ -685,7 +719,7 @@ struct RollGridCard: View {
 }
 
 /// 기존 롤 가져오기. 툴바에서 뜨는 화살표 메뉴 대신, 웹처럼 아래에서 올라온다.
-private struct ImportChoiceSheet: View {
+struct ImportChoiceSheet: View {
     var onOne: () -> Void
     var onMany: () -> Void
 
@@ -723,4 +757,24 @@ private struct ImportChoiceSheet: View {
         .padding(.vertical, 16)
         .contentShape(Rectangle())
     }
+}
+
+/// 모든 탭 왼쪽 위: 설정 (웹·갤럭시와 같은 자리)
+private struct SettingsButtonModifier: ViewModifier {
+    @State private var show = false
+    func body(content: Content) -> some View {
+        content
+            #if os(iOS)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("설정", systemImage: "gearshape") { show = true }
+                }
+            }
+            .sheet(isPresented: $show) { SettingsView() }
+            #endif
+    }
+}
+
+extension View {
+    func settingsButton() -> some View { modifier(SettingsButtonModifier()) }
 }

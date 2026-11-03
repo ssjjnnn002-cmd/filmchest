@@ -19,6 +19,7 @@ import { sections } from '../core/privacyText'
 import { APP_VERSION } from '../core/version'
 import { Btn, Footnote, Group, Row, RowText, Section, Segmented, Sub } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
+import { GlassBtn } from '../page'
 import { saveFileNow, storageEstimate } from '../platform'
 import { pickFiles } from '../pick'
 import { applyTheme, useTheme } from '../theme'
@@ -224,5 +225,16 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
       {cloud ? <CloudBackup onClose={() => setCloud(false)} /> : null}
       {purge ? <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={async () => { const run = purge; setPurge(null); await run() }} /> : null}
     </Sheet>
+  )
+}
+
+/** 탭 왼쪽 위 설정 버튼 (웹 SettingsButton과 같음) */
+export function SettingsButton() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <GlassBtn icon="gear" label="설정" onPress={() => setOpen(true)} />
+      {open ? <Settings onClose={() => setOpen(false)} /> : null}
+    </>
   )
 }

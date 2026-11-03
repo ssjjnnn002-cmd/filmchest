@@ -9,7 +9,9 @@ import { statusName } from '../core/types'
 import { dateUnknown, rollFilmName, rollStart } from '../core/display'
 import { tagSections } from '../gearExtras'
 import { Btn, Chip, Chips, Empty, Group, OptionsModal, Row, SearchBox, Section, Segmented } from '../kit'
-import { GlassBtn, Page } from '../page'
+import { GlassGroup, Page } from '../page'
+import { SettingsButton } from './Settings'
+import { useArchiveChoice } from './Pending'
 import { RollCard, RollRow } from '../RollRow'
 import { ProjectStrip } from './Projects'
 
@@ -93,10 +95,15 @@ export function Rolls() {
 
   const reset = () => { setFavoritesOnly(false); setFilmId(''); setCameraId(''); setStatus(''); setTag('') }
 
+  const archiveChoice = useArchiveChoice()
   return (
     <Page title="롤 보관함"
-      actions={<GlassBtn icon={layout === 'grid' ? 'list' : 'grid'} label={layout === 'grid' ? '목록으로 보기' : '그리드로 보기'}
-        onPress={() => { const n = layout === 'grid' ? 'list' : 'grid'; setLayout(n); setPref('rollsLayout', n) }} />}>
+      left={<SettingsButton />}
+      actions={<GlassGroup items={[
+        { icon: layout === 'grid' ? 'list' : 'grid', label: layout === 'grid' ? '목록으로 보기' : '그리드로 보기', onPress: () => { const n = layout === 'grid' ? 'list' : 'grid'; setLayout(n); setPref('rollsLayout', n) } },
+        { icon: 'plus', label: '기존 롤 가져오기', onPress: archiveChoice.open },
+      ]} />}>
+      {archiveChoice.sheets}
 
       <ProjectStrip rolls={rolls ?? []} />
 

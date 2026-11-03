@@ -7,6 +7,7 @@ import { CameraCover, cameraName, Canister, Icon, PageHeader, fmtDay, rollCamera
 import { LabDropOff, PlaceEdit } from './Editors'
 import { Meter } from './Meter'
 import { features } from '../core/features'
+import { SettingsButton } from './Settings'
 
 export function Shooting() {
   const nav = useNav()
@@ -14,6 +15,7 @@ export function Shooting() {
   return (
     <>
       <PageHeader title="촬영 중"
+        left={<SettingsButton />}
         actions={<button className="glass-btn round" onClick={() => nav.loadFilm()} aria-label="필름 장착하기"><Icon name="plus" /></button>} />
       {rolls === undefined && <div className="skeleton" style={{ height: 160 }} />}
       {rolls?.length === 0 && (

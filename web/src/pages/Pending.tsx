@@ -8,23 +8,22 @@ import { RollRow } from '../ui/RollRow'
 import { LabDropOff } from './Editors'
 import { ArchiveImport } from './ArchiveImport'
 import { isZipFile } from '../core/zip'
+import { SettingsButton } from './Settings'
 
 export function Pending() {
   const nav = useNav()
   const rolls = useLiveQuery(async () => (await db.rolls.where('status').anyOf('finished', 'atLab').reverse().sortBy('loadedAt')).filter(kept), []) ?? []
   const [dropOff, setDropOff] = useState<Roll>()
-  const [archive, setArchive] = useState(false)
-  const [choice, setChoice] = useState(false)
   const [clearQueue, setClearQueue] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
-  const multiInput = useRef<HTMLInputElement>(null)
   const atLab = rolls.filter((r) => r.status === 'atLab')
   const finished = rolls.filter((r) => r.status === 'finished')
 
   return (
     <>
       <PageHeader title="현상 스캔"
-        actions={<button className="glass-btn round" onClick={() => setChoice(true)} aria-label="기존 롤 가져오기"><Icon name="plus" /></button>} />
+        left={<SettingsButton />}
+        actions={<ArchiveImportButton />} />
 
       {nav.zipQueue.length > 0 && (
         <div className="section">
@@ -102,28 +101,7 @@ export function Pending() {
         )}
       </div>
 
-      <input ref={multiInput} type="file" accept=".zip,application/zip" multiple hidden
-        onChange={(e) => {
-          const files = [...(e.target.files ?? [])]
-          e.target.value = ''
-          setChoice(false)
-          if (files.length) nav.enqueueZipRolls(files)
-        }} />
-
       {dropOff && <LabDropOff roll={dropOff} onClose={() => setDropOff(undefined)} />}
-      {archive && <ArchiveImport onClose={() => setArchive(false)} />}
-      {choice && (
-        <Sheet title="기존 롤 가져오기" onClose={() => setChoice(false)}>
-          <div className="group">
-            <button className="row" onClick={() => { setChoice(false); setArchive(true) }}>
-              <span className="grow"><b>한 롤</b><div className="sub">사진이나 zip 하나를 바로 입력해요</div></span>
-            </button>
-            <button className="row" onClick={() => multiInput.current?.click()}>
-              <span className="grow"><b>여러 롤</b><div className="sub">zip을 여러 개 고르면 대기열에서 차례로 입력해요</div></span>
-            </button>
-          </div>
-        </Sheet>
-      )}
     </>
   )
 }
@@ -150,5 +128,38 @@ function DropZone() {
       className="dropzone" style={{ borderColor: over ? 'var(--safelight)' : undefined, color: over ? 'var(--safelight)' : undefined }}>
       zip이나 사진을 여기에 놓으세요
     </div>
+  )
+}
+
+/** 오른쪽 위 + : 기존 롤 가져오기 (한 롤 / 여러 롤). 현상 스캔·롤 보관함에서 같은 창 */
+export function ArchiveImportButton({ bare }: { bare?: boolean }) {
+  const nav = useNav()
+  const [archive, setArchive] = useState(false)
+  const [choice, setChoice] = useState(false)
+  const multiInput = useRef<HTMLInputElement>(null)
+  return (
+    <>
+      <button className={bare ? undefined : 'glass-btn round'} onClick={() => setChoice(true)} aria-label="기존 롤 가져오기"><Icon name="plus" /></button>
+      <input ref={multiInput} type="file" accept=".zip,application/zip" multiple hidden
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])]
+          e.target.value = ''
+          setChoice(false)
+          if (files.length) nav.enqueueZipRolls(files)
+        }} />
+      {archive && <ArchiveImport onClose={() => setArchive(false)} />}
+      {choice && (
+        <Sheet title="기존 롤 가져오기" onClose={() => setChoice(false)}>
+          <div className="group">
+            <button className="row" onClick={() => { setChoice(false); setArchive(true) }}>
+              <span className="grow"><b>한 롤</b><div className="sub">사진이나 zip 하나를 바로 입력해요</div></span>
+            </button>
+            <button className="row" onClick={() => multiInput.current?.click()}>
+              <span className="grow"><b>여러 롤</b><div className="sub">zip을 여러 개 고르면 대기열에서 차례로 입력해요</div></span>
+            </button>
+          </div>
+        </Sheet>
+      )}
+    </>
   )
 }

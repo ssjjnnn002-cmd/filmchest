@@ -4,7 +4,9 @@ import { db, kept } from '../db'
 import { useNav } from '../App'
 import type { Roll, RollStatus } from '../core/types'
 import { statusName } from '../core/types'
-import { Icon, PageHeader, dateUnknown, rollFilmName, rollStart } from '../ui/common'
+import { GlassGroup, Icon, PageHeader, dateUnknown, rollFilmName, rollStart } from '../ui/common'
+import { SettingsButton } from './Settings'
+import { ArchiveImportButton } from './Pending'
 import { RollCard, RollRow } from '../ui/RollRow'
 import { tagSections } from '../ui/gearExtras'
 import { getPref, setPref } from '../platform'
@@ -92,11 +94,15 @@ export function Rolls() {
   return (
     <>
       <PageHeader title="롤 보관함"
+        left={<SettingsButton />}
         actions={
-          <button className="glass-btn round" aria-label={layout === 'grid' ? '목록으로 보기' : '그리드로 보기'}
-            onClick={() => { const n = layout === 'grid' ? 'list' : 'grid'; setLayout(n); setPref('rollsLayout', n) }}>
-            <Icon name={layout === 'grid' ? 'list' : 'grid'} />
-          </button>
+          <GlassGroup>
+            <button aria-label={layout === 'grid' ? '목록으로 보기' : '그리드로 보기'}
+              onClick={() => { const n = layout === 'grid' ? 'list' : 'grid'; setLayout(n); setPref('rollsLayout', n) }}>
+              <Icon name={layout === 'grid' ? 'list' : 'grid'} />
+            </button>
+            <ArchiveImportButton bare />
+          </GlassGroup>
         } />
 
       <ProjectStrip rolls={rolls ?? []} />

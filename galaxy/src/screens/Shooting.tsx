@@ -13,12 +13,13 @@ import { useTheme } from '../theme'
 import { LabDropOff, PlaceEdit } from './Editors'
 import { Meter } from './Meter'
 import { features } from '../core/features'
+import { SettingsButton } from './Settings'
 
 export function Shooting() {
   const nav = useNav()
   const rolls = useLiveQuery(async () => (await db.rolls.where('status').equals('loaded').reverse().sortBy('loadedAt')).filter(kept), [])
   return (
-    <Page title="촬영 중" actions={<GlassBtn icon="plus" label="필름 장착하기" onPress={() => nav.loadFilm()} />}>
+    <Page title="촬영 중" left={<SettingsButton />} actions={<GlassBtn icon="plus" label="필름 장착하기" onPress={() => nav.loadFilm()} />}>
       {rolls === undefined ? <Skeleton height={160} /> : null}
       {rolls?.length === 0 ? (
         <Empty icon="film" title="장착된 필름이 없어요">

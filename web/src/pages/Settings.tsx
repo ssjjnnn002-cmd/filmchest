@@ -271,3 +271,14 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
     </Sheet>
   )
 }
+
+/** 탭 왼쪽 위 설정 버튼 (모든 탭 같은 자리) */
+export function SettingsButton() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button className="glass-btn round" onClick={() => setOpen(true)} aria-label="설정"><Icon name="gear" /></button>
+      {open && <Settings onClose={() => setOpen(false)} />}
+    </>
+  )
+}
