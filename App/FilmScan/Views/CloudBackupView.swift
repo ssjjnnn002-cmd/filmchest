@@ -8,6 +8,8 @@ struct CloudBackupView: View {
     @State private var picking = false
     @State private var pendingCloud: String?
     @State private var message: (text: String, ok: Bool)?
+    @State private var photoProgress: (done: Int, total: Int)?
+    @State private var driveMessage: (text: String, ok: Bool)?
     @State private var revision = 0
     @State private var confirmDisconnect = false
     @State private var confirmRestore = false
@@ -24,9 +26,9 @@ struct CloudBackupView: View {
         Task {
             do {
                 try await work()
-                if let ok { message = (ok, true) }
+                if let ok { driveMessage = (ok, true) }
             } catch {
-                message = (error.localizedDescription, false)
+                driveMessage = (error.localizedDescription, false)
             }
             revision += 1
         }
@@ -45,19 +47,39 @@ struct CloudBackupView: View {
                     if let c = DrivePhotos.counts {
                         LabeledContent("드라이브의 스캔 사진", value: c.onDrive == c.total ? "\(c.total)장 모두" : "\(c.onDrive) / \(c.total)장")
                     }
-                    Button("사진 다시 확인하고 올리기", systemImage: "arrow.triangle.2.circlepath") {
-                        driveRun(nil) {
-                            await DrivePhotos.sync(context)
-                            if let c = DrivePhotos.counts {
-                                message = (c.onDrive == c.total ? "스캔 사진 \(c.total)장이 모두 드라이브에 있어요." : "드라이브에 \(c.onDrive) / \(c.total)장 있어요. 나머지는 다음에 다시 올려요.", c.onDrive == c.total)
+                    if let m = driveMessage {
+                        Label(m.text, systemImage: m.ok ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(m.ok ? .green : .orange)
+                    }
+                    if let p = photoProgress {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text(p.total > 0 ? "사진 확인 중 \(p.done) / \(p.total)장" : "드라이브 확인 중…").monospacedDigit()
+                        }
+                    } else {
+                        Button("사진 다시 확인하고 올리기", systemImage: "arrow.triangle.2.circlepath") {
+                            photoProgress = (0, 0)
+                            driveMessage = nil
+                            Task {
+                                let error = await DrivePhotos.sync(context) { done, total in photoProgress = (done, total) }
+                                photoProgress = nil
+                                if let error {
+                                    driveMessage = (error, false)
+                                } else if let c = DrivePhotos.counts {
+                                    driveMessage = c.onDrive == c.total
+                                        ? ("스캔 사진 \(c.total)장이 모두 드라이브에 있어요.", true)
+                                        : ("드라이브에 \(c.onDrive) / \(c.total)장 있어요. 사진 앱에서 지워진 사진은 올릴 수 없어요.", false)
+                                }
+                                revision += 1
                             }
                         }
                     }
                     Button("드라이브에서 장비·기록 복구 (최신 파일)", systemImage: "arrow.down.doc") {
                         driveRun(nil) {
                             if let c = try await DriveSync.pull(context, force: true) {
-                                message = ("카메라 \(c.cameras)대, 롤 \(c.rolls)개를 맞췄어요.", true)
-                            } else { message = ("드라이브에 백업 파일이 아직 없어요.", false) }
+                                driveMessage = ("카메라 \(c.cameras)대, 롤 \(c.rolls)개를 맞췄어요.", true)
+                            } else { driveMessage = ("드라이브에 백업 파일이 아직 없어요.", false) }
                         }
                     }
                     Button("드라이브에서 백업 폴더 열기", systemImage: "folder") {

@@ -569,19 +569,28 @@ enum DrivePhotos {
         }
     }
 
-    /// 아직 안 올렸거나, 돌리거나 날짜·위치가 바뀐 사진만 올린다. 실패는 조용히 다음 번에 다시
+    /// 아직 안 올렸거나, 돌리거나 날짜·위치가 바뀐 사진만 올린다. 실패하면 다음 번에 다시.
+    /// progress가 있으면(직접 누른 경우) 자동으로 도는 중이어도 끝날 때까지 기다렸다가 다시 확인한다. 실패하면 이유를 돌려준다
     @MainActor
-    static func sync(_ context: ModelContext) async {
-        guard GoogleAuth.isConnected, !running else { return }
+    @discardableResult
+    static func sync(_ context: ModelContext, progress: ((Int, Int) -> Void)? = nil) async -> String? {
+        guard GoogleAuth.isConnected else { return "구글 드라이브에 연결돼 있지 않아요." }
+        if running {
+            guard progress != nil else { return nil }
+            while running { try? await Task.sleep(for: .milliseconds(300)) }
+        }
         running = true
         defer { running = false }
         var sent = UserDefaults.standard.dictionary(forKey: sentKey) as? [String: String] ?? [:]
         var folders = UserDefaults.standard.dictionary(forKey: folderKey) as? [String: String] ?? [:]
         let rolls = ((try? context.fetch(FetchDescriptor<RollItem>())) ?? []).filter { $0.deletedAt == nil && $0.status == .imported }
-        guard !rolls.isEmpty, let root = try? await DriveClient.rootFolder() else { return }
+        let all = rolls.reduce(0) { $0 + ($1.frames ?? []).filter { $0.assetIdentifier != nil }.count }
+        guard all > 0 else { return "올릴 스캔 사진이 없어요." }
+        guard let root = try? await DriveClient.rootFolder() else { return "드라이브에 연결하지 못했어요. 인터넷 연결을 확인해 주세요." }
         let day = DateFormatter()
         day.dateFormat = "yyyy-MM-dd"
-        var onDrive = 0, total = 0
+        var onDrive = 0, total = 0, done = 0
+        progress?(0, all)
         for roll in rolls {
             let frames = (roll.frames ?? []).filter { $0.assetIdentifier != nil }.sorted { $0.index < $1.index }
             guard !frames.isEmpty else { continue }
@@ -602,9 +611,10 @@ enum DrivePhotos {
                 }
                 if let f = folder { for c in try await DriveClient.children(f) { files[c.name] = c.id } }
             } catch {
-                return
+                return "드라이브 폴더를 확인하지 못했어요. 잠시 뒤 다시 눌러 주세요."
             }
             for frame in frames {
+                defer { done += 1; progress?(done, all) }
                 guard let assetID = frame.assetIdentifier else { continue }
                 let key = "\(roll.id.uuidString.lowercased())-\(frame.index)"
                 let name = String(format: "%02d.jpg", frame.index)
@@ -632,12 +642,13 @@ enum DrivePhotos {
                     onDrive += 1
                 } catch {
                     UserDefaults.standard.set(sent, forKey: sentKey)
-                    return
+                    return "사진을 올리다 멈췄어요 (\(done) / \(all)장 확인). 잠시 뒤 다시 눌러 주세요."
                 }
             }
         }
         UserDefaults.standard.set(sent, forKey: sentKey)
         UserDefaults.standard.set([onDrive, total], forKey: countKey)
+        return nil
     }
 
     /// 마지막으로 확인했을 때 드라이브에 있는 사진 / 아이폰의 사진
