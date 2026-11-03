@@ -5,7 +5,7 @@ import { driveAccount, driveConnected, signOutAndClear } from '../drive'
 import { notifyBackup } from '../core/backupNudge'
 import { Text, View } from 'react-native'
 import { db, wipeLocal, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll } from '../data'
-import { getPref, setPref, useLiveQuery } from '../store'
+import { getPref, useLiveQuery } from '../store'
 import { backupFileName, exportAll, exportWithPhotos, importBackupFile, localBackupAt, photoBackupFileName, writeLocalBackup } from '../backup'
 import { lastBackupAt, markFileBackup } from '../core/backupNudge'
 import { useBackupRefresh } from '../BackupNudge'
@@ -17,7 +17,7 @@ import { filmById } from '../core/films'
 import { bytesText } from '../core/display'
 import { sections } from '../core/privacyText'
 import { APP_VERSION } from '../core/version'
-import { Btn, Footnote, Group, Row, RowText, Section, Segmented, Sub, Toggle } from '../kit'
+import { Btn, Footnote, Group, Row, RowText, Section, Segmented, Sub } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { GlassBtn } from '../page'
 import { saveFileNow, storageEstimate } from '../platform'
@@ -42,7 +42,6 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   const [saveChoice, setSaveChoice] = useState(false)
   const [login, setLogin] = useState(false)
   const [logout, setLogout] = useState(false)
-  const [memoShown, setMemoShown] = useState(getPref<string>('showRollMemo', '0') === '1')
   const [logoutStep, setLogoutStep] = useState<string>()
   const [saving, setSaving] = useState<string>()
   const [purge, setPurge] = useState<(() => Promise<unknown>) | null>(null)
@@ -59,9 +58,6 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
       <Section title="화면">
         <Segmented value={theme} options={themes} onChange={choose} />
       </Section>
-      <Group>
-        <Toggle label="롤 보관함에 메모 보이기" value={memoShown} onChange={(v) => { setMemoShown(v); setPref('showRollMemo', v ? '1' : '0') }} />
-      </Group>
 
       <Section title="계정">
         <Group>

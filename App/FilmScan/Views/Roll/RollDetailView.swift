@@ -60,6 +60,22 @@ struct RollDetailView: View {
 
     var body: some View {
         List {
+            // 맨 위 큰 제목 바로 아래: 제목 편집 (비우면 필름 이름)
+            Section {
+                Button {
+                    titleDraft = roll.customTitle ?? ""
+                    editingTitle = true
+                } label: {
+                    Label("제목 편집", systemImage: "pencil")
+                        .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(Color(.tertiarySystemFill), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            }
+            .listSectionSpacing(4)
             header
 
             // 다음에 할 일을 맨 위에 크게: 현상소 고르기 / 스캔 불러오기
@@ -224,8 +240,15 @@ struct RollDetailView: View {
             RollProjectsSection(roll: roll)
 
 
-            Section("메모") {
+            Section {
                 TextField("메모", text: Binding(get: { roll.note ?? "" }, set: { roll.note = $0.nilIfBlank }), axis: .vertical)
+            } header: {
+                HStack {
+                    Text("메모")
+                    Spacer()
+                    Toggle("목록에서 표시하기", isOn: Binding(get: { roll.noteInList }, set: { roll.noteInList = $0 }))
+                        .font(.footnote).textCase(nil).fixedSize().tint(Theme.safelight)
+                }
             }
             }
         }
@@ -354,21 +377,7 @@ struct RollDetailView: View {
                 FilmCanisterView(stock: roll.film, format: roll.format).frame(width: 96, height: 96)
                 VStack(alignment: .leading, spacing: 5) {
                     StatusBadge(status: roll.status)
-                    HStack(spacing: 6) {
-                        Text(roll.hasCustomTitle ? roll.displayTitle : roll.filmName + (roll.shotISO.map { " @ ISO \($0)" } ?? "")).font(.title3.bold())
-                        Button {
-                            titleDraft = roll.customTitle ?? ""
-                            editingTitle = true
-                        } label: {
-                            Image(systemName: "pencil").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                                .frame(width: 28, height: 28).background(Color(.tertiarySystemFill), in: Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("제목 바꾸기")
-                    }
-                    if roll.hasCustomTitle {
-                        Text(roll.filmName + (roll.shotISO.map { " @ ISO \($0)" } ?? "")).font(.subheadline)
-                    }
+                    Text(roll.filmName + (roll.shotISO.map { " @ ISO \($0)" } ?? "")).font(.title3.bold())
                     Text(roll.cameraName).font(.subheadline)
                     if let lens = roll.lens?.displayName ?? roll.fixedLensLabel {
                         Text(lens).font(.caption).foregroundStyle(.secondary)

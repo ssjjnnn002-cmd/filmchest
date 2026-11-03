@@ -1,6 +1,6 @@
 // 웹 pages/RollDetail.tsx
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, Text, TextInput, View } from 'react-native'
+import { Pressable, Switch, Text, TextInput, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 import { db, deleteRoll } from '../data'
 import { useLiveQuery } from '../store'
@@ -77,20 +77,19 @@ export function RollDetail({ id }: { id: string }) {
           </Pressable>
         </View>
       }>
+      {/* 맨 위 큰 제목 바로 아래: 제목 편집 (비우면 필름 이름) */}
+      <Pressable onPress={() => setTitleEdit(roll.title ?? '')} hitSlop={6}
+        style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: -6, marginBottom: 12, marginHorizontal: 4, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 99, backgroundColor: c.fill }}>
+        <Icon name="pencil" size={15} color={c.muted} />
+        <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted }}>제목 편집</Text>
+      </Pressable>
       <TagField tags={roll.tags ?? []} setTags={(tags) => db.rolls.update(id, { tags })} />
 
       <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center', marginHorizontal: 4, marginBottom: 8 }}>
         <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={104} />
         <View style={{ gap: 3, minWidth: 0, flex: 1, alignItems: 'flex-start' }}>
           <StatusBadge status={roll.status} />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%' }}>
-            <Text style={{ flexShrink: 1, fontSize: 22, fontWeight: '700', color: c.ink }}>{roll.title?.trim() || `${rollFilmName(roll)}${roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}`}</Text>
-            <Pressable onPress={() => setTitleEdit(roll.title ?? '')} accessibilityLabel="제목 바꾸기" hitSlop={8}
-              style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: c.fill, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="pencil" size={17} color={c.muted} />
-            </Pressable>
-          </View>
-          {roll.title?.trim() ? <Text style={{ fontSize: 17, color: c.ink }}>{rollFilmName(roll)}{roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}</Text> : null}
+          <Text style={{ fontSize: 22, fontWeight: '700', color: c.ink }}>{rollFilmName(roll)}{roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}</Text>
           <Text style={{ fontSize: 17, color: c.ink }}>{cameraName(camera, roll)}</Text>
           {lens || camera?.fixedLens || roll.cameraFixedLens ? (
             <Sub>
@@ -191,7 +190,13 @@ export function RollDetail({ id }: { id: string }) {
 
       <RollProjects roll={roll} />
 
-      <Section title="메모">
+      <Section title="메모" right={
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ fontSize: 13, color: c.muted }}>목록에서 표시하기</Text>
+          <Switch value={!!roll.noteInList} onValueChange={(v) => { void db.rolls.update(id, { noteInList: v || undefined }) }}
+            trackColor={{ true: c.safelight }} thumbColor="#fff" />
+        </View>
+      }>
         <Group>
           <View style={{ paddingVertical: 8, paddingHorizontal: 18 }}>
             <TextInput multiline accessibilityLabel="메모" defaultValue={roll.note ?? ''} placeholderTextColor={c.faint}

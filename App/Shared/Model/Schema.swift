@@ -231,6 +231,8 @@ final class RollItem {
     var note: String?
     /// 사용자가 붙인 롤 제목 (없으면 필름 이름)
     var customTitle: String?
+    /// 메모를 롤 보관함 목록·카드에도 보여 줌
+    var noteInList: Bool = false
     var albumIdentifier: String?
     var isFavorite: Bool = false
     var tags: [String] = []

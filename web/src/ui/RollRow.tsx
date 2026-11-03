@@ -3,7 +3,7 @@ import { db } from '../db'
 import type { Roll } from '../core/types'
 import { formatInfo } from '../core/types'
 import { TagLine } from './gearExtras'
-import { Canister, cameraName, rollCameraFormat, StatusBadge, dateRangeText, rollFilm, rollFilmName, rollName, showRollMemo, sortedLocations, useObjectURL } from './common'
+import { Canister, cameraName, rollCameraFormat, StatusBadge, dateRangeText, rollFilm, rollFilmName, rollName, sortedLocations, useObjectURL } from './common'
 
 export function RollRow({ roll }: { roll: Roll }) {
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
@@ -23,7 +23,7 @@ export function RollRow({ roll }: { roll: Roll }) {
         {/* 제목을 붙였으면 필름 이름은 아래 줄에 */}
         <div className="sub truncate">{[roll.title?.trim() ? rollFilmName(roll) : undefined, cameraName(camera, roll), dateRangeText(roll)].filter(Boolean).join(' · ')}</div>
         <div className="sub truncate">{places || '\u00a0'}</div>
-        {showRollMemo() && roll.note?.trim() && <div className="sub truncate roll-memo">{roll.note.trim()}</div>}
+        {roll.noteInList && roll.note?.trim() && <div className="sub truncate roll-memo">{roll.note.trim()}</div>}
         <TagLine tags={roll.tags} />
       </div>
     </div>
@@ -48,7 +48,7 @@ export function RollCard({ roll, onClick }: { roll: Roll; onClick: () => void })
       <div className="sub">{dateRangeText(roll)}{formatInfo[rollCameraFormat(camera, roll)].is120 ? ` · ${formatInfo[rollCameraFormat(camera, roll)].name}` : ''}</div>
       {/* 목록형과 같이 장소 (비어 있어도 자리를 지켜 카드 높이가 같다) */}
       <div className="sub truncate">{sortedLocations(roll).map((l) => l.name).filter(Boolean).join(', ') || '\u00a0'}</div>
-      {showRollMemo() && roll.note?.trim() && <div className="sub truncate roll-memo">{roll.note.trim()}</div>}
+      {roll.noteInList && roll.note?.trim() && <div className="sub truncate roll-memo">{roll.note.trim()}</div>}
       <TagLine tags={roll.tags} />
     </button>
   )

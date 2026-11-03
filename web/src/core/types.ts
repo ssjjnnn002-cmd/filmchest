@@ -190,6 +190,8 @@ export interface Roll {
   note?: string
   /** 사용자가 붙인 롤 제목 (없으면 필름 이름) */
   title?: string
+  /** 메모를 롤 보관함 목록·카드에도 보여 줌 */
+  noteInList?: boolean
   tags?: string[]
   favorite: boolean
   isArchive: boolean

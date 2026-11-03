@@ -62,17 +62,16 @@ export function RollDetail({ id }: { id: string }) {
           </GlassGroup>
         } />
 
+      {/* 맨 위 큰 제목 바로 아래: 제목 편집 (비우면 필름 이름) */}
+      <button className="title-edit" onClick={() => setTitleEdit(roll.title ?? '')}><Icon name="pencil" size={15} />제목 편집</button>
+
       <TagField tags={roll.tags ?? []} setTags={(tags) => db.rolls.update(id, { tags })} />
 
       <div style={{ display: 'flex', gap: 16, alignItems: 'center', margin: '0 4px 8px' }}>
         <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={104} />
         <div style={{ display: 'grid', gap: 3, minWidth: 0, justifyItems: 'start' }}>
           <StatusBadge status={roll.status} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-            <h2 style={{ fontSize: 22, fontWeight: 700 }}>{roll.title?.trim() || `${rollFilmName(roll)}${roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}`}</h2>
-            <button className="icon-btn small" onClick={() => setTitleEdit(roll.title ?? '')} aria-label="제목 바꾸기"><Icon name="pencil" size={17} /></button>
-          </div>
-          {roll.title?.trim() && <span>{rollFilmName(roll)}{roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}</span>}
+          <h2 style={{ fontSize: 22, fontWeight: 700 }}>{rollFilmName(roll)}{roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}</h2>
           <span>{cameraName(camera, roll)}</span>
           {(lens || camera?.fixedLens || roll.cameraFixedLens) && (
             <span className="sub">
@@ -191,7 +190,10 @@ export function RollDetail({ id }: { id: string }) {
       <RollProjects roll={roll} />
 
       <div className="section">
-        <h2>메모</h2>
+        <h2 className="section-title"><span>메모</span>
+          <label className="inline-toggle">목록에서 표시하기
+            <input type="checkbox" className="switch" checked={!!roll.noteInList} onChange={(e) => db.rolls.update(id, { noteInList: e.target.checked || undefined })} /></label>
+        </h2>
         <div className="group"><div className="field">
           <textarea className="input" aria-label="메모" defaultValue={roll.note ?? ''}
             onBlur={(e) => db.rolls.update(id, { note: e.target.value.trim() || undefined })} />

@@ -66,7 +66,6 @@ export function Icon({ name, size = 20, color }: { name: string; size?: number; 
   const out = `// 자동 복사: web/src/ui/common.tsx 표시용 도우미 (node scripts/sync-galaxy-core.mjs). 여기서 고치지 말 것.
 import type { Camera, FilmFormat, Roll } from './types'
 import { filmById, filmDisplayName } from './films'
-import { getPref } from '../store'
 
 ${common.slice(start).trim()}
 `

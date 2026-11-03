@@ -773,3 +773,5 @@ a.row.accent { color: var(--safelight); }
 .glass-picker > .on { background: var(--fill, rgba(0,0,0,.06)); color: var(--ink); box-shadow: inset 0 0 0 2px var(--safelight); }
 .glass-picker input[type=color] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .filter-preview { display: grid; place-items: center; padding: 18px 12px 10px; }
+.title-edit { display: inline-flex; align-items: center; gap: 5px; margin: -6px 4px 12px; padding: 4px 10px; border: 0; border-radius: 99px; background: var(--fill, rgba(0,0,0,.06)); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; }
+.inline-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; }

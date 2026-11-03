@@ -4,7 +4,7 @@ import { db } from './data'
 import { useLiveQuery } from './store'
 import type { Roll } from './core/types'
 import { formatInfo } from './core/types'
-import { cameraName, dateRangeText, rollCameraFormat, rollFilm, rollFilmName, rollName, showRollMemo, sortedLocations } from './core/display'
+import { cameraName, dateRangeText, rollCameraFormat, rollFilm, rollFilmName, rollName, sortedLocations } from './core/display'
 import { Canister, StatusBadge, Sub } from './kit'
 import { useTheme } from './theme'
 import { TagLine } from './gearExtras'
@@ -31,7 +31,7 @@ export function RollRow({ roll }: { roll: Roll }) {
         {/* 제목을 붙였으면 필름 이름은 아래 줄에 (웹과 같음) */}
         <Sub lines={1}>{[roll.title?.trim() ? rollFilmName(roll) : undefined, cameraName(camera, roll), dateRangeText(roll)].filter(Boolean).join(' · ')}</Sub>
         <Sub lines={1}>{places || ' '}</Sub>
-        {showRollMemo() && roll.note?.trim() ? <Sub lines={1}>{roll.note.trim()}</Sub> : null}
+        {roll.noteInList && roll.note?.trim() ? <Sub lines={1}>{roll.note.trim()}</Sub> : null}
         <TagLine tags={roll.tags} />
       </View>
     </View>
@@ -58,7 +58,7 @@ export function RollCard({ roll, onPress }: { roll: Roll; onPress: () => void })
       <Sub lines={1}>{dateRangeText(roll)}{formatInfo[format].is120 ? ` · ${formatInfo[format].name}` : ''}</Sub>
       {/* 목록형과 같이 장소 (웹과 같음) */}
       <Sub lines={1}>{sortedLocations(roll).map((l) => l.name).filter(Boolean).join(', ') || ' '}</Sub>
-      {showRollMemo() && roll.note?.trim() ? <Sub lines={1}>{roll.note.trim()}</Sub> : null}
+      {roll.noteInList && roll.note?.trim() ? <Sub lines={1}>{roll.note.trim()}</Sub> : null}
       <TagLine tags={roll.tags} />
     </Pressable>
   )

@@ -8,7 +8,6 @@ import { filmById, filmDisplayName } from '../core/films'
 import { fallbackSnapshot, snapshot } from '../core/model3d'
 import { modelHash, profileFor } from '../core/profiles'
 import { canisterURL } from '../core/canister'
-import { getPref } from '../platform'
 import type { FilmFormat } from '../core/types'
 
 // --- 아이콘: iOS 시스템 아이콘 느낌(둥근 끝, 같은 굵기, 탭은 채운 모양)으로 새로 그린 것. currentColor.
@@ -459,8 +458,6 @@ export const rollFilm = (r: Roll) => filmById(r.filmId)
 export const rollFilmName = (r: Roll) => filmById(r.filmId) ? filmDisplayName(filmById(r.filmId)) : '필름 알 수 없음'
 /** 롤 이름: 붙인 제목, 없으면 필름 이름 */
 export const rollName = (r: Roll) => r.title?.trim() || rollFilmName(r)
-/** 설정 '롤 보관함에 메모 보이기' */
-export const showRollMemo = () => getPref<string>('showRollMemo', '0') === '1'
 export const dateUnknown = (r: Roll) => r.isArchive && r.days.length === 0
 export const sortedDays = (r: Roll) => [...r.days].sort((a, b) => a.startedAt - b.startedAt)
 export const sortedLocations = (r: Roll) => [...r.locations].sort((a, b) => a.startFrame - b.startFrame)

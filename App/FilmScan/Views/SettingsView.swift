@@ -15,7 +15,6 @@ struct SettingsView: View {
     @State private var showPaywall = false
     @State private var showLogin = false
     @State private var confirmLogout = false
-    @AppStorage("filmscan.showRollMemo") private var showRollMemo = false
     @State private var logoutStep: String?
     @State private var accountRevision = 0
     @State private var note: String?
@@ -37,7 +36,6 @@ struct SettingsView: View {
                         ForEach(AppearanceMode.allCases) { Text($0.displayName).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    Toggle("롤 보관함에 메모 보이기", isOn: $showRollMemo)
                 }
 
                 Section("계정") {

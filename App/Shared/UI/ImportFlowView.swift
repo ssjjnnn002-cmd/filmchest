@@ -359,7 +359,6 @@ struct ImportFlowView: View {
 struct RollRow: View {
     let roll: RollItem
     @State private var cover: CGImage?
-    @AppStorage("filmscan.showRollMemo") private var showMemo = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -393,7 +392,7 @@ struct RollRow: View {
                 // 장소·태그 줄은 비어 있어도 자리를 지켜서 모든 줄 높이가 같다
                 let place = roll.sortedLocations.map(\.name).joined(separator: ", ")
                 Text(place.isEmpty ? " " : place).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                if showMemo, let memo = roll.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank {
+                if roll.noteInList, let memo = roll.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank {
                     Text(memo).font(.caption).italic().foregroundStyle(.secondary).lineLimit(1)
                 }
                 TagLine(tags: roll.tags)

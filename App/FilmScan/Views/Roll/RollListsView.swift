@@ -678,7 +678,6 @@ enum RollGrouping: String, CaseIterable, Identifiable {
 struct RollGridCard: View {
     let roll: RollItem
     @State private var cover: CGImage?
-    @AppStorage("filmscan.showRollMemo") private var showMemo = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -710,7 +709,7 @@ struct RollGridCard: View {
                 // 목록형과 같이 장소 (비어 있어도 자리를 지켜 카드 높이가 같다)
                 let place = roll.sortedLocations.map(\.name).joined(separator: ", ")
                 Text(place.isEmpty ? " " : place).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                if showMemo, let memo = roll.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank {
+                if roll.noteInList, let memo = roll.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank {
                     Text(memo).font(.caption2).italic().foregroundStyle(.secondary).lineLimit(1)
                 }
                 TagLine(tags: roll.tags)
