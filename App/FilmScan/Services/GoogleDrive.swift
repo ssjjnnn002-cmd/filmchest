@@ -534,6 +534,8 @@ enum DrivePhotos {
     private static let countKey = "filmscan.drivePhotoCount"    // [드라이브에 있는 장 수, 전체]
     @MainActor private static var running = false
     @MainActor private static var pulling = false
+    /// 마지막 확인에서 새로 올린 장 수
+    @MainActor static var lastUploaded = 0
 
     /// 다른 기기(웹·갤럭시)가 드라이브에 올린 스캔 사진을 받아 사진 앱에 저장하고 롤에 붙인다.
     /// 이 기기가 올린 폴더와 이미 받은 파일은 건너뛰고, 사진이 비어 있는 롤이 있을 때만 찾아본다.
@@ -573,7 +575,7 @@ enum DrivePhotos {
     /// progress가 있으면(직접 누른 경우) 자동으로 도는 중이어도 끝날 때까지 기다렸다가 다시 확인한다. 실패하면 이유를 돌려준다
     @MainActor
     @discardableResult
-    static func sync(_ context: ModelContext, progress: ((Int, Int) -> Void)? = nil) async -> String? {
+    static func sync(_ context: ModelContext, progress: ((Int, Int, String) -> Void)? = nil) async -> String? {
         guard GoogleAuth.isConnected else { return "구글 드라이브에 연결돼 있지 않아요." }
         if running {
             guard progress != nil else { return nil }
@@ -589,8 +591,8 @@ enum DrivePhotos {
         guard let root = try? await DriveClient.rootFolder() else { return "드라이브에 연결하지 못했어요. 인터넷 연결을 확인해 주세요." }
         let day = DateFormatter()
         day.dateFormat = "yyyy-MM-dd"
-        var onDrive = 0, total = 0, done = 0
-        progress?(0, all)
+        var onDrive = 0, total = 0, done = 0, uploaded = 0
+        progress?(0, all, "드라이브 확인 중")
         for roll in rolls {
             let frames = (roll.frames ?? []).filter { $0.assetIdentifier != nil }.sorted { $0.index < $1.index }
             guard !frames.isEmpty else { continue }
@@ -600,6 +602,7 @@ enum DrivePhotos {
             // 드라이브에서 폴더나 사진을 지웠을 수 있어 매번 실제로 있는지 본다 (지워졌으면 다시 올린다)
             var folder = folders[roll.id.uuidString]
             var files: [String: String] = [:]   // 파일 이름: id
+            progress?(done, all, "\(roll.albumTitle) 폴더 확인 중")
             do {
                 let found = try await DriveClient.find(folderName, parent: root, folder: true)
                 if let f = folder, f != found {
@@ -614,7 +617,7 @@ enum DrivePhotos {
                 return "드라이브 폴더를 확인하지 못했어요. 잠시 뒤 다시 눌러 주세요."
             }
             for frame in frames {
-                defer { done += 1; progress?(done, all) }
+                defer { done += 1; progress?(done, all, "") }
                 guard let assetID = frame.assetIdentifier else { continue }
                 let key = "\(roll.id.uuidString.lowercased())-\(frame.index)"
                 let name = String(format: "%02d.jpg", frame.index)
@@ -622,6 +625,7 @@ enum DrivePhotos {
                 let stamp = String(Int(modified?.timeIntervalSince1970 ?? 0))
                 let prevID = sent[key]?.components(separatedBy: "|").first
                 if let prev = sent[key], prev.hasSuffix("|\(stamp)"), let prevID, files[name] == prevID { onDrive += 1; continue }
+                progress?(done, all, "\(frame.index)번 컷 사진 꺼내는 중")
                 guard let file = await PhotoLibrary.fileData(assetID: assetID) else { continue }
                 // 사진 앱의 날짜·위치를 고쳐도 파일 속 정보는 그대로라, 올릴 때 지금 기록으로 다시 쓴다
                 let data = RollImporter.withCurrentInfo(file.data, frame: frame, roll: roll) ?? file.data
@@ -635,7 +639,9 @@ enum DrivePhotos {
                     var id = files[name]
                     if id == nil { id = try await DriveClient.createFile(name, parent: folder, mime: "image/jpeg") }
                     guard let id, !id.isEmpty else { continue }
+                    progress?(done, all, "\(roll.albumTitle) \(frame.index)번 컷 올리는 중 (\(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)))")
                     try await DriveClient.upload(id, data, mime: "image/jpeg")
+                    uploaded += 1
                     files[name] = id
                     sent[key] = "\(id)|\(stamp)"
                     UserDefaults.standard.set(sent, forKey: sentKey)
@@ -648,6 +654,7 @@ enum DrivePhotos {
         }
         UserDefaults.standard.set(sent, forKey: sentKey)
         UserDefaults.standard.set([onDrive, total], forKey: countKey)
+        lastUploaded = uploaded
         return nil
     }
 

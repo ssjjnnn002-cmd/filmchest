@@ -8,7 +8,7 @@ struct CloudBackupView: View {
     @State private var picking = false
     @State private var pendingCloud: String?
     @State private var message: (text: String, ok: Bool)?
-    @State private var photoProgress: (done: Int, total: Int)?
+    @State private var photoProgress: (done: Int, total: Int, step: String)?
     @State private var driveMessage: (text: String, ok: Bool)?
     @State private var revision = 0
     @State private var confirmDisconnect = false
@@ -55,20 +55,28 @@ struct CloudBackupView: View {
                     if let p = photoProgress {
                         HStack(spacing: 10) {
                             ProgressView()
-                            Text(p.total > 0 ? "사진 확인 중 \(p.done) / \(p.total)장" : "드라이브 확인 중…").monospacedDigit()
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(p.total > 0 ? "사진 확인 중 \(p.done) / \(p.total)장" : "드라이브 확인 중…").monospacedDigit()
+                                if !p.step.isEmpty { Text(p.step).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                            }
                         }
                     } else {
                         Button("사진 다시 확인하고 올리기", systemImage: "arrow.triangle.2.circlepath") {
-                            photoProgress = (0, 0)
+                            photoProgress = (0, 0, "")
                             driveMessage = nil
                             Task {
-                                let error = await DrivePhotos.sync(context) { done, total in photoProgress = (done, total) }
+                                // 올리는 동안 화면이 꺼지면 멈추므로 켜 둔다
+                                #if os(iOS)
+                                UIApplication.shared.isIdleTimerDisabled = true
+                                defer { UIApplication.shared.isIdleTimerDisabled = false }
+                                #endif
+                                let error = await DrivePhotos.sync(context) { done, total, step in photoProgress = (done, total, step.isEmpty ? (photoProgress?.step ?? "") : step) }
                                 photoProgress = nil
                                 if let error {
                                     driveMessage = (error, false)
                                 } else if let c = DrivePhotos.counts {
                                     driveMessage = c.onDrive == c.total
-                                        ? ("스캔 사진 \(c.total)장이 모두 드라이브에 있어요.", true)
+                                        ? ("스캔 사진 \(c.total)장이 모두 드라이브에 있어요." + (DrivePhotos.lastUploaded > 0 ? " \(DrivePhotos.lastUploaded)장을 새로 올렸어요." : ""), true)
                                         : ("드라이브에 \(c.onDrive) / \(c.total)장 있어요. 사진 앱에서 지워진 사진은 올릴 수 없어요.", false)
                                 }
                                 revision += 1
