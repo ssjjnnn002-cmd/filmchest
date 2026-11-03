@@ -513,7 +513,9 @@ struct RollsView: View {
                                 .contextMenu { rollMenu(roll) }
                                 // 구분선 없이 촘촘하게 (사진이 줄을 나눈다)
                                 .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 16))
+                                // 카드 맨 위·맨 아래는 여유 있게
+                                .listRowInsets(EdgeInsets(top: roll.id == group.rolls.first?.id ? 14 : 5, leading: 14,
+                                                          bottom: roll.id == group.rolls.last?.id ? 14 : 5, trailing: 16))
                         }
                     }
                 }

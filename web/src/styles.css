@@ -776,6 +776,6 @@ a.row.accent { color: var(--safelight); }
 .title-edit { display: inline-flex; align-items: center; gap: 5px; margin: -6px 4px 12px; padding: 4px 10px; border: 0; border-radius: 99px; background: var(--fill, rgba(0,0,0,.06)); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; }
 .inline-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; }
 /* 롤 보관함 목록형: 구분선 없이 촘촘하게 (사진이 줄을 나눈다) */
-.group.rolls-list { padding: 6px 0; }
+.group.rolls-list { padding: 12px 0; }
 .group.rolls-list > .row { min-height: 0; padding-top: 5px; padding-bottom: 5px; padding-left: 14px; }
 .group.rolls-list > .row::before { display: none; }
