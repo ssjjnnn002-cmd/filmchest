@@ -203,6 +203,23 @@ enum DriveClient {
 
     static func download(_ id: String) async throws -> Data { try await call("\(api)/\(id)?alt=media") }
 
+    /// 폴더 안 항목 전부 (id, 이름, 종류)
+    static func children(_ parent: String) async throws -> [(id: String, name: String, mime: String)] {
+        let query = "'\(parent)' in parents and trashed = false".addingPercentEncoding(withAllowedCharacters: .alphanumerics)!
+        var out: [(id: String, name: String, mime: String)] = []
+        var page: String?
+        repeat {
+            let token = page.map { "&pageToken=\($0)" } ?? ""
+            let data = try await call("\(api)?q=\(query)&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000\(token)")
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            for f in (json?["files"] as? [[String: Any]]) ?? [] {
+                if let id = f["id"] as? String { out.append((id, f["name"] as? String ?? "", f["mimeType"] as? String ?? "")) }
+            }
+            page = json?["nextPageToken"] as? String
+        } while page != nil
+        return out
+    }
+
     /// 폴더 찾기, 없으면 만들기
     static func folder(_ name: String, parent: String) async throws -> String {
         if let id = try await find(name, parent: parent, folder: true) { return id }
@@ -493,7 +510,10 @@ enum DriveSync {
     @MainActor
     static func onActive(_ context: ModelContext) {
         guard GoogleAuth.isConnected else { return }
-        Task { _ = try? await pull(context) }
+        Task {
+            _ = try? await pull(context)
+            await DrivePhotos.pull(context)
+        }
     }
 
     @MainActor
@@ -508,7 +528,43 @@ enum DriveSync {
 enum DrivePhotos {
     private static let sentKey = "filmscan.driveFrames"        // "롤id-컷": "파일id|사진 앱 수정 시각"
     private static let folderKey = "filmscan.driveRollFolders"  // 롤id: 폴더id
+    private static let pulledKey = "filmscan.drivePulledPhotos" // 이미 받은 드라이브 파일 id
     @MainActor private static var running = false
+    @MainActor private static var pulling = false
+
+    /// 다른 기기(웹·갤럭시)가 드라이브에 올린 스캔 사진을 받아 사진 앱에 저장하고 롤에 붙인다.
+    /// 이 기기가 올린 폴더와 이미 받은 파일은 건너뛰고, 사진이 비어 있는 롤이 있을 때만 찾아본다.
+    @MainActor
+    static func pull(_ context: ModelContext) async {
+        guard GoogleAuth.isConnected, !pulling else { return }
+        pulling = true
+        defer { pulling = false }
+        let rolls = ((try? context.fetch(FetchDescriptor<RollItem>())) ?? []).filter { $0.deletedAt == nil && $0.status == .imported }
+        guard rolls.contains(where: { ($0.frames ?? []).isEmpty }),
+              (try? await PhotoLibrary.requestAccess()) != nil,
+              let root = try? await DriveClient.rootFolder(),
+              let folders = try? await DriveClient.children(root) else { return }
+        let mine = Set((UserDefaults.standard.dictionary(forKey: folderKey) as? [String: String] ?? [:]).values)
+        var got = Set(UserDefaults.standard.stringArray(forKey: pulledKey) ?? [])
+        for folder in folders where folder.mime == DriveClient.folderMime && !mine.contains(folder.id) {
+            guard let files = try? await DriveClient.children(folder.id) else { continue }
+            for file in files where file.mime.hasPrefix("image/") && !got.contains(file.id) {
+                guard let data = try? await DriveClient.download(file.id) else { continue }
+                defer { got.insert(file.id); UserDefaults.standard.set(Array(got), forKey: pulledKey) }
+                // 이미 그 컷이 있는 롤이면 사진 앱에 또 저장하지 않는다
+                let roll = PhotoRestore.mark(in: data).flatMap { m in rolls.first { $0.id == m.0 }.map { ($0, m.1) } }
+                if let (roll, index) = roll, (roll.frames ?? []).contains(where: { $0.index == index }) { continue }
+                var album: PHAssetCollection?
+                if let (roll, _) = roll { album = try? await RollImporter.targetAlbum(for: roll.snapshot()) }
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("drive-\(file.id)-\(file.name)")
+                guard (try? data.write(to: url)) != nil else { continue }
+                defer { try? FileManager.default.removeItem(at: url) }
+                guard let assetID = try? await PhotoLibrary.add(fileURL: url, originalName: file.name, date: nil, location: nil, to: album) else { continue }
+                if let roll = roll?.0, roll.albumIdentifier == nil, let album { roll.albumIdentifier = album.localIdentifier }
+                _ = PhotoRestore.restore(data: data, assetID: assetID, context: context)
+            }
+        }
+    }
 
     /// 아직 안 올렸거나, 돌리거나 날짜·위치가 바뀐 사진만 올린다. 실패는 조용히 다음 번에 다시
     @MainActor
@@ -570,5 +626,6 @@ enum DrivePhotos {
     static func forget() {
         UserDefaults.standard.removeObject(forKey: sentKey)
         UserDefaults.standard.removeObject(forKey: folderKey)
+        UserDefaults.standard.removeObject(forKey: pulledKey)
     }
 }
