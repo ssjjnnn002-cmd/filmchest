@@ -142,7 +142,7 @@ export function Rolls() {
               {g.rolls.map((r) => <RollCard key={r.id} roll={r} onClick={() => nav.push({ type: 'roll', id: r.id })} />)}
             </div>
           ) : (
-            <div className="group">
+            <div className="group rolls-list">
               {g.rolls.map((r) => (
                 <button key={r.id} className="row" onClick={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /><Icon name="chev" size={18} /></button>
               ))}

@@ -367,13 +367,13 @@ struct RollRow: View {
             Group {
                 if let cover {
                     Image(cgImage: cover).resizable().scaledToFill()
-                        .frame(width: 78, height: 52)
+                        .frame(width: 90, height: 60)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 } else {
-                    FilmCanisterView(stock: roll.film, format: roll.format).frame(width: 52, height: 52)
+                    FilmCanisterView(stock: roll.film, format: roll.format).frame(width: 56, height: 56)
                 }
             }
-            .frame(width: 78, height: 52)
+            .frame(width: 90, height: 60)
             .task(id: "\(roll.frames?.count ?? 0)|\(roll.coverFrameIndex ?? 0)") {
                 guard let data = roll.coverFrame?.thumbnail else { cover = nil; return }
                 cover = await Task.detached { ImageThumbnail.make(data: data, maxPixel: 160) }.value

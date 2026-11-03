@@ -403,9 +403,9 @@ select.input { appearance: none; -webkit-appearance: none; color: var(--muted); 
 /* --- 롤 */
 .roll-row { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .roll-row img.can { width: 56px; height: 56px; flex-shrink: 0; }
-.roll-row img.roll-row-thumb { width: 84px; height: 56px; flex-shrink: 0; border-radius: 10px; object-fit: cover; background: var(--film-base, #1a1a1a); }
+.roll-row img.roll-row-thumb { width: 90px; height: 60px; flex-shrink: 0; border-radius: 10px; object-fit: cover; background: var(--film-base, #1a1a1a); }
 /* 필름통만 있는 줄도 사진 칸과 같은 폭: 글 시작이 맞는다 */
-.roll-row img.can { margin: 0 14px; }
+.roll-row img.can { margin: 0 17px; }
 .roll-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .roll-title b { font-size: 17px; font-weight: 600; }
 .star { color: #f5b700; }
@@ -775,3 +775,7 @@ a.row.accent { color: var(--safelight); }
 .filter-preview { display: grid; place-items: center; padding: 18px 12px 10px; }
 .title-edit { display: inline-flex; align-items: center; gap: 5px; margin: -6px 4px 12px; padding: 4px 10px; border: 0; border-radius: 99px; background: var(--fill, rgba(0,0,0,.06)); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; }
 .inline-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--muted); text-transform: none; letter-spacing: 0; }
+/* 롤 보관함 목록형: 구분선 없이 촘촘하게 (사진이 줄을 나눈다) */
+.group.rolls-list { padding: 6px 0; }
+.group.rolls-list > .row { min-height: 0; padding-top: 5px; padding-bottom: 5px; padding-left: 14px; }
+.group.rolls-list > .row::before { display: none; }

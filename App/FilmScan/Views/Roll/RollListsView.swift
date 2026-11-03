@@ -511,6 +511,9 @@ struct RollsView: View {
                                     Button("삭제", systemImage: "trash", role: .destructive) { deleting = roll }
                                 }
                                 .contextMenu { rollMenu(roll) }
+                                // 구분선 없이 촘촘하게 (사진이 줄을 나눈다)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 5, leading: 14, bottom: 5, trailing: 16))
                         }
                     }
                 }

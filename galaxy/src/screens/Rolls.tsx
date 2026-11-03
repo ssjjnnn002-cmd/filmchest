@@ -138,9 +138,10 @@ export function Rolls() {
               ))}
             </View>
           ) : (
-            <Group>
+            // 구분선 없이 촘촘하게 (웹과 같음)
+            <Group plain style={{ paddingVertical: 6 }}>
               {g.rolls.map((r) => (
-                <Row key={r.id} chev onPress={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /></Row>
+                <Row key={r.id} chev onPress={() => nav.push({ type: 'roll', id: r.id })} style={{ minHeight: 0, paddingVertical: 5, paddingLeft: 14 }}><RollRow roll={r} /></Row>
               ))}
             </Group>
           )}

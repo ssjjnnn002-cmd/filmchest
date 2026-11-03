@@ -18,8 +18,8 @@ export function RollRow({ roll }: { roll: Roll }) {
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14, minWidth: 0 }}>
       {/* 스캔이 있으면 대표 사진, 없으면 필름통 (웹과 같음) */}
       {/* 바둑판형 표지와 같은 가로 비율. 필름통도 같은 폭 칸에 두어 글 시작이 맞는다 */}
-      <View style={{ width: 84, height: 56, alignItems: 'center', justifyContent: 'center' }}>
-        {cover?.thumb ? <Image source={{ uri: cover.thumb }} style={{ width: 84, height: 56, borderRadius: 10, backgroundColor: c.filmBase }} resizeMode="cover" />
+      <View style={{ width: 90, height: 60, alignItems: 'center', justifyContent: 'center' }}>
+        {cover?.thumb ? <Image source={{ uri: cover.thumb }} style={{ width: 90, height: 60, borderRadius: 10, backgroundColor: c.filmBase }} resizeMode="cover" />
           : <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={52} />}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>

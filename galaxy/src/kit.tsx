@@ -39,14 +39,14 @@ export function Footnote({ children, warn }: { children: ReactNode; warn?: boole
 }
 
 /** .group: 흰 둥근 묶음. 줄 사이에 왼쪽 18 띄운 구분선 */
-export function Group({ children, style }: { children: ReactNode; style?: ViewStyle }) {
+export function Group({ children, style, plain }: { children: ReactNode; style?: ViewStyle; /** 구분선 없이 */ plain?: boolean }) {
   const c = useTheme()
   const items = Children.toArray(children).filter((x) => isValidElement(x) || typeof x === 'string')
   return (
     <View style={[{ backgroundColor: c.cell, borderRadius: 22, overflow: 'hidden' }, style]}>
       {items.map((child, i) => (
         <Fragment key={i}>
-          {i > 0 ? <View style={{ height: 0.5, marginLeft: 18, backgroundColor: c.sep }} /> : null}
+          {i > 0 && !plain ? <View style={{ height: 0.5, marginLeft: 18, backgroundColor: c.sep }} /> : null}
           {child}
         </Fragment>
       ))}
