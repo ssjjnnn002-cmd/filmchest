@@ -91,6 +91,45 @@ function glassTex() {
   })
 }
 
+/** 단독 렌즈 앞유리. 코팅이 초록·보라로 살짝 돈다 */
+function coatedGlassTex() {
+  return canvasTex('coated-glass', 256, 256, (ctx) => {
+    const s = 256
+    const g = ctx.createRadialGradient(s / 2, s / 2, 6, s / 2, s / 2, s / 2)
+    g.addColorStop(0, '#22182c'); g.addColorStop(0.45, '#101816'); g.addColorStop(1, '#07080a')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, s, s)
+    ctx.strokeStyle = 'rgba(80, 190, 140, 0.4)'
+    ctx.lineWidth = 11
+    ctx.beginPath(); ctx.arc(s / 2, s / 2, 86, 0.4, 2.4); ctx.stroke()
+    ctx.strokeStyle = 'rgba(168, 96, 190, 0.34)'
+    ctx.lineWidth = 8
+    ctx.beginPath(); ctx.arc(s / 2, s / 2, 54, 2.6, 5.4); ctx.stroke()
+    const h = ctx.createRadialGradient(s * 0.36, s * 0.32, 0, s * 0.36, s * 0.32, 42)
+    h.addColorStop(0, 'rgba(255,255,255,0.9)'); h.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = h
+    ctx.fillRect(0, 0, s, s)
+  })
+}
+
+/** 앞테에 새기는 구경 */
+function lensRingTex(frontMm: number) {
+  return canvasTex(`lensring:${frontMm}`, 512, 512, (ctx) => {
+    ctx.fillStyle = '#101012'
+    ctx.beginPath(); ctx.arc(256, 256, 256, 0, PI * 2); ctx.fill()
+    ctx.fillStyle = '#ececee'
+    ctx.font = '600 26px Helvetica, Arial, sans-serif'
+    ctx.textAlign = 'center'
+    const text = `LENS   MULTI COATED   ⌀${frontMm}   `
+    const R = 214
+    for (let i = 0; i < text.length; i++) {
+      const a = -PI * 0.85 + (i / text.length) * PI * 1.7
+      ctx.save(); ctx.translate(256 + Math.cos(a) * R, 256 + Math.sin(a) * R); ctx.rotate(a + PI / 2)
+      ctx.fillText(text[i], 0, 0); ctx.restore()
+    }
+  })
+}
+
 /** 렌즈 경통 눈금 (둘레에 감기는 띠). 위쪽(u=0.5 근처)에 숫자가 모인다. */
 function scaleTex(labels: string[], ink = '#f2f2f2', bg = '#111113') {
   return canvasTex(`scale:${labels.join(',')}:${ink}`, 1024, 64, (ctx) => {

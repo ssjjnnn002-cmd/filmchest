@@ -163,8 +163,13 @@ struct LibraryView: View {
                 } description: {
                     Text("가진 카메라를 등록해 보세요.")
                 } actions: {
-                    Button("카메라 추가") { showAddCamera = true }
-                        .buttonStyle(.borderedProminent)
+                    HStack {
+                        Button("카메라 추가") { showAddCamera = true }
+                            .buttonStyle(.borderedProminent)
+                        // 웹·갤럭시와 같은 예시 (장비·필름 재고·롤 네 단계·사진·노출 기록·프로젝트)
+                        Button("예시로 둘러보기") { try? DemoSeed.run(context) }
+                            .buttonStyle(.bordered)
+                    }
                 }
                 .padding(.top, 80)
             } else {
