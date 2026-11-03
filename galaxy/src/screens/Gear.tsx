@@ -368,7 +368,7 @@ export function FilterEdit({ filter, onClose, onSaved }: { filter?: GearFilter; 
           )}
           <Field label={isFilter ? '종류' : '이름'} value={name} onChangeText={setName} />
           {hints.length > 0 && <Chips>{hints.map((item) => <Chip key={item} label={item} onPress={() => setName(item)} />)}</Chips>}
-          {isFilter && <Field label="직경 (mm)" value={diameter} onChangeText={setDiameter} keyboardType="decimal-pad" />}
+          {isFilter && <Field label="직경" value={diameter} onChangeText={setDiameter} keyboardType="decimal-pad" suffix="mm" />}
           {isFilter && <Chips>{filterDiameters.filter((item) => item !== diameter).map((item) => <Chip key={item} label={item} onPress={() => setDiameter(item)} />)}</Chips>}
         </Group>
       </Section>

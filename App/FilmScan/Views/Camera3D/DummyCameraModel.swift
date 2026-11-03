@@ -38,9 +38,36 @@ enum DummyCameraModel {
         }
         guard let ctx = context,
               let result = ctx.objectForKeyedSubscript("Camera3D")?.objectForKeyedSubscript("build")?
-                .call(withArguments: [brand, model, style.rawValue]),
-              result.isObject,
-              let parts = result.objectForKeyedSubscript("parts"), parts.isArray else { return nil }
+                .call(withArguments: [brand, model, style.rawValue]) else { return nil }
+        guard let shape = parse(result) else { return nil }
+        cache[key] = shape
+        return shape
+    }
+
+    /// 렌즈 모양 (웹 model3dExport.buildLens). 같은 렌즈는 한 번만 만든다
+    static func lensShape(brand: String, model: String, mount: String) -> Shape? {
+        let key = "lens|\(brand)|\(model)|\(mount)".lowercased()
+        lock.lock()
+        defer { lock.unlock() }
+        if let hit = cache[key] { return hit }
+        if context == nil {
+            guard let url = Bundle.main.url(forResource: "camera3d", withExtension: "js"),
+                  let source = try? String(contentsOf: url, encoding: .utf8),
+                  let ctx = JSContext() else { return nil }
+            ctx.exceptionHandler = { _, error in print("camera3d.js:", error?.toString() ?? "") }
+            ctx.evaluateScript(source)
+            context = ctx
+        }
+        guard let ctx = context,
+              let result = ctx.objectForKeyedSubscript("Camera3D")?.objectForKeyedSubscript("buildLens")?
+                .call(withArguments: [brand, model, mount]),
+              let shape = parse(result) else { return nil }
+        cache[key] = shape
+        return shape
+    }
+
+    private static func parse(_ result: JSValue) -> Shape? {
+        guard result.isObject, let parts = result.objectForKeyedSubscript("parts"), parts.isArray else { return nil }
         let count = Int(parts.objectForKeyedSubscript("length").toInt32())
         var out: [Part] = []
         for i in 0..<count {
@@ -52,9 +79,7 @@ enum DummyCameraModel {
             flipV(&uv)
             out.append(Part(role: role, geometry: geometry(position: pos, normal: nor, uv: uv)))
         }
-        let shape = Shape(parts: out, bottom: result.objectForKeyedSubscript("bottom")?.toDouble() ?? 4)
-        cache[key] = shape
-        return shape
+        return Shape(parts: out, bottom: result.objectForKeyedSubscript("bottom")?.toDouble() ?? 4)
     }
 
     /// Float32Array → Data
@@ -97,22 +122,24 @@ enum DummyCameraModel {
     // MARK: 장면
 
     /// 모형 노드 (재질 포함)
-    static func modelNode(_ shape: Shape, colorHex: String) -> SCNNode {
+    /// lens: 렌즈 모형 (앞 테에 카메라용 글씨 무늬를 쓰지 않고, 앞 유리가 보이게 돌린다)
+    static func modelNode(_ shape: Shape, colorHex: String, lens: Bool = false) -> SCNNode {
         let kit = Materials(base: PlatformColor(hex: colorHex))
         let node = SCNNode()
         for part in shape.parts {
             let g = part.geometry.copy() as! SCNGeometry
-            g.materials = [kit.material(for: part.role)]
+            g.materials = [kit.material(for: lens && part.role == "frontring" ? "lensBlack" : part.role)]
             node.addChildNode(SCNNode(geometry: g))
         }
-        node.eulerAngles = SCNVector3(0, -0.42, 0)
+        node.eulerAngles = lens ? SCNVector3(0.08, 0.2, 0) : SCNVector3(0, -0.42, 0)
         node.name = "model"
         return node
     }
 
-    static func makeScene(_ shape: Shape, colorHex: String = CameraBodyStyle.defaultColorHex) -> SCNScene {
+    /// lens: 렌즈 모형. 기종끼리 같은 거리 대신 이 렌즈 크기에 맞춘다
+    static func makeScene(_ shape: Shape, colorHex: String = CameraBodyStyle.defaultColorHex, lens: Bool = false) -> SCNScene {
         let scene = SCNScene()
-        let model = modelNode(shape, colorHex: colorHex)
+        let model = modelNode(shape, colorHex: colorHex, lens: lens)
         scene.rootNode.addChildNode(model)
 
         scene.lightingEnvironment.contents = StudioEnvironment.image
@@ -159,7 +186,7 @@ enum DummyCameraModel {
         let center = v(Double(rotated.0.x + rotated.1.x) / 2, Double(rotated.0.y + rotated.1.y) / 2,
                        Double(rotated.0.z + rotated.1.z) / 2)
         let span = Double(max(size.x, size.y * 1.33, size.z))
-        let dist = max(span, referenceSpan()) * 1.7
+        let dist = (lens ? span * 1.55 : max(span, referenceSpan())) * 1.7
         let camera = SCNNode()
         camera.camera = SCNCamera()
         camera.camera!.fieldOfView = 21
@@ -537,6 +564,50 @@ enum DummySnapshot {
         #else
         return image.cgImage(forProposedRect: nil, context: nil, hints: nil)
         #endif
+    }
+}
+
+/// 렌즈 기본 모형 정지 이미지 (사진이 없는 렌즈 칸·렌즈 편집)
+enum LensSnapshot {
+    private static let cache = NSCache<NSString, CGImage>()
+
+    static func image(brand: String, model: String, mount: String) async -> CGImage? {
+        let key = "\(brand)|\(model)|\(mount)" as NSString
+        if let hit = cache.object(forKey: key) { return hit }
+        guard let shape = await Task.detached(priority: .userInitiated, operation: {
+            DummyCameraModel.lensShape(brand: brand, model: model, mount: mount)
+        }).value else { return nil }
+        let image = await MainActor.run { () -> CGImage? in
+            let scene = DummyCameraModel.makeScene(shape, colorHex: "#1c1c1c", lens: true)
+            let renderer = SCNRenderer(device: MTLCreateSystemDefaultDevice(), options: nil)
+            renderer.scene = scene
+            renderer.pointOfView = scene.rootNode.childNode(withName: "camera", recursively: false)
+            renderer.autoenablesDefaultLighting = false
+            scene.background.contents = PlatformColor.clear
+            let img = renderer.snapshot(atTime: 0, with: CGSize(width: 800, height: 600), antialiasingMode: .multisampling4X)
+            #if os(iOS)
+            return img.cgImage
+            #else
+            return img.cgImage(forProposedRect: nil, context: nil, hints: nil)
+            #endif
+        }
+        if let image { cache.setObject(image, forKey: key) }
+        return image
+    }
+}
+
+struct DummyLensImage: View {
+    let brand: String
+    let model: String
+    let mount: String
+    @State private var image: CGImage?
+
+    var body: some View {
+        Group {
+            if let image { Image(cgImage: image).resizable().scaledToFit() } else { ProgressView().controlSize(.small) }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: "\(brand)|\(model)|\(mount)") { image = await LensSnapshot.image(brand: brand, model: model, mount: mount) }
     }
 }
 

@@ -289,7 +289,8 @@ struct LensEditView: View {
     var body: some View {
         NavigationStack {
             Form {
-                GearPhotoEditor(photo: $photo, symbol: "camera.aperture")
+                GearPhotoEditor(photo: $photo, symbol: "camera.aperture",
+                                placeholder: AnyView(DummyLensImage(brand: lensBrand, model: model, mount: mountText)))
                 Section(mountEditable ? "렌즈" : "렌즈 · \(mount)") {
                     if mountEditable {
                         TextField("마운트", text: $mountText)

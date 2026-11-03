@@ -299,7 +299,12 @@ private struct LensGearCard: View {
     let lens: LensItem
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            GearPhotoThumb(data: lens.photo, symbol: "camera.aperture", card: true)
+            // 사진이 없으면 기본 렌즈 모형 (웹·갤럭시와 같음)
+            if lens.photo == nil {
+                DummyLensImage(brand: lens.brand, model: lens.model, mount: lens.mount).frame(height: 110)
+            } else {
+                GearPhotoThumb(data: lens.photo, symbol: "camera.aperture", card: true)
+            }
             Text(lens.model.isEmpty ? "렌즈" : lens.model).font(.headline).lineLimit(2)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .topLeading)
             Text(lens.brand.nilIfBlank ?? " ")
@@ -319,7 +324,11 @@ private struct LensGearRow: View {
     let lens: LensItem
     var body: some View {
         HStack(spacing: 14) {
-            GearPhotoThumb(data: lens.photo, symbol: "camera.aperture").frame(width: 68, height: 52).clipShape(RoundedRectangle(cornerRadius: 8))
+            Group {
+                if lens.photo == nil { DummyLensImage(brand: lens.brand, model: lens.model, mount: lens.mount) }
+                else { GearPhotoThumb(data: lens.photo, symbol: "camera.aperture") }
+            }
+            .frame(width: 68, height: 52).clipShape(RoundedRectangle(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 3) {
                 Text(lens.displayName.trimmingCharacters(in: .whitespaces).isEmpty ? "렌즈" : lens.displayName)
                     .font(.subheadline.weight(.semibold)).lineLimit(1)
@@ -457,6 +466,8 @@ private extension FilmLotItem {
 struct GearPhotoEditor: View {
     @Binding var photo: Data?
     var symbol: String = "photo"
+    /// 사진이 없을 때 보일 그림 (렌즈 기본 모형)
+    var placeholder: AnyView? = nil
     @State private var pickerItem: PhotosPickerItem?
     @State private var showCamera = false
     @State private var cameraUnavailable = false
@@ -470,6 +481,8 @@ struct GearPhotoEditor: View {
                 Group {
                     if let photo {
                         CameraImageView(data: photo)
+                    } else if let placeholder {
+                        placeholder
                     } else {
                         Image(systemName: symbol)
                             .font(.system(size: 42, weight: .light))
@@ -599,10 +612,16 @@ struct FilterEditView: View {
                         if !hits.isEmpty {
                             chipRow(Array(hits)) { name = $0 }
                         }
-                        TextField("직경 (mm)", text: $diameter)
-                            #if os(iOS)
-                            .keyboardType(.decimalPad)
-                            #endif
+                        HStack {
+                            Text("직경")
+                            TextField("", text: $diameter)
+                                .multilineTextAlignment(.trailing)
+                                #if os(iOS)
+                                .keyboardType(.decimalPad)
+                                #endif
+                            Text("mm").foregroundStyle(.secondary)
+                        }
+                        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
                         chipRow(filterDiameters.filter { $0 != diameter }) { diameter = $0 }
                     }
                 }

@@ -84,7 +84,7 @@ export function RowText({ children, color, sub, grow = true, lines = 1 }: { chil
 }
 
 /** .field: 왼쪽 이름, 오른쪽 값. 여러 줄(또는 stack)이면 위에 작은 이름, 아래 입력 */
-export function Field({ label, children, stack, ...input }: { label: string; children?: ReactNode; stack?: boolean } & TextInputProps) {
+export function Field({ label, children, stack, suffix, ...input }: { label: string; children?: ReactNode; stack?: boolean; /** 입력 오른쪽에 늘 보이는 단위 (예: mm) */ suffix?: string } & TextInputProps) {
   const c = useTheme()
   const stacked = stack || input.multiline
   if (stacked) {
@@ -101,11 +101,12 @@ export function Field({ label, children, stack, ...input }: { label: string; chi
   return (
     <View style={{ minHeight: 52, paddingVertical: 8, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <Text style={{ fontSize: 17, color: c.ink, minWidth: 72, maxWidth: '45%' }} numberOfLines={1}>{label}</Text>
-      <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end' }}>
+      <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end', flexDirection: suffix ? 'row' : 'column', justifyContent: 'flex-end', gap: 4 }}>
         {children ?? (
           <TextInput placeholderTextColor={c.faint} {...input}
-            style={{ alignSelf: 'stretch', fontSize: 17, color: c.ink, paddingVertical: 3, paddingHorizontal: 0, textAlign: 'right' }} />
+            style={{ alignSelf: 'stretch', flex: suffix ? 1 : undefined, fontSize: 17, color: c.ink, paddingVertical: 3, paddingHorizontal: 0, textAlign: 'right' }} />
         )}
+        {suffix ? <Text style={{ fontSize: 17, color: c.muted, alignSelf: 'center' }}>{suffix}</Text> : null}
       </View>
     </View>
   )

@@ -4,6 +4,7 @@ import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js'
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { profileFor, type ModelProfile } from './profiles'
+import type { LensSpec } from './lensSpecs'
 import type { BodyStyle } from './types'
 
 // 기본 3D 모형. 단위 cm, 렌즈는 +z(보는 사람 쪽), 몸체 중심이 원점.
@@ -887,6 +888,210 @@ export function buildCamera(p: ModelProfile, colorHex: string) {
   return group
 }
 
+function namedMat(role: string, params: THREE.MeshPhysicalMaterialParameters) {
+  const material = new THREE.MeshPhysicalMaterial(params)
+  material.name = role
+  return material
+}
+
+/**
+ * 사진이 없는 렌즈의 기본 모형. 단위 cm, 광축은 +z, 앞유리가 보는 사람 쪽.
+ * 재질 이름은 카메라 모형과 같게 둔다 (lensBlack, rubber, accent, glass, frontring).
+ */
+export function buildLens(spec: LensSpec) {
+  const group = new THREE.Group()
+  group.name = 'lens'
+  const cm = (mm: number) => mm / 10
+  const L = Math.max(2.2, cm(spec.lengthMm))
+  const R = Math.max(1.5, cm(spec.diameterMm) / 2)
+  const glassR = Math.min(R * 0.78, Math.max(0.7, cm(spec.frontMm) * 0.36))
+
+  const black = namedMat('lensBlack', { color: 0x121214, roughness: 0.36, metalness: 0.48, clearcoat: 0.55, clearcoatRoughness: 0.28 })
+  const satin = namedMat('lensSatin', { color: 0x1c1c20, roughness: 0.55, metalness: 0.28 })
+  const silver = namedMat('accent', { color: 0xc8c8ce, roughness: 0.2, metalness: 0.95, clearcoat: 0.5, clearcoatRoughness: 0.16 })
+  const rubber = namedMat('rubber', { color: 0x0c0c0d, roughness: 0.94, metalness: 0 })
+  const mountMetal = namedMat('plate', { color: 0xb5b5ba, roughness: 0.32, metalness: 0.88, clearcoat: 0.25 })
+  const bodyMat = spec.finish === 'silver' ? silver : black
+  const noseMat = spec.finish === 'black' ? black : silver
+  const focusMat = spec.focusRing.startsWith('rubber') || spec.focusRing === 'thin-af' ? rubber : spec.finish === 'black' ? satin : silver
+  const apertureMat = spec.finish === 'black' ? black : silver
+  const tickMat = spec.finish === 'black' ? silver : black
+
+  const flange = 0.26
+  const usable = Math.max(1.5, L - flange)
+  const frac = {
+    ap: spec.apertureRing ? (spec.zoom ? 0.13 : 0.15) : 0,
+    scale: spec.zoom ? 0.1 : 0.12,
+    focus: spec.focusRing === 'thin-af' ? 0.12 : spec.zoom ? 0.2 : 0.3,
+    zoom: spec.zoom ? 0.18 : 0,
+  }
+  const rings = frac.ap + frac.scale + frac.focus + frac.zoom
+  const frontF = Math.max(0.2, 1 - rings)
+  const unit = usable / (frontF + rings)
+  const apH = frac.ap * unit
+  const scaleH = frac.scale * unit
+  const focusH = frac.focus * unit
+  const zoomH = frac.zoom * unit
+  const frontH = frontF * unit
+  let z = flange
+  const zAp = z; z += apH
+  const zScale = z; z += scaleH
+  const zFocus = z; z += focusH
+  const zZoom = z; z += zoomH
+  const zFront = z
+  const zEnd = z + frontH
+
+  const lathe = (profile: [number, number][], material: THREE.Material) => {
+    const pts = profile.map(([zz, r]) => new THREE.Vector2(Math.max(0.05, r), zz))
+    const mesh = new THREE.Mesh(new THREE.LatheGeometry(pts, 64), material)
+    mesh.rotation.x = PI / 2
+    group.add(mesh)
+    return mesh
+  }
+  // 원통 앞쪽 반지름이 radius, 뒤가 back. z 는 뒷면.
+  const tube = (radius: number, length: number, at: number, material: THREE.Material | THREE.Material[], back = radius, open = false) => {
+    if (length < 0.04) return
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, back, length, 64, 1, open), material)
+    mesh.rotation.x = PI / 2
+    mesh.position.z = at + length / 2
+    group.add(mesh)
+  }
+  const ribs = (at: number, length: number, radius: number, count: number, material: THREE.Material, size: number) => {
+    const geo = new THREE.BoxGeometry(size, size * 1.15, length * 0.86)
+    const inst = new THREE.InstancedMesh(geo, material, count)
+    const dummy = new THREE.Object3D()
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * PI * 2
+      dummy.position.set(Math.cos(a) * radius, Math.sin(a) * radius, at + length / 2)
+      dummy.rotation.z = a
+      dummy.updateMatrix()
+      inst.setMatrixAt(i, dummy.matrix)
+    }
+    group.add(inst)
+  }
+  const grooves = (at: number, length: number, radius: number, material: THREE.Material) => {
+    for (let i = 1; i <= 3; i++) {
+      const mesh = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.03, 6, 40), material)
+      mesh.position.z = at + (length * i) / 4
+      group.add(mesh)
+    }
+  }
+
+  lathe([
+    [0.02, R * 0.7],
+    [0.08, R * 0.98],
+    [flange, R * 0.98],
+    [flange + 0.08, R * 0.82],
+    [zScale, R * 0.84],
+    [zFront, R * 0.8],
+    [zEnd, Math.max(glassR * 1.15, R * 0.72)],
+  ], bodyMat)
+  tube(R * 1.05, flange, 0, mountMetal, R * 0.86)
+
+  if (spec.apertureRing && apH > 0.05) {
+    tube(R * 0.98, apH, zAp, apertureMat)
+    ribs(zAp, apH * 0.45, R * 0.99, 18, tickMat, 0.05)
+  }
+
+  const labels = ['∞', '10', '5', '2', '1', '0.7']
+  const scaleMap = scaleTex(labels)
+  const scaleMat = namedMat(`scale:${labels.join(',')}`, {
+    color: 0x141416, roughness: 0.42, metalness: 0.25, clearcoat: 0.3, ...(scaleMap ? { map: scaleMap } : {}),
+  })
+  tube(R * 0.9, scaleH, zScale, [scaleMat, black, black])
+  const pip = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), namedMat('frosted', { color: 0xe8e8ea, roughness: 0.4, metalness: 0.05 }))
+  pip.position.set(0, R * 0.96, zScale + scaleH * 0.5)
+  group.add(pip)
+
+  tube(R, focusH, zFocus, focusMat)
+  if (spec.focusRing === 'rubber-grid') {
+    ribs(zFocus, focusH, R * 1.01, 32, rubber, 0.05)
+    grooves(zFocus, focusH, R * 1.01, rubber)
+  } else if (spec.focusRing === 'rubber-ribbed' || spec.focusRing === 'thin-af') {
+    ribs(zFocus, focusH, R * 1.01, spec.focusRing === 'thin-af' ? 46 : 26, rubber, spec.focusRing === 'thin-af' ? 0.04 : 0.07)
+  } else if (spec.focusRing === 'metal-scalloped') {
+    const count = 12
+    const geo = new THREE.SphereGeometry(Math.min(0.16, focusH * 0.28), 10, 8)
+    const inst = new THREE.InstancedMesh(geo, focusMat, count)
+    const dummy = new THREE.Object3D()
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * PI * 2
+      dummy.position.set(Math.cos(a) * R, Math.sin(a) * R, zFocus + focusH / 2)
+      dummy.updateMatrix()
+      inst.setMatrixAt(i, dummy.matrix)
+    }
+    group.add(inst)
+  } else {
+    ribs(zFocus, focusH, R * 1.005, 70, focusMat, 0.032)
+  }
+  if (spec.focusTab) {
+    const tab = new THREE.Mesh(new RoundedBoxGeometry(0.26, 0.58, Math.min(0.5, focusH * 0.75), 2, 0.06), focusMat)
+    tab.position.set(R * 0.2, R + 0.22, zFocus + focusH * 0.45)
+    group.add(tab)
+  }
+
+  if (spec.zoom && zoomH > 0.05) {
+    tube(R * 0.97, zoomH, zZoom, rubber)
+    ribs(zZoom, zoomH, R * 0.98, 30, rubber, 0.06)
+  }
+
+  if (spec.finish === 'chrome-nose') tube(R * 0.9, frontH, zFront, noseMat, R * 0.84)
+  else tube(R * 0.86, frontH * 0.55, zFront + frontH * 0.4, noseMat)
+
+  const lip = Math.max(glassR * 1.22, R * 0.62)
+  const outer = Math.max(lip + 0.12, R * 0.84)
+  const ringTex = lensRingTex(spec.frontMm)
+  const ringMat = new THREE.MeshPhysicalMaterial({ color: 0x121214, roughness: 0.45, metalness: 0.3, ...(ringTex ? { map: ringTex } : {}) })
+  ringMat.name = 'frontring'
+  const ringGeo = new THREE.RingGeometry(lip, outer, 64)
+  const uv = ringGeo.attributes.uv as THREE.BufferAttribute
+  const pos = ringGeo.attributes.position as THREE.BufferAttribute
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / (outer * 2) + 0.5, pos.getY(i) / (outer * 2) + 0.5)
+  const ring = new THREE.Mesh(ringGeo, ringMat)
+  ring.position.z = zEnd + 0.02
+  group.add(ring)
+
+  const recessMat = namedMat('recess', { color: 0x050505, roughness: 0.8, metalness: 0 })
+  const recess = new THREE.Mesh(new THREE.RingGeometry(glassR, lip, 64), recessMat)
+  recess.position.z = zEnd + 0.012
+  group.add(recess)
+  const glassTex = coatedGlassTex()
+  const glassMat = new THREE.MeshBasicMaterial({ color: 0x140e18, ...(glassTex ? { map: glassTex } : {}) })
+  glassMat.name = 'glass'
+  const glass = new THREE.Mesh(new THREE.CircleGeometry(glassR, 64), glassMat)
+  glass.position.z = zEnd + 0.028
+  group.add(glass)
+
+  const hoodLen = spec.hood === 'round' ? Math.min(2.4, R * 1.1) : spec.hood === 'petal' ? Math.min(1.5, R * 0.75) : spec.hood === 'built-in' ? Math.min(1.1, R * 0.55) : 0
+  if (spec.hood === 'petal') {
+    const shape = new THREE.Shape()
+    const steps = 72
+    const rIn = outer * 0.98
+    const rOut = outer * 1.18
+    for (let i = 0; i <= steps; i++) {
+      const a = (i / steps) * PI * 2
+      const lobe = Math.abs(Math.cos(2 * a))
+      const radius = rIn + (rOut - rIn) * (0.2 + 0.8 * lobe ** 0.6)
+      const x = Math.cos(a) * radius
+      const y = Math.sin(a) * radius
+      if (i === 0) shape.moveTo(x, y)
+      else shape.lineTo(x, y)
+    }
+    const hole = new THREE.Path()
+    hole.absarc(0, 0, glassR * 1.05, 0, PI * 2, true)
+    shape.holes.push(hole)
+    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: hoodLen, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.03, bevelSegments: 1, curveSegments: 6 }), black)
+    mesh.position.z = zEnd
+    group.add(mesh)
+  } else if (hoodLen > 0) {
+    const frontR = spec.hood === 'built-in' ? outer * 1.08 : outer * 1.02
+    tube(frontR, hoodLen, zEnd, black, outer * 0.98, true)
+  }
+
+  group.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = true })
+  return group
+}
+
 // --- 장면
 
 let shadowTex: THREE.Texture | undefined
@@ -1030,7 +1235,7 @@ export function snapshot(p: ModelProfile, colorHex: string): string {
   }
 }
 
-function renderSnapshot(p: ModelProfile, colorHex: string, key: string): string {
+function ensureSnapRenderer() {
   if (!snapRenderer || !snapRenderer.getContext()) {
     snapRenderer?.dispose()
     snapRenderer?.domElement.remove()
@@ -1042,15 +1247,20 @@ function renderSnapshot(p: ModelProfile, colorHex: string, key: string): string 
     mountSnapCanvas(snapRenderer)
   }
   if (!snapRenderer.getContext()) throw new Error('webgl')
-  const { scene, camera } = buildScene(p, colorHex, snapRenderer)
-  snapRenderer.setClearColor(0x000000, 0)
+  return snapRenderer
+}
+
+function renderSnapshot(p: ModelProfile, colorHex: string, key: string): string {
+  const renderer = ensureSnapRenderer()
+  const { scene, camera } = buildScene(p, colorHex, renderer)
+  renderer.setClearColor(0x000000, 0)
   let url: string
   try {
-    url = captureScene(snapRenderer, scene, camera)
+    url = captureScene(renderer, scene, camera)
   } catch {
     // 환경맵이 프레임버퍼를 붙잡은 채 끝나면 캔버스가 빈다. 조명만으로 다시 그린다.
     scene.environment = null
-    url = captureScene(snapRenderer, scene, camera)
+    url = captureScene(renderer, scene, camera)
   }
   snapCache.set(key, url)
   scene.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose() })
@@ -1114,6 +1324,116 @@ export function fallbackSnapshot(p: ModelProfile): string {
   ctx.fill()
   ctx.lineWidth = 8
   ctx.strokeStyle = '#3a3a40'
+  ctx.stroke()
+  return c.toDataURL('image/png')
+}
+
+function buildLensScene(spec: LensSpec, renderer: THREE.WebGLRenderer) {
+  const scene = new THREE.Scene()
+  try {
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    scene.environmentIntensity = 0.9
+    pmrem.dispose()
+  } catch { /* 방향광으로 충분 */ }
+  renderer.setRenderTarget(null)
+
+  const model = buildLens(spec)
+  // 앞유리와 옆 경통이 같이 보이게 비스듬히 (앞(+z)이 오른쪽 앞에 있는 카메라 쪽을 보게)
+  model.rotation.y = 0.2
+  model.rotation.x = 0.08
+  scene.add(model)
+
+  const box = new THREE.Box3().setFromObject(model)
+  const sz = box.getSize(new THREE.Vector3())
+  const center = box.getCenter(new THREE.Vector3())
+  const shadow = contactShadow()
+  const span = Math.max(sz.x, sz.z) * 1.45
+  shadow.scale.set(span, span * 0.5, 1)
+  shadow.rotation.x = -PI / 2
+  shadow.position.y = box.min.y - 0.02
+  scene.add(shadow)
+
+  const key = new THREE.DirectionalLight(0xffffff, 2.2)
+  key.position.set(-8, 14, 16)
+  scene.add(key)
+  const fill = new THREE.DirectionalLight(0xffffff, 0.55)
+  fill.position.set(12, 6, 8)
+  scene.add(fill)
+  const rim = new THREE.DirectionalLight(0xffffff, 1.5)
+  rim.position.set(6, 10, -14)
+  scene.add(rim)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.28))
+
+  const size = Math.max(sz.x, sz.y * 1.2, sz.z)
+  const dist = size * 2.45
+  const camera = new THREE.PerspectiveCamera(22, 4 / 3, 0.1, 400)
+  camera.position.set(center.x + dist * 0.62, center.y + dist * 0.26, center.z + dist * 0.72)
+  camera.lookAt(center.x, center.y, center.z + sz.z * 0.06)
+  return { scene, camera }
+}
+
+/** 렌즈 카드용 정지 이미지. WebGL이 없으면 납작한 그림으로 대체한다. */
+export function lensSnapshot(spec: LensSpec): string {
+  const key = `lens|${JSON.stringify(spec)}`
+  const hit = snapCache.get(key)
+  if (hit) return hit
+  try {
+    const renderer = ensureSnapRenderer()
+    const { scene, camera } = buildLensScene(spec, renderer)
+    renderer.setClearColor(0x000000, 0)
+    let url: string
+    try {
+      url = captureScene(renderer, scene, camera)
+    } catch {
+      scene.environment = null
+      url = captureScene(renderer, scene, camera)
+    }
+    snapCache.set(key, url)
+    scene.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose() })
+    return url
+  } catch {
+    const url = fallbackLensSnapshot(spec)
+    snapCache.set(key, url)
+    return url
+  }
+}
+
+/** WebGL이 없을 때 렌즈 옆모습 */
+export function fallbackLensSnapshot(spec: LensSpec): string {
+  const c = document.createElement('canvas')
+  c.width = 800
+  c.height = 600
+  const ctx = c.getContext('2d')!
+  const length = Math.max(spec.lengthMm, 20)
+  const diameter = Math.max(spec.diameterMm, 30)
+  const s = 460 / Math.max(length, diameter * 1.3)
+  const bw = length * s
+  const bh = diameter * s
+  const x = 400 - bw / 2
+  const y = 300 - bh / 2
+  const nose = spec.finish === 'black' ? '#1a1a1c' : '#c8c8ce'
+  const body = spec.finish === 'silver' ? '#b8b8be' : '#141416'
+  ctx.fillStyle = body
+  ctx.beginPath()
+  if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, bw, bh, bh * 0.18)
+  else ctx.rect(x, y, bw, bh)
+  ctx.fill()
+  ctx.fillStyle = spec.focusRing.startsWith('rubber') || spec.focusRing === 'thin-af' ? '#0c0c0d' : nose
+  ctx.fillRect(x + bw * 0.38, y - 4, bw * (spec.zoom ? 0.22 : 0.28), bh + 8)
+  if (spec.zoom) ctx.fillRect(x + bw * 0.62, y - 2, bw * 0.16, bh + 4)
+  ctx.fillStyle = nose
+  ctx.fillRect(x + bw * 0.72, y + bh * 0.08, bw * 0.28, bh * 0.84)
+  ctx.beginPath()
+  ctx.ellipse(x + bw * 0.96, y + bh / 2, bh * 0.28, bh * 0.34, 0, 0, Math.PI * 2)
+  ctx.fillStyle = '#140e18'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(120, 190, 150, 0.7)'
+  ctx.lineWidth = 4
+  ctx.stroke()
+  ctx.strokeStyle = 'rgba(170, 100, 190, 0.45)'
+  ctx.beginPath()
+  ctx.ellipse(x + bw * 0.96, y + bh / 2, bh * 0.16, bh * 0.2, 0, 0, Math.PI * 2)
   ctx.stroke()
   return c.toDataURL('image/png')
 }

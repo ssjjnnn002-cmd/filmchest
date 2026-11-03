@@ -24,6 +24,8 @@ export function FilterRing({ name, glass, size = 96 }: { name: string; glass?: s
         </RadialGradient>
         <ClipPath id={`${id}c`}><Ellipse cx="50" cy="48" rx="30" ry="41" /></ClipPath>
       </Defs>
+      {/* 두께·그림자가 오른쪽으로 나오므로 전체를 조금 왼쪽으로 옮겨 가운데로 (웹과 같음) */}
+      <G x={-1.6}>
       <Ellipse cx="53" cy="94" rx="27" ry="3.6" fill={`url(#${id}sh)`} />
       <Ellipse cx="53.2" cy="48" rx="34.4" ry="45.2" fill="#070708" />
       <Ellipse cx="50" cy="48" rx="34.4" ry="45.2" fill="#141416" />
@@ -43,6 +45,7 @@ export function FilterRing({ name, glass, size = 96 }: { name: string; glass?: s
         <Ellipse cx="50" cy="48" rx="30" ry="41" fill="none" stroke="#000" strokeOpacity={0.28} strokeWidth={2} />
       </G>
       {look.kind === 'polar' ? <Rect x="49.3" y="3.6" width="1.4" height="3.6" rx=".7" fill="#fff" fillOpacity={0.75} /> : null}
+      </G>
     </Svg>
   )
 }

@@ -57,7 +57,8 @@ struct FilterRingView: View {
         let look = GlassLook(glass: glass)
         Canvas { ctx, size in
             let u = min(size.width, size.height) / 100
-            let ox = (size.width - 100 * u) / 2, oy = (size.height - 100 * u) / 2
+            // 두께·그림자가 오른쪽으로 나오므로 전체를 조금 왼쪽으로 옮겨 가운데로 (웹과 같음)
+            let ox = (size.width - 100 * u) / 2 - 1.6 * u, oy = (size.height - 100 * u) / 2
             func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * u, y: oy + y * u) }
             func ellipse(_ cx: CGFloat, _ cy: CGFloat, _ rx: CGFloat, _ ry: CGFloat) -> Path {
                 Path(ellipseIn: CGRect(x: ox + (cx - rx) * u, y: oy + (cy - ry) * u, width: rx * 2 * u, height: ry * 2 * u))
@@ -123,19 +124,11 @@ struct GlassPicker: View {
                     cell(p.name, ring: FilterRingView(glass: value), on: (glass ?? "clear") == p.kind.rawValue) { glass = value }
                 }
                 let customOn = glass?.hasPrefix("#") == true
-                VStack(spacing: 4) {
-                    ZStack {
-                        FilterRingView(glass: custom.hexString)
-                        ColorPicker("", selection: $custom, supportsOpacity: false).labelsHidden().opacity(0.02).scaleEffect(2)
-                    }
-                    .frame(width: 44, height: 44)
-                    Text("직접").font(.caption2).foregroundStyle(customOn ? .primary : .secondary)
-                }
-                .padding(.vertical, 6).frame(maxWidth: .infinity)
-                .background(customOn ? Color(.tertiarySystemFill) : .clear, in: RoundedRectangle(cornerRadius: 12))
-                .overlay { if customOn { RoundedRectangle(cornerRadius: 12).stroke(Theme.safelight, lineWidth: 2) } }
+                cell("직접", ring: FilterRingView(glass: custom.hexString), on: customOn) { glass = custom.hexString }
             }
             .padding(.vertical, 4)
+            // 직접 고르는 색: 누르면 색 고르기 창이 열린다
+            ColorPicker("직접 고른 색", selection: $custom, supportsOpacity: false)
             .onChange(of: custom) { _, c in glass = c.hexString }
             .onAppear { if let glass, glass.hasPrefix("#"), let c = Color(filterHex: glass) { custom = c } }
         }

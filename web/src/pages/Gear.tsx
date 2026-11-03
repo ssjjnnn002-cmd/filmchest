@@ -4,6 +4,8 @@ import { db } from '../db'
 import type { CustomFilmRow } from '../core/films'
 import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films'
 import { lensesFor } from '../core/lenses'
+import { lensSpec as lensBody } from '../core/lensSpecs'
+import { fallbackLensSnapshot, lensSnapshot } from '../core/model3d'
 import { filmFits, filterDiameters, filterKinds, groupPrice, lensSpec, parseLens } from '../core/optics'
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
 import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
@@ -154,7 +156,8 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false }: {
   const box = (children: React.ReactNode) => <div className={grid ? 'grid' : 'group'}>{children}</div>
   const lensCell = (lens: Lens) => (
     <button key={lens.id} className={grid ? 'card' : 'row'} onClick={() => setEdit(lens.id)} style={{ textAlign: 'left' }}>
-      <GearPhoto id={lens.id} hasPhoto={lens.hasPhoto} grid={grid} />
+      <GearPhoto id={lens.id} hasPhoto={lens.hasPhoto} grid={grid}
+        fallback={<LensPicture brand={lens.brand} model={lens.model} mount={lens.mount} height={grid ? 110 : 52} />} />
       <span className="grow">
         <b className={grid ? 'clamp-2 reserve-2' : 'truncate'}>{lens.model || '렌즈'}</b>
         <span className="sub truncate">{(grid ? lens.brand : [lens.brand, lensSpec(lens)].filter(Boolean).join(' · ')) || '\u00a0'}</span>
@@ -218,6 +221,44 @@ export function GearAdd({ kind, onClose }: { kind: GearKind; onClose: () => void
   return <FilmEdit onClose={onClose} />
 }
 
+const lensShotQueue: Array<() => void> = []
+let lensShotBusy = false
+/** 목록의 렌즈를 한꺼번에 그리지 않고 한 장씩 만든다 */
+function scheduleLensShot(run: () => void) {
+  lensShotQueue.push(run)
+  if (lensShotBusy) return
+  lensShotBusy = true
+  const pump = () => {
+    const next = lensShotQueue.shift()
+    if (!next) { lensShotBusy = false; return }
+    next()
+    window.setTimeout(pump, 24)
+  }
+  window.setTimeout(pump, 24)
+}
+
+function useLensPreview(brand: string, model: string, mount?: string) {
+  const spec = useMemo(() => lensBody(brand, model, mount), [brand, model, mount])
+  const [src, setSrc] = useState('')
+  useEffect(() => {
+    let cancel = false
+    try { setSrc(fallbackLensSnapshot(spec)) } catch { setSrc('') }
+    scheduleLensShot(() => {
+      if (!cancel) {
+        try { setSrc(lensSnapshot(spec)) } catch { /* 납작한 그림을 유지 */ }
+      }
+    })
+    return () => { cancel = true }
+  }, [spec])
+  return src
+}
+
+function LensPicture({ brand, model, mount, height }: { brand: string; model: string; mount?: string; height: number }) {
+  const src = useLensPreview(brand, model, mount)
+  if (!src) return <Icon name="camera" size={28} />
+  return <img src={src} alt="" style={{ width: '100%', height, objectFit: 'contain', display: 'block' }} />
+}
+
 /** 장비 사진. 바둑판: 그냥 사진이면 카드 위쪽·양옆 끝까지 채운다. 목록: 고정 크기 + 둥근 모서리 */
 function GearPhoto({ id, hasPhoto, grid, fallback }: { id: string; hasPhoto?: boolean; grid: boolean; fallback?: React.ReactNode }) {
   const url = useCameraPhoto(id, !!hasPhoto)
@@ -248,6 +289,7 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
   const [tags, setTags] = useState<string[]>(lens?.tags ?? [])
   const [confirm, setConfirm] = useState(false)
   const hits = lensesFor(mount, model).filter((name) => name !== model).slice(0, 6)
+  const preview = useLensPreview(brand, model, mount)
   const apply = (name: string) => {
     const next = parseLens(name)
     setModel(name)
@@ -277,7 +319,8 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
   return (
     <Sheet title={lens ? '렌즈 수정' : '렌즈 추가'} onClose={onClose}
       right={<button className="btn ghost" disabled={!model.trim() || !mount.trim()} onClick={save}><b>저장</b></button>}>
-      <PhotoField id={lens?.id} hasPhoto={lens?.hasPhoto} blob={blob} setBlob={setBlob} cleared={cleared} setCleared={setCleared} />
+      <PhotoField id={lens?.id} hasPhoto={lens?.hasPhoto} blob={blob} setBlob={setBlob} cleared={cleared} setCleared={setCleared}
+        placeholder={preview ? <img src={preview} alt="" style={{ width: '100%', height: 150, objectFit: 'contain' }} /> : undefined} />
       <div className="section">
         <h2>렌즈</h2>
         <div className="group">
@@ -376,7 +419,7 @@ export function FilterEdit({ filter, onClose, onSaved }: { filter?: GearFilter; 
           <div className="field"><label htmlFor="ft-name">{isFilter ? '종류' : '이름'}</label><input id="ft-name" className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
           {hints.length > 0 && <div className="suggest">{hints.map((item) => <button key={item} type="button" className="chip" onClick={() => setName(item)}>{item}</button>)}</div>}
           {isFilter && <>
-            <div className="field"><label htmlFor="ft-mm">직경 (mm)</label><input id="ft-mm" className="input" inputMode="decimal" value={diameter} onChange={(e) => setDiameter(e.target.value)} /></div>
+            <div className="field"><label htmlFor="ft-mm">직경</label><input id="ft-mm" className="input" inputMode="decimal" value={diameter} onChange={(e) => setDiameter(e.target.value)} /><span className="unit">mm</span></div>
             <div className="suggest">{filterDiameters.filter((item) => item !== diameter).map((item) => <button key={item} type="button" className="chip" onClick={() => setDiameter(item)}>{item}</button>)}</div>
           </>}
         </div>

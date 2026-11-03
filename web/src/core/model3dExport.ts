@@ -2,7 +2,8 @@
 // 웹과 같은 buildCamera를 그대로 쓰고, 재질 이름(역할)별로 삼각형을 모아 넘긴다.
 //   빌드: npm run build:ios3d  → App/FilmScan/Resources/camera3d.js
 import * as THREE from 'three'
-import { buildCamera } from './model3d'
+import { buildCamera, buildLens as buildLensGroup } from './model3d'
+import { lensSpec } from './lensSpecs'
 import { profileFor } from './profiles'
 import type { BodyStyle } from './types'
 
@@ -71,4 +72,14 @@ export function build(brand: string, model: string, style: BodyStyle) {
   const group = buildCamera(profile, '#1c1c1c')
   group.rotation.y = 0 // 방향은 앱에서 정한다
   return { parts: collect(group), bottom: profile.body[1] / 2, profile: JSON.stringify(profile) }
+}
+
+/** 렌즈 모양. 마운트가 없으면 이름만으로 추정한다. 방향은 앱에서 정한다. */
+export function buildLens(brand: string, model: string, mount = '') {
+  const spec = lensSpec(brand, model, mount)
+  const group = buildLensGroup(spec)
+  group.rotation.set(0, 0, 0)
+  group.updateMatrixWorld(true)
+  const box = new THREE.Box3().setFromObject(group)
+  return { parts: collect(group), bottom: -box.min.y, spec: JSON.stringify(spec) }
 }

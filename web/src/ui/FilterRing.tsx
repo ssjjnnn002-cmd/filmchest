@@ -23,6 +23,8 @@ export function FilterRing({ name, glass, size = 96 }: { name: string; glass?: s
         </radialGradient>
         <clipPath id={`${id}c`}><ellipse cx="50" cy="48" rx="30" ry="41" /></clipPath>
       </defs>
+      {/* 두께·그림자가 오른쪽으로 나오므로 전체를 조금 왼쪽으로 옮겨 가운데로 */}
+      <g transform="translate(-1.6 0)">
       {/* 그림자 */}
       <ellipse cx="53" cy="94" rx="27" ry="3.6" fill={`url(#${id}sh)`} />
       {/* 테 두께 (오른쪽으로 보이는 면) */}
@@ -47,6 +49,7 @@ export function FilterRing({ name, glass, size = 96 }: { name: string; glass?: s
         <ellipse cx="50" cy="48" rx="30" ry="41" fill="none" stroke="#000" strokeOpacity=".28" strokeWidth="2" />
       </g>
       {look.kind === 'polar' && <rect x="49.3" y="3.6" width="1.4" height="3.6" rx=".7" fill="#fff" fillOpacity=".75" />}
+      </g>
     </svg>
   )
 }

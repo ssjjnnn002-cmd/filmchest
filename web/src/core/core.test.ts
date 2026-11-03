@@ -8,6 +8,9 @@ import { exposureText, formatComp, meterFrameTitle, meterProgress, meterShotAt, 
 import type { MeterShot } from './types'
 import { filmById } from './films'
 import { catalogMatch, inferStyle } from './cameras'
+import { lensSpec } from './lensSpecs'
+import { buildLens } from './model3d'
+import * as THREE from 'three'
 
 const day = (s: string) => new Date(s).getTime()
 
@@ -152,5 +155,33 @@ describe('catalog', () => {
     expect(inferStyle('Olympus', '35 RC', '135', false)).toBe('rangefinder')
     expect(inferStyle('Pentax', '17', '135', false)).toBe('compact')
     expect(scannerName('NORITSU KOKI', 'HS-1800')).toBe('Noritsu HS-1800')
+  })
+})
+
+describe('lens body', () => {
+  it('uses a catalog spec when the name matches, and estimates the rest', () => {
+    const known = lensSpec('Nikon', 'Nikkor 50mm f/1.4 AI-S', 'Nikon F')
+    expect(known.frontMm).toBe(52)
+    expect(known.apertureRing).toBe(true)
+    expect(known.focusRing).toBe('rubber-grid')
+    const close = lensSpec('Nikon', '50mm f/1.4 AI-S', 'Nikon F')
+    expect(close.frontMm).toBe(52)
+    const ef = lensSpec('Canon', 'EF 50mm f/1.8 STM', 'Canon EF')
+    expect(ef.apertureRing).toBe(false)
+    expect(ef.focusRing).toBe('thin-af')
+    const leica = lensSpec('Leica', 'Elmar 90mm f/4', 'Leica L39')
+    expect(leica.finish === 'chrome-nose' || leica.finish === 'silver').toBe(true)
+    expect(leica.lengthMm).toBeGreaterThan(known.lengthMm)
+  })
+
+  it('builds a barrel along the optical axis', () => {
+    const tele = lensSpec('Nikon', 'Nikkor 180mm f/2.8 ED AI-S', 'Nikon F')
+    const group = buildLens(tele)
+    const box = new THREE.Box3().setFromObject(group)
+    const size = box.getSize(new THREE.Vector3())
+    expect(size.z).toBeGreaterThan(size.y)
+    expect(group.children.length).toBeGreaterThan(4)
+    const wide = buildLens(lensSpec('Leica', 'Summicron-M 35mm f/2', 'Leica M'))
+    expect(new THREE.Box3().setFromObject(wide).getSize(new THREE.Vector3()).z).toBeLessThan(size.z)
   })
 })
