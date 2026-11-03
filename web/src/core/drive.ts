@@ -85,6 +85,8 @@ async function putBlob(t: string, id: string, blob: Blob): Promise<Fetchable> {
 /** 기록 백업 파일: 드라이브 '필름함' 폴더 안 하나에 덮어쓴다. force가 아니면 바뀐 게 없을 때 건너뛴다 */
 export async function backupToDrive(force = false) {
   const t = await driveToken()
+  // 다른 기기에서 고친 것을 먼저 받아 합친다 (안 받고 올리면 그 기기의 수정을 덮어쓴다)
+  await pullFromDrive().catch(() => {})
   const blob = await exportAll()
   const key = await backupKey(blob)
   let id = getPref('driveFileId', '' as string)

@@ -42,6 +42,17 @@ struct CloudBackupView: View {
                     if let last = DriveSync.lastSync {
                         LabeledContent("마지막으로 맞춤", value: last.formatted(date: .abbreviated, time: .shortened))
                     }
+                    if let c = DrivePhotos.counts {
+                        LabeledContent("드라이브의 스캔 사진", value: c.onDrive == c.total ? "\(c.total)장 모두" : "\(c.onDrive) / \(c.total)장")
+                    }
+                    Button("사진 다시 확인하고 올리기", systemImage: "arrow.triangle.2.circlepath") {
+                        driveRun(nil) {
+                            await DrivePhotos.sync(context)
+                            if let c = DrivePhotos.counts {
+                                message = (c.onDrive == c.total ? "스캔 사진 \(c.total)장이 모두 드라이브에 있어요." : "드라이브에 \(c.onDrive) / \(c.total)장 있어요. 나머지는 다음에 다시 올려요.", c.onDrive == c.total)
+                            }
+                        }
+                    }
                     Button("드라이브에서 장비·기록 복구 (최신 파일)", systemImage: "arrow.down.doc") {
                         driveRun(nil) {
                             if let c = try await DriveSync.pull(context, force: true) {

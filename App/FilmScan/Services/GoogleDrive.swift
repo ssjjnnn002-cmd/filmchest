@@ -472,6 +472,8 @@ enum DriveSync {
     /// 올리기: force가 아니면 지난번과 같을 때 건너뛴다
     @MainActor
     static func push(_ context: ModelContext, force: Bool = false) async throws {
+        // 다른 기기에서 고친 것을 먼저 받아 합친다 (안 받고 올리면 그 기기의 수정을 덮어쓴다)
+        _ = try? await pull(context)
         let data = try WebFormat.export(from: context)
         let key = contentKey(data)
         if !force, key == UserDefaults.standard.string(forKey: pushedKey) { return }
@@ -529,6 +531,7 @@ enum DrivePhotos {
     private static let sentKey = "filmscan.driveFrames"        // "롤id-컷": "파일id|사진 앱 수정 시각"
     private static let folderKey = "filmscan.driveRollFolders"  // 롤id: 폴더id
     private static let pulledKey = "filmscan.drivePulledPhotos" // 이미 받은 드라이브 파일 id
+    private static let countKey = "filmscan.drivePhotoCount"    // [드라이브에 있는 장 수, 전체]
     @MainActor private static var running = false
     @MainActor private static var pulling = false
 
@@ -578,54 +581,75 @@ enum DrivePhotos {
         guard !rolls.isEmpty, let root = try? await DriveClient.rootFolder() else { return }
         let day = DateFormatter()
         day.dateFormat = "yyyy-MM-dd"
+        var onDrive = 0, total = 0
         for roll in rolls {
             let frames = (roll.frames ?? []).filter { $0.assetIdentifier != nil }.sorted { $0.index < $1.index }
+            guard !frames.isEmpty else { continue }
+            total += frames.count
+            let start = roll.shootingDays.map(\.startedAt).min() ?? roll.loadedAt
+            let folderName = String("\(day.string(from: start)) \(roll.albumTitle)".replacingOccurrences(of: "/", with: "-").prefix(120))
+            // 드라이브에서 폴더나 사진을 지웠을 수 있어 매번 실제로 있는지 본다 (지워졌으면 다시 올린다)
+            var folder = folders[roll.id.uuidString]
+            var files: [String: String] = [:]   // 파일 이름: id
+            do {
+                let found = try await DriveClient.find(folderName, parent: root, folder: true)
+                if let f = folder, f != found {
+                    // 기억해 둔 폴더가 지워졌거나 이름이 바뀜: 그 안에 올린 기록은 잊는다
+                    if let found { folder = found } else { folder = nil }
+                    for f in frames { sent["\(roll.id.uuidString.lowercased())-\(f.index)"] = nil }
+                } else if folder == nil {
+                    folder = found
+                }
+                if let f = folder { for c in try await DriveClient.children(f) { files[c.name] = c.id } }
+            } catch {
+                return
+            }
             for frame in frames {
                 guard let assetID = frame.assetIdentifier else { continue }
                 let key = "\(roll.id.uuidString.lowercased())-\(frame.index)"
+                let name = String(format: "%02d.jpg", frame.index)
                 let modified = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject?.modificationDate
                 let stamp = String(Int(modified?.timeIntervalSince1970 ?? 0))
-                if let prev = sent[key], prev.hasSuffix("|\(stamp)") { continue }
+                let prevID = sent[key]?.components(separatedBy: "|").first
+                if let prev = sent[key], prev.hasSuffix("|\(stamp)"), let prevID, files[name] == prevID { onDrive += 1; continue }
                 guard let file = await PhotoLibrary.fileData(assetID: assetID) else { continue }
                 // 사진 앱의 날짜·위치를 고쳐도 파일 속 정보는 그대로라, 올릴 때 지금 기록으로 다시 쓴다
                 let data = RollImporter.withCurrentInfo(file.data, frame: frame, roll: roll) ?? file.data
                 do {
-                    var folder = folders[roll.id.uuidString]
                     if folder == nil {
-                        let start = roll.shootingDays.map(\.startedAt).min() ?? roll.loadedAt
-                        let name = "\(day.string(from: start)) \(roll.albumTitle)".replacingOccurrences(of: "/", with: "-")
-                        folder = try await DriveClient.folder(String(name.prefix(120)), parent: root)
-                        folders[roll.id.uuidString] = folder
-                        UserDefaults.standard.set(folders, forKey: folderKey)
+                        folder = try await DriveClient.folder(folderName, parent: root)
                     }
                     guard let folder else { continue }
-                    let name = String(format: "%02d.jpg", frame.index)
-                    var id = sent[key]?.components(separatedBy: "|").first
-                    if id == nil { id = try await DriveClient.find(name, parent: folder, folder: false) }
+                    folders[roll.id.uuidString] = folder
+                    UserDefaults.standard.set(folders, forKey: folderKey)
+                    var id = files[name]
                     if id == nil { id = try await DriveClient.createFile(name, parent: folder, mime: "image/jpeg") }
                     guard let id, !id.isEmpty else { continue }
-                    do {
-                        try await DriveClient.upload(id, data, mime: "image/jpeg")
-                    } catch {
-                        // 드라이브에서 폴더나 파일을 지운 경우: 다음 번에 새로 만든다
-                        folders[roll.id.uuidString] = nil
-                        sent[key] = nil
-                        UserDefaults.standard.set(folders, forKey: folderKey)
-                        UserDefaults.standard.set(sent, forKey: sentKey)
-                        continue
-                    }
+                    try await DriveClient.upload(id, data, mime: "image/jpeg")
+                    files[name] = id
                     sent[key] = "\(id)|\(stamp)"
                     UserDefaults.standard.set(sent, forKey: sentKey)
+                    onDrive += 1
                 } catch {
+                    UserDefaults.standard.set(sent, forKey: sentKey)
                     return
                 }
             }
         }
+        UserDefaults.standard.set(sent, forKey: sentKey)
+        UserDefaults.standard.set([onDrive, total], forKey: countKey)
+    }
+
+    /// 마지막으로 확인했을 때 드라이브에 있는 사진 / 아이폰의 사진
+    static var counts: (onDrive: Int, total: Int)? {
+        guard let a = UserDefaults.standard.array(forKey: countKey) as? [Int], a.count == 2 else { return nil }
+        return (a[0], a[1])
     }
 
     static func forget() {
         UserDefaults.standard.removeObject(forKey: sentKey)
         UserDefaults.standard.removeObject(forKey: folderKey)
         UserDefaults.standard.removeObject(forKey: pulledKey)
+        UserDefaults.standard.removeObject(forKey: countKey)
     }
 }

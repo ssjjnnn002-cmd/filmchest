@@ -82,6 +82,8 @@ function key(body: Uint8Array) {
 /** 기록 백업: '필름함/필름함 백업.json' 하나에 덮어쓴다. force가 아니면 바뀐 게 없을 때 건너뛴다 */
 export async function backupToDrive(force = false, interactive = true) {
   const t = await token(interactive)
+  // 다른 기기에서 고친 것을 먼저 받아 합친다 (웹과 같음)
+  await pullFromDrive(false, false).catch(() => {})
   const body = await exportAll()
   const k = key(body)
   let id = getPref('driveFileId', '' as string)
