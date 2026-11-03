@@ -1328,20 +1328,22 @@ export function fallbackSnapshot(p: ModelProfile): string {
   return c.toDataURL('image/png')
 }
 
-function buildLensScene(spec: LensSpec, renderer: THREE.WebGLRenderer) {
+/** 렌즈 보기 각도 (도). 기본은 앞 유리와 옆 경통이 같이 보이는 비스듬한 각도 */
+export interface LensAngle { yaw: number; pitch: number }
+export const defaultLensAngle: LensAngle = { yaw: 0, pitch: 0 }
+export function buildLensScene(spec: LensSpec, renderer: THREE.WebGLRenderer, angle: LensAngle = defaultLensAngle) {
   const scene = new THREE.Scene()
   try {
     const pmrem = new THREE.PMREMGenerator(renderer)
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
-    scene.environmentIntensity = 0.9
+    scene.environmentIntensity = 1.1
     pmrem.dispose()
   } catch { /* 방향광으로 충분 */ }
   renderer.setRenderTarget(null)
 
   const model = buildLens(spec)
-  // 앞유리와 옆 경통이 같이 보이게 비스듬히 (앞(+z)이 오른쪽 앞에 있는 카메라 쪽을 보게)
-  model.rotation.y = 0.2
-  model.rotation.x = 0.08
+  model.name = 'lensModel'
+  // 정한 각도로 (기본: 앞 유리와 옆 경통이 같이 보이게 비스듬히). 돌려도 화면 안에 들어오게 크기는 돌리기 전 기준
   scene.add(model)
 
   const box = new THREE.Box3().setFromObject(model)
@@ -1365,22 +1367,44 @@ function buildLensScene(spec: LensSpec, renderer: THREE.WebGLRenderer) {
   scene.add(rim)
   scene.add(new THREE.AmbientLight(0xffffff, 0.28))
 
-  const size = Math.max(sz.x, sz.y * 1.2, sz.z)
+  // 반짝이는 테두리가 보이게 위쪽 넓은 빛을 하나 더
+  const top = new THREE.DirectionalLight(0xffffff, 0.7)
+  top.position.set(0, 20, 4)
+  scene.add(top)
+
+  const size = Math.max(sz.x, sz.y, sz.z) * 1.25
   const dist = size * 2.45
   const camera = new THREE.PerspectiveCamera(22, 4 / 3, 0.1, 400)
   camera.position.set(center.x + dist * 0.62, center.y + dist * 0.26, center.z + dist * 0.72)
-  camera.lookAt(center.x, center.y, center.z + sz.z * 0.06)
-  return { scene, camera }
+  const target = new THREE.Vector3(center.x, center.y, center.z)
+  camera.lookAt(target)
+  // 모형은 가운데를 축으로 돌린다
+  model.position.sub(center)
+  const pivot = new THREE.Group()
+  pivot.name = 'lensPivot'
+  pivot.position.copy(center)
+  scene.remove(model)
+  pivot.add(model)
+  scene.add(pivot)
+  setLensAngle(scene, angle)
+  return { scene, camera, target }
+}
+
+/** 장면의 렌즈를 이 각도로 돌린다 (끌어서 돌려 볼 때) */
+export function setLensAngle(scene: THREE.Scene, angle: LensAngle) {
+  const pivot = scene.getObjectByName('lensPivot')
+  if (!pivot) return
+  pivot.rotation.set(angle.pitch * PI / 180, angle.yaw * PI / 180, 0, 'YXZ')
 }
 
 /** 렌즈 카드용 정지 이미지. WebGL이 없으면 납작한 그림으로 대체한다. */
-export function lensSnapshot(spec: LensSpec): string {
-  const key = `lens|${JSON.stringify(spec)}`
+export function lensSnapshot(spec: LensSpec, angle: LensAngle = defaultLensAngle): string {
+  const key = `lens|${JSON.stringify(spec)}|${angle.yaw}|${angle.pitch}`
   const hit = snapCache.get(key)
   if (hit) return hit
   try {
     const renderer = ensureSnapRenderer()
-    const { scene, camera } = buildLensScene(spec, renderer)
+    const { scene, camera } = buildLensScene(spec, renderer, angle)
     renderer.setClearColor(0x000000, 0)
     let url: string
     try {

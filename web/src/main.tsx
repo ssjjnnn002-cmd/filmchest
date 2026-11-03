@@ -26,9 +26,11 @@ pinTabbar()
 window.visualViewport?.addEventListener('resize', pinTabbar)
 
 // 갤럭시·안드로이드에서 키보드가 입력칸을 가리면 그 칸이 보이게 올린다.
+// 시트 안은 시트가 직접 스크롤한다. 여기서 문서를 밀면 아이폰이 커서를 시트 밖(뒤 화면·메모)으로 보낸다.
 document.addEventListener('focusin', (e) => {
   const t = e.target
   if (!(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement)) return
+  if (t.closest('.sheet-root')) return
   if (t.type === 'file' || t.type === 'checkbox' || t.type === 'radio' || t.type === 'color' || t.type === 'range') return
   window.setTimeout(() => {
     const vv = window.visualViewport

@@ -45,6 +45,7 @@ struct LabField: View {
         TextField("현상소", text: $lab)
         if !labs.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
+                // 추천 칩을 스치면 키보드가 내려가지 않게
                 HStack {
                     ForEach(labs, id: \.self) { name in
                         HStack(spacing: 2) {
@@ -63,6 +64,7 @@ struct LabField: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.never)
         }
     }
 }

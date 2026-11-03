@@ -131,6 +131,8 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
 }) {
   const blockBackdrop = useRef(true)
   const blockTimer = useRef(0)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
   const [shieldOn, setShieldOn] = useState(!!shield)
   useEffect(() => {
     const pause = () => {
@@ -139,8 +141,8 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       blockTimer.current = window.setTimeout(() => { blockBackdrop.current = false }, 800)
     }
     pause()
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    // 필름·날짜·파일 선택 창이 닫힐 때 남는 탭
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCloseRef.current() }
+    // 필름·날짜·파일 선택 창이 닫힐 때 남는 탭. 글자를 치는 동안에는 다시 걸지 않는다.
     document.addEventListener('change', pause, true)
     document.addEventListener('focusout', pause, true)
     window.addEventListener('keydown', onKey)
@@ -150,7 +152,7 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       document.removeEventListener('focusout', pause, true)
       window.removeEventListener('keydown', onKey)
     }
-  }, [onClose])
+  }, [])
   useEffect(() => {
     if (!shield) return
     const t = window.setTimeout(() => setShieldOn(false), 700)
@@ -170,7 +172,11 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       const ghost = root.cloneNode(true) as HTMLElement
       ghost.classList.add('leaving')
       ghost.setAttribute('aria-hidden', 'true')
+      ghost.inert = true
       ghost.style.pointerEvents = 'none'
+      // 열린 뒤 붙인 animation:none 이 닫히는 동작을 막지 않게
+      ghost.style.animation = ''
+      ghost.querySelectorAll<HTMLElement>('.sheet, .fullscreen').forEach((el) => { el.style.animation = '' })
       const scroller = root.querySelector('.sheet, .sheet-page')
       const ghostScroller = ghost.querySelector('.sheet, .sheet-page')
       document.body.appendChild(ghost)
@@ -179,29 +185,41 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
     }
   }, [])
 
-  // 키보드는 화면을 줄인다. 시트는 보이는 영역에만 두고, 그 변화 때문에 커서가 빠지면 다시 붙인다.
-  useEffect(() => {
+  // 키보드는 화면을 줄인다. 시트는 보이는 영역에만 두고, 커서가 뒤 화면으로 나가지 않게 한다.
+  // 꽉 찬 시트(현상소 고르기)도 같은 스크롤 칸을 쓴다. 여기가 비어 있으면 보정이 통째로 빠졌다.
+  useLayoutEffect(() => {
     const root = rootRef.current
     const sheet = sheetRef.current
     const vv = window.visualViewport
     if (!root || !sheet) return
     const body = document.body
+    const appRoot = document.getElementById('root')
     const lockedHere = !body.dataset.sheetLock
     const scrollY = window.scrollY
     const prev = { position: body.style.position, top: body.style.top, width: body.style.width, overflow: body.style.overflow }
+    const prevInert = appRoot?.inert ?? false
     if (lockedHere) {
       body.dataset.sheetLock = '1'
       body.style.overflow = 'hidden'
       body.style.position = 'fixed'
       body.style.top = `-${scrollY}px`
       body.style.width = '100%'
+      // 뒤 화면의 메모 칸이 포커스를 받지 못하게
+      if (appRoot) appRoot.inert = true
     }
-    let resizedAt = 0
+    let lastVV = vv?.height ?? window.innerHeight
+    let restoring = false
+    let held: HTMLInputElement | HTMLTextAreaElement | null = null
+    const keep = (el: EventTarget | null): el is HTMLInputElement | HTMLTextAreaElement => {
+      if (el instanceof HTMLTextAreaElement) return true
+      if (!(el instanceof HTMLInputElement)) return false
+      return !['date', 'time', 'datetime-local', 'month', 'week', 'file', 'checkbox', 'radio', 'color', 'range', 'button', 'submit', 'reset'].includes(el.type)
+    }
     const pinCaret = (el: EventTarget | null) => {
       if (!(el instanceof HTMLInputElement) || el.type === 'date' || el.type === 'time' || el.type === 'file') return
-      // WebKit은 오른쪽 정렬 입력칸에서 스크롤 위치와 그려진 커서가 어긋난다. 치는 동안만 왼쪽으로 두고 끝글자를 보여 준다.
-      el.style.textAlign = 'left'
-      if (el.selectionStart === el.value.length && el.selectionEnd === el.value.length) {
+      // WebKit은 오른쪽 정렬 입력칸에서 스크롤 위치와 그려진 커서가 어긋난다. 치는 동안만 왼쪽으로 둔다.
+      if (el.style.textAlign !== 'left') el.style.textAlign = 'left'
+      if (el.scrollWidth > el.clientWidth + 1 && el.selectionStart === el.value.length && el.selectionEnd === el.value.length) {
         el.scrollLeft = el.scrollWidth
       }
     }
@@ -209,6 +227,7 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       if (!(target instanceof HTMLElement) || !target.matches('input, textarea, select')) return
       const field = target.closest('.field') ?? target
       window.setTimeout(() => {
+        if (!sheet.isConnected) return
         const box = sheet.getBoundingClientRect()
         const rect = field.getBoundingClientRect()
         const top = box.top + 72
@@ -220,42 +239,96 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
     }
     const fit = () => {
       if (!vv || drag.current) return
-      root.style.top = `${vv.offsetTop}px`
-      root.style.height = `${vv.height}px`
-      root.style.bottom = 'auto'
-      sheet.style.maxHeight = `${Math.max(280, vv.height - 12)}px`
+      const top = `${vv.offsetTop}px`
+      const height = `${vv.height}px`
+      if (root.style.top !== top) root.style.top = top
+      if (root.style.height !== height) root.style.height = height
+      if (root.style.bottom !== 'auto') root.style.bottom = 'auto'
+      // 꽉 찬 화면은 그리드가 높이를 맡는다. 아래 시트만 키보드 위로 높이를 제한한다.
+      if (sheet.classList.contains('sheet')) {
+        const max = `${Math.max(280, vv.height - 12)}px`
+        if (sheet.style.maxHeight !== max) sheet.style.maxHeight = max
+      }
     }
-    const onResize = () => { resizedAt = performance.now(); fit() }
-    const onFocusIn = (e: FocusEvent) => reveal(e.target)
+    const restore = () => {
+      if (restoring) return
+      const field = held
+      if (!field?.isConnected || !root.isConnected) return
+      const active = document.activeElement
+      if (active instanceof Node && root.contains(active)) return
+      const app = document.getElementById('root')
+      const onPage = active instanceof Node && !!app?.contains(active)
+      const onBody = !active || active === document.body || active === document.documentElement
+      if (!onPage && !onBody) return
+      restoring = true
+      field.focus({ preventScroll: true })
+      window.setTimeout(() => { restoring = false }, 350)
+    }
+    const onResize = () => {
+      const height = vv?.height ?? window.innerHeight
+      const opening = height < lastVV - 80
+      lastVV = height
+      fit()
+      // 키보드가 올라오며 커서가 빠질 때만 되돌린다. 내릴 때는 두지 않는다.
+      if (opening) requestAnimationFrame(() => requestAnimationFrame(restore))
+    }
+    const onFocusIn = (e: FocusEvent) => {
+      if (keep(e.target)) held = e.target
+      else if (e.target instanceof Node && root.contains(e.target)) held = null
+      reveal(e.target)
+    }
+    const onDocFocus = (e: FocusEvent) => {
+      if (restoring) return
+      const t = e.target
+      if (!(t instanceof Node) || root.contains(t)) return
+      const app = document.getElementById('root')
+      if (!app?.contains(t)) return
+      const field = held?.isConnected ? held : root.querySelector<HTMLElement>('textarea, input:not([type=date]):not([type=time]):not([type=file]):not([type=checkbox]):not([type=radio])')
+      if (!field) return
+      restoring = true
+      field.focus({ preventScroll: true })
+      window.setTimeout(() => { restoring = false }, 350)
+    }
     const onInput = (e: Event) => pinCaret(e.target)
     const onFocusOut = (e: FocusEvent) => {
       const t = e.target
       if (!(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) || !root.contains(t)) return
-      const recentResize = performance.now() - resizedAt <= 500
-      const movedInside = e.relatedTarget instanceof Node && root.contains(e.relatedTarget)
-      window.setTimeout(() => {
-        if (!root.isConnected) return
-        const back = recentResize && !movedInside && !(document.activeElement instanceof HTMLElement && root.contains(document.activeElement))
-        if (back) {
-          t.focus({ preventScroll: true })
-          reveal(t)
-          return
-        }
-        if (document.activeElement !== t && t instanceof HTMLInputElement) t.style.textAlign = ''
-      }, 0)
+      if (e.relatedTarget instanceof Node && root.contains(e.relatedTarget)) {
+        if (t instanceof HTMLInputElement) t.style.textAlign = ''
+        return
+      }
+      requestAnimationFrame(() => {
+        if (!root.isConnected || document.activeElement === t || held === t) return
+        if (t instanceof HTMLInputElement) t.style.textAlign = ''
+      })
     }
+    const onAnim = (e: AnimationEvent) => {
+      const el = e.target
+      if (!(el instanceof HTMLElement) || (el !== root && el !== sheet)) return
+      // transform 애니메이션이 남아 있으면 아이폰이 입력 칸 포커스를 바로 놓친다
+      if (e.animationName === 'sheet-up' || e.animationName === 'sheet-pop') el.style.animation = 'none'
+    }
+    const settleTimer = window.setTimeout(() => {
+      if (root.classList.contains('fullscreen')) root.style.animation = 'none'
+      if (sheet.classList.contains('sheet')) sheet.style.animation = 'none'
+    }, 520)
     fit()
     vv?.addEventListener('resize', onResize)
     vv?.addEventListener('scroll', fit)
     root.addEventListener('focusin', onFocusIn)
     root.addEventListener('input', onInput)
     root.addEventListener('focusout', onFocusOut)
+    root.addEventListener('animationend', onAnim)
+    document.addEventListener('focusin', onDocFocus, true)
     return () => {
+      window.clearTimeout(settleTimer)
       vv?.removeEventListener('resize', onResize)
       vv?.removeEventListener('scroll', fit)
       root.removeEventListener('focusin', onFocusIn)
       root.removeEventListener('input', onInput)
       root.removeEventListener('focusout', onFocusOut)
+      root.removeEventListener('animationend', onAnim)
+      document.removeEventListener('focusin', onDocFocus, true)
       root.style.top = ''
       root.style.height = ''
       root.style.bottom = ''
@@ -266,6 +339,7 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
         body.style.top = prev.top
         body.style.width = prev.width
         body.style.overflow = prev.overflow
+        if (appRoot) appRoot.inert = prevInert
         window.scrollTo(0, scrollY)
       }
     }
@@ -306,9 +380,9 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
   ) : null
   if (page) {
     return createPortal(
-      <div ref={rootRef} className="fullscreen sheet-root" role="dialog" aria-label={title}>
+      <div ref={rootRef} className="fullscreen sheet-root" role="dialog" aria-modal="true" aria-label={title}>
         {head}
-        <div className="sheet-page">{children}</div>
+        <div ref={sheetRef} className="sheet-page">{children}</div>
         {guard}
       </div>,
       document.body,
@@ -324,7 +398,7 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
         if (!startedOutside || e.target !== e.currentTarget || blockBackdrop.current) return
         onClose()
       }}>
-      <div ref={sheetRef} className="sheet" role="dialog" aria-label={title} style={wide ? { width: 'min(820px, 100%)' } : undefined}>
+      <div ref={sheetRef} className="sheet" role="dialog" aria-modal="true" aria-label={title} style={wide ? { width: 'min(820px, 100%)' } : undefined}>
         {head}
         {children}
         {guard}

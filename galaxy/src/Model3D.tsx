@@ -28,3 +28,17 @@ export function Model3D({ profile, color, height = 240 }: { profile: ModelProfil
     </View>
   )
 }
+
+/** 손가락으로 돌려 보는 렌즈 모형 (웹 LensModel3D와 같은 장면, 보기만) */
+export function LensModel3D({ brand, model, mount, height = 190 }: { brand: string; model: string; mount: string; height?: number }) {
+  const ref = useRef<WebView>(null)
+  const [ready, setReady] = useState(false)
+  const call = `window.showLens(${JSON.stringify(brand)}, ${JSON.stringify(model)}, ${JSON.stringify(mount)}); true;`
+  useEffect(() => { if (ready) ref.current?.injectJavaScript(call) }, [ready, call])
+  return (
+    <View style={{ height, alignSelf: 'stretch' }}>
+      <WebView ref={ref} source={{ html }} originWhitelist={['*']} style={{ backgroundColor: 'transparent', opacity: ready ? 1 : 0 }}
+        scrollEnabled={false} bounces={false} overScrollMode="never" androidLayerType="hardware" onLoadEnd={() => setReady(true)} />
+    </View>
+  )
+}

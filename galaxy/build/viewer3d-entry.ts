@@ -1,7 +1,8 @@
 // 갤럭시 3D 모형 보기 (웹 ui/Viewers.tsx Model3D와 같은 장면·조작). WebView 안에서 돈다.
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { buildScene } from '../../web/src/core/model3d'
+import { buildLensScene, buildScene } from '../../web/src/core/model3d'
+import { lensSpec } from '../../web/src/core/lensSpecs'
 import type { ModelProfile } from '../../web/src/core/profiles'
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -39,6 +40,21 @@ loop()
   if (key !== last) {
     camera.position.copy(built.camera.position)
     controls.target.copy(built.target)
+    last = key
+  }
+  scene?.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose() })
+  scene = built.scene
+}
+
+// 렌즈 모형 (웹 LensModel3D와 같은 장면). 렌즈는 위아래로도 더 돌려 볼 수 있게
+;(window as unknown as { showLens: (brand: string, model: string, mount: string) => void }).showLens = (brand, model, mount) => {
+  const built = buildLensScene(lensSpec(brand, model, mount), renderer)
+  const key = `lens|${brand}|${model}|${mount}`
+  if (key !== last) {
+    camera.position.copy(built.camera.position)
+    controls.target.copy(built.target)
+    controls.minPolarAngle = Math.PI * 0.15
+    controls.maxPolarAngle = Math.PI * 0.85
     last = key
   }
   scene?.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose() })

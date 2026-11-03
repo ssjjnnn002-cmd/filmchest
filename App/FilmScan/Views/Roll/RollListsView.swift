@@ -8,6 +8,9 @@ struct ShootingView: View {
     @Environment(Router.self) private var router
     @Query(filter: #Predicate<RollItem> { $0.statusRaw == "loaded" }, sort: \RollItem.loadedAt, order: .reverse)
     private var rolls: [RollItem]
+    /// 목록 줄 안에 시트를 두면 키보드가 목록을 밀 때 입력 칸이 다시 만들어져 커서가 빠진다
+    @State private var dropOff: RollItem?
+    @State private var dropOffHeld: RollItem?
 
     private var visible: [RollItem] { rolls.filter { $0.deletedAt == nil } }
 
@@ -24,7 +27,7 @@ struct ShootingView: View {
             ForEach(visible) { roll in
                 Section {
                     NavigationLink(value: roll) { LoadedRollCard(roll: roll) }
-                    RollQuickActions(roll: roll)
+                    RollQuickActions(roll: roll) { openDropOff(roll) }
                 }
             }
         }
@@ -36,6 +39,21 @@ struct ShootingView: View {
             ToolbarItem { Button("필름 장착하기", systemImage: "plus") { router.loadFilm() } }
         }
         .settingsButton()
+        .sheet(item: $dropOff, onDismiss: endDropOffIfNeeded) { LabDropOffView(roll: $0) }
+    }
+
+    private func openDropOff(_ roll: RollItem) {
+        dropOffHeld = roll
+        dropOff = roll
+    }
+
+    /// 저장하지 않고 닫으면 촬영만 끝난 상태로 남긴다. 맡기면 상태가 이미 바뀌어 있다.
+    private func endDropOffIfNeeded() {
+        if let roll = dropOffHeld, roll.status == .loaded {
+            roll.status = .finished
+            roll.finishedAt = Date()
+        }
+        dropOffHeld = nil
     }
 }
 
@@ -76,8 +94,8 @@ struct LoadedRollCard: View {
 
 struct RollQuickActions: View {
     let roll: RollItem
+    var onDropOff: () -> Void
     @State private var showPlace = false
-    @State private var showDropOff = false
     @State private var showMeter = false
     /// 노출계에서 촬영을 끝냈으면, 노출계가 완전히 닫힌 뒤 현상 맡기기를 연다
     @State private var dropOffAfterMeter = false
@@ -96,7 +114,7 @@ struct RollQuickActions: View {
             #if os(iOS)
             if Features.meter {
                 Button {
-                    showDropOff = true
+                    onDropOff()
                 } label: {
                     Text("촬영 끝내기").frame(maxWidth: .infinity)
                 }
@@ -110,7 +128,7 @@ struct RollQuickActions: View {
                 .tint(Theme.safelight)
             } else {
                 Button {
-                    showDropOff = true
+                    onDropOff()
                 } label: {
                     Text("촬영 끝내기").frame(maxWidth: .infinity)
                 }
@@ -119,7 +137,7 @@ struct RollQuickActions: View {
             }
             #else
             Button {
-                showDropOff = true
+                onDropOff()
             } label: {
                 Text("촬영 끝내기").frame(maxWidth: .infinity)
             }
@@ -129,12 +147,11 @@ struct RollQuickActions: View {
         }
         .font(.subheadline.weight(.semibold))
         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 12, trailing: 16))
-        .sheet(isPresented: $showPlace) { PlaceEditView(roll: roll, segment: nil).filmKeyboard() }
-        .sheet(isPresented: $showDropOff, onDismiss: endShootingIfNeeded) { LabDropOffView(roll: roll) }
+        .sheet(isPresented: $showPlace) { PlaceEditView(roll: roll, segment: nil) }
         #if os(iOS)
         // 노출계에서 촬영을 끝내면 닫히고 나서 현상 맡기기로 이어진다
         .fullScreenCover(isPresented: $showMeter, onDismiss: {
-            if dropOffAfterMeter { dropOffAfterMeter = false; showDropOff = true }
+            if dropOffAfterMeter { dropOffAfterMeter = false; onDropOff() }
         }) {
             MeterView(roll: roll) {
                 dropOffAfterMeter = true
@@ -142,13 +159,6 @@ struct RollQuickActions: View {
             }
         }
         #endif
-    }
-
-    private func endShootingIfNeeded() {
-        if roll.status == .loaded {
-            roll.status = .finished
-            roll.finishedAt = Date()
-        }
     }
 }
 

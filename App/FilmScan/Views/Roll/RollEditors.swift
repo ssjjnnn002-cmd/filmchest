@@ -191,9 +191,15 @@ struct LabDropOffView: View {
     let roll: RollItem
 
     @Environment(\.dismiss) private var dismiss
-    @State private var lab = ""
-    @State private var date = Date()
+    @State private var lab: String
+    @State private var date: Date
     @State private var showNearby = false
+
+    init(roll: RollItem) {
+        self.roll = roll
+        _lab = State(initialValue: roll.labName ?? "")
+        _date = State(initialValue: roll.droppedOffAt ?? Date())
+    }
 
     var body: some View {
         NavigationStack {
@@ -221,10 +227,6 @@ struct LabDropOffView: View {
                         dismiss()
                     }
                 }
-            }
-            .onAppear {
-                lab = roll.labName ?? ""
-                date = roll.droppedOffAt ?? Date()
             }
             .sheet(isPresented: $showNearby) { NearbyLabsView { lab = $0 } }
         }

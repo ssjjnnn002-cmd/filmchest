@@ -100,6 +100,7 @@ struct RollDetailView: View {
             }
 
             TagField(tags: Binding(get: { roll.tags }, set: { roll.tags = $0 }))
+                .disabled(showDropOff)
 
             if Features.meter {
             Section {
@@ -242,6 +243,7 @@ struct RollDetailView: View {
 
             Section {
                 TextField("메모", text: Binding(get: { roll.note ?? "" }, set: { roll.note = $0.nilIfBlank }), axis: .vertical)
+                    .disabled(showDropOff)
             } header: {
                 HStack {
                     Text("메모")

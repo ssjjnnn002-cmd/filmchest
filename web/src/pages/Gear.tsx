@@ -6,6 +6,7 @@ import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films
 import { lensesFor } from '../core/lenses'
 import { lensSpec as lensBody } from '../core/lensSpecs'
 import { fallbackLensSnapshot, lensSnapshot } from '../core/model3d'
+import { LensModel3D } from '../ui/Viewers'
 import { filmFits, filterDiameters, filterKinds, groupPrice, lensSpec, parseLens } from '../core/optics'
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
 import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
@@ -289,7 +290,7 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
   const [tags, setTags] = useState<string[]>(lens?.tags ?? [])
   const [confirm, setConfirm] = useState(false)
   const hits = lensesFor(mount, model).filter((name) => name !== model).slice(0, 6)
-  const preview = useLensPreview(brand, model, mount)
+  const body = useMemo(() => lensBody(brand, model, mount), [brand, model, mount])
   const apply = (name: string) => {
     const next = parseLens(name)
     setModel(name)
@@ -320,7 +321,7 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
     <Sheet title={lens ? '렌즈 수정' : '렌즈 추가'} onClose={onClose}
       right={<button className="btn ghost" disabled={!model.trim() || !mount.trim()} onClick={save}><b>저장</b></button>}>
       <PhotoField id={lens?.id} hasPhoto={lens?.hasPhoto} blob={blob} setBlob={setBlob} cleared={cleared} setCleared={setCleared}
-        placeholder={preview ? <img src={preview} alt="" style={{ width: '100%', height: 150, objectFit: 'contain' }} /> : undefined} />
+        placeholder={<LensModel3D spec={body} height={190} />} />
       <div className="section">
         <h2>렌즈</h2>
         <div className="group">

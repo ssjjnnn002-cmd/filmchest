@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Image, Pressable, Text, TextInput, View } from 'react-native'
 import { glassPresets, isLensFilter } from '../core/filterLook'
 import { FilterRing } from '../FilterRing'
+import { LensModel3D } from '../Model3D'
 import * as ImagePicker from 'expo-image-picker'
 import { db } from '../data'
 import type { CustomFilmRow } from '../core/films'
@@ -288,7 +289,7 @@ function LensEdit({ lens, onClose }: { lens?: Lens; onClose: () => void }) {
     <Sheet title={lens ? '렌즈 수정' : '렌즈 추가'} onClose={onClose}
       right={<SheetBtn label="저장" accent disabled={!model.trim() || !mount.trim()} onPress={save} />}>
       <PhotoBlock id={lens?.id} hasPhoto={lens?.hasPhoto} uri={uri} setUri={setUri} cleared={cleared} setCleared={setCleared}
-        placeholder={model.trim() ? <LensPicture brand={brand} model={model} mount={mount} width="100%" height={150} /> : undefined} />
+        placeholder={model.trim() ? <LensModel3D brand={brand} model={model} mount={mount} height={190} /> : undefined} />
       <Section title="렌즈">
         <Group>
           <Field label="마운트" value={mount} onChangeText={setMount} />

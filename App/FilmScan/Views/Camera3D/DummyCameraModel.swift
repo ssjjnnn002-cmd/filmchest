@@ -123,23 +123,30 @@ enum DummyCameraModel {
 
     /// 모형 노드 (재질 포함)
     /// lens: 렌즈 모형 (앞 테에 카메라용 글씨 무늬를 쓰지 않고, 앞 유리가 보이게 돌린다)
-    static func modelNode(_ shape: Shape, colorHex: String, lens: Bool = false) -> SCNNode {
+    static func modelNode(_ shape: Shape, colorHex: String, lens: Bool = false, angle: LensViewAngle = .standard) -> SCNNode {
         let kit = Materials(base: PlatformColor(hex: colorHex))
         let node = SCNNode()
+        // 렌즈는 가운데를 축으로 돌린다 (뒤쪽 마운트가 원점이라 그대로 돌리면 옆으로 밀려난다): 부품을 한 겹 안에 넣고 가운데로 옮긴다
+        let holder = lens ? SCNNode() : node
         for part in shape.parts {
             let g = part.geometry.copy() as! SCNGeometry
             g.materials = [kit.material(for: lens && part.role == "frontring" ? "lensBlack" : part.role)]
-            node.addChildNode(SCNNode(geometry: g))
+            holder.addChildNode(SCNNode(geometry: g))
         }
-        node.eulerAngles = lens ? SCNVector3(0.08, 0.2, 0) : SCNVector3(0, -0.42, 0)
+        if lens {
+            let (lo, hi) = holder.boundingBox
+            holder.position = SCNVector3(-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -(lo.z + hi.z) / 2)
+            node.addChildNode(holder)
+        }
+        node.eulerAngles = lens ? angle.euler : SCNVector3(0, -0.42, 0)
         node.name = "model"
         return node
     }
 
     /// lens: 렌즈 모형. 기종끼리 같은 거리 대신 이 렌즈 크기에 맞춘다
-    static func makeScene(_ shape: Shape, colorHex: String = CameraBodyStyle.defaultColorHex, lens: Bool = false) -> SCNScene {
+    static func makeScene(_ shape: Shape, colorHex: String = CameraBodyStyle.defaultColorHex, lens: Bool = false, angle: LensViewAngle = .standard) -> SCNScene {
         let scene = SCNScene()
-        let model = modelNode(shape, colorHex: colorHex, lens: lens)
+        let model = modelNode(shape, colorHex: colorHex, lens: lens, angle: angle)
         scene.rootNode.addChildNode(model)
 
         scene.lightingEnvironment.contents = StudioEnvironment.image
@@ -186,7 +193,12 @@ enum DummyCameraModel {
         let center = v(Double(rotated.0.x + rotated.1.x) / 2, Double(rotated.0.y + rotated.1.y) / 2,
                        Double(rotated.0.z + rotated.1.z) / 2)
         let span = Double(max(size.x, size.y * 1.33, size.z))
-        let dist = (lens ? span * 1.55 : max(span, referenceSpan())) * 1.7
+        // 렌즈: 어느 각도로 돌려도 같은 크기로 보이게, 돌리기 전 가장 긴 쪽 기준
+        let lensSpan: Double = {
+            let (a, b) = model.boundingBox
+            return Double(max(b.x - a.x, b.y - a.y, b.z - a.z))
+        }()
+        let dist = (lens ? lensSpan * 1.85 : max(span, referenceSpan())) * 1.7
         let camera = SCNNode()
         camera.camera = SCNCamera()
         camera.camera!.fieldOfView = 21
@@ -571,14 +583,14 @@ enum DummySnapshot {
 enum LensSnapshot {
     private static let cache = NSCache<NSString, CGImage>()
 
-    static func image(brand: String, model: String, mount: String) async -> CGImage? {
-        let key = "\(brand)|\(model)|\(mount)" as NSString
+    static func image(brand: String, model: String, mount: String, angle: LensViewAngle = .standard) async -> CGImage? {
+        let key = "\(brand)|\(model)|\(mount)|\(angle.yaw)|\(angle.pitch)" as NSString
         if let hit = cache.object(forKey: key) { return hit }
         guard let shape = await Task.detached(priority: .userInitiated, operation: {
             DummyCameraModel.lensShape(brand: brand, model: model, mount: mount)
         }).value else { return nil }
         let image = await MainActor.run { () -> CGImage? in
-            let scene = DummyCameraModel.makeScene(shape, colorHex: "#1c1c1c", lens: true)
+            let scene = DummyCameraModel.makeScene(shape, colorHex: "#1c1c1c", lens: true, angle: angle)
             let renderer = SCNRenderer(device: MTLCreateSystemDefaultDevice(), options: nil)
             renderer.scene = scene
             renderer.pointOfView = scene.rootNode.childNode(withName: "camera", recursively: false)
@@ -600,6 +612,7 @@ struct DummyLensImage: View {
     let brand: String
     let model: String
     let mount: String
+    var angle: LensViewAngle = .standard
     @State private var image: CGImage?
 
     var body: some View {
@@ -607,7 +620,7 @@ struct DummyLensImage: View {
             if let image { Image(cgImage: image).resizable().scaledToFit() } else { ProgressView().controlSize(.small) }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task(id: "\(brand)|\(model)|\(mount)") { image = await LensSnapshot.image(brand: brand, model: model, mount: mount) }
+        .task(id: "\(brand)|\(model)|\(mount)|\(angle.yaw)|\(angle.pitch)") { image = await LensSnapshot.image(brand: brand, model: model, mount: mount, angle: angle) }
     }
 }
 
@@ -726,3 +739,82 @@ private extension SceneHost {
         }
     }
 }
+
+/// 렌즈 그림 각도 (도). 웹 LensAngle과 같은 값: 웹은 오른쪽 앞에서 보고 아이폰은 정면에서 보므로 좌우에 40°를 더해 같은 모습으로
+struct LensViewAngle: Equatable, Sendable {
+    var yaw: Double
+    var pitch: Double
+    static let standard = LensViewAngle(yaw: 0, pitch: 0)
+    var euler: SCNVector3 { SCNVector3(Float(pitch * .pi / 180), Float((yaw - 40) * .pi / 180), 0) }
+}
+
+#if os(iOS)
+/// 끌어서 돌려 보는 렌즈 모형 (렌즈 편집, 보기만)
+struct DummyLens3DView: View {
+    let brand: String
+    let model: String
+    let mount: String
+    @Binding var angle: LensViewAngle
+    @State private var shape: DummyCameraModel.Shape?
+    @State private var start: LensViewAngle?
+
+    var body: some View {
+        ZStack {
+            if let shape { LensSceneView(shape: shape, angle: angle) } else { ProgressView() }
+        }
+        // 끌기는 칸 전체에서 받는다 (SceneKit 뷰는 손을 받지 않게 해 두어서)
+        .contentShape(Rectangle())
+        .highPriorityGesture(DragGesture(minimumDistance: 2)
+            .onChanged { g in
+                let s = start ?? angle
+                if start == nil { start = angle }
+                var yaw = s.yaw + g.translation.width * 0.6
+                yaw = ((yaw + 540).truncatingRemainder(dividingBy: 360)) - 180
+                angle = LensViewAngle(yaw: yaw, pitch: min(60, max(-60, s.pitch + g.translation.height * 0.4)))
+            }
+            .onEnded { _ in start = nil })
+        .task(id: "\(brand)|\(model)|\(mount)") {
+            let (b, m, mt) = (brand, model, mount)
+            shape = await Task.detached(priority: .userInitiated) { DummyCameraModel.lensShape(brand: b, model: m, mount: mt) }.value
+        }
+    }
+}
+
+private struct LensSceneView: UIViewRepresentable {
+    let shape: DummyCameraModel.Shape
+    let angle: LensViewAngle
+
+    final class Coordinator { var shapeID: ObjectIdentifier? }
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> SCNView {
+        let view = SCNView()
+        view.backgroundColor = .clear
+        view.antialiasingMode = .multisampling4X
+        view.autoenablesDefaultLighting = false
+        view.isUserInteractionEnabled = false   // 돌리기는 SwiftUI 끌기로
+        return view
+    }
+
+    func updateUIView(_ view: SCNView, context: Context) {
+        let id = ObjectIdentifier(shape.parts.first?.geometry ?? SCNGeometry())
+        if context.coordinator.shapeID != id || view.scene == nil {
+            let scene = DummyCameraModel.makeScene(shape, colorHex: "#1c1c1c", lens: true, angle: angle)
+            scene.background.contents = UIColor.clear
+            view.scene = scene
+            view.pointOfView = scene.rootNode.childNode(withName: "camera", recursively: false)
+            context.coordinator.shapeID = id
+        }
+        view.scene?.rootNode.childNode(withName: "model", recursively: false)?.eulerAngles = angle.euler
+    }
+}
+#else
+/// Mac: 돌려 보기 대신 정지 그림 (각도는 슬라이더로)
+struct DummyLens3DView: View {
+    let brand: String
+    let model: String
+    let mount: String
+    @Binding var angle: LensViewAngle
+    var body: some View { DummyLensImage(brand: brand, model: model, mount: mount, angle: angle) }
+}
+#endif

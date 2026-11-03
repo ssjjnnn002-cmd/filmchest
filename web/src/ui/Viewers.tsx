@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { ModelProfile } from '../core/profiles'
-import { buildScene, fallbackSnapshot } from '../core/model3d'
+import { buildLensScene, buildScene, defaultLensAngle, fallbackSnapshot, setLensAngle, type LensAngle } from '../core/model3d'
+import type { LensSpec } from '../core/lensSpecs'
 import { modelHash } from '../core/profiles'
 
 /** 손가락/마우스로 돌려 보는 기본 3D 모형 (턴테이블) */
@@ -201,5 +202,74 @@ export function ZoomView({ src, onSwipe, background = 'transparent' }: {
       onDoubleClick={onDouble} onWheel={onWheel}>
       <img ref={img} src={src} alt="" onLoad={fit} draggable={false} />
     </div>
+  )
+}
+
+/** 끌어서 돌려 보는 렌즈 모형 (보기만, 각도는 저장하지 않는다) */
+export function LensModel3D({ spec, height = 200 }: { spec: LensSpec; height?: number }) {
+  const host = useRef<HTMLDivElement>(null)
+  const state = useRef<{ renderer: THREE.WebGLRenderer; camera: THREE.PerspectiveCamera; scene?: THREE.Scene; draw: () => void } | null>(null)
+  const live = useRef<LensAngle>(defaultLensAngle)
+  const drag = useRef<{ x: number; y: number; a: LensAngle } | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    const el = host.current!
+    let renderer: THREE.WebGLRenderer
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    } catch {
+      setFailed(true)
+      return
+    }
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
+    renderer.outputColorSpace = THREE.SRGBColorSpace
+    renderer.toneMapping = THREE.NeutralToneMapping
+    el.appendChild(renderer.domElement)
+    const camera = new THREE.PerspectiveCamera(22, 4 / 3, 0.1, 400)
+    const draw = () => { const s = state.current; if (s?.scene) renderer.render(s.scene, s.camera) }
+    state.current = { renderer, camera, draw }
+    const resize = () => {
+      const w = el.clientWidth, h = el.clientHeight
+      renderer.setSize(w, h, false)
+      camera.aspect = w / h
+      camera.updateProjectionMatrix()
+      draw()
+    }
+    const ro = new ResizeObserver(resize)
+    ro.observe(el)
+    resize()
+    return () => { ro.disconnect(); renderer.dispose(); renderer.domElement.remove(); state.current = null }
+  }, [])
+
+  // 렌즈가 바뀌면 장면을 새로
+  const key = JSON.stringify(spec)
+  useEffect(() => {
+    const s = state.current
+    if (!s) return
+    const { scene, camera, target } = buildLensScene(spec, s.renderer, live.current)
+    s.camera.position.copy(camera.position)
+    s.camera.lookAt(target)
+    s.scene?.traverse((o) => { if (o instanceof THREE.Mesh) o.geometry.dispose() })
+    s.scene = scene
+    s.draw()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+
+  const clamp = (a: LensAngle): LensAngle => ({ yaw: Math.round(((a.yaw + 540) % 360) - 180), pitch: Math.round(Math.max(-60, Math.min(60, a.pitch))) })
+  if (failed) return null
+  return (
+    <div ref={host} className="viewer3d" style={{ height, touchAction: 'none', cursor: 'grab' }} aria-label="끌어서 돌려 보는 렌즈 모형"
+      onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); drag.current = { x: e.clientX, y: e.clientY, a: live.current } }}
+      onPointerMove={(e) => {
+        const d = drag.current
+        const s = state.current
+        if (!d || !s?.scene) return
+        live.current = clamp({ yaw: d.a.yaw + (e.clientX - d.x) * 0.6, pitch: d.a.pitch + (e.clientY - d.y) * 0.4 })
+        setLensAngle(s.scene, live.current)
+        s.draw()
+      }}
+      onPointerUp={() => { drag.current = null }}
+      onPointerCancel={() => { drag.current = null }} />
   )
 }

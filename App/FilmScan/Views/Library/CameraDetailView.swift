@@ -277,6 +277,8 @@ struct LensEditView: View {
     @State private var apertureOpen = ""
     @State private var apertureClose = ""
     @State private var photo: Data?
+    /// 끌어서 돌려 보는 각도 (보기만, 저장하지 않는다)
+    @State private var angle = LensViewAngle.standard
     @State private var confirmDelete = false
     @State private var hasPurchaseDate = false
     @State private var purchaseDate = Date()
@@ -290,7 +292,7 @@ struct LensEditView: View {
         NavigationStack {
             Form {
                 GearPhotoEditor(photo: $photo, symbol: "camera.aperture",
-                                placeholder: AnyView(DummyLensImage(brand: lensBrand, model: model, mount: mountText)))
+                                placeholder: AnyView(DummyLens3DView(brand: lensBrand, model: model, mount: currentMount, angle: $angle)))
                 Section(mountEditable ? "렌즈" : "렌즈 · \(mount)") {
                     if mountEditable {
                         TextField("마운트", text: $mountText)
