@@ -11,7 +11,6 @@ struct FilmScanApp: App {
 
     init() {
         CanisterCache.prewarm()
-        BackgroundUpload.register()
         DriveUploader.shared.resume()
     }
 

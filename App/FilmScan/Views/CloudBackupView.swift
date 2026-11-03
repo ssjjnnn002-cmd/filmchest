@@ -89,9 +89,8 @@ struct CloudBackupView: View {
                                 BackgroundUpload.begin()
                                 let error = await DrivePhotos.sync(context) { done, total, step in
                                     photoProgress = (done, total, step.isEmpty ? (photoProgress?.step ?? "") : step)
-                                    BackgroundUpload.update(done, total, photoProgress?.step ?? "")
                                 }
-                                BackgroundUpload.end(success: error == nil)
+                                BackgroundUpload.end()
                                 photoProgress = nil
                                 if let error {
                                     driveMessage = (error, false)
