@@ -65,12 +65,18 @@ struct CloudBackupView: View {
                             photoProgress = (0, 0, "")
                             driveMessage = nil
                             Task {
-                                // 올리는 동안 화면이 꺼지면 멈추므로 켜 둔다
+                                // 보고 있는 동안은 화면을 켜 둔다
                                 #if os(iOS)
                                 UIApplication.shared.isIdleTimerDisabled = true
                                 defer { UIApplication.shared.isIdleTimerDisabled = false }
                                 #endif
-                                let error = await DrivePhotos.sync(context) { done, total, step in photoProgress = (done, total, step.isEmpty ? (photoProgress?.step ?? "") : step) }
+                                // 다른 앱으로 넘어가도 이어서 올린다
+                                BackgroundUpload.begin()
+                                let error = await DrivePhotos.sync(context) { done, total, step in
+                                    photoProgress = (done, total, step.isEmpty ? (photoProgress?.step ?? "") : step)
+                                    BackgroundUpload.update(done, total, photoProgress?.step ?? "")
+                                }
+                                BackgroundUpload.end(success: error == nil)
                                 photoProgress = nil
                                 if let error {
                                     driveMessage = (error, false)

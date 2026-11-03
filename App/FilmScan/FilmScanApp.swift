@@ -6,7 +6,10 @@ import FilmScanCore
 struct FilmScanApp: App {
     @State private var container = Store.makeContainer()
 
-    init() { CanisterCache.prewarm() }
+    init() {
+        CanisterCache.prewarm()
+        BackgroundUpload.register()
+    }
 
     @State private var router = Router()
     @Environment(\.scenePhase) private var scenePhase

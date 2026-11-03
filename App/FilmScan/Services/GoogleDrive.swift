@@ -203,6 +203,17 @@ enum DriveClient {
 
     static func download(_ id: String) async throws -> Data { try await call("\(api)/\(id)?alt=media") }
 
+    /// 그 id의 파일·폴더가 드라이브에 아직 있는지 (휴지통에 있으면 없음). 인터넷이 안 되면 오류
+    static func exists(_ id: String) async throws -> Bool {
+        var req = URLRequest(url: URL(string: "\(api)/\(id)?fields=id,trashed")!)
+        req.setValue("Bearer \(try await GoogleAuth.token())", forHTTPHeaderField: "Authorization")
+        let (data, res) = try await URLSession.shared.data(for: req)
+        let status = (res as? HTTPURLResponse)?.statusCode ?? 0
+        if status == 404 { return false }
+        guard (200..<300).contains(status) else { throw DriveError.message("드라이브 요청 실패 (\(status))") }
+        return ((try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["trashed"] as? Bool) != true
+    }
+
     /// 폴더 안 항목 전부 (id, 이름, 종류)
     static func children(_ parent: String) async throws -> [(id: String, name: String, mime: String)] {
         let query = "'\(parent)' in parents and trashed = false".addingPercentEncoding(withAllowedCharacters: .alphanumerics)!
@@ -599,20 +610,15 @@ enum DrivePhotos {
             total += frames.count
             let start = roll.shootingDays.map(\.startedAt).min() ?? roll.loadedAt
             let folderName = String("\(day.string(from: start)) \(roll.albumTitle)".replacingOccurrences(of: "/", with: "-").prefix(120))
-            // 드라이브에서 폴더나 사진을 지웠을 수 있어 매번 실제로 있는지 본다 (지워졌으면 다시 올린다)
+            // 드라이브에서 폴더나 사진을 지웠을 수 있어 매번 실제로 있는지 본다 (지워졌으면 다시 올린다).
+            // 기억해 둔 폴더는 id로 확인해서, 롤 이름이 바뀌어도 같은 폴더를 쓴다
             var folder = folders[roll.id.uuidString]
             var files: [String: String] = [:]   // 파일 이름: id
             progress?(done, all, "\(roll.albumTitle) 폴더 확인 중")
             do {
-                let found = try await DriveClient.find(folderName, parent: root, folder: true)
-                if let f = folder, f != found {
-                    // 기억해 둔 폴더가 지워졌거나 이름이 바뀜: 그 안에 올린 기록은 잊는다
-                    if let found { folder = found } else { folder = nil }
-                    for f in frames { sent["\(roll.id.uuidString.lowercased())-\(f.index)"] = nil }
-                } else if folder == nil {
-                    folder = found
-                }
-                if let f = folder { for c in try await DriveClient.children(f) { files[c.name] = c.id } }
+                if let f = folder, try await !DriveClient.exists(f) { folder = nil }
+                if folder == nil { folder = try await DriveClient.find(folderName, parent: root, folder: true) }
+                if let f = folder { for c in try await DriveClient.children(f) where c.mime != DriveClient.folderMime { files[c.name] = c.id } }
             } catch {
                 return "드라이브 폴더를 확인하지 못했어요. 잠시 뒤 다시 눌러 주세요."
             }
@@ -623,8 +629,16 @@ enum DrivePhotos {
                 let name = String(format: "%02d.jpg", frame.index)
                 let modified = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject?.modificationDate
                 let stamp = String(Int(modified?.timeIntervalSince1970 ?? 0))
-                let prevID = sent[key]?.components(separatedBy: "|").first
-                if let prev = sent[key], prev.hasSuffix("|\(stamp)"), let prevID, files[name] == prevID { onDrive += 1; continue }
+                let prev = sent[key]?.components(separatedBy: "|")
+                if let onFile = files[name] {
+                    // 드라이브에 이미 있는 사진은 다시 올리지 않는다. 올린 뒤 사진 앱에서 돌리거나 정보를 고친 것만 다시 올린다
+                    // (기억이 없거나 다른 기기가 올린 같은 컷이면 그 파일을 내 것으로 기억만 한다)
+                    if prev?.first != onFile || prev?.last == stamp {
+                        sent[key] = "\(onFile)|\(stamp)"
+                        onDrive += 1
+                        continue
+                    }
+                }
                 progress?(done, all, "\(frame.index)번 컷 사진 꺼내는 중")
                 guard let file = await PhotoLibrary.fileData(assetID: assetID) else { continue }
                 // 사진 앱의 날짜·위치를 고쳐도 파일 속 정보는 그대로라, 올릴 때 지금 기록으로 다시 쓴다
