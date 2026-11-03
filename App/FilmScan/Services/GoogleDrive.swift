@@ -489,7 +489,10 @@ enum DriveSync {
         _ = try? await pull(context)
         let data = try WebFormat.export(from: context)
         let key = contentKey(data)
-        if !force, key == UserDefaults.standard.string(forKey: pushedKey) { return }
+        if !force, key == UserDefaults.standard.string(forKey: pushedKey) {
+            UserDefaults.standard.set(Date(), forKey: "filmscan.driveLast")   // 확인했고 같음
+            return
+        }
         guard var id = try await fileID(create: true) else { return }
         do {
             try await DriveClient.upload(id, data, mime: "application/json")
@@ -545,10 +548,34 @@ enum DrivePhotos {
     private static let folderKey = "filmscan.driveRollFolders"  // 롤id: 폴더id
     private static let pulledKey = "filmscan.drivePulledPhotos" // 이미 받은 드라이브 파일 id
     private static let countKey = "filmscan.drivePhotoCount"    // [드라이브에 있는 장 수, 전체]
+    private static let missingKey = "filmscan.drivePhotoMissing" // 못 올린 이유별 장 수
+    private static let failedKey = "filmscan.driveUploadFailed"  // [실패 장 수, 마지막 응답 코드]
     @MainActor private static var running = false
     @MainActor private static var pulling = false
     /// 마지막 확인에서 iOS에 맡긴(올라가는 중인) 장 수
     @MainActor static var lastQueued = 0
+
+    /// 드라이브에 없는 사진이 왜 빠졌는지 (화면에 보여 줄 줄들)
+    @MainActor
+    static var missingReasons: [String] {
+        var out: [String] = []
+        let m = UserDefaults.standard.dictionary(forKey: missingKey) ?? [:]
+        if let n = m["gone"] as? Int, n > 0 {
+            let rolls = (m["rolls"] as? [String] ?? []).joined(separator: ", ")
+            out.append("사진 앱에서 지워진 사진 \(n)장" + (rolls.isEmpty ? "" : " (\(rolls))"))
+        }
+        if let n = m["unreadable"] as? Int, n > 0 { out.append("사진 앱에서 꺼내지 못한 사진 \(n)장 (iCloud에서 받지 못함)") }
+        if let f = UserDefaults.standard.array(forKey: failedKey) as? [Int], f.count == 2, f[0] > 0 {
+            out.append("올리기 실패 \(f[0])장" + (f[1] > 0 ? " (응답 \(f[1]))" : " (인터넷 끊김)"))
+        }
+        return out
+    }
+
+    @MainActor
+    static func uploadFailed(_ status: Int) {
+        let f = UserDefaults.standard.array(forKey: failedKey) as? [Int] ?? [0, 0]
+        UserDefaults.standard.set([(f.first ?? 0) + 1, status], forKey: failedKey)
+    }
 
     /// iOS가 사진 하나를 다 올렸을 때
     @MainActor
@@ -619,7 +646,9 @@ enum DrivePhotos {
         guard let root = try? await DriveClient.rootFolder() else { return "드라이브에 연결하지 못했어요. 인터넷 연결을 확인해 주세요." }
         let day = DateFormatter()
         day.dateFormat = "yyyy-MM-dd"
-        var onDrive = 0, total = 0, done = 0, queued = 0
+        var onDrive = 0, total = 0, done = 0, queued = 0, gone = 0, unreadable = 0
+        var goneRolls: Set<String> = []
+        UserDefaults.standard.removeObject(forKey: failedKey)
         let pending = await DriveUploader.shared.pendingKeys()
         progress?(0, all, "드라이브 확인 중")
         for roll in rolls {
@@ -651,7 +680,10 @@ enum DrivePhotos {
                 let key = "\(roll.id.uuidString.lowercased())-\(frame.index)"
                 if pending.contains(key) { queued += 1; continue }   // 이미 iOS가 올리는 중
                 let name = String(format: "%02d.jpg", frame.index)
-                let modified = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject?.modificationDate
+                guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject else {
+                    gone += 1; goneRolls.insert(roll.albumTitle); continue
+                }
+                let modified = asset.modificationDate
                 let stamp = String(Int(modified?.timeIntervalSince1970 ?? 0))
                 let prev = sent[key]?.components(separatedBy: "|")
                 if let onFile = files[name] {
@@ -664,7 +696,7 @@ enum DrivePhotos {
                     }
                 }
                 progress?(done, all, "\(frame.index)번 컷 사진 꺼내는 중")
-                guard let file = await PhotoLibrary.fileData(assetID: assetID) else { continue }
+                guard let file = await PhotoLibrary.fileData(assetID: assetID) else { unreadable += 1; continue }
                 // 사진 앱의 날짜·위치를 고쳐도 파일 속 정보는 그대로라, 올릴 때 지금 기록으로 다시 쓴다
                 let data = RollImporter.withCurrentInfo(file.data, frame: frame, roll: roll) ?? file.data
                 do {
@@ -687,6 +719,7 @@ enum DrivePhotos {
             }
         }
         UserDefaults.standard.set([onDrive, total], forKey: countKey)
+        UserDefaults.standard.set(["gone": gone, "unreadable": unreadable, "rolls": Array(goneRolls.sorted().prefix(3))] as [String: Any], forKey: missingKey)
         lastQueued = queued
         return nil
     }
@@ -702,5 +735,7 @@ enum DrivePhotos {
         UserDefaults.standard.removeObject(forKey: folderKey)
         UserDefaults.standard.removeObject(forKey: pulledKey)
         UserDefaults.standard.removeObject(forKey: countKey)
+        UserDefaults.standard.removeObject(forKey: missingKey)
+        UserDefaults.standard.removeObject(forKey: failedKey)
     }
 }

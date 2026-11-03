@@ -48,6 +48,14 @@ struct CloudBackupView: View {
                     if let c = DrivePhotos.counts {
                         LabeledContent("드라이브의 스캔 사진", value: c.onDrive == c.total ? "\(c.total)장 모두" : "\(c.onDrive) / \(c.total)장")
                     }
+                    if let c = DrivePhotos.counts, c.onDrive < c.total, pendingUploads == 0, photoProgress == nil {
+                        let reasons = DrivePhotos.missingReasons
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("빠진 \(c.total - c.onDrive)장").font(.subheadline.weight(.semibold))
+                            ForEach(reasons, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
+                            if reasons.isEmpty { Text("다시 확인하면 남은 사진을 올려요.").font(.caption).foregroundStyle(.secondary) }
+                        }
+                    }
                     if pendingUploads > 0 {
                         HStack(spacing: 10) {
                             ProgressView()

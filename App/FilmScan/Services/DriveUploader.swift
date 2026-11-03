@@ -41,12 +41,17 @@ final class DriveUploader: NSObject, URLSessionDataDelegate, @unchecked Sendable
     func enqueue(_ data: Data, fileID: String, key: String, stamp: String) async throws {
         let file = Self.folder.appendingPathComponent("\(key).jpg")
         try data.write(to: file)
+        try await send(file, fileID: fileID, key: key, stamp: stamp, attempt: 1)
+    }
+
+    /// 보낼 때마다 새 로그인 정보를 붙인다 (구글 로그인은 1시간이면 끝나서, 줄이 길면 뒤쪽이 거절된다)
+    private func send(_ file: URL, fileID: String, key: String, stamp: String, attempt: Int) async throws {
         var req = URLRequest(url: URL(string: "https://www.googleapis.com/upload/drive/v3/files/\(fileID)?uploadType=media")!)
         req.httpMethod = "PATCH"
         req.setValue("Bearer \(try await GoogleAuth.token())", forHTTPHeaderField: "Authorization")
         req.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
         let task = session.uploadTask(with: req, fromFile: file)
-        task.taskDescription = "\(key)|\(fileID)|\(stamp)"
+        task.taskDescription = "\(key)|\(fileID)|\(stamp)|\(attempt)"
         task.resume()
     }
 
@@ -54,10 +59,24 @@ final class DriveUploader: NSObject, URLSessionDataDelegate, @unchecked Sendable
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         let parts = task.taskDescription?.components(separatedBy: "|") ?? []
-        guard parts.count == 3 else { return }
+        guard parts.count >= 3 else { return }
         let status = (task.response as? HTTPURLResponse)?.statusCode ?? 0
-        try? FileManager.default.removeItem(at: Self.folder.appendingPathComponent("\(parts[0]).jpg"))
-        guard error == nil, (200..<300).contains(status) else { return }   // 실패: 다음 확인 때 다시 올린다
+        let file = Self.folder.appendingPathComponent("\(parts[0]).jpg")
+        let attempt = parts.count > 3 ? Int(parts[3]) ?? 1 : 1
+        guard error == nil, (200..<300).contains(status) else {
+            // 실패: 새 로그인 정보로 세 번까지 다시 보내고, 그래도 안 되면 다음 확인 때 다시
+            if attempt < 3, FileManager.default.fileExists(atPath: file.path) {
+                Task { @MainActor in
+                    do { try await self.send(file, fileID: parts[1], key: parts[0], stamp: parts[2], attempt: attempt + 1) }
+                    catch { try? FileManager.default.removeItem(at: file); DrivePhotos.uploadFailed(status) }
+                }
+            } else {
+                try? FileManager.default.removeItem(at: file)
+                DispatchQueue.main.async { DrivePhotos.uploadFailed(status) }
+            }
+            return
+        }
+        try? FileManager.default.removeItem(at: file)
         DispatchQueue.main.async {
             DrivePhotos.uploaded(parts[0], "\(parts[1])|\(parts[2])")
             NotificationCenter.default.post(name: Self.doneNotification, object: nil)
