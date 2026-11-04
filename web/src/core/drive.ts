@@ -15,7 +15,18 @@ const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
 export const driveAvailable = !!clientId
 
 type TokenClient = { requestAccessToken(o?: { prompt?: string }): void; callback: (r: { access_token?: string; expires_in?: number; error?: string }) => void }
-declare global { interface Window { google?: { accounts: { oauth2: { initTokenClient(o: Record<string, unknown>): TokenClient } } } } }
+type CodeClient = { requestCode(): void }
+declare global { interface Window { google?: { accounts: { oauth2: {
+  initTokenClient(o: Record<string, unknown>): TokenClient
+  initCodeClient(o: Record<string, unknown>): CodeClient
+} } } } }
+
+const SCOPE = 'https://www.googleapis.com/auth/drive.file'
+const TOKEN_API = '/api/google-token'
+// 오래 쓰는 허가: 이 브라우저에만 둔다. 있으면 1시간마다 창 없이 새 허가를 받는다 (서버는 저장하지 않고 바꿔 주기만 한다)
+const refreshToken = () => getPref('driveRefresh', '' as string)
+// 서버에 앱 비밀번호가 들어 있는지. 없으면 예전 방식(1시간마다 '다시 연결')으로 동작한다
+const serverReady = driveAvailable ? fetch(TOKEN_API).then((r) => r.ok).catch(() => false) : Promise.resolve(false)
 
 // 받은 구글 허가는 만료 전까지 기억해 둔다 (새로 고쳐도 다시 묻지 않게)
 let token: { value: string; until: number } | undefined = (() => {
@@ -34,24 +45,69 @@ function loadScript() {
   })
 }
 
-/** 버튼을 누를 때 불러야 팝업이 막히지 않는다 */
+/** 받은 허가를 기억하고 연결됨으로 표시 */
+function remember(access: string, expiresIn?: number) {
+  token = { value: access, until: Date.now() + (expiresIn ?? 3600) * 1000 }
+  try { sessionStorage.setItem('driveToken', JSON.stringify(token)) } catch { /* 저장 못 함 */ }
+  setPref('driveConnected', '1')
+  // 로그인한 계정 이름 (드라이브 권한만으로 읽을 수 있다)
+  if (!driveAccount()) void fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', { headers: { Authorization: `Bearer ${access}` } })
+    .then((x) => x.json()).then((j) => { if (j?.user?.emailAddress) { setPref('driveAccount', j.user.emailAddress); notifyBackup() } }).catch(() => {})
+  return access
+}
+
+async function askServer(body: Record<string, string>) {
+  const res = await fetch(TOKEN_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: clientId, ...body }) })
+  return (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; refresh_token?: string; error?: string }
+}
+
+let renewing: Promise<string | undefined> | undefined
+/** 오래 쓰는 허가로 창 없이 새 허가를 받는다. 구글이 허가를 취소했으면 잊고 다시 로그인하게 한다 */
+function renew() {
+  renewing ??= (async () => {
+    try {
+      if (!refreshToken()) return undefined
+      const j = await askServer({ refresh_token: refreshToken() })
+      if (j.access_token) return remember(j.access_token, j.expires_in)
+      if (j.error === 'invalid_grant') { setPref('driveRefresh', ''); notifyBackup(); return undefined }
+      throw new Error('드라이브에 연결하지 못했어요')
+    } finally {
+      renewing = undefined
+    }
+  })()
+  return renewing
+}
+
+/** 로그인 창을 한 번 띄워 오래 쓰는 허가까지 받는다 */
+function signInForRefresh() {
+  return new Promise<string>((resolve, reject) => {
+    window.google!.accounts.oauth2.initCodeClient({
+      client_id: clientId, scope: SCOPE, ux_mode: 'popup',
+      callback: (r: { code?: string; error?: string }) => {
+        if (!r.code) return reject(new Error(r.error ?? '연결하지 못했어요'))
+        void askServer({ code: r.code }).then((j) => {
+          if (!j.access_token) return reject(new Error(j.error ?? '연결하지 못했어요'))
+          if (j.refresh_token) setPref('driveRefresh', j.refresh_token)
+          resolve(remember(j.access_token, j.expires_in))
+        }, reject)
+      },
+      error_callback: (e: { message?: string }) => reject(new Error(e.message ?? '연결하지 못했어요')),
+    }).requestCode()
+  })
+}
+
+/** 오래 쓰는 허가가 있으면 창 없이 받는다. 없으면 창을 띄우므로 버튼을 누를 때 불러야 팝업이 막히지 않는다 */
 export async function driveToken(prompt = ''): Promise<string> {
   if (token && token.until > Date.now() + 60_000) return token.value
+  const renewed = await renew()
+  if (renewed) return renewed
   await loadScript()
+  if (await serverReady) return signInForRefresh()
   return new Promise((resolve, reject) => {
-    client = window.google!.accounts.oauth2.initTokenClient({
-      client_id: clientId, scope: 'https://www.googleapis.com/auth/drive.file',
-      callback: () => {},
-    })
+    client = window.google!.accounts.oauth2.initTokenClient({ client_id: clientId, scope: SCOPE, callback: () => {} })
     client.callback = (r) => {
       if (!r.access_token) return reject(new Error(r.error ?? '연결하지 못했어요'))
-      token = { value: r.access_token, until: Date.now() + (r.expires_in ?? 3600) * 1000 }
-      try { sessionStorage.setItem('driveToken', JSON.stringify(token)) } catch { /* 저장 못 함 */ }
-      setPref('driveConnected', '1')
-      // 로그인한 계정 이름 (드라이브 권한만으로 읽을 수 있다)
-      if (!driveAccount()) void fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', { headers: { Authorization: `Bearer ${r.access_token}` } })
-        .then((x) => x.json()).then((j) => { if (j?.user?.emailAddress) { setPref('driveAccount', j.user.emailAddress); notifyBackup() } }).catch(() => {})
-      resolve(r.access_token)
+      resolve(remember(r.access_token, r.expires_in))
     }
     client.requestAccessToken({ prompt })
   })
@@ -68,8 +124,13 @@ export function disconnectDrive() {
   setPref('driveRollFolders', '{}'); setPref('driveFrames', '{}')
   token = undefined
   try { sessionStorage.removeItem('driveToken') } catch { /* 없음 */ }
+  // 오래 쓰는 허가도 구글에서 취소하고 지운다
+  const refresh = refreshToken()
+  if (refresh) void fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(refresh)}`, { method: 'POST' }).catch(() => {})
+  setPref('driveRefresh', '')
 }
-export const hasDriveToken = () => !!token && token.until > Date.now() + 60_000
+/** 지금 창 없이 드라이브를 쓸 수 있는지 (유효한 허가가 있거나, 오래 쓰는 허가로 새로 받을 수 있거나) */
+export const hasDriveToken = () => (!!token && token.until > Date.now() + 60_000) || !!refreshToken()
 
 type Fetchable = { status: number; ok: boolean }
 /** 드라이브 안 '필름함' 폴더 (지웠으면 다시 만든다) */
