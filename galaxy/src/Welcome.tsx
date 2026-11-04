@@ -36,7 +36,13 @@ export function Welcome({ onDone }: { onDone: () => void }) {
       <Group>
         {result
           ? <Row onPress={finish}><RowText color={c.safelight}>{result}</RowText><Text style={{ color: c.safelight, fontWeight: '700', fontSize: 17 }}>시작</Text></Row>
-          : <Row onPress={start}><Text style={{ color: c.safelight, fontWeight: '700', fontSize: 17 }}>{step ?? '구글로 시작하기'}</Text></Row>}
+          : step
+            ? <Row static><Text style={{ color: c.safelight, fontWeight: '700', fontSize: 17 }}>{step}</Text></Row>
+            // 둘 다 같은 구글 로그인 (웹과 같음)
+            : [
+              <Row key="new" onPress={start}><RowText color={c.muted}>처음이에요</RowText><Text style={{ color: c.safelight, fontWeight: '700', fontSize: 17 }}>구글로 시작하기</Text></Row>,
+              <Row key="has" onPress={start}><RowText color={c.muted}>계정이 있어요</RowText><Text style={{ color: c.safelight, fontWeight: '700', fontSize: 17 }}>구글로 로그인하기</Text></Row>,
+            ]}
         {!result ? <Row onPress={() => { if (!step) finish() }}><RowText>로그인 없이 쓰기</RowText></Row> : null}
       </Group>
       {error ? <Text style={{ color: c.danger, fontSize: 14, margin: 12 }}>{error}</Text> : null}

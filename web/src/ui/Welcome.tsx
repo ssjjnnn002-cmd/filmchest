@@ -29,7 +29,13 @@ export function Welcome({ onDone }: { onDone: () => void }) {
       <div className="group">
         {result
           ? <button className="row accent" onClick={finish}><span className="grow">{result}</span><b>시작</b></button>
-          : <button className="row accent" disabled={!!step} onClick={start}><span className="grow"><b>{step ?? '구글로 시작하기'}</b></span></button>}
+          : step
+            ? <div className="row static"><span className="grow"><b>{step}</b></span></div>
+            // 둘 다 같은 구글 로그인 (드라이브에 기록이 있으면 받아 오고, 없으면 새로 시작)
+            : <>
+              <button className="row accent" onClick={start}><span className="grow sub">처음이에요</span><b>구글로 시작하기</b></button>
+              <button className="row accent" onClick={start}><span className="grow sub">계정이 있어요</span><b>구글로 로그인하기</b></button>
+            </>}
         {!result && <button className="row" disabled={!!step} onClick={finish}>로그인 없이 쓰기</button>}
       </div>
       {error && <p className="footnote" style={{ color: 'var(--danger)' }}>{error}</p>}

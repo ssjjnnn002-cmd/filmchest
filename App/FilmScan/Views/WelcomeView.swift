@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// 처음 켤 때 한 번: 구글로 시작하기 (내 구글 드라이브에 기록·사진 저장) 또는 로그인 없이 쓰기 (웹·갤럭시와 같게)
+/// 처음 켤 때 한 번: 구글로 시작하기 / 구글로 로그인하기 (내 구글 드라이브에 기록·사진 저장) 또는 로그인 없이 쓰기 (웹·갤럭시와 같게)
 struct WelcomeView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -30,14 +30,19 @@ struct WelcomeView: View {
                         }
                         .tint(Theme.safelight)
                     } else {
-                        Button { start() } label: {
-                            HStack {
-                                Text(step ?? "구글로 시작하기").bold()
-                                if step != nil { Spacer(); ProgressView() }
+                        if let step {
+                            HStack { Text(step).bold(); Spacer(); ProgressView() }
+                        } else {
+                            // 둘 다 같은 구글 로그인 (드라이브에 기록이 있으면 받아 오고, 없으면 새로 시작)
+                            Button { start() } label: {
+                                LabeledContent("처음이에요") { Text("구글로 시작하기").bold() }
                             }
+                            .tint(Theme.safelight)
+                            Button { start() } label: {
+                                LabeledContent("계정이 있어요") { Text("구글로 로그인하기").bold() }
+                            }
+                            .tint(Theme.safelight)
                         }
-                        .tint(Theme.safelight)
-                        .disabled(step != nil)
                         Button("로그인 없이 쓰기") { finish() }.disabled(step != nil)
                     }
                 } footer: {
