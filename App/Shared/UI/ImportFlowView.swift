@@ -390,11 +390,8 @@ struct RollRow: View {
                 Text([roll.hasCustomTitle ? roll.filmName : nil, roll.cameraLabel, roll.dateRangeText].compactMap { $0 }.joined(separator: " · "))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 // 장소·태그 줄은 비어 있어도 자리를 지켜서 모든 줄 높이가 같다
-                let place = roll.sortedLocations.map(\.name).joined(separator: ", ")
-                Text(place.isEmpty ? " " : place).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                if roll.noteInList, let memo = roll.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank {
-                    Text(memo).font(.caption).italic().foregroundStyle(.secondary).lineLimit(1)
-                }
+                // 메모는 장소 줄에 이어 붙인다 (줄이 늘면 높이가 달라진다)
+                Text(roll.placeAndMemo.nilIfBlank ?? " ").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 TagLine(tags: roll.tags)
             }
             Spacer(minLength: 0)

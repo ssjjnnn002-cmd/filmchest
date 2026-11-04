@@ -12,7 +12,6 @@ import { TagLine } from './gearExtras'
 export function RollRow({ roll }: { roll: Roll }) {
   const c = useTheme()
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
-  const places = sortedLocations(roll).map((l) => l.name).filter(Boolean).join(', ')
   const cover = useCoverFrame(roll)
   return (
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14, minWidth: 0 }}>
@@ -30,8 +29,8 @@ export function RollRow({ roll }: { roll: Roll }) {
         </View>
         {/* 제목을 붙였으면 필름 이름은 아래 줄에 (웹과 같음) */}
         <Sub lines={1}>{[roll.title?.trim() ? rollFilmName(roll) : undefined, cameraName(camera, roll), dateRangeText(roll)].filter(Boolean).join(' · ')}</Sub>
-        <Sub lines={1}>{places || ' '}</Sub>
-        {roll.noteInList && roll.note?.trim() ? <Sub lines={1}>{roll.note.trim()}</Sub> : null}
+        {/* 메모는 장소 줄에 이어 붙인다 (줄이 늘면 높이가 달라진다) */}
+        <Sub lines={1}>{placeAndMemo(roll) || ' '}</Sub>
         <TagLine tags={roll.tags} />
       </View>
     </View>
@@ -57,8 +56,7 @@ export function RollCard({ roll, onPress }: { roll: Roll; onPress: () => void })
       <Sub lines={1}>{[roll.title?.trim() ? rollFilmName(roll) : undefined, cameraName(camera, roll)].filter(Boolean).join(' · ')}</Sub>
       <Sub lines={1}>{dateRangeText(roll)}{formatInfo[format].is120 ? ` · ${formatInfo[format].name}` : ''}</Sub>
       {/* 목록형과 같이 장소 (웹과 같음) */}
-      <Sub lines={1}>{sortedLocations(roll).map((l) => l.name).filter(Boolean).join(', ') || ' '}</Sub>
-      {roll.noteInList && roll.note?.trim() ? <Sub lines={1}>{roll.note.trim()}</Sub> : null}
+      <Sub lines={1}>{placeAndMemo(roll) || ' '}</Sub>
       <TagLine tags={roll.tags} />
     </Pressable>
   )
@@ -70,4 +68,10 @@ function useCoverFrame(roll: Roll) {
     const list = (await db.frames.where('rollId').equals(roll.id).toArray()).sort((a, b) => a.index - b.index)
     return list.find((f) => f.index === (roll.coverIndex ?? 1)) ?? list.find((f) => f.index >= 1) ?? list[0]
   }, [roll.id, roll.coverIndex])
+}
+
+/** 장소 줄: 장소 · 메모 (목록에서 표시하기를 켠 롤만 메모. 웹과 같음) */
+function placeAndMemo(roll: Roll) {
+  const places = sortedLocations(roll).map((l) => l.name).filter(Boolean).join(', ')
+  return [places, roll.noteInList ? roll.note?.trim() : undefined].filter(Boolean).join(' · ')
 }

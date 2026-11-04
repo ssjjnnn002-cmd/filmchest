@@ -721,12 +721,8 @@ struct RollGridCard: View {
                 }
                 Text([roll.hasCustomTitle ? roll.filmName : nil, roll.cameraName].compactMap { $0 }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Text(roll.dateRangeText).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                // 목록형과 같이 장소 (비어 있어도 자리를 지켜 카드 높이가 같다)
-                let place = roll.sortedLocations.map(\.name).joined(separator: ", ")
-                Text(place.isEmpty ? " " : place).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                if roll.noteInList, let memo = roll.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank {
-                    Text(memo).font(.caption2).italic().foregroundStyle(.secondary).lineLimit(1)
-                }
+                // 목록형과 같이 장소·메모 한 줄 (비어 있어도 자리를 지켜 카드 높이가 같다)
+                Text(roll.placeAndMemo.nilIfBlank ?? " ").font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 TagLine(tags: roll.tags)
             }
         }

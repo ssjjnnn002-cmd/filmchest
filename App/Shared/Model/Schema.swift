@@ -282,6 +282,12 @@ final class RollItem {
     var filmName: String { film?.displayName ?? (filmStockID.isEmpty ? "필름 알 수 없음" : filmStockID) }
     /// 롤 이름: 붙인 제목, 없으면 필름 이름
     var displayTitle: String { customTitle?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank ?? filmName }
+    /// 목록의 장소 줄: 장소 · 메모 (목록에서 표시하기를 켠 롤만 메모)
+    var placeAndMemo: String {
+        let place = sortedLocations.map(\.name).filter { !$0.isEmpty }.joined(separator: ", ")
+        let memo = noteInList ? note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank : nil
+        return [place.nilIfBlank, memo].compactMap { $0 }.joined(separator: " · ")
+    }
     var hasCustomTitle: Bool { customTitle?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank != nil }
     var recordedCameraName: String {
         [recordedCameraBrand, recordedCameraModel].filter { !$0.isEmpty }.joined(separator: " ")

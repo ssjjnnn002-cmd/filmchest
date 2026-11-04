@@ -765,7 +765,6 @@ a.row.accent { color: var(--safelight); }
 
 .icon-btn.small { width: 30px; height: 30px; box-shadow: none; background: var(--fill, rgba(0,0,0,.06)); color: var(--muted); }
 .icon-btn.small svg { width: 17px; height: 17px; }
-.roll-memo { font-style: italic; }
 
 /* 필터 유리 색 고르기 */
 .glass-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 6px; padding: 10px; }

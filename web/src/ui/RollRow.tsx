@@ -7,7 +7,6 @@ import { Canister, cameraName, rollCameraFormat, StatusBadge, dateRangeText, rol
 
 export function RollRow({ roll }: { roll: Roll }) {
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
-  const places = sortedLocations(roll).map((l) => l.name).filter(Boolean).join(', ')
   // 스캔이 있으면 대표 사진, 없으면 필름통 (필름 이름은 옆에 있다)
   const cover = useCoverFrame(roll)
   const url = useObjectURL(cover?.thumb)
@@ -22,8 +21,8 @@ export function RollRow({ roll }: { roll: Roll }) {
         </div>
         {/* 제목을 붙였으면 필름 이름은 아래 줄에 */}
         <div className="sub truncate">{[roll.title?.trim() ? rollFilmName(roll) : undefined, cameraName(camera, roll), dateRangeText(roll)].filter(Boolean).join(' · ')}</div>
-        <div className="sub truncate">{places || '\u00a0'}</div>
-        {roll.noteInList && roll.note?.trim() && <div className="sub truncate roll-memo">{roll.note.trim()}</div>}
+        {/* 메모는 장소 줄에 이어 붙인다 (줄이 늘면 높이가 달라진다) */}
+        <div className="sub truncate">{placeAndMemo(roll) || '\u00a0'}</div>
         <TagLine tags={roll.tags} />
       </div>
     </div>
@@ -47,8 +46,7 @@ export function RollCard({ roll, onClick }: { roll: Roll; onClick: () => void })
       <div className="sub truncate">{[roll.title?.trim() ? rollFilmName(roll) : undefined, cameraName(camera, roll)].filter(Boolean).join(' · ')}</div>
       <div className="sub">{dateRangeText(roll)}{formatInfo[rollCameraFormat(camera, roll)].is120 ? ` · ${formatInfo[rollCameraFormat(camera, roll)].name}` : ''}</div>
       {/* 목록형과 같이 장소 (비어 있어도 자리를 지켜 카드 높이가 같다) */}
-      <div className="sub truncate">{sortedLocations(roll).map((l) => l.name).filter(Boolean).join(', ') || '\u00a0'}</div>
-      {roll.noteInList && roll.note?.trim() && <div className="sub truncate roll-memo">{roll.note.trim()}</div>}
+      <div className="sub truncate">{placeAndMemo(roll) || '\u00a0'}</div>
       <TagLine tags={roll.tags} />
     </button>
   )
@@ -60,4 +58,10 @@ function useCoverFrame(roll: Roll) {
     const list = await db.frames.where('rollId').equals(roll.id).sortBy('index')
     return list.find((f) => f.index === (roll.coverIndex ?? 1)) ?? list.find((f) => f.index >= 1) ?? list[0]
   }, [roll.id, roll.coverIndex])
+}
+
+/** 장소 줄: 장소 · 메모 (목록에서 표시하기를 켠 롤만 메모) */
+function placeAndMemo(roll: Roll) {
+  const places = sortedLocations(roll).map((l) => l.name).filter(Boolean).join(', ')
+  return [places, roll.noteInList ? roll.note?.trim() : undefined].filter(Boolean).join(' · ')
 }
