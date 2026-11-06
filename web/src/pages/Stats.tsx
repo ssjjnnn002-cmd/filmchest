@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, kept } from '../db'
 import { Canister, Icon, Sheet, rollFilmName } from '../ui/common'
 import { filmById } from '../core/films'
+import { groupedNumber } from '../core/types'
 import { colorSplit, monthlyRolls, rollsThisYear, topCounts } from '../core/stats'
 import { Spending } from './Spending'
 
@@ -72,7 +73,7 @@ export function Stats({ onClose }: { onClose: () => void }) {
 function Tile({ label, value }: { label: string; value: number }) {
   return (
     <div className="stat-tile">
-      <b>{value.toLocaleString('ko-KR')}</b>
+      <b>{groupedNumber(value)}</b>
       <span>{label}</span>
     </div>
   )

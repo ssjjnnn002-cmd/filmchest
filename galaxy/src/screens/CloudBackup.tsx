@@ -9,6 +9,8 @@ import * as Drive from '../drive'
 import { Toggle } from '../kit'
 import { Group, Row, RowText, Section, Select, Sub } from '../kit'
 import { Sheet, SheetBtn } from '../overlay'
+import { formatDateTime } from '../core/types'
+import { withWork } from '../core/work'
 import { useTheme } from '../theme'
 
 const clouds: [string, string][] = [
@@ -33,10 +35,10 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
   const drive = Drive.driveConnected()
   const refresh = () => setRev((n) => n + 1)
   const connected = !!cloudUri()
-  const run = async (fn: () => Promise<unknown>, ok: string) => {
+  const run = (fn: () => Promise<unknown>, ok: string) => { void withWork(async () => {
     try { await fn(); if (ok) setMsg({ text: ok, ok: true }) } catch (e) { setProgress(''); setMsg({ text: (e as Error).message || '하지 못했어요', ok: false }) }
     refresh()
-  }
+  }) }
   return (
     <Sheet title="클라우드 백업" onClose={onClose} left={<span />} right={<SheetBtn label="완료" accent onPress={onClose} />}>
       <Section title="구글 드라이브" foot={`내 드라이브의 '필름함' 폴더에 기록과 스캔 사진을 올려요. 바뀌면 바로 올리고, 앱을 보는 동안 다른 기기에서 고친 기록을 받아요. 장비 기록은 '${backupFileName}' 하나에 덮어써서 여러 번 불러와도 늘어나지 않아요.`}>
@@ -48,7 +50,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
             <Row key="s" static>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>연결됨 · {Drive.driveAccount() ?? '구글 드라이브'}</Text>
-                {Drive.driveLast() ? <Sub>마지막 백업 {new Date(Drive.driveLast()!).toLocaleString('ko-KR')}</Sub> : null}
+                {Drive.driveLast() ? <Sub>마지막 백업 {formatDateTime(Drive.driveLast()!)}</Sub> : null}
               </View>
             </Row>,
             <Row key="o" chev onPress={() => { void Drive.openDriveFolder() }}><RowText>드라이브에서 백업 폴더 열기</RowText></Row>,
@@ -68,7 +70,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
             <Text style={{ fontSize: 24, color: connected ? c.safelight : c.muted, marginRight: 4 }}>{connected ? '☁︎' : '⊘'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>{cloudStatus()}</Text>
-              {cloudLast() ? <Sub>마지막 백업 {new Date(cloudLast()!).toLocaleString('ko-KR')}</Sub> : null}
+              {cloudLast() ? <Sub>마지막 백업 {formatDateTime(cloudLast()!)}</Sub> : null}
             </View>
           </Row>
           {connected ? [
@@ -110,7 +112,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
         </Section>
       ) : null}
 
-      <Section title="휴대폰 구글 백업" foot={`${localBackupAt() ? `마지막으로 써 둔 파일 ${new Date(localBackupAt()!).toLocaleString('ko-KR')}. ` : ''}휴대폰 설정 > 계정 및 백업 > Google 드라이브 백업이 켜져 있으면 이 파일도 함께 올라가요. 확인은 휴대폰 설정에서만 할 수 있어요.`}>
+      <Section title="휴대폰 구글 백업" foot={`${localBackupAt() ? `마지막으로 써 둔 파일 ${formatDateTime(localBackupAt()!)}. ` : ''}휴대폰 설정 > 계정 및 백업 > Google 드라이브 백업이 켜져 있으면 이 파일도 함께 올라가요. 확인은 휴대폰 설정에서만 할 수 있어요.`}>
         <Group>
           <Row onPress={openAppSettings}><RowText>{"휴대폰 설정 › 애플리케이션 › 필름함 열기"}</RowText></Row>
         </Group>

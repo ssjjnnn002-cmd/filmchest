@@ -9,9 +9,6 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var context
     @AppStorage(AppSettings.Key.appearance, store: AppSettings.defaults) private var appearance: AppearanceMode = .system
     @AppStorage(AppSettings.Key.albumMode, store: AppSettings.defaults) private var albumMode: AlbumMode = .perRoll
-    @Query(sort: \CameraItem.sortOrder) private var cameras: [CameraItem]
-    @Query(sort: \LensItem.createdAt) private var lenses: [LensItem]
-    @Query(sort: \RollItem.loadedAt, order: .reverse) private var rolls: [RollItem]
     @State private var showPaywall = false
     @State private var showLogin = false
     @State private var confirmLogout = false
@@ -24,7 +21,7 @@ struct SettingsView: View {
     var showsDoneButton = true
 
     private static var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.0"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5.1"
     }
 
 
@@ -157,12 +154,6 @@ struct SettingsView: View {
         #if os(macOS)
         .frame(minWidth: 460, minHeight: 480)
         #endif
-    }
-
-    private var keptRolls: [RollItem] { rolls.filter { $0.deletedAt == nil } }
-
-    private func topName(_ counts: [String: Int]) -> String {
-        counts.max { $0.value < $1.value }?.key ?? "—"
     }
 
     private var meterSection: some View {

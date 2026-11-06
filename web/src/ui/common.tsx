@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { subscribeWork } from '../core/work'
 import { pushOverlay } from '../backStack'
 import type { Camera, Roll, RollStatus } from '../core/types'
 import { statusName } from '../core/types'
@@ -464,6 +465,14 @@ export function useToast() {
   }
   const node = msg ? <div key={msg} className={`toast ${leaving ? 'leaving' : ''}`} role="status">{msg}</div> : null
   return [node, show] as const
+}
+
+/** 바로 끝나지 않는 일. 일은 이미 시작됐고, 이 줄은 그동안만 보인다. */
+export function WorkBanner() {
+  const [on, setOn] = useState(false)
+  useEffect(() => subscribeWork(setOn), [])
+  if (!on) return null
+  return <div className="toast" role="status" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span className="spinner" />불러오는 중…</div>
 }
 
 // --- 그림

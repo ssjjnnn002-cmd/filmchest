@@ -60,7 +60,7 @@ body {
 }
 #root, .app { min-height: 100%; max-width: 100%; overflow-x: clip; }
 button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
-button { -webkit-user-select: none; user-select: none; }
+button { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 img { max-width: 100%; display: block; }
 h1, h2, h3 { margin: 0; text-wrap: balance; }
 p { margin: 0; }

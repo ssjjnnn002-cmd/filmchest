@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, kept, purgeOldCameras, purgeOldRolls } from './db'
 import { migrateCameraPhotos } from './photoStore'
-import { Icon, useToast } from './ui/common'
+import { Icon, useToast, WorkBanner } from './ui/common'
 import { Library } from './pages/Library'
 import { CameraDetail } from './pages/CameraDetail'
 import { Shooting } from './pages/Shooting'
@@ -334,6 +334,7 @@ export function App() {
           }} />
       )}
       {toastNode}
+      <WorkBanner />
       {intro && <Intro onDone={() => setIntro(false)} />}
       {!intro && (welcome ? <Welcome onDone={() => setWelcome(false)} /> : <MoveNotice />)}
     </NavContext.Provider>

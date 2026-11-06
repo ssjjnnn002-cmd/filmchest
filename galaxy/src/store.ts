@@ -122,6 +122,25 @@ export class Table<T extends Doc, K extends string = string> {
     changed()
   }
   async toArray() { return this.all().map(clone) }
+  /** 휴지통만. 카메라 사진까지 전부 풀지 않는다. */
+  deletedOnly(): T[] {
+    try {
+      const rows = sql.getAllSync<{ data: string }>(
+        `SELECT data FROM docs WHERE coll = ? AND json_extract(data, '$.deletedAt') IS NOT NULL`,
+        this.name,
+      )
+      const out: T[] = []
+      for (const row of rows) {
+        try {
+          const parsed = JSON.parse(row.data) as T
+          if (parsed.deletedAt) out.push(parsed)
+        } catch { /* 깨진 줄은 건너뛴다 */ }
+      }
+      return out
+    } catch {
+      return this.all().filter((row) => row.deletedAt)
+    }
+  }
   async count() { return this.all().length }
   toArraySync() { return this.all().map(clone) }
   where(field: string) {

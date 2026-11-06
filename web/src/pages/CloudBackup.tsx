@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Icon, Sheet } from '../ui/common'
 import { backupFileName } from '../core/backup'
 import { driveFolderUrl, backupToDrive, pullFromDrive, restorePhotosFromDrive, disconnectDrive, driveAvailable, driveConnected, driveLastBackup, driveToken, hasDriveToken } from '../core/drive'
+import { formatDateTime } from '../core/types'
 import {
   allowFolder, backupToFolder, restoreFromFolder, disconnectFolder, folderAvailable, folderCloud, folderLast, folderName, folderPermission, pickFolder, verifyFolder,
 } from '../core/folderBackup'
@@ -46,7 +47,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
             <span className="grow">
               <b>{cloudStatus()}</b>
               {folder && <span className="sub">폴더: {folder}{perm === 'granted' ? '' : ' · 권한 필요'}</span>}
-              {last > 0 && <span className="sub">마지막 백업 {new Date(last).toLocaleString('ko-KR')}</span>}
+              {last > 0 && <span className="sub">마지막 백업 {formatDateTime(last)}</span>}
             </span>
           </div>
           {msg && <div className="row static" style={{ color: msg.ok ? '#30a46c' : 'var(--danger)' }}>{msg.ok ? '✓' : '✕'} {msg.text}</div>}

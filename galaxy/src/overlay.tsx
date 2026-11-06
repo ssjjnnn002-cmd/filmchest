@@ -1,9 +1,10 @@
 // 웹 common.tsx의 Sheet·Confirm·useToast, .menu 를 갤럭시로 옮긴 것
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { Animated, findNodeHandle, Keyboard, Modal, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native'
-import { BlurView } from 'expo-blur'
+import { ActivityIndicator, Animated, findNodeHandle, Keyboard, Modal, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native'
+import { Glass } from './glass'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from './theme'
+import { subscribeWork } from './core/work'
 
 /** 시트 머리의 동그란 버튼 (.sheet-head .btn). right 쪽이면 주황 */
 export function SheetBtn({ label, onPress, accent, disabled }: { label: string; onPress: () => void; accent?: boolean; disabled?: boolean }) {
@@ -137,7 +138,7 @@ export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onC
     <Modal transparent visible animationType="fade" onRequestClose={onCancel} statusBarTranslucent>
       <Pressable onPress={onCancel} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <Pressable style={{ width: '100%', maxWidth: 320, borderRadius: 28, overflow: 'hidden', elevation: 16 }}>
-          <BlurView intensity={40} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass, paddingTop: 22, paddingHorizontal: 18, paddingBottom: 16 }}>
+          <Glass intensity={40} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass, paddingTop: 22, paddingHorizontal: 18, paddingBottom: 16 }}>
             <Text style={{ color: c.ink, fontSize: 17, fontWeight: '600', textAlign: 'center', lineHeight: 23, marginBottom: 16 }}>{message}</Text>
             {busy ? null : (
               <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -145,7 +146,7 @@ export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onC
                 {btn(action, safe ? c.safelight : c.danger, onConfirm)}
               </View>
             )}
-          </BlurView>
+          </Glass>
         </Pressable>
       </Pressable>
     </Modal>
@@ -163,7 +164,7 @@ export function Menu({ items, onClose }: { items: { label: string; danger?: bool
     <Modal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <Pressable onPress={onClose} style={{ flex: 1 }}>
         <Animated.View style={{ position: 'absolute', right: 16, top: insets.top + 10 + 52, minWidth: 200, borderRadius: 18, overflow: 'hidden', elevation: 14, transform: [{ scale }] }}>
-          <BlurView intensity={40} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass }}>
+          <Glass intensity={40} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass }}>
             {items.map((it, i) => (
               <Pressable key={it.label} onPress={() => { onClose(); it.onPress() }}
                 style={({ pressed }) => ({ minHeight: 46, paddingVertical: 10, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: pressed ? c.fill : 'transparent',
@@ -171,7 +172,7 @@ export function Menu({ items, onClose }: { items: { label: string; danger?: bool
                 <Text style={{ fontSize: 17, color: it.danger ? c.danger : c.ink }}>{it.label}</Text>
               </Pressable>
             ))}
-          </BlurView>
+          </Glass>
         </Animated.View>
       </Pressable>
     </Modal>
@@ -198,11 +199,28 @@ export function useToast() {
     <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 96, alignItems: 'center',
       opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }] }}>
       <View style={{ borderRadius: 999, overflow: 'hidden', borderWidth: 0.5, borderColor: c.glassLine, elevation: 6 }}>
-        <BlurView intensity={30} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass, paddingHorizontal: 20, paddingVertical: 12 }}>
+        <Glass intensity={30} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass, paddingHorizontal: 20, paddingVertical: 12 }}>
           <Text style={{ color: c.ink, fontSize: 15, fontWeight: '600', textAlign: 'center' }}>{msg}</Text>
-        </BlurView>
+        </Glass>
       </View>
     </Animated.View>
   ) : null
   return [node, show] as const
+}
+
+/** 바로 끝나지 않는 일. 일은 이미 시작됐고, 이 줄은 그동안만 보인다. */
+export function WorkBanner() {
+  const c = useTheme()
+  const insets = useSafeAreaInsets()
+  const [on, setOn] = useState(false)
+  useEffect(() => subscribeWork(setOn), [])
+  if (!on) return null
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 96, alignItems: 'center', zIndex: 40 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 999, overflow: 'hidden', borderWidth: 0.5, borderColor: c.glassLine, backgroundColor: c.glass, paddingHorizontal: 18, paddingVertical: 12 }}>
+        <ActivityIndicator color={c.ink} />
+        <Text style={{ color: c.ink, fontSize: 15, fontWeight: '600' }}>불러오는 중…</Text>
+      </View>
+    </View>
+  )
 }

@@ -4,6 +4,7 @@ import { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import Slider from '@react-native-community/slider'
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Switch, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native'
 import { Icon } from './icons'
+import { watchWork } from './core/work'
 import { useTheme } from './theme'
 import { statusName, type Camera, type FilmFormat, type RollStatus } from './core/types'
 import { formatInfo } from './core/types'
@@ -69,7 +70,7 @@ export function Row({ children, onPress, accent, danger, chev, value, static: is
     </View>
   )
   if (!onPress || isStatic) return body(false)
-  return <Pressable onPress={onPress}>{({ pressed }) => body(pressed)}</Pressable>
+  return <Pressable onPress={() => watchWork(onPress())}>{({ pressed }) => body(pressed)}</Pressable>
 }
 
 /** 줄 안 글자 (웹 .row 안의 기본 글자) */
@@ -135,7 +136,7 @@ export function Btn({ label, onPress, kind, size, block, disabled, icon }: {
   const color = kind === 'primary' ? '#fff' : kind === 'soft' || kind === 'ghost' ? c.safelight : kind === 'danger' ? c.danger : c.ink
   const height = size === 'large' ? 54 : size === 'stack' ? 50 : size === 'small' ? 32 : 40
   return (
-    <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => ({
+    <Pressable disabled={disabled} onPress={() => watchWork(onPress())} style={({ pressed }) => ({
       height, paddingHorizontal: kind === 'ghost' ? 8 : size === 'small' ? 12 : 18, borderRadius: size === 'large' || size === 'stack' ? 16 : 999,
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: bg,
       alignSelf: block ? 'stretch' : 'auto', flex: block ? undefined : undefined,

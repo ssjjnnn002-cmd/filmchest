@@ -617,6 +617,7 @@ private struct HoldReorder: UIViewRepresentable {
             self.press = press
             self.host = host
             scroll = host as? UIScrollView
+            scroll?.delaysContentTouches = false
         }
 
         func detach() {

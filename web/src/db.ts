@@ -168,7 +168,6 @@ export async function purgeCamera(id: string) {
 }
 
 export async function purgeOldCameras() {
-  await rememberCameras()
   const cutoff = Date.now() - day
   const cameras = await db.cameras.toArray()
   for (const camera of cameras) {

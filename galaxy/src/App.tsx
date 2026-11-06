@@ -5,13 +5,13 @@ import { getPref } from './store'
 import { driveConnected } from './drive'
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Animated, BackHandler, Easing, Pressable, Text, View } from 'react-native'
-import { BlurView } from 'expo-blur'
+import { Glass } from './glass'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { db, kept, purgeOldCameras, purgeOldRolls } from './data'
 import { useLiveQuery } from './store'
 import { Icon } from './icons'
 import { useTheme } from './theme'
-import { closeTopOverlay, useToast } from './overlay'
+import { closeTopOverlay, useToast, WorkBanner } from './overlay'
 import { PageScrollContext, type PageScroll } from './page'
 import { uid } from './core/types'
 import { setCustomFilms } from './core/films'
@@ -349,6 +349,7 @@ export function App() {
       )}
       <WebToolsHost />
       {toastNode}
+      <WorkBanner />
       {intro && <Intro onDone={() => setIntro(false)} />}
       {!intro && welcome ? <Welcome onDone={() => setWelcome(false)} /> : null}
     </NavContext.Provider>
@@ -373,7 +374,7 @@ function TabBar({ tab, badge, onTab }: { tab: Tab; badge: Record<Tab, number>; o
         width: '100%', maxWidth: 420, height: 64, borderRadius: 32, overflow: 'hidden',
         borderWidth: 0.5, borderColor: c.glassLine, elevation: 8,
       }}>
-        <BlurView intensity={c.dark ? 48 : 36} tint={c.dark ? 'dark' : 'light'} style={{ flex: 1, backgroundColor: c.glass }}>
+        <Glass intensity={c.dark ? 48 : 36} tint={c.dark ? 'dark' : 'light'} style={{ flex: 1, backgroundColor: c.glass }}>
           {pill > 0 ? (
             <Animated.View style={{ position: 'absolute', top: 4, bottom: 4, left: 4, width: pill, borderRadius: 28, backgroundColor: c.fill,
               transform: [{ translateX: Animated.multiply(slide, pill + gap) }] }} />
@@ -396,7 +397,7 @@ function TabBar({ tab, badge, onTab }: { tab: Tab; badge: Record<Tab, number>; o
               )
             })}
           </View>
-        </BlurView>
+        </Glass>
       </View>
     </View>
   )

@@ -14,6 +14,8 @@ import { CloudBackup, cloudStatus } from './CloudBackup'
 import { Stats } from './Stats'
 import { checkUpdate, downloadUpdate, installedBuilt } from '../update'
 import { filmById } from '../core/films'
+import { formatDate, formatDateTime } from '../core/types'
+import { withWork } from '../core/work'
 import { bytesText } from '../core/display'
 import { sections } from '../core/privacyText'
 import { APP_VERSION } from '../core/version'
@@ -27,7 +29,7 @@ import { applyTheme, useTheme } from '../theme'
 const themes: [string, string][] = [['system', '기기 설정'], ['light', '라이트'], ['dark', '다크']]
 
 /** 기기 밖에 남긴 마지막 백업 (기기 안 자동 백업은 앱을 지우면 함께 지워져서 빼고 센다) */
-export const lastBackupText = () => { const t = lastBackupAt(); return t ? `마지막 백업 ${new Date(t).toLocaleString('ko-KR')}.` : '아직 기기 밖에 백업하지 않았어요.' }
+export const lastBackupText = () => { const t = lastBackupAt(); return t ? `마지막 백업 ${formatDateTime(t)}.` : '아직 기기 밖에 백업하지 않았어요.' }
 
 export function Settings({ onClose, openBackup = false }: { onClose: () => void; openBackup?: boolean }) {
   useBackupRefresh()
@@ -46,9 +48,9 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   const [saving, setSaving] = useState<string>()
   const [purge, setPurge] = useState<(() => Promise<unknown>) | null>(null)
   const [spending, setSpending] = useState(false)
-  const [update, setUpdate] = useState(() => (installedBuilt() ? new Date(installedBuilt() * 1000).toLocaleDateString('ko-KR') : ''))
-  const deleted = useLiveQuery(async () => (await db.rolls.toArray()).filter((r) => r.deletedAt), []) ?? []
-  const deletedCameras = useLiveQuery(async () => (await db.cameras.toArray()).filter((x) => x.deletedAt), []) ?? []
+  const [update, setUpdate] = useState(() => (installedBuilt() ? formatDate(installedBuilt() * 1000) : ''))
+  const deleted = useLiveQuery(() => db.rolls.deletedOnly(), [])
+  const deletedCameras = useLiveQuery(() => db.cameras.deletedOnly(), [])
   useEffect(() => { storageEstimate().then(setUsage); void purgeOldRolls(); void purgeOldCameras() }, [])
 
   const choose = (t: string) => { setTheme(t); applyTheme(t) }
@@ -91,13 +93,13 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
       <Section title="버전" foot="앱 버전은 아이폰, 갤럭시, 웹이 같습니다.">
         <Group>
           <Row static value={APP_VERSION}><RowText>앱 버전</RowText></Row>
-          <Row chev value={update} onPress={async () => {
+          <Row chev value={update} onPress={() => { void withWork(async () => {
             try {
               const u = await checkUpdate()
               if (u.newer) { setUpdate('새 버전 있음'); void downloadUpdate(); setNote('새 버전을 내려받아요. 다 받으면 알림을 눌러 설치하세요. 기록은 그대로 남아요.') }
               else { setUpdate('최신 버전'); setNote('지금 최신 버전이에요.') }
             } catch { setNote('업데이트를 확인하지 못했어요. 인터넷 연결을 확인해 주세요.') }
-          }}><RowText>업데이트 확인</RowText></Row>
+          }) }}><RowText>업데이트 확인</RowText></Row>
         </Group>
       </Section>
 
@@ -150,17 +152,15 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         <Sheet title="백업 파일로 저장" onClose={() => setSaveChoice(false)}>
           <Section foot="사진까지 저장한 zip을 불러오면 사진도 롤에 다시 붙어요.">
             <Group>
-              <Row onPress={async () => {
-                if (saving) return
+              <Row onPress={() => { if (saving) return; void withWork(async () => {
                 await writeLocalBackup(); await saveFileNow(backupFileName, await exportAll(), 'application/json'); markFileBackup(); setSaveChoice(false)
-              }}><RowText sub="장비·필름·롤 기록 · 작은 파일">기록만</RowText></Row>
-              <Row value={saving} onPress={async () => {
-                if (saving) return
+              }) }}><RowText sub="장비·필름·롤 기록 · 작은 파일">기록만</RowText></Row>
+              <Row value={saving} onPress={() => { if (saving) return; void withWork(async () => {
                 try {
                   const zip = await exportWithPhotos((d, t) => setSaving(`사진 ${d}/${t}`))
                   await saveFileNow(photoBackupFileName, zip, 'application/zip'); markFileBackup(); setSaveChoice(false)
                 } finally { setSaving(undefined) }
-              }}><RowText sub="스캔 사진도 함께 · zip · 큰 파일">사진까지</RowText></Row>
+              }) }}><RowText sub="스캔 사진도 함께 · zip · 큰 파일">사진까지</RowText></Row>
             </Group>
           </Section>
         </Sheet>
@@ -171,7 +171,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
             <Group>
               <Row chev value={cloudStatus()} onPress={() => setCloud(true)}><RowText>클라우드 백업</RowText></Row>
               <Row onPress={() => setSaveChoice(true)}>백업 파일로 저장</Row>
-              <Row onPress={async () => {
+              <Row onPress={() => { void withWork(async () => {
                 const [file] = await pickFiles(['application/json', 'text/plain', '*/*'], false)
                 if (!file) return
                 try {
@@ -180,24 +180,24 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
                 } catch {
                   setNote('백업 파일을 읽지 못했어요.')
                 }
-              }}>백업 불러오기</Row>
+              }) }}>백업 불러오기</Row>
             </Group>
           </Section>
 
           <Section title="사진으로 롤 복구" foot="이 앱(아이폰·웹·갤럭시)으로 저장했던 사진을 고르면 표식으로 롤을 다시 묶어요. 클라우드 백업을 먼저 복구하면 필름·카메라 정보까지 함께 돌아와요.">
             <Group>
-              <Row onPress={async () => {
+              <Row onPress={() => { void withWork(async () => {
                 const files = await pickFiles(['image/jpeg'])
                 if (!files.length) return
                 const result = await restorePhotos(files)
                 setNote(result.frames === 0 ? '표식을 찾지 못했어요. 이 앱에서 저장한 원본 사진을 골라 주세요.' : `롤 ${result.rolls}개, 사진 ${result.frames}장을 가져왔어요.`)
-              }}>이 앱이 저장한 사진 고르기</Row>
+              }) }}>이 앱이 저장한 사진 고르기</Row>
             </Group>
           </Section>
           <Section title="삭제한 롤" foot="지운 롤은 24시간 동안 여기 남아요. 사진 앱에 저장한 사진은 그대로예요.">
             <Group>
-              {deleted.length === 0 ? <Row static><Sub>최근 24시간 안에 지운 롤이 없어요</Sub></Row> : null}
-              {deleted.map((roll) => (
+              {deleted === undefined ? <Row static><Sub>불러오는 중…</Sub></Row> : deleted.length === 0 ? <Row static><Sub>최근 24시간 안에 지운 롤이 없어요</Sub></Row> : null}
+              {deleted?.map((roll) => (
                 <Row key={roll.id} static>
                   <RowText>{filmById(roll.filmId)?.name ?? '필름 알 수 없음'}</RowText>
                   <Btn label="되돌리기" kind="ghost" onPress={() => { void restoreRoll(roll.id) }} />
@@ -209,8 +209,8 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
 
           <Section title="삭제한 장비" foot="지운 카메라는 24시간 동안 여기 남아요. 필름에 적힌 카메라 정보는 카메라를 지워도 그대로예요.">
             <Group>
-              {deletedCameras.length === 0 ? <Row static><Sub>최근 24시간 안에 지운 카메라가 없어요</Sub></Row> : null}
-              {deletedCameras.map((camera) => (
+              {deletedCameras === undefined ? <Row static><Sub>불러오는 중…</Sub></Row> : deletedCameras.length === 0 ? <Row static><Sub>최근 24시간 안에 지운 카메라가 없어요</Sub></Row> : null}
+              {deletedCameras?.map((camera) => (
                 <Row key={camera.id} static>
                   <RowText>{camera.brand} {camera.model}</RowText>
                   <Btn label="되돌리기" kind="ghost" onPress={() => { void restoreCamera(camera.id) }} />
@@ -223,7 +223,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         </Sheet>
       ) : null}
       {cloud ? <CloudBackup onClose={() => setCloud(false)} /> : null}
-      {purge ? <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={async () => { const run = purge; setPurge(null); await run() }} /> : null}
+      {purge ? <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={() => { const run = purge; setPurge(null); void withWork(run) }} /> : null}
     </Sheet>
   )
 }

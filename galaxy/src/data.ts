@@ -70,8 +70,7 @@ export async function restoreRoll(id: string) {
 
 export async function purgeOldRolls() {
   const cutoff = Date.now() - day
-  const rolls = await db.rolls.toArray()
-  for (const roll of rolls) {
+  for (const roll of db.rolls.deletedOnly()) {
     if (roll.deletedAt && roll.deletedAt < cutoff) await deleteRoll(roll.id, true)
   }
 }
@@ -99,10 +98,8 @@ export async function purgeCamera(id: string) {
 }
 
 export async function purgeOldCameras() {
-  await rememberCameras()
   const cutoff = Date.now() - day
-  const cameras = await db.cameras.toArray()
-  for (const camera of cameras) {
+  for (const camera of db.cameras.deletedOnly()) {
     if (camera.deletedAt && camera.deletedAt < cutoff) await purgeCamera(camera.id)
   }
 }

@@ -5,6 +5,7 @@ import { db, kept } from '../data'
 import { useLiveQuery } from '../store'
 import { rollFilmName } from '../core/display'
 import { filmById } from '../core/films'
+import { groupedNumber } from '../core/types'
 import { colorSplit, monthlyRolls, rollsThisYear, topCounts, type MonthBar } from '../core/stats'
 import { Canister, Group, Row, RowText, Section, Sub } from '../kit'
 import { Sheet, SheetBtn } from '../overlay'
@@ -32,7 +33,7 @@ export function Stats({ onClose }: { onClose: () => void }) {
   })
   const tile = (label: string, value: number) => (
     <View style={{ flex: 1, backgroundColor: c.card, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 12, gap: 2 }}>
-      <Text style={{ fontSize: 28, fontWeight: '700', color: c.ink, fontVariant: ['tabular-nums'] }}>{value.toLocaleString('ko-KR')}</Text>
+      <Text style={{ fontSize: 28, fontWeight: '700', color: c.ink, fontVariant: ['tabular-nums'] }}>{groupedNumber(value)}</Text>
       <Text style={{ fontSize: 13, color: c.muted }}>{label}</Text>
     </View>
   )

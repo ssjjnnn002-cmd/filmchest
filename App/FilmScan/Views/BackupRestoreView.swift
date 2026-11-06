@@ -10,6 +10,7 @@ struct BackupRestoreView: View {
     @State private var showImport = false
     @State private var restoreItems: [PhotosPickerItem] = []
     @State private var note: String?
+    @State private var working = false
     @State private var purgeRoll: RollItem?
     @State private var purgeCamera: CameraItem?
     @Query(sort: \RollItem.loadedAt, order: .reverse) private var rolls: [RollItem]
@@ -26,10 +27,15 @@ struct BackupRestoreView: View {
                 LabeledContent("클라우드 백업", value: CloudStatus.text)
             }
             Button("백업 파일로 저장") {
-                if let data = try? DataBackup.data(from: context) {
-                    gearDoc = GearDocument(data: data)
-                    showExport = true
-                    BackupNudgeRule.markFileBackup()
+                working = true
+                Task { @MainActor in
+                    await Task.yield()
+                    if let data = try? DataBackup.data(from: context) {
+                        gearDoc = GearDocument(data: data)
+                        showExport = true
+                        BackupNudgeRule.markFileBackup()
+                    }
+                    working = false
                 }
             }
             Button("백업 불러오기") { showImport = true }
@@ -41,7 +47,9 @@ struct BackupRestoreView: View {
 
         Section {
             Button("사진 앱에서 롤 복구") {
+                working = true
                 Task {
+                    defer { working = false }
                     do {
                         let result = try await PhotoRestore.restoreAppAlbums(context: context)
                         note = result.frames == 0
@@ -120,7 +128,10 @@ struct BackupRestoreView: View {
         }
     }
     .onChange(of: restoreItems) { _, items in
+        guard !items.isEmpty else { return }
+        working = true
         Task {
+            defer { working = false }
             var rolls = 0
             var frames = 0
             for item in items {
@@ -137,6 +148,19 @@ struct BackupRestoreView: View {
             Button("확인", role: .cancel) { note = nil }
         } message: {
             Text(note ?? "")
+        }
+        .overlay {
+            if working {
+                ZStack {
+                    Color.black.opacity(0.2).ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        ProgressView()
+                        Text("불러오는 중…")
+                    }
+                    .padding(24)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+                }
+            }
         }
         .confirmationDialog("완전히 지울까요?", isPresented: Binding(get: { purgeRoll != nil || purgeCamera != nil },
                                                                set: { if !$0 { purgeRoll = nil; purgeCamera = nil } }),

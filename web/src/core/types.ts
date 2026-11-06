@@ -115,7 +115,25 @@ export const defaultAccessoryKinds = [FILTER_KIND, '그립', '소프트 셔터 �
   '플래시', '노출계', '삼각대', '릴리즈 케이블', '배터리', '어댑터', '기타']
 export const kindOf = (a: { kind?: string }) => a.kind?.trim() || FILTER_KIND
 
-export const priceText = (n: number) => `${n.toLocaleString('ko-KR')}원`
+const grouped = (n: number) => {
+  const neg = n < 0
+  const body = String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return neg ? `-${body}` : body
+}
+/** 로케일 날짜 함수는 일부 안드로이드에서 앱을 종료시킨다. 숫자는 직접 적는다. */
+export const priceText = (n: number) => `${grouped(n)}원`
+export const groupedNumber = grouped
+const pad2 = (n: number) => String(n).padStart(2, '0')
+export function formatDate(ms: number) {
+  const d = new Date(ms)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`
+}
+export function formatDateTime(ms: number) {
+  const d = new Date(ms)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${formatDate(ms)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
 
 /** 액세서리 (필터, 그립, 스트랩 … 유형은 사용자가 더할 수 있다). 이름은 예전 필터 그대로 GearFilter */
 export interface GearFilter {

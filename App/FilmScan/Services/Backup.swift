@@ -12,8 +12,8 @@ enum Trash {
         let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
         let rolls = (try? context.fetch(FetchDescriptor<RollItem>())) ?? []
         for roll in rolls {
-            roll.rememberCamera()
-            if let deleted = roll.deletedAt, deleted < cutoff { context.delete(roll) }
+            guard let deleted = roll.deletedAt, deleted < cutoff else { continue }
+            context.delete(roll)
         }
         let cameras = (try? context.fetch(FetchDescriptor<CameraItem>())) ?? []
         for camera in cameras {
