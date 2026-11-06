@@ -44,6 +44,8 @@ struct ArchiveImportView: View {
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var fileURLs: [URL]
     @State private var showFiles = false
+    /// 파일 고르기 창: 폴더만 고르는 때 (웹의 '폴더 통째로 고르기'와 같음)
+    @State private var pickingFolder = false
     @State private var thumbs: [CGImage] = []
     /// 미리보기 칸마다 원본 (눌러서 크게 볼 때)
     @State private var sources: [PreviewSource] = []
@@ -79,7 +81,8 @@ struct ArchiveImportView: View {
                                      photoLibrary: .shared()) {
                             Label("사진 앱에서 고르기", systemImage: "photo.on.rectangle")
                         }
-                        Button("파일에서 가져오기", systemImage: "folder") { showFiles = true }
+                        Button("사진 또는 zip 고르기", systemImage: "doc") { pickingFolder = false; showFiles = true }
+                        Button("폴더 통째로 고르기", systemImage: "folder") { pickingFolder = true; showFiles = true }
                     }
                     if count > 0 {
                         selectionSummary
@@ -154,8 +157,8 @@ struct ArchiveImportView: View {
                     }
                 }
             }
-            .fileImporter(isPresented: $showFiles, allowedContentTypes: [.image, .zip, .folder],
-                          allowsMultipleSelection: true) { result in
+            .fileImporter(isPresented: $showFiles, allowedContentTypes: pickingFolder ? [.folder] : [.image, .zip],
+                          allowsMultipleSelection: !pickingFolder) { result in
                 if case .success(let urls) = result {
                     photoItems = []
                     fileURLs = urls
@@ -234,6 +237,10 @@ struct ArchiveImportView: View {
                 didGuessFilm = true
             }
             await loadFiles(peek.samples, scoped: false)
+        } else if let folder = fileURLs.first(where: { ScanFolder.isScopedFolder($0) }) {
+            // 폴더: 고른 폴더 권한을 이 화면 동안 열어 두고 안의 사진을 미리 본다 (zip이 있으면 저장할 때 펼친다)
+            _ = folder.startAccessingSecurityScopedResource()
+            await loadFiles(ScanFolder.images(in: folder), scoped: false)
         } else if !fileURLs.isEmpty {
             let images: Set<String> = ["jpg", "jpeg", "png", "heic", "heif", "tif", "tiff", "dng"]
             await loadFiles(fileURLs.filter { images.contains($0.pathExtension.lowercased()) }, scoped: true)
@@ -347,9 +354,11 @@ struct ArchiveImportView: View {
             defer { if ok { url.stopAccessingSecurityScopedResource() } }
             var isDir: ObjCBool = false
             FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-            let sources: [URL] = isDir.boolValue
-                ? ((try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? [])
-                : [url]
+            // 폴더: 안쪽 폴더까지 사진을 찾고, 사진이 없으면 그 폴더의 파일(zip 등)을 그대로
+            let inside = isDir.boolValue ? ScanFolder.images(in: url) : []
+            let sources: [URL] = !isDir.boolValue ? [url]
+                : !inside.isEmpty ? inside
+                : ((try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? [])
             for src in sources where !src.lastPathComponent.hasPrefix(".") {
                 let dest = dir.appendingPathComponent(src.lastPathComponent)
                 try? FileManager.default.copyItem(at: src, to: dest)

@@ -291,7 +291,7 @@ struct PendingView: View {
                 }
             )
         }
-        .fileImporter(isPresented: $showMultiZip, allowedContentTypes: [.zip], allowsMultipleSelection: true) { result in
+        .fileImporter(isPresented: $showMultiZip, allowedContentTypes: [.zip, .folder], allowsMultipleSelection: true) { result in
             if case .success(let urls) = result { enqueue(urls) }
         }
         // 파일 앱 등에서 받은 여러 롤을 대기열에 넣었을 때
@@ -454,7 +454,7 @@ struct RollsView: View {
             }
             .sheet(isPresented: $showArchive) { ArchiveImportView(onSaved: { router.showRoll($0) }) }
             // 여러 롤: 대기열에 넣고 현상 스캔에서 차례로 입력
-            .fileImporter(isPresented: $showMultiZip, allowedContentTypes: [.zip], allowsMultipleSelection: true) { result in
+            .fileImporter(isPresented: $showMultiZip, allowedContentTypes: [.zip, .folder], allowsMultipleSelection: true) { result in
                 if case .success(let urls) = result { router.enqueueArchive(urls) }
             }
             .searchable(text: $search, prompt: "필름, 카메라, 장소, 현상소, 메모, 태그")
@@ -748,12 +748,12 @@ struct ImportChoiceSheet: View {
                 .padding(.top, 18)
                 .padding(.bottom, 8)
             Button(action: onOne) {
-                choiceRow("한 롤", "사진이나 zip 하나를 바로 입력해요")
+                choiceRow("한 롤", "사진, zip, 폴더 하나를 바로 입력해요")
             }
             .buttonStyle(.plain)
             Divider().padding(.leading, 20)
             Button(action: onMany) {
-                choiceRow("여러 롤", "zip을 여러 개 고르면 대기열에서 차례로 입력해요")
+                choiceRow("여러 롤", "zip이나 폴더를 여러 개 고르면 대기열에서 차례로 입력해요")
             }
             .buttonStyle(.plain)
             Spacer(minLength: 0)

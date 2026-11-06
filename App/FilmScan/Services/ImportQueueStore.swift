@@ -31,7 +31,8 @@ enum ImportQueueStore {
         var jobs = load()
         var added: [Job] = []
         let start = jobs.count
-        for url in urls where url.pathExtension.lowercased() == "zip" || ScanFolder.isFolder(url) {
+        // 파일 고르기 창에서 받은 폴더는 권한을 열어야 폴더인지 알 수 있다
+        for url in urls where url.pathExtension.lowercased() == "zip" || ScanFolder.isScopedFolder(url) {
             let accessing = url.startAccessingSecurityScopedResource()
             defer { if accessing { url.stopAccessingSecurityScopedResource() } }
             let id = UUID()

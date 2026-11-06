@@ -96,6 +96,13 @@ enum ScanFolder {
         return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
     }
 
+    /// 파일 고르기 창에서 받은 주소가 폴더인지 (권한을 잠깐 열어 확인)
+    static func isScopedFolder(_ url: URL) -> Bool {
+        let ok = url.startAccessingSecurityScopedResource()
+        defer { if ok { url.stopAccessingSecurityScopedResource() } }
+        return isFolder(url)
+    }
+
     static func images(in dir: URL) -> [URL] {
         let ok = dir.startAccessingSecurityScopedResource()
         defer { if ok { dir.stopAccessingSecurityScopedResource() } }
