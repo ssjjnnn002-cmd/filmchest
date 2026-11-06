@@ -7,6 +7,7 @@ import { lensIdAt } from '../core/types'
 import { previewThumbs, readFiles } from '../core/zip'
 import { importScans } from '../core/importer'
 import { Progress, Sheet, rollFilmName } from '../ui/common'
+import { reuseNextOverlay } from '../backStack'
 import { ImportFlow } from './ImportFlow'
 import { ArchiveImport } from './ArchiveImport'
 
@@ -35,12 +36,12 @@ export function IncomingImport({ files, onClose }: { files: File[]; onClose: () 
         </div>
       </div>
       <div className="group">
-        <button className="row" onClick={() => setStep(many ? 'multi' : 'pending')}>
+        <button className="row" onClick={() => { reuseNextOverlay(); setStep(many ? 'multi' : 'pending') }}>
           <span className="grow"><b>스캔 대기 중인 롤에 넣기</b>
             <div className="sub">{rolls.length === 0 ? '현상 맡긴 롤이 없으면 새 롤로 만들 수 있어요' : many ? '파일마다 롤을 골라 한 번에 가져와요' : '현상 맡긴 롤 중에서 골라요'}</div>
           </span>
         </button>
-        <button className="row" onClick={() => { if (many) { nav.enqueueZipRolls(files); onClose() } else setStep('archive') }}>
+        <button className="row" onClick={() => { if (many) { nav.enqueueZipRolls(files); onClose() } else { reuseNextOverlay(); setStep('archive') } }}>
           <span className="grow"><b>기존 롤로 가져오기</b>
             <div className="sub">{many ? '대기열에 넣고 차례로 입력해요' : '예전에 찍은 롤을 롤 보관함에 넣어요'}</div>
           </span>

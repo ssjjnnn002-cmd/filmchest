@@ -1,6 +1,7 @@
 // 웹 PageHeader + .page: 위에 동그란 유리 버튼, 아래 큰 제목. 스크롤하면 가운데 작은 제목.
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Animated, Pressable, Text, View, type ScrollView } from 'react-native'
+import { useScrollFocusedField } from './overlay'
 import { BlurView } from 'expo-blur'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Icon } from './icons'
@@ -59,6 +60,7 @@ export function Page({ title, onBack, left, actions, large = true, children, foo
   const insets = useSafeAreaInsets()
   const scroll = useContext(PageScrollContext)
   const ref = useRef<ScrollView>(null)
+  useScrollFocusedField(ref)
   const y = useRef(new Animated.Value(0)).current
   const [scrolled, setScrolled] = useState(!large)
   const titleBottom = 50

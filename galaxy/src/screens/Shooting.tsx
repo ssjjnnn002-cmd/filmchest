@@ -63,7 +63,7 @@ function LoadedCard({ roll }: { roll: Roll }) {
         {features.meter ? <View style={{ flex: 1 }}><Btn label="노출계" kind="primary" block onPress={() => setMeter(true)} /></View> : null}
       </View>
       {placing ? <PlaceEdit roll={roll} onClose={() => setPlacing(false)} /> : null}
-      {dropOff ? <LabDropOff roll={roll} onClose={() => setDropOff(false)} /> : null}
+      {dropOff ? <LabDropOff roll={roll} onClose={(ended) => { setDropOff(false); if (ended) nav.toPending(roll.id) }} /> : null}
       {meter ? <Meter roll={roll} onClose={() => setMeter(false)} onEnd={() => { setMeter(false); setDropOff(true) }} /> : null}
     </View>
   )

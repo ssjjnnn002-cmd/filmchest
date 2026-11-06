@@ -11,7 +11,7 @@ import { db, kept, purgeOldCameras, purgeOldRolls } from './data'
 import { useLiveQuery } from './store'
 import { Icon } from './icons'
 import { useTheme } from './theme'
-import { useToast } from './overlay'
+import { closeTopOverlay, useToast } from './overlay'
 import { PageScrollContext, type PageScroll } from './page'
 import { uid } from './core/types'
 import { setCustomFilms } from './core/films'
@@ -48,7 +48,11 @@ interface Nav {
   tab: Tab
   setTab: (t: Tab) => void
   push: (s: Screen, inTab?: Tab) => void
-  pop: () => void
+  pop: () => boolean
+  /** 그 롤 화면을 롤 보관함에서 연다 */
+  showRoll: (id: string) => void
+  /** 촬영을 막 끝낸 롤이면 현상 스캔 탭으로 간다 */
+  toPending: (rollId: string) => void
   loadFilm: (cameraId?: string) => void
   importScans: (files: PickedFile[], rollId?: string) => void
   /** 바깥에서 받은 zip들: 어디로 넣을지 묻는 창을 띄운다 */
@@ -154,29 +158,83 @@ export function App() {
     return top ? `${t}/${top.type}/${top.id}` : t
   }
 
+  const cloneStacks = (st: Record<Tab, Screen[]>): Record<Tab, Screen[]> => ({
+    library: [...st.library], shooting: [...st.shooting], pending: [...st.pending], rolls: [...st.rolls],
+  })
+  const sameStacks = (a: Record<Tab, Screen[]>, b: Record<Tab, Screen[]>) =>
+    (['library', 'shooting', 'pending', 'rolls'] as Tab[]).every((k) => a[k].length === b[k].length && a[k].every((s, i) => s.type === b[k][i].type && s.id === b[k][i].id))
+  // 탭과 화면을 밟은 순서. 뒤로 가면 직전 단계로 돌아가고, 처음 화면에서만 앱을 나간다.
+  const trail = useRef<{ tab: Tab; stacks: Record<Tab, Screen[]> }[]>([
+    { tab: 'library', stacks: { library: [], shooting: [], pending: [], rolls: [] } },
+  ])
+  const restoring = useRef(false)
+  const record = (nextTab: Tab, nextStacks: Record<Tab, Screen[]>) => {
+    if (restoring.current) return
+    const snap = { tab: nextTab, stacks: cloneStacks(nextStacks) }
+    const top = trail.current.at(-1)
+    if (top && top.tab === snap.tab && sameStacks(top.stacks, snap.stacks)) return
+    trail.current.push(snap)
+  }
+  const goBack = () => {
+    if (trail.current.length <= 1) return false
+    trail.current.pop()
+    const prev = trail.current.at(-1)!
+    restoring.current = true
+    setMotion('pop')
+    setTabState(prev.tab)
+    setStacks(cloneStacks(prev.stacks))
+    restoring.current = false
+    return true
+  }
   const nav: Nav = {
     tab,
     setTab: (t) => {
       if (t === tab) {
         // 같은 탭을 다시 누르면: 안쪽 화면이면 처음으로, 처음 화면이면 맨 위로
-        if (stacks[t].length) { setMotion('pop'); setStacks((s) => ({ ...s, [t]: [] })) }
-        else toTop.forEach((fn) => fn())
+        if (stacks[t].length) {
+          const next = { ...stacks, [t]: [] }
+          setMotion('pop')
+          setStacks(next)
+          record(t, next)
+        } else toTop.forEach((fn) => fn())
         return
       }
       setMotion(tabOrder.indexOf(t) > tabOrder.indexOf(tab) ? 'tab-left' : 'tab-right')
       setTabState(t)
+      record(t, stacks)
     },
     push: (s, inTab) => {
       const t = inTab ?? tab
       setMotion('push')
       scrollSaved.delete(`${t}/${s.type}/${s.id}`)
-      setStacks((st) => ({ ...st, [t]: [...st[t], s] }))
+      const next = { ...stacks, [t]: [...stacks[t], s] }
+      setStacks(next)
+      record(tab, next)
     },
     pop: () => {
-      if (!stacks[tab].length) return
+      if (goBack()) return true
+      if (!stacks[tab].length) return false
       scrollSaved.delete(screenKey(tab))
+      const next = { ...stacks, [tab]: stacks[tab].slice(0, -1) }
       setMotion('pop')
-      setStacks((st) => ({ ...st, [tab]: st[tab].slice(0, -1) }))
+      setStacks(next)
+      record(tab, next)
+      return true
+    },
+    showRoll: (id) => {
+      const rolls = [...stacks.rolls.filter((s) => !(s.type === 'roll' && s.id === id)), { type: 'roll' as const, id }]
+      const next = { ...stacks, rolls }
+      setMotion('push')
+      setTabState('rolls')
+      setStacks(next)
+      record('rolls', next)
+    },
+    toPending: (rollId) => {
+      const next = { ...stacks, shooting: stacks.shooting.filter((s) => !(s.type === 'roll' && s.id === rollId)) }
+      setMotion(tabOrder.indexOf('pending') >= tabOrder.indexOf(tab) ? 'tab-left' : 'tab-right')
+      setTabState('pending')
+      setStacks(next)
+      record('pending', next)
     },
     loadFilm: (cameraId) => setLoadFilmFor({ cameraId }),
     importScans: (files, rollId) => setImportReq({ files, rollId }),
@@ -189,7 +247,11 @@ export function App() {
       const batch = files.map((file, i) => ({ id: uid(), file, index: i + 1, total: files.length }))
       const next = [...zipQueueRef.current, ...batch]
       setQueue(next, activeZipId ?? batch[0].id)
-      setTabState('pending')
+      if (tab !== 'pending') {
+        setMotion('tab-left')
+        setTabState('pending')
+        record('pending', stacks)
+      }
       void Promise.all(batch.map((job) => db.zipQueue.put({
         id: job.id, name: job.file.name, blob: job.file.uri, index: job.index, total: job.total, addedAt: Date.now(),
       })))
@@ -210,23 +272,23 @@ export function App() {
     const index = prev.findIndex((job) => job.id === id)
     const next = prev.filter((job) => job.id !== id)
     const following = index >= 0 ? prev[index + 1] : undefined
-    setQueue(next, following && next.some((job) => job.id === following.id) ? following.id : (next[0]?.id ?? null))
+    const active = following && next.some((job) => job.id === following.id) ? following.id : (next[0]?.id ?? null)
+    setQueue(next, active)
     removeFile(prev[index]?.file.uri)
     void db.zipQueue.delete(id)
+    return active != null
   }
 
-  // 안드로이드 뒤로 버튼: 안쪽 화면이면 한 단계 뒤로, 첫 화면이면 내 장비로
+  // 안드로이드 뒤로: 입력 창 → 직전 화면. 처음 화면에서만 앱 밖으로 나간다.
   const navRef = useRef(nav)
   navRef.current = nav
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      const n = navRef.current
-      if (stacks[n.tab].length) { n.pop(); return true }
-      if (n.tab !== 'library') { n.setTab('library'); return true }
-      return false
+      if (closeTopOverlay()) return true
+      return navRef.current.pop()
     })
     return () => sub.remove()
-  }, [stacks])
+  }, [])
 
   const currentKey = screenKey(tab)
   const scroll: PageScroll = useMemo(() => ({ key: currentKey, saved: scrollSaved, toTop }), [currentKey, scrollSaved, toTop])
@@ -267,7 +329,10 @@ export function App() {
       {loadFilmFor && (
         <LoadFilm initialCameraId={loadFilmFor.cameraId} onClose={(loadedRoll) => {
           setLoadFilmFor(null)
-          if (loadedRoll) { setTabState('shooting'); toast('필름을 장착했어요') }
+          if (loadedRoll) {
+            nav.setTab('shooting')
+            toast('필름을 장착했어요')
+          }
         }} />
       )}
       {incomingPhotos && <PhotoImportFlow photos={incomingPhotos} onClose={() => setIncomingPhotos(null)} />}
@@ -277,7 +342,10 @@ export function App() {
         <ArchiveImport key={activeZip.id} presetFile={activeZip.file}
           stepLabel={`${activeZip.index} / ${activeZip.total}`}
           onClose={() => setActiveZipId(null)}
-          onSaved={() => finishZip(activeZip.id)} />
+          onSaved={(rollId) => {
+            const more = finishZip(activeZip.id)
+            if (!more) nav.showRoll(rollId)
+          }} />
       )}
       <WebToolsHost />
       {toastNode}

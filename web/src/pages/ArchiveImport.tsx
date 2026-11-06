@@ -19,7 +19,7 @@ export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onS
   /** 공유로 받은 사진 묶음 (한 롤) */
   presetFiles?: File[]
   stepLabel?: string
-  onSaved?: () => void
+  onSaved?: (rollId: string) => void
 }) {
   const nav = useNav()
   const cameras = useLiveQuery(() => db.cameras.orderBy('sortOrder').filter((c) => !c.deletedAt).toArray(), []) ?? []
@@ -89,8 +89,8 @@ export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onS
       await db.rolls.add(roll)
       await importScans(scan.primary, roll, camera, () => undefined, setProgress)
       nav.toast(`${scan.primary.files.length}장을 롤 보관함에 넣었어요`)
-      if (onSaved) onSaved()
-      else onClose()
+      if (onSaved) onSaved(roll.id)
+      else { nav.showRoll(roll.id); onClose() }
     } catch (e) {
       setProgress(undefined)
       setError(`가져오지 못했어요. (${(e as Error).message})`)

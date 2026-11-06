@@ -1,18 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Sheet } from '../ui/common'
 import { ArchiveImport } from './ArchiveImport'
+import { reuseNextOverlay } from '../backStack'
+import { useNav } from '../App'
 
 const colors = ['var(--safelight)', '#0a7aff', '#34a853', '#8e5cd9', '#f08a00', '#14a3a3', '#e5488a', '#8d6e4c', '#5856d6', '#2fb38a']
 
 /** 사진을 여러 장 공유받았을 때: 몇 롤인지 고르고 롤마다 나눈 뒤, 롤 하나씩 기존 롤 가져오기로 (아이폰 PhotoImportFlow와 같은 흐름) */
 export function PhotoImportFlow({ photos, onClose }: { photos: File[]; onClose: () => void }) {
+  const nav = useNav()
   const [sets, setSets] = useState<File[][] | null>(null)
   const [step, setStep] = useState(0)
   if (sets && sets[step]) {
     return <ArchiveImport key={step} presetFiles={sets[step]} stepLabel={sets.length > 1 ? `${step + 1} / ${sets.length}` : undefined}
-      onClose={onClose} onSaved={() => { if (step + 1 < sets.length) setStep(step + 1); else onClose() }} />
+      onClose={onClose} onSaved={(rollId) => {
+        if (step + 1 < sets.length) { reuseNextOverlay(); setStep(step + 1) }
+        else { nav.showRoll(rollId); onClose() }
+      }} />
   }
-  return <PhotoSplit photos={photos} onCancel={onClose} onDone={(s) => { setSets(s); setStep(0) }} />
+  return <PhotoSplit photos={photos} onCancel={onClose} onDone={(s) => { reuseNextOverlay(); setSets(s); setStep(0) }} />
 }
 
 function PhotoSplit({ photos, onCancel, onDone }: { photos: File[]; onCancel: () => void; onDone: (sets: File[][]) => void }) {

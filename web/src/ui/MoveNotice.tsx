@@ -6,6 +6,7 @@ import { importAll } from '../core/backup'
 import { driveAvailable, driveToken, restoreFromDrive } from '../core/drive'
 import { getPref, setPref } from '../platform'
 import { Sheet, useToast } from './common'
+import { replaceUrl } from '../backStack'
 
 const newHost = NEW_SITE.replace('https://', '')
 const oldHost = OLD_SITE.replace('https://', '')
@@ -51,7 +52,7 @@ function NewSiteWelcome() {
 
   useEffect(() => {
     receiveFromOldSite(() => { setPref('moveAsked', '1'); setReceiving(false); setAsked(true); setNote('예전 주소의 기록을 옮겼어요.') })
-    if (new URLSearchParams(location.search).has('move') && !window.opener) history.replaceState(null, '', '/')
+    if (new URLSearchParams(location.search).has('move') && !window.opener) replaceUrl('/')
     // 2분 안에 못 받으면 기다림을 푼다 (예전 주소 창을 닫은 경우)
     const t = window.setTimeout(() => setReceiving((r) => { if (r) setNote('기록을 받지 못했어요. 예전 주소에서 다시 눌러 주세요.'); return false }), 120_000)
     return () => window.clearTimeout(t)

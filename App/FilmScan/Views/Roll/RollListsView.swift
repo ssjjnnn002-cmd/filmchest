@@ -11,6 +11,7 @@ struct ShootingView: View {
     /// 목록 줄 안에 시트를 두면 키보드가 목록을 밀 때 입력 칸이 다시 만들어져 커서가 빠진다
     @State private var dropOff: RollItem?
     @State private var dropOffHeld: RollItem?
+    @State private var dropOffWasLoaded = false
 
     private var visible: [RollItem] { rolls.filter { $0.deletedAt == nil } }
 
@@ -43,17 +44,23 @@ struct ShootingView: View {
     }
 
     private func openDropOff(_ roll: RollItem) {
+        dropOffWasLoaded = roll.status == .loaded
         dropOffHeld = roll
         dropOff = roll
     }
 
     /// 저장하지 않고 닫으면 촬영만 끝난 상태로 남긴다. 맡기면 상태가 이미 바뀌어 있다.
+    /// 촬영 중이던 롤을 현상소에 맡겼으면 현상 스캔으로 넘어간다.
     private func endDropOffIfNeeded() {
         if let roll = dropOffHeld, roll.status == .loaded {
             roll.status = .finished
             roll.finishedAt = Date()
         }
+        if dropOffWasLoaded, dropOffHeld?.status == .atLab {
+            router.tab = .pending
+        }
         dropOffHeld = nil
+        dropOffWasLoaded = false
     }
 }
 

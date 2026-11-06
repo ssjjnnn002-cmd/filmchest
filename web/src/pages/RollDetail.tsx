@@ -216,7 +216,7 @@ export function RollDetail({ id }: { id: string }) {
           <p className="footnote">비워 두면 필름 이름으로 보여요.</p>
         </Sheet>
       )}
-      {dropOff && <LabDropOff roll={roll} onClose={() => setDropOff(false)} />}
+      {dropOff && <LabDropOff roll={roll} onClose={(ended) => { setDropOff(false); if (ended) nav.toPending(roll.id) }} />}
       {viewing !== null && <FrameViewer frames={frames} start={viewing} onClose={() => setViewing(null)} />}
       {framePrint && <FramePrint roll={roll} frames={frames} onClose={() => setFramePrint(false)} />}
       {sheet && <ContactSheetView roll={roll} frames={frames} onClose={() => setSheet(false)} />}

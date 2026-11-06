@@ -6,15 +6,20 @@ import { Sheet, SheetBtn } from '../overlay'
 import type { PickedFile } from '../pick'
 import { useTheme } from '../theme'
 import { ArchiveImport } from './ArchiveImport'
+import { useNav } from '../App'
 
 const colors = ['#DE542E', '#0A7AFF', '#34A853', '#8E5CD9', '#F08A00', '#14A3A3', '#E5488A', '#8D6E4C', '#5856D6', '#2FB38A']
 
 export function PhotoImportFlow({ photos, onClose }: { photos: PickedFile[]; onClose: () => void }) {
+  const nav = useNav()
   const [sets, setSets] = useState<PickedFile[][] | null>(null)
   const [step, setStep] = useState(0)
   if (sets && sets[step]) {
     return <ArchiveImport key={step} presetFiles={sets[step]} stepLabel={sets.length > 1 ? `${step + 1} / ${sets.length}` : undefined}
-      onClose={onClose} onSaved={() => { if (step + 1 < sets.length) setStep(step + 1); else onClose() }} />
+      onClose={onClose} onSaved={(rollId) => {
+        if (step + 1 < sets.length) setStep(step + 1)
+        else { nav.showRoll(rollId); onClose() }
+      }} />
   }
   return <PhotoSplit photos={photos} onCancel={onClose} onDone={(s) => { setSets(s); setStep(0) }} />
 }

@@ -27,16 +27,28 @@ window.visualViewport?.addEventListener('resize', pinTabbar)
 
 // 갤럭시·안드로이드에서 키보드가 입력칸을 가리면 그 칸이 보이게 올린다.
 // 시트 안은 시트가 직접 스크롤한다. 여기서 문서를 밀면 아이폰이 커서를 시트 밖(뒤 화면·메모)으로 보낸다.
-document.addEventListener('focusin', (e) => {
-  const t = e.target
+// 키보드가 화면을 줄이지 않고 위에 덮기만 할 때도, 칸이 보이는 영역 아래면 올린다.
+const revealPageField = (t: EventTarget | null) => {
   if (!(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement)) return
   if (t.closest('.sheet-root')) return
   if (t.type === 'file' || t.type === 'checkbox' || t.type === 'radio' || t.type === 'color' || t.type === 'range') return
-  window.setTimeout(() => {
-    const vv = window.visualViewport
-    if (vv && vv.height > window.innerHeight * 0.85) return
-    t.scrollIntoView({ block: 'center', inline: 'nearest' })
-  }, 280)
+  const panel = (t.closest('.field') as HTMLElement | null) ?? t
+  const vv = window.visualViewport
+  const viewH = vv?.height ?? window.innerHeight
+  const touch = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700
+  const covered = touch && viewH > window.innerHeight * 0.85 ? Math.round(window.innerHeight * 0.42) : 0
+  const top = (vv?.offsetTop ?? 0) + 12
+  const bottom = (vv?.offsetTop ?? 0) + viewH - 12 - covered
+  const rect = panel.getBoundingClientRect()
+  if (rect.bottom > bottom) window.scrollBy({ top: rect.bottom - bottom + 16, behavior: 'smooth' })
+  else if (rect.top < top) window.scrollBy({ top: rect.top - top - 8, behavior: 'smooth' })
+}
+document.addEventListener('focusin', (e) => {
+  window.setTimeout(() => revealPageField(e.target), 60)
+  window.setTimeout(() => revealPageField(e.target), 320)
+})
+window.visualViewport?.addEventListener('resize', () => {
+  window.setTimeout(() => revealPageField(document.activeElement), 80)
 })
 
 // 내가 만든 필름을 먼저 불러온 뒤 그린다 (필름 이름이 처음부터 보이게). 바뀌면 다시 채운다.

@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { pushOverlay } from '../backStack'
 import type { Camera, Roll, RollStatus } from '../core/types'
 import { statusName } from '../core/types'
 import type { FilmStock } from '../core/films'
@@ -153,6 +154,7 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       window.removeEventListener('keydown', onKey)
     }
   }, [])
+  useEffect(() => pushOverlay(() => onCloseRef.current()), [])
   useEffect(() => {
     if (!shield) return
     const t = window.setTimeout(() => setShieldOn(false), 700)
@@ -223,19 +225,33 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
         el.scrollLeft = el.scrollWidth
       }
     }
-    const reveal = (target: EventTarget | null) => {
-      if (!(target instanceof HTMLElement) || !target.matches('input, textarea, select')) return
+    const revealNow = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement) || !sheet.isConnected) return
+      if (!target.matches('input, textarea, select')) return
       const field = target.closest('.field') ?? target
-      window.setTimeout(() => {
-        if (!sheet.isConnected) return
-        const box = sheet.getBoundingClientRect()
-        const rect = field.getBoundingClientRect()
-        const top = box.top + 72
-        const bottom = Math.min(box.bottom, (vv?.offsetTop ?? 0) + (vv?.height ?? window.innerHeight)) - 16
-        if (rect.bottom > bottom) sheet.scrollTop += rect.bottom - bottom
-        else if (rect.top < top) sheet.scrollTop -= top - rect.top
-        pinCaret(target)
-      }, 60)
+      const box = sheet.getBoundingClientRect()
+      const top = box.top + 72
+      const viewH = vv?.height ?? window.innerHeight
+      // 키보드가 화면을 줄이지 않고 덮기만 하면 visualViewport가 그대로다. 그때는 아래쪽을 키보드로 보고, 그만큼 더 스크롤되게 여백을 둔다.
+      const touch = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700
+      const covered = touch && viewH > window.innerHeight * 0.85 ? Math.round(window.innerHeight * 0.42) : 0
+      sheet.style.paddingBottom = covered > 0 ? `${covered + 24}px` : ''
+      const fieldBox = field.getBoundingClientRect()
+      const bottom = Math.min(box.bottom, (vv?.offsetTop ?? 0) + viewH) - 20 - covered
+      const room = bottom - top
+      let edge = fieldBox.bottom
+      const suggest = field.nextElementSibling
+      if (suggest instanceof HTMLElement && suggest.classList.contains('suggest') && suggest.getBoundingClientRect().bottom - fieldBox.top <= room) {
+        edge = suggest.getBoundingClientRect().bottom
+      }
+      if (edge > bottom) sheet.scrollTop += edge - bottom + 8
+      else if (fieldBox.top < top) sheet.scrollTop -= top - fieldBox.top + 8
+      pinCaret(target)
+    }
+    const reveal = (target: EventTarget | null) => {
+      revealNow(target)
+      window.setTimeout(() => revealNow(target), 80)
+      window.setTimeout(() => revealNow(target), 320)
     }
     const fit = () => {
       if (!vv || drag.current) return
@@ -270,7 +286,10 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       lastVV = height
       fit()
       // 키보드가 올라오며 커서가 빠질 때만 되돌린다. 내릴 때는 두지 않는다.
-      if (opening) requestAnimationFrame(() => requestAnimationFrame(restore))
+      if (opening) {
+        requestAnimationFrame(() => requestAnimationFrame(restore))
+        reveal(document.activeElement)
+      }
     }
     const onFocusIn = (e: FocusEvent) => {
       if (keep(e.target)) held = e.target
@@ -333,6 +352,7 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       root.style.height = ''
       root.style.bottom = ''
       sheet.style.maxHeight = ''
+      sheet.style.paddingBottom = ''
       if (lockedHere) {
         delete body.dataset.sheetLock
         body.style.position = prev.position
@@ -412,6 +432,9 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
 export function Confirm({ message, action = '삭제', safe, onConfirm, onCancel }: {
   message: string; action?: string; safe?: boolean; onConfirm: () => void; onCancel: () => void
 }) {
+  const cancelRef = useRef(onCancel)
+  cancelRef.current = onCancel
+  useEffect(() => pushOverlay(() => cancelRef.current()), [])
   return createPortal(
     <div className="alert-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}>
       <div className="alert" role="alertdialog" aria-label={message}>

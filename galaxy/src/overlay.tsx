@@ -1,6 +1,6 @@
 // 웹 common.tsx의 Sheet·Confirm·useToast, .menu 를 갤럭시로 옮긴 것
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Animated, Keyboard, Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { Animated, findNodeHandle, Keyboard, Modal, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native'
 import { BlurView } from 'expo-blur'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from './theme'
@@ -18,6 +18,44 @@ export function SheetBtn({ label, onPress, accent, disabled }: { label: string; 
       <Text style={{ color: accent ? c.safelight : c.ink, fontSize: 17, fontWeight: accent ? '600' : '500' }}>{label}</Text>
     </Pressable>
   )
+}
+
+const overlayClosers: Array<() => void> = []
+
+/** 안드로이드 뒤로: 열려 있는 입력 창이 있으면 화면 대신 그 창만 닫는다. */
+export function closeTopOverlay() {
+  const close = overlayClosers.at(-1)
+  if (!close) return false
+  close()
+  return true
+}
+
+function useOverlayBack(onClose: () => void) {
+  const ref = useRef(onClose)
+  ref.current = onClose
+  useEffect(() => {
+    const fn = () => ref.current()
+    overlayClosers.push(fn)
+    return () => {
+      const i = overlayClosers.lastIndexOf(fn)
+      if (i >= 0) overlayClosers.splice(i, 1)
+    }
+  }, [])
+}
+
+/** 키보드에 가려진 입력칸을 스크롤 영역 안으로 올린다. */
+export function useScrollFocusedField(scrollRef: RefObject<ScrollView | null>) {
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      const input = TextInput.State.currentlyFocusedInput?.()
+      const node = input ? findNodeHandle(input as never) : null
+      const responder = scrollRef.current?.getScrollResponder?.() as { scrollResponderScrollNativeHandleToKeyboard?: (n: number, extra: number, prevent: boolean) => void } | undefined
+      if (node && responder?.scrollResponderScrollNativeHandleToKeyboard) {
+        responder.scrollResponderScrollNativeHandleToKeyboard(node, 96, true)
+      }
+    })
+    return () => sub.remove()
+  }, [scrollRef])
 }
 
 function useKeyboard() {
@@ -40,6 +78,9 @@ export function Sheet({ title, onClose, left, right, children, page, scroll = tr
   const insets = useSafeAreaInsets()
   const { height } = useWindowDimensions()
   const keyboard = useKeyboard()
+  const scrollRef = useRef<ScrollView>(null)
+  useScrollFocusedField(scrollRef)
+  useOverlayBack(onClose)
   const head = (
     <View style={{ minHeight: 64, paddingTop: 8, paddingBottom: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <View style={{ flex: 1, alignItems: 'flex-start' }}>{left ?? <SheetBtn label="닫기" onPress={onClose} />}</View>
@@ -48,7 +89,7 @@ export function Sheet({ title, onClose, left, right, children, page, scroll = tr
     </View>
   )
   const body = scroll ? (
-    <ScrollView keyboardShouldPersistTaps="handled" style={page ? { flex: 1 } : { flexGrow: 0 }}
+    <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" style={page ? { flex: 1 } : { flexGrow: 0 }}
       contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: (keyboard ? 12 : insets.bottom) + 28 }}>
       {children}
     </ScrollView>
@@ -86,6 +127,7 @@ export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onC
   busy?: boolean
 }) {
   const c = useTheme()
+  useOverlayBack(onCancel)
   const btn = (label: string, color: string, fn: () => void) => (
     <Pressable onPress={fn} style={({ pressed }) => ({ flex: 1, height: 48, borderRadius: 999, backgroundColor: c.fill, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.96 : 1 }] })}>
       <Text style={{ color, fontSize: 17, fontWeight: '600' }}>{label}</Text>
@@ -114,6 +156,7 @@ export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onC
 export function Menu({ items, onClose }: { items: { label: string; danger?: boolean; onPress: () => void }[]; onClose: () => void }) {
   const c = useTheme()
   const insets = useSafeAreaInsets()
+  useOverlayBack(onClose)
   const scale = useRef(new Animated.Value(0.9)).current
   useEffect(() => { Animated.timing(scale, { toValue: 1, duration: 180, useNativeDriver: true }).start() }, [scale])
   return (

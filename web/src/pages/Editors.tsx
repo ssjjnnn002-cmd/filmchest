@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
@@ -271,17 +271,18 @@ export function LabField({ value, onChange, id = 'lab-name' }: { value: string; 
   )
 }
 
-export function LabDropOff({ roll, onClose }: { roll: Roll; onClose: () => void }) {
+export function LabDropOff({ roll, onClose }: { roll: Roll; onClose: (ended?: boolean) => void }) {
   const [lab, setLab] = useState(roll.lab ?? '')
   const [date, setDate] = useState(roll.droppedAt ?? Date.now())
   const [nearby, setNearby] = useState(false)
+  const wasLoaded = useRef(roll.status === 'loaded').current
 
   const close = async () => {
     const current = await db.rolls.get(roll.id)
     if (current?.status === 'loaded') {
       await db.rolls.update(roll.id, { status: 'finished', finishedAt: current.finishedAt ?? Date.now() })
     }
-    onClose()
+    onClose(false)
   }
 
   const save = async () => {
@@ -291,7 +292,7 @@ export function LabDropOff({ roll, onClose }: { roll: Roll; onClose: () => void 
       status: roll.status === 'loaded' || roll.status === 'finished' ? 'atLab' : roll.status,
       finishedAt: roll.finishedAt ?? date,
     })
-    onClose()
+    onClose(wasLoaded)
   }
 
   return (

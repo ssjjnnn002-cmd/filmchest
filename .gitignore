@@ -32,3 +32,9 @@ build/
 
 # 갤럭시 APK 조각 (빌드할 때 생긴다)
 web/public/apk/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example

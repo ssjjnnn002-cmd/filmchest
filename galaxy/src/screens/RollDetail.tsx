@@ -219,7 +219,7 @@ export function RollDetail({ id }: { id: string }) {
           </Section>
         </Sheet>
       ) : null}
-      {dropOff ? <LabDropOff roll={roll} onClose={() => setDropOff(false)} /> : null}
+      {dropOff ? <LabDropOff roll={roll} onClose={(ended) => { setDropOff(false); if (ended) nav.toPending(roll.id) }} /> : null}
       {viewing !== null ? <FrameViewer frames={frames} start={viewing} onClose={() => setViewing(null)} /> : null}
       {framePrint ? <FramePrint roll={roll} frames={frames} onClose={() => setFramePrint(false)} /> : null}
       {sheet ? <ContactSheetView roll={roll} frames={frames} onClose={() => setSheet(false)} /> : null}

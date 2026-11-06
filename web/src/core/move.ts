@@ -1,6 +1,7 @@
 // 주소 이사: 예전 주소(Vercel)의 브라우저에 있는 기록·사진을 새 주소로 그대로 넘긴다.
 // 브라우저 저장소는 주소마다 따로라서, 예전 주소 화면이 새 주소 창을 열고 postMessage로 건넨다.
 import { db } from '../db'
+import { replaceUrl } from '../backStack'
 import { cameraPhotoBlob, saveCameraPhoto } from '../photoStore'
 
 export const OLD_SITE: string = import.meta.env.VITE_OLD_SITE ?? 'https://filmchest.vercel.app'
@@ -57,7 +58,7 @@ export function receiveFromOldSite(onDone: () => void) {
     for (const [id, blob] of Object.entries(photos)) await saveCameraPhoto(id, blob)
     for (const [k, v] of Object.entries(prefs)) if (localStorage.getItem(k) === null) localStorage.setItem(k, v)
     window.opener?.postMessage({ type: 'filmchest-done' }, OLD_SITE)
-    history.replaceState(null, '', '/')
+    replaceUrl('/')
     onDone()
   })
   window.opener.postMessage({ type: 'filmchest-ready' }, OLD_SITE)

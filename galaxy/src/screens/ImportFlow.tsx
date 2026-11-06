@@ -68,7 +68,9 @@ export function ImportFlow({ files, rollId, onClose }: { files: PickedFile[]; ro
       const lensAt = (frame: number) => { const id = lensIdAt(roll, frame); return id ? lensMap.get(id) : undefined }
       const updated = await importScans(set, roll, camera, lensAt, setProgress, meterOffset)
       setRoll(updated)
-      setPhase('done')
+      nav.toast('롤 보관함에 기록했어요')
+      nav.showRoll(updated.id)
+      onClose()
     } catch (e) {
       setError(`저장하지 못했어요. 기기 저장 공간이 부족할 수 있어요. (${(e as Error).message})`)
       setPhase('error')

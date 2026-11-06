@@ -22,6 +22,7 @@ import { Welcome } from './ui/Welcome'
 import { driveAvailable, driveConnected } from './core/drive'
 import { isOldSite } from './core/move'
 import { getPref, inClaudeHost } from './platform'
+import { goBack, noteNavigation, replaceUrl, reuseNextOverlay, startBackStack, type BackSnap } from './backStack'
 
 export type Tab = 'library' | 'shooting' | 'pending' | 'rolls'
 type Screen = { type: 'camera'; id: string } | { type: 'roll'; id: string }
@@ -38,6 +39,10 @@ interface Nav {
   setTab: (t: Tab) => void
   push: (s: Screen, inTab?: Tab) => void
   pop: () => void
+  /** 그 롤 화면을 롤 보관함에서 연다 */
+  showRoll: (id: string) => void
+  /** 촬영을 막 끝낸 롤이면 현상 스캔 탭으로 간다 */
+  toPending: (rollId: string) => void
   loadFilm: (cameraId?: string) => void
   importScans: (files: File[], rollId?: string) => void
   /** 바깥에서 받은 zip들: 어디로 넣을지 묻는 창을 띄운다 */
@@ -88,7 +93,7 @@ export function App() {
       else if (photos.length) setIncomingPhotos(photos)
     }
     if (new URLSearchParams(location.search).has('shared')) {
-      history.replaceState(null, '', location.pathname)
+      replaceUrl(location.pathname)
       void caches.open('filmchest-share').then(async (cache) => {
         const keys = await cache.keys()
         const files = await Promise.all(keys.map(async (k) => {
@@ -136,31 +141,44 @@ export function App() {
   }
   const remember = () => scrollPos.current.set(screenKey(tab), window.scrollY)
 
+  const land = (next: BackSnap, motion: Motion) => {
+    remember()
+    noteNavigation(next)
+    setMotion(motion)
+    setTabState(next.tab as Tab)
+    setStacks(next.stacks as Record<Tab, Screen[]>)
+  }
   const nav: Nav = {
     tab,
     setTab: (t) => {
       remember()
       if (t === tab) {
         // 같은 탭을 다시 누르면: 안쪽 화면이면 처음으로, 처음 화면이면 맨 위로
-        if (stacks[t].length) { setMotion('pop'); setStacks((s) => ({ ...s, [t]: [] })) }
+        if (stacks[t].length) land({ tab, stacks: { ...stacks, [t]: [] } }, 'pop')
         else window.scrollTo({ top: 0, behavior: 'smooth' })
         return
       }
-      setMotion(tabOrder.indexOf(t) > tabOrder.indexOf(tab) ? 'tab-left' : 'tab-right')
-      setTabState(t)
+      land({ tab: t, stacks }, tabOrder.indexOf(t) > tabOrder.indexOf(tab) ? 'tab-left' : 'tab-right')
     },
     push: (s, inTab) => {
-      remember()
       const t = inTab ?? tab
-      setMotion('push')
       scrollPos.current.delete(`${t}/${s.type}/${s.id}`)
-      setStacks((st) => ({ ...st, [t]: [...st[t], s] }))
+      land({ tab, stacks: { ...stacks, [t]: [...stacks[t], s] } }, 'push')
     },
     pop: () => {
+      if (goBack()) return
       if (!stacks[tab].length) return
       scrollPos.current.delete(screenKey(tab))
       setMotion('pop')
       setStacks((st) => ({ ...st, [tab]: st[tab].slice(0, -1) }))
+    },
+    showRoll: (id) => {
+      const rolls = [...stacks.rolls.filter((s) => !(s.type === 'roll' && s.id === id)), { type: 'roll' as const, id }]
+      land({ tab: 'rolls', stacks: { ...stacks, rolls } }, 'push')
+    },
+    toPending: (rollId) => {
+      const shooting = stacks.shooting.filter((s) => !(s.type === 'roll' && s.id === rollId))
+      land({ tab: 'pending', stacks: { ...stacks, shooting } }, tabOrder.indexOf('pending') >= tabOrder.indexOf(tab) ? 'tab-left' : 'tab-right')
     },
     loadFilm: (cameraId) => setLoadFilmFor({ cameraId }),
     importScans: (files, rollId) => setImportReq({ files, rollId }),
@@ -173,7 +191,7 @@ export function App() {
       const batch = files.map((file, i) => ({ id: uid(), file, index: i + 1, total: files.length }))
       const next = [...zipQueueRef.current, ...batch]
       setQueue(next, activeZipId ?? batch[0].id)
-      setTabState('pending')
+      if (tab !== 'pending') land({ tab: 'pending', stacks }, 'tab-left')
       void Promise.all(batch.map((job) => db.zipQueue.put({
         id: job.id, name: job.file.name, blob: job.file, index: job.index, total: job.total, addedAt: Date.now(),
       })))
@@ -193,9 +211,24 @@ export function App() {
     const index = prev.findIndex((job) => job.id === id)
     const next = prev.filter((job) => job.id !== id)
     const following = index >= 0 ? prev[index + 1] : undefined
-    setQueue(next, following && next.some((job) => job.id === following.id) ? following.id : (next[0]?.id ?? null))
+    const active = following && next.some((job) => job.id === following.id) ? following.id : (next[0]?.id ?? null)
+    setQueue(next, active)
     void db.zipQueue.delete(id)
+    return active != null
   }
+
+  const snapRef = useRef({ tab, stacks })
+  snapRef.current = { tab, stacks }
+  const rememberRef = useRef(remember)
+  rememberRef.current = remember
+  useEffect(() => startBackStack((restored) => {
+    rememberRef.current()
+    const cur = snapRef.current
+    const same = cur.tab === restored.tab && JSON.stringify(cur.stacks) === JSON.stringify(restored.stacks)
+    if (!same) setMotion('pop')
+    setTabState(restored.tab as Tab)
+    setStacks(restored.stacks as Record<Tab, Screen[]>)
+  }), [])
 
   const currentKey = screenKey(tab)
   useLayoutEffect(() => {
@@ -239,7 +272,7 @@ export function App() {
       if (done) {
         scrollPos.current.delete(currentKey)
         setMotion('none')
-        setStacks((st) => ({ ...st, [tab]: st[tab].slice(0, -1) }))
+        if (!goBack()) setStacks((st) => ({ ...st, [tab]: st[tab].slice(0, -1) }))
       }
     }, 220)
   }
@@ -281,7 +314,10 @@ export function App() {
       {loadFilmFor && (
         <LoadFilm initialCameraId={loadFilmFor.cameraId} onClose={(loadedRoll) => {
           setLoadFilmFor(null)
-          if (loadedRoll) { setTabState('shooting'); toast('필름을 장착했어요') }
+          if (loadedRoll) {
+            nav.setTab('shooting')
+            toast('필름을 장착했어요')
+          }
         }} />
       )}
       {incomingPhotos && <PhotoImportFlow photos={incomingPhotos} onClose={() => setIncomingPhotos(null)} />}
@@ -291,7 +327,11 @@ export function App() {
         <ArchiveImport key={activeZip.id} presetFile={activeZip.file}
           stepLabel={`${activeZip.index} / ${activeZip.total}`}
           onClose={() => setActiveZipId(null)}
-          onSaved={() => finishZip(activeZip.id)} />
+          onSaved={(rollId) => {
+            const more = finishZip(activeZip.id)
+            if (more) reuseNextOverlay()
+            else nav.showRoll(rollId)
+          }} />
       )}
       {toastNode}
       {intro && <Intro onDone={() => setIntro(false)} />}

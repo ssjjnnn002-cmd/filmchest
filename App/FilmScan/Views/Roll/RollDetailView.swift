@@ -31,6 +31,8 @@ struct RollDetailView: View {
 
     private func lensName(_ id: UUID) -> String { allLenses.first { $0.id == id }?.displayName ?? "렌즈 모름" }
     @State private var showDropOff = false
+    /// 현상소 창을 열 때 아직 촬영 중이었는지. 저장해서 맡긴 경우에만 현상 스캔으로 넘어간다.
+    @State private var dropOffWasLoaded = false
     /// 사진 앱 정보 맞추기 결과 (잠깐 보여 준다)
     @State private var photoNote: String?
     @State private var photoTask: Task<Void, Never>?
@@ -304,6 +306,9 @@ struct RollDetailView: View {
         }
         .sheet(item: $editingPlace) { PlaceEditView(roll: roll, segment: $0) }
         .sheet(isPresented: $showDropOff, onDismiss: endShootingIfNeeded) { LabDropOffView(roll: roll) }
+        .onChange(of: showDropOff) { _, open in
+            if open { dropOffWasLoaded = roll.status == .loaded }
+        }
         .sheet(isPresented: Binding(get: { shotEdit != nil }, set: { if !$0 { shotEdit = nil } })) {
             if let shotEdit { FrameShotEditView(roll: roll, pos: shotEdit) }
         }
@@ -456,11 +461,17 @@ struct RollDetailView: View {
     }
 
     /// 현상 맡기기를 저장하지 않고 닫으면 촬영만 끝난 상태로 남긴다.
+    /// 촬영 중이던 롤을 맡겼으면 현상 스캔으로 넘어간다.
     private func endShootingIfNeeded() {
         if roll.status == .loaded {
             roll.status = .finished
             roll.finishedAt = Date()
         }
+        if dropOffWasLoaded, roll.status == .atLab {
+            router.tab = .pending
+            dismiss()
+        }
+        dropOffWasLoaded = false
     }
 
     private func deleteDay(_ day: ShootingDay) {
