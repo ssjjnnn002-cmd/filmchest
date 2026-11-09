@@ -108,7 +108,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           </div>
           <p className="footnote">
             내려받은 파일을 열어 설치하세요. 처음엔 '출처를 알 수 없는 앱 설치'를 허용해 달라고 나와요.
-            갤럭시에 설치되는 필름함 앱이에요. 카메라와 롤 기록은 그 앱 안에 저장돼요.
+            갤럭시에 설치되는 필름함 앱이에요. 같은 구글 계정으로 로그인하면 기록이 이어져요.
           </p>
         </div>
       )}
