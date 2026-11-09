@@ -2,14 +2,14 @@
   "expo": {
     "name": "필름함",
     "slug": "filmchest",
-    "version": "1.5.7",
+    "version": "1.5.8",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "filmchest",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "app.vercel.filmchest",
-      "versionCode": 17,
+      "versionCode": 18,
       "adaptiveIcon": {
         "backgroundColor": "#141414",
         "foregroundImage": "./assets/android-icon-foreground.png",

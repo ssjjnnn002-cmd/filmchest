@@ -1,5 +1,6 @@
 // 웹 common.tsx의 Sheet·Confirm·useToast, .menu 를 갤럭시로 옮긴 것
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { fieldFocusListeners } from './fieldFocus'
 import { ActivityIndicator, Animated, findNodeHandle, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native'
 import { Glass } from './glass'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -44,19 +45,33 @@ function useOverlayBack(onClose: () => void) {
   }, [])
 }
 
-/** 키보드에 가려진 입력칸을 스크롤 영역 안으로 올린다. */
+
+/** 키보드에 가려진 입력칸을 스크롤 영역 안으로 올린다.
+ *  칸에 들어갈 때 한 번만 맞춘다. 그 뒤 사용자가 스크롤하면 그대로 둔다 (키보드 높이가 조금 바뀌어도 다시 끌어오지 않는다). */
 export function useScrollFocusedField(scrollRef: RefObject<ScrollView | null>) {
   useEffect(() => {
-    const sub = Keyboard.addListener('keyboardDidShow', () => {
+    let shown = false
+    let revealed: number | null = null
+    const reveal = () => {
       const input = TextInput.State.currentlyFocusedInput?.()
       const node = input ? findNodeHandle(input as never) : null
+      if (!node || node === revealed) return
       const responder = scrollRef.current?.getScrollResponder?.() as { scrollResponderScrollNativeHandleToKeyboard?: (n: number, extra: number, prevent: boolean) => void } | undefined
-      if (node && responder?.scrollResponderScrollNativeHandleToKeyboard) {
-        responder.scrollResponderScrollNativeHandleToKeyboard(node, 96, true)
-      }
-    })
-    return () => sub.remove()
+      if (!responder?.scrollResponderScrollNativeHandleToKeyboard) return
+      revealed = node
+      responder.scrollResponderScrollNativeHandleToKeyboard(node, 96, true)
+    }
+    const show = Keyboard.addListener('keyboardDidShow', () => { if (!shown) { shown = true; reveal() } })
+    const hide = Keyboard.addListener('keyboardDidHide', () => { shown = false; revealed = null })
+    const focus = () => { if (shown) setTimeout(reveal, 50) }
+    fieldFocusListeners.add(focus)
+    return () => { show.remove(); hide.remove(); fieldFocusListeners.delete(focus) }
   }, [scrollRef])
+}
+
+/** 입력칸 밖(버튼·입력칸이 아닌 곳)을 누르면 키보드를 닫는다. 스크롤은 누름으로 치지 않는다 */
+export const dismissOnTap = {
+  onStartShouldSetResponder: () => { if (Keyboard.isVisible()) Keyboard.dismiss(); return false },
 }
 
 function useKeyboard() {
@@ -186,7 +201,7 @@ export function Sheet({ title, onClose, left, right, children, page, scroll = tr
   const max = Math.round(height - Math.max(insets.top, 12) - 12 - keyboard)
   const inner = page ? (
     <OverlayBoundary>
-      <View style={{ flex: 1, backgroundColor: c.paper, paddingTop: nested ? 0 : insets.top, paddingBottom: keyboard }}>
+      <View {...dismissOnTap} style={{ flex: 1, backgroundColor: c.paper, paddingTop: nested ? 0 : insets.top, paddingBottom: keyboard }}>
         {head}
         {body}
       </View>
@@ -195,7 +210,7 @@ export function Sheet({ title, onClose, left, right, children, page, scroll = tr
     <OverlayBoundary>
       <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboard }}>
         <Pressable onPress={onClose} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)' }} />
-        <View style={{ maxHeight: max, height: scroll ? undefined : max, backgroundColor: c.paper, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden',
+        <View {...dismissOnTap} style={{ maxHeight: max, height: scroll ? undefined : max, backgroundColor: c.paper, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden',
           shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 40, elevation: 12 }}>
           <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: c.faint, opacity: 0.6, alignSelf: 'center', marginTop: 6 }} />
           {head}

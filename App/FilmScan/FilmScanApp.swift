@@ -10,6 +10,9 @@ struct FilmScanApp: App {
     @State private var container = Store.makeContainer()
 
     init() {
+        #if os(iOS)
+        KeyboardHelper.shared.install()
+        #endif
         CanisterCache.prewarm()
         DriveUploader.shared.resume()
     }

@@ -2,6 +2,7 @@
 import { Children, Fragment, isValidElement, useEffect, useState, type ReactNode } from 'react'
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import Slider from '@react-native-community/slider'
+import { notifyFieldFocus } from './fieldFocus'
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Switch, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native'
 import { Icon } from './icons'
 import { watchWork } from './core/work'
@@ -93,7 +94,7 @@ export function Field({ label, children, stack, suffix, ...input }: { label: str
       <View style={{ minHeight: 52, paddingVertical: 8, paddingHorizontal: 18, gap: 4 }}>
         <Text style={{ fontSize: 13, color: c.muted }}>{label}</Text>
         {children ?? (
-          <TextInput placeholderTextColor={c.faint} {...input}
+          <TextInput placeholderTextColor={c.faint} {...input} onFocus={(e) => { notifyFieldFocus(); input.onFocus?.(e) }}
             style={[{ fontSize: 17, color: c.ink, paddingVertical: 3, paddingHorizontal: 0 }, input.multiline ? { minHeight: 64, textAlignVertical: 'top', lineHeight: 23 } : null]} />
         )}
       </View>
@@ -104,7 +105,8 @@ export function Field({ label, children, stack, suffix, ...input }: { label: str
       <Text style={{ fontSize: 17, color: c.ink, minWidth: 72, maxWidth: '45%' }} numberOfLines={1}>{label}</Text>
       <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end', flexDirection: suffix ? 'row' : 'column', justifyContent: 'flex-end', gap: 4 }}>
         {children ?? (
-          <TextInput placeholderTextColor={c.faint} {...input}
+          <TextInput placeholderTextColor={c.faint} returnKeyType="done" submitBehavior="blurAndSubmit" {...input}
+            onFocus={(e) => { notifyFieldFocus(); input.onFocus?.(e) }}
             style={{ alignSelf: 'stretch', flex: suffix ? 1 : undefined, fontSize: 17, color: c.ink, paddingVertical: 3, paddingHorizontal: 0, textAlign: 'right' }} />
         )}
         {suffix ? <Text style={{ fontSize: 17, color: c.muted, alignSelf: 'center' }}>{suffix}</Text> : null}

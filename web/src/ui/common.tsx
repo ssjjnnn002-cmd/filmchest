@@ -232,13 +232,10 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       const field = target.closest('.field') ?? target
       const box = sheet.getBoundingClientRect()
       const top = box.top + 72
+      // 키보드 높이는 짐작하지 않는다: 보이는 영역(visualViewport)이 키보드만큼 줄어든 것만 쓴다
       const viewH = vv?.height ?? window.innerHeight
-      // 키보드가 화면을 줄이지 않고 덮기만 하면 visualViewport가 그대로다. 그때는 아래쪽을 키보드로 보고, 그만큼 더 스크롤되게 여백을 둔다.
-      const touch = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700
-      const covered = touch && viewH > window.innerHeight * 0.85 ? Math.round(window.innerHeight * 0.42) : 0
-      sheet.style.paddingBottom = covered > 0 ? `${covered + 24}px` : ''
       const fieldBox = field.getBoundingClientRect()
-      const bottom = Math.min(box.bottom, (vv?.offsetTop ?? 0) + viewH) - 20 - covered
+      const bottom = Math.min(box.bottom, (vv?.offsetTop ?? 0) + viewH) - 20
       const room = bottom - top
       let edge = fieldBox.bottom
       const suggest = field.nextElementSibling
@@ -249,10 +246,13 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       else if (fieldBox.top < top) sheet.scrollTop -= top - fieldBox.top + 8
       pinCaret(target)
     }
+    // 칸에 들어갈 때·키보드가 올라올 때만 맞춘다. 그 사이 손으로 스크롤하면 더 맞추지 않는다
+    let pending: number[] = []
+    const cancelReveal = () => { pending.forEach((t) => window.clearTimeout(t)); pending = [] }
     const reveal = (target: EventTarget | null) => {
+      cancelReveal()
       revealNow(target)
-      window.setTimeout(() => revealNow(target), 80)
-      window.setTimeout(() => revealNow(target), 320)
+      pending = [window.setTimeout(() => revealNow(target), 80), window.setTimeout(() => revealNow(target), 320)]
     }
     const fit = () => {
       if (!vv || drag.current) return
@@ -335,6 +335,8 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
     fit()
     vv?.addEventListener('resize', onResize)
     vv?.addEventListener('scroll', fit)
+    sheet.addEventListener('touchstart', cancelReveal, { passive: true })
+    sheet.addEventListener('wheel', cancelReveal, { passive: true })
     root.addEventListener('focusin', onFocusIn)
     root.addEventListener('input', onInput)
     root.addEventListener('focusout', onFocusOut)
@@ -344,6 +346,9 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       window.clearTimeout(settleTimer)
       vv?.removeEventListener('resize', onResize)
       vv?.removeEventListener('scroll', fit)
+      sheet.removeEventListener('touchstart', cancelReveal)
+      sheet.removeEventListener('wheel', cancelReveal)
+      cancelReveal()
       root.removeEventListener('focusin', onFocusIn)
       root.removeEventListener('input', onInput)
       root.removeEventListener('focusout', onFocusOut)

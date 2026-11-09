@@ -1,7 +1,7 @@
 // 웹 PageHeader + .page: 위에 동그란 유리 버튼, 아래 큰 제목. 스크롤하면 가운데 작은 제목.
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Animated, Pressable, Text, View, type ScrollView } from 'react-native'
-import { useScrollFocusedField } from './overlay'
+import { dismissOnTap, useScrollFocusedField } from './overlay'
 import { Glass } from './glass'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Icon } from './icons'
@@ -75,7 +75,7 @@ export function Page({ title, onBack, left, actions, large = true, children, foo
   }, [])
   const head = insets.top + 10 + 44 + 8
   return (
-    <View style={{ flex: 1, backgroundColor: c.paper }}>
+    <View {...dismissOnTap} style={{ flex: 1, backgroundColor: c.paper }}>
       <Animated.ScrollView ref={ref as never} keyboardShouldPersistTaps="handled"
         scrollEventThrottle={16}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y } } }], {
