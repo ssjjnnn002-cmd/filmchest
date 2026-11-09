@@ -543,7 +543,13 @@ enum DriveSync {
             try await Task.sleep(for: .seconds(1))
         }
         onStep("이 기기에서 지우는 중…")
-        // 먼저 연결을 끊는다: 지운 빈 기록이 드라이브·파일 앱 폴더 백업을 덮어쓰지 않게
+        try wipeDevice(context)
+    }
+
+    /// 이 기기의 기록을 모두 지운다 (로그아웃, 모든 기록 지우기). 웹·갤럭시 wipeLocal과 같음.
+    /// 먼저 연결을 끊는다: 지운 빈 기록이 드라이브·파일 앱 폴더 백업을 덮어쓰지 않게. 사진 앱의 사진은 그대로
+    @MainActor
+    static func wipeDevice(_ context: ModelContext) throws {
         GoogleAuth.signOut()
         DrivePhotos.forget()
         forget()

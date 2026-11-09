@@ -7,7 +7,7 @@ import { lastBackupAt, markFileBackup } from '../core/backupNudge'
 import { useBackupRefresh } from '../ui/BackupNudge'
 import { MoveGuide } from '../ui/MoveNotice'
 import { Welcome } from '../ui/Welcome'
-import { driveAccount, driveAvailable, driveConnected, signOutAndClear } from '../core/drive'
+import { disconnectDrive, driveAccount, driveAvailable, driveConnected, signOutAndClear } from '../core/drive'
 import { CloudBackup, cloudStatus } from './CloudBackup'
 import { Stats } from './Stats'
 import { restorePhotos } from '../core/restore'
@@ -90,8 +90,9 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           <div className="row static"><span className="grow">이 브라우저에 저장된 양</span><span className="value">{bytesText(usage?.used) ?? '—'}</span></div>
         </div>
         <p className="footnote">
-          기록과 사진은 이 기기의 이 브라우저 안에만 저장돼요. 서버로 올라가지 않아서 다른 기기나 다른 사람에게는 보이지 않아요.
-          브라우저 데이터를 지우면 함께 지워지니, 중요한 롤은 사진을 내려받아 두세요.
+          {driveConnected()
+            ? '기록과 사진은 이 브라우저와 내 구글 드라이브에 저장돼요. 같은 계정으로 로그인한 기기에서만 보여요.'
+            : '기록과 사진은 이 브라우저 안에만 저장돼요. 브라우저 데이터를 지우면 함께 지워지니, 구글로 로그인하거나 백업해 두세요.'}
         </p>
         {inClaudeHost() && <p className="footnote">이 화면에서는 위치 확인과 장소 검색을 쓸 수 없어요. 장소는 이름과 좌표를 직접 넣어 주세요.</p>}
       </div>
@@ -141,7 +142,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         <button className="row" style={{ color: '#c0392b' }} onClick={() => setConfirm(true)}>모든 기록 지우기</button>
       </div>
 
-      <p className="footnote" style={{ textAlign: 'center', marginTop: 24 }}>필름함 · Filmchest · {__APP_VERSION__}</p>
+      <p className="footnote" style={{ textAlign: 'center', marginTop: 24 }}>필름함 {__APP_VERSION__}</p>
       {privacy && (
         <Sheet title="개인정보 처리방침" onClose={() => setPrivacy(false)}>
           <PrivacyPolicy />
@@ -152,9 +153,9 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         <Confirm message={note} action="확인" onCancel={() => setNote(undefined)} onConfirm={async () => setNote(undefined)} />
       )}
       {confirm && (
-        <Confirm message="카메라, 렌즈, 롤, 저장한 사진을 모두 지울까요? 되돌릴 수 없어요." action="모두 지우기"
+        <Confirm message={driveConnected() ? '카메라, 렌즈, 롤, 저장한 사진을 이 기기에서 모두 지울까요? 구글 드라이브의 기록은 그대로 두고 로그아웃돼요. 되돌릴 수 없어요.' : '카메라, 렌즈, 롤, 저장한 사진을 모두 지울까요? 되돌릴 수 없어요.'} action="모두 지우기"
           onCancel={() => setConfirm(false)}
-          onConfirm={() => { void withWork(async () => { await wipeLocal(); setConfirm(false); onClose() }) }} />
+          onConfirm={() => { void withWork(async () => { if (driveConnected()) disconnectDrive(); await wipeLocal(); setConfirm(false); onClose() }) }} />
       )}
       {spending && <Stats onClose={() => setSpending(false)} />}
       {backupOpen && (

@@ -168,7 +168,7 @@ struct MultiRollImportView: View {
                         Picker("롤", selection: binding(for: zip)) {
                             Text("고르지 않음").tag(UUID?.none)
                             ForEach(rolls.filter { r in pick[zip] == r.id || !pick.values.contains(r.id) }) { r in
-                                Text("\(r.filmName) · \(r.cameraLabel)").tag(Optional(r.id))
+                                Text([r.filmName, r.cameraLabel].compactMap { $0 }.joined(separator: " · ")).tag(Optional(r.id))
                             }
                         }
                         .disabled(saving || savedCount != nil)

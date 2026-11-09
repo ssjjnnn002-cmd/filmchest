@@ -12,6 +12,8 @@ struct SettingsView: View {
     @State private var showPaywall = false
     @State private var showLogin = false
     @State private var confirmLogout = false
+    @State private var confirmWipe = false
+    @State private var usedBytes: Int64?
     @State private var logoutStep: String?
     @State private var accountRevision = 0
     @State private var note: String?
@@ -57,6 +59,17 @@ struct SettingsView: View {
                         LabeledContent("백업 및 복구", value: CloudStatus.text)
                     }
                 }
+                Section {
+                    LabeledContent("이 앱에 저장된 양", value: Resolution.bytes(usedBytes) ?? "—")
+                } header: {
+                    Text("저장")
+                } footer: {
+                    let _ = accountRevision
+                    Text(GoogleAuth.isConnected
+                         ? "기록과 사진은 이 앱과 내 구글 드라이브에 저장돼요. 같은 계정으로 로그인한 기기에서만 보여요."
+                         : "기록과 사진은 이 앱 안에만 저장돼요. 앱을 지우면 함께 지워지니, 구글로 로그인하거나 백업해 두세요.")
+                }
+
                 if Features.meter { meterSection }
 
                 Section {
@@ -102,6 +115,14 @@ struct SettingsView: View {
                 } header: {
                     Text("버전")
                 }
+
+                Section {
+                    Button("모든 기록 지우기", role: .destructive) { confirmWipe = true }
+                } footer: {
+                    Text("필름함 \(Self.appVersion)")
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 24)
+                }
             }
             .formStyle(.grouped)
             .filmKeyboard()
@@ -119,6 +140,20 @@ struct SettingsView: View {
                         logoutStep = nil
                         accountRevision += 1
                     }
+                }
+            }
+            .confirmationDialog(GoogleAuth.isConnected
+                                ? "카메라, 렌즈, 롤, 저장한 사진을 이 기기에서 모두 지울까요? 구글 드라이브의 기록은 그대로 두고 로그아웃돼요. 사진 앱의 사진은 그대로예요. 되돌릴 수 없어요."
+                                : "카메라, 렌즈, 롤, 저장한 사진을 모두 지울까요? 사진 앱의 사진은 그대로예요. 되돌릴 수 없어요.",
+                                isPresented: $confirmWipe, titleVisibility: .visible) {
+                Button("모두 지우기", role: .destructive) {
+                    do {
+                        try DriveSync.wipeDevice(context)
+                        dismiss()
+                    } catch {
+                        note = "지우지 못했어요. (\(error.localizedDescription))"
+                    }
+                    accountRevision += 1
                 }
             }
             .overlay {
@@ -144,7 +179,10 @@ struct SettingsView: View {
                 if Subscriptions.subscriptionEnabled { await Subscriptions.shared.refreshEntitlement() }
             }
             .navigationTitle("설정")
-            .onAppear { profiles = AppSettings.meterProfiles }
+            .onAppear {
+                profiles = AppSettings.meterProfiles
+                usedBytes = Self.storeSize()
+            }
             .toolbar {
                 if showsDoneButton {
                     ToolbarItem(placement: .confirmationAction) { Button("완료") { dismiss() } }
@@ -154,6 +192,18 @@ struct SettingsView: View {
         #if os(macOS)
         .frame(minWidth: 460, minHeight: 480)
         #endif
+    }
+
+    /// 기록 저장소 폴더(사진 썸네일 포함) 크기. 웹 '이 브라우저에 저장된 양'과 같은 자리
+    private static func storeSize() -> Int64 {
+        let fm = FileManager.default
+        guard let e = fm.enumerator(at: Store.directory, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileSizeKey]) else { return 0 }
+        var total: Int64 = 0
+        for case let url as URL in e {
+            let v = try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileSizeKey])
+            total += Int64(v?.totalFileAllocatedSize ?? v?.fileSize ?? 0)
+        }
+        return total
     }
 
     private var meterSection: some View {

@@ -1,7 +1,7 @@
 // 웹 pages/Settings.tsx
 import { useEffect, useState } from 'react'
 import { Welcome } from '../Welcome'
-import { driveAccount, driveConnected, signOutAndClear } from '../drive'
+import { disconnectDrive, driveAccount, driveConnected, signOutAndClear } from '../drive'
 import { notifyBackup } from '../core/backupNudge'
 import { Text, View } from 'react-native'
 import { db, wipeLocal, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll } from '../data'
@@ -80,9 +80,10 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
       ) : null}
       {note ? <Confirm message={note} action="확인" onCancel={() => setNote(undefined)} onConfirm={() => setNote(undefined)} /> : null}
       {confirm ? (
-        <Confirm message="카메라, 렌즈, 롤, 저장한 사진을 모두 지울까요? 되돌릴 수 없어요." action="모두 지우기"
+        <Confirm message={driveConnected() ? '카메라, 렌즈, 롤, 저장한 사진을 이 기기에서 모두 지울까요? 구글 드라이브의 기록은 그대로 두고 로그아웃돼요. 되돌릴 수 없어요.' : '카메라, 렌즈, 롤, 저장한 사진을 모두 지울까요? 되돌릴 수 없어요.'} action="모두 지우기"
           onCancel={() => setConfirm(false)}
           onConfirm={async () => {
+            if (driveConnected()) await disconnectDrive()
             await wipeLocal()
             setConfirm(false)
             onClose()
@@ -235,7 +236,9 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           </Group>
         </Section>
 
-        <Section title="저장" foot="기록과 사진은 이 기기의 필름함 앱 안에만 저장돼요. 서버로 올라가지 않아서 다른 기기나 다른 사람에게는 보이지 않아요. 앱을 지우면 함께 지워지니, 중요한 롤은 사진을 내려받아 두세요.">
+        <Section title="저장" foot={driveConnected()
+          ? '기록과 사진은 이 앱과 내 구글 드라이브에 저장돼요. 같은 계정으로 로그인한 기기에서만 보여요.'
+          : '기록과 사진은 이 앱 안에만 저장돼요. 앱을 지우면 함께 지워지니, 구글로 로그인하거나 백업해 두세요.'}>
           <Group>
             <Row static value={bytesText(usage?.used) ?? '—'}><RowText>이 앱에 저장된 양</RowText></Row>
           </Group>
@@ -265,7 +268,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           <Row onPress={() => setConfirm(true)}><RowText color="#c0392b">모든 기록 지우기</RowText></Row>
         </Group>
 
-        <View style={{ marginTop: 24, alignItems: 'center' }}><Footnote>필름함 · Filmchest · {APP_VERSION}</Footnote></View>
+        <View style={{ marginTop: 24, alignItems: 'center' }}><Footnote>필름함 {APP_VERSION}</Footnote></View>
       </Sheet>
       {dialogs}
     </>
