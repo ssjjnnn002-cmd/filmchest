@@ -110,7 +110,9 @@ export function App() {
   }, [])
   const [intro, setIntro] = useState(true)
   // 처음 켤 때 한 번: 구글로 시작하기 (이미 연결했거나, 예전 주소·Claude 화면에서는 묻지 않는다)
-  const [welcome, setWelcome] = useState(() => driveAvailable && !driveConnected() && !isOldSite && !inClaudeHost() && getPref('welcomeSeen', '' as string) !== '1')
+  // 예전 주소가 기록을 건네려고 연 창(?move)이면 시작 화면 대신 받는 화면(MoveNotice)을 먼저 띄운다
+  const [welcome, setWelcome] = useState(() => driveAvailable && !driveConnected() && !isOldSite && !inClaudeHost()
+    && !new URLSearchParams(location.search).has('move') && getPref('welcomeSeen', '' as string) !== '1')
 
   const setQueue = (next: ZipJob[], active: string | null) => {
     zipQueueRef.current = next
