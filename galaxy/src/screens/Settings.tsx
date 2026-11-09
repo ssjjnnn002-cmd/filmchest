@@ -6,7 +6,7 @@ import { notifyBackup } from '../core/backupNudge'
 import { Text, View } from 'react-native'
 import { db, wipeLocal, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll } from '../data'
 import { getPref, useLiveQuery } from '../store'
-import { backupFileName, exportAll, exportWithPhotos, importBackupFile, localBackupAt, photoBackupFileName, writeLocalBackup } from '../backup'
+import { backupFileName, exportAll, exportWithPhotos, importBackupFile, photoBackupFileName, writeLocalBackup } from '../backup'
 import { lastBackupAt, markFileBackup } from '../core/backupNudge'
 import { useBackupRefresh } from '../BackupNudge'
 import { restorePhotos } from '../restore'
@@ -49,65 +49,23 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   const [purge, setPurge] = useState<(() => Promise<unknown>) | null>(null)
   const [spending, setSpending] = useState(false)
   const [update, setUpdate] = useState(() => (installedBuilt() ? formatDate(installedBuilt() * 1000) : ''))
-  const deleted = useLiveQuery(() => db.rolls.deletedOnly(), [])
-  const deletedCameras = useLiveQuery(() => db.cameras.deletedOnly(), [])
-  useEffect(() => { storageEstimate().then(setUsage); void purgeOldRolls(); void purgeOldCameras() }, [])
+  // 백업 시트를 열 때만 휴지통을 읽는다 (설정 열자마자 큰 JSON을 건드리지 않음)
+  const deleted = useLiveQuery(() => (backupOpen ? db.rolls.deletedOnly() : null), [backupOpen])
+  const deletedCameras = useLiveQuery(() => (backupOpen ? db.cameras.deletedOnly() : null), [backupOpen])
+  useEffect(() => {
+    // 시트 그린 뒤에만 무거운 일 (폴드처럼 메모리가 빠듯한 기기에서 열자마자 죽지 않게)
+    const t = setTimeout(() => {
+      void storageEstimate().then(setUsage)
+      void purgeOldRolls()
+      void purgeOldCameras()
+    }, 400)
+    return () => clearTimeout(t)
+  }, [])
 
   const choose = (t: string) => { setTheme(t); applyTheme(t) }
 
-  return (
-    <Sheet title="설정" onClose={onClose} left={<span />} right={<SheetBtn label="완료" accent onPress={onClose} />}>
-      <Section title="화면">
-        <Segmented value={theme} options={themes} onChange={choose} />
-      </Section>
-
-      <Section title="계정">
-        <Group>
-          {driveConnected() ? [
-            <Row key="a" static><RowText sub="기록과 사진을 내 구글 드라이브에 맞춰요">{driveAccount() ?? '구글 계정'}</RowText></Row>,
-            <Row key="o" onPress={() => setLogout(true)}><RowText color={c.danger}>로그아웃</RowText></Row>,
-          ] : <Row onPress={() => setLogin(true)}><Text style={{ color: c.safelight, fontSize: 17 }}>구글로 로그인</Text></Row>}
-        </Group>
-      </Section>
-
-      <Section foot={lastBackupText()}>
-        <Group>
-          <Row chev onPress={() => setSpending(true)}><RowText>통계</RowText></Row>
-          <Row chev value={cloudStatus()} onPress={() => setBackupOpen(true)}><RowText>백업 및 복구</RowText></Row>
-        </Group>
-      </Section>
-
-      <Section title="저장" foot="기록과 사진은 이 기기의 필름함 앱 안에만 저장돼요. 서버로 올라가지 않아서 다른 기기나 다른 사람에게는 보이지 않아요. 앱을 지우면 함께 지워지니, 중요한 롤은 사진을 내려받아 두세요.">
-        <Group>
-          <Row static value={bytesText(usage?.used) ?? '—'}><RowText>이 앱에 저장된 양</RowText></Row>
-        </Group>
-      </Section>
-
-
-      <Section title="안내">
-        <Group>
-          <Row onPress={() => setPrivacy(true)}>개인정보 처리방침</Row>
-        </Group>
-      </Section>
-
-      <Section title="버전" foot="앱 버전은 아이폰, 갤럭시, 웹이 같습니다.">
-        <Group>
-          <Row static value={APP_VERSION}><RowText>앱 버전</RowText></Row>
-          <Row chev value={update} onPress={() => { void withWork(async () => {
-            try {
-              const u = await checkUpdate()
-              if (u.newer) { setUpdate('새 버전 있음'); void downloadUpdate(); setNote('새 버전을 내려받아요. 다 받으면 알림을 눌러 설치하세요. 기록은 그대로 남아요.') }
-              else { setUpdate('최신 버전'); setNote('지금 최신 버전이에요.') }
-            } catch { setNote('업데이트를 확인하지 못했어요. 인터넷 연결을 확인해 주세요.') }
-          }) }}><RowText>업데이트 확인</RowText></Row>
-        </Group>
-      </Section>
-
-      <Group>
-        <Row onPress={() => setConfirm(true)}><RowText color="#c0392b">모든 기록 지우기</RowText></Row>
-      </Group>
-
-      <View style={{ marginTop: 24, alignItems: 'center' }}><Footnote>필름함 · Filmchest · {APP_VERSION}</Footnote></View>
+  const dialogs = (
+    <>
       {privacy ? (
         <Sheet title="개인정보 처리방침" onClose={() => setPrivacy(false)}>
           <View style={{ gap: 18 }}>
@@ -120,7 +78,6 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           </View>
         </Sheet>
       ) : null}
-
       {note ? <Confirm message={note} action="확인" onCancel={() => setNote(undefined)} onConfirm={() => setNote(undefined)} /> : null}
       {confirm ? (
         <Confirm message="카메라, 렌즈, 롤, 저장한 사진을 모두 지울까요? 되돌릴 수 없어요." action="모두 지우기"
@@ -131,7 +88,6 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
             onClose()
           }} />
       ) : null}
-      {spending ? <Stats onClose={() => setSpending(false)} /> : null}
       {login ? <Welcome onDone={() => setLogin(false)} /> : null}
       {logout ? <Confirm message="로그아웃할까요? 기록과 사진을 드라이브에 올린 뒤 이 기기에서 지워요. 다시 로그인하면 받아 와요." action="로그아웃"
         onCancel={() => setLogout(false)} onConfirm={async () => {
@@ -148,7 +104,23 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           }
         }} /> : null}
       {logoutStep ? <Confirm message={logoutStep} busy onCancel={() => {}} onConfirm={() => {}} /> : null}
-      {saveChoice ? (
+      {purge ? <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={() => { const run = purge; setPurge(null); void withWork(run) }} /> : null}
+    </>
+  )
+
+  // 삼성 등에서 Modal을 겹치면 바로 종료되는 경우가 있어, 맨 위 시트만 연다.
+  if (cloud) {
+    return (
+      <>
+        <CloudBackup onClose={() => setCloud(false)} />
+        {dialogs}
+      </>
+    )
+  }
+
+  if (saveChoice) {
+    return (
+      <>
         <Sheet title="백업 파일로 저장" onClose={() => setSaveChoice(false)}>
           <Section foot="사진까지 저장한 zip을 불러오면 사진도 롤에 다시 붙어요.">
             <Group>
@@ -164,9 +136,24 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
             </Group>
           </Section>
         </Sheet>
-      ) : null}
-      {backupOpen ? (
-        <Sheet title="백업 및 복구" onClose={() => setBackupOpen(false)} left={<span />} right={<SheetBtn label="완료" accent onPress={() => setBackupOpen(false)} />}>
+        {dialogs}
+      </>
+    )
+  }
+
+  if (spending) {
+    return (
+      <>
+        <Stats onClose={() => setSpending(false)} />
+        {dialogs}
+      </>
+    )
+  }
+
+  if (backupOpen) {
+    return (
+      <>
+        <Sheet title="백업 및 복구" onClose={() => setBackupOpen(false)} left={null} right={<SheetBtn label="완료" accent onPress={() => setBackupOpen(false)} />}>
           <Section title="백업" foot={`${lastBackupText()} 장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 웹앱 백업 파일도 불러올 수 있어요.`}>
             <Group>
               <Row chev value={cloudStatus()} onPress={() => setCloud(true)}><RowText>클라우드 백업</RowText></Row>
@@ -196,7 +183,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           </Section>
           <Section title="삭제한 롤" foot="지운 롤은 24시간 동안 여기 남아요. 사진 앱에 저장한 사진은 그대로예요.">
             <Group>
-              {deleted === undefined ? <Row static><Sub>불러오는 중…</Sub></Row> : deleted.length === 0 ? <Row static><Sub>최근 24시간 안에 지운 롤이 없어요</Sub></Row> : null}
+              {deleted == null ? <Row static><Sub>불러오는 중…</Sub></Row> : deleted.length === 0 ? <Row static><Sub>최근 24시간 안에 지운 롤이 없어요</Sub></Row> : null}
               {deleted?.map((roll) => (
                 <Row key={roll.id} static>
                   <RowText>{filmById(roll.filmId)?.name ?? '필름 알 수 없음'}</RowText>
@@ -209,7 +196,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
 
           <Section title="삭제한 장비" foot="지운 카메라는 24시간 동안 여기 남아요. 필름에 적힌 카메라 정보는 카메라를 지워도 그대로예요.">
             <Group>
-              {deletedCameras === undefined ? <Row static><Sub>불러오는 중…</Sub></Row> : deletedCameras.length === 0 ? <Row static><Sub>최근 24시간 안에 지운 카메라가 없어요</Sub></Row> : null}
+              {deletedCameras == null ? <Row static><Sub>불러오는 중…</Sub></Row> : deletedCameras.length === 0 ? <Row static><Sub>최근 24시간 안에 지운 카메라가 없어요</Sub></Row> : null}
               {deletedCameras?.map((camera) => (
                 <Row key={camera.id} static>
                   <RowText>{camera.brand} {camera.model}</RowText>
@@ -219,12 +206,69 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
               ))}
             </Group>
           </Section>
-
         </Sheet>
-      ) : null}
-      {cloud ? <CloudBackup onClose={() => setCloud(false)} /> : null}
-      {purge ? <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={() => { const run = purge; setPurge(null); void withWork(run) }} /> : null}
-    </Sheet>
+        {dialogs}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <Sheet title="설정" onClose={onClose} left={null} right={<SheetBtn label="완료" accent onPress={onClose} />}>
+        <Section title="화면">
+          <Segmented value={theme} options={themes} onChange={choose} />
+        </Section>
+
+        <Section title="계정">
+          <Group>
+            {driveConnected() ? [
+              <Row key="a" static><RowText sub="기록과 사진을 내 구글 드라이브에 맞춰요">{driveAccount() ?? '구글 계정'}</RowText></Row>,
+              <Row key="o" onPress={() => setLogout(true)}><RowText color={c.danger}>로그아웃</RowText></Row>,
+            ] : <Row onPress={() => setLogin(true)}><Text style={{ color: c.safelight, fontSize: 17 }}>구글로 로그인</Text></Row>}
+          </Group>
+        </Section>
+
+        <Section foot={lastBackupText()}>
+          <Group>
+            <Row chev onPress={() => setSpending(true)}><RowText>통계</RowText></Row>
+            <Row chev value={cloudStatus()} onPress={() => setBackupOpen(true)}><RowText>백업 및 복구</RowText></Row>
+          </Group>
+        </Section>
+
+        <Section title="저장" foot="기록과 사진은 이 기기의 필름함 앱 안에만 저장돼요. 서버로 올라가지 않아서 다른 기기나 다른 사람에게는 보이지 않아요. 앱을 지우면 함께 지워지니, 중요한 롤은 사진을 내려받아 두세요.">
+          <Group>
+            <Row static value={bytesText(usage?.used) ?? '—'}><RowText>이 앱에 저장된 양</RowText></Row>
+          </Group>
+        </Section>
+
+
+        <Section title="안내">
+          <Group>
+            <Row onPress={() => setPrivacy(true)}>개인정보 처리방침</Row>
+          </Group>
+        </Section>
+
+        <Section title="버전" foot="앱 버전은 아이폰, 갤럭시, 웹이 같습니다.">
+          <Group>
+            <Row static value={APP_VERSION}><RowText>앱 버전</RowText></Row>
+            <Row chev value={update} onPress={() => { void withWork(async () => {
+              try {
+                const u = await checkUpdate()
+                if (u.newer) { setUpdate('새 버전 있음'); void downloadUpdate(); setNote('새 버전을 내려받아요. 다 받으면 알림을 눌러 설치하세요. 기록은 그대로 남아요.') }
+                else { setUpdate('최신 버전'); setNote('지금 최신 버전이에요.') }
+              } catch { setNote('업데이트를 확인하지 못했어요. 인터넷 연결을 확인해 주세요.') }
+            }) }}><RowText>업데이트 확인</RowText></Row>
+          </Group>
+        </Section>
+
+        <Group>
+          <Row onPress={() => setConfirm(true)}><RowText color="#c0392b">모든 기록 지우기</RowText></Row>
+        </Group>
+
+        <View style={{ marginTop: 24, alignItems: 'center' }}><Footnote>필름함 · Filmchest · {APP_VERSION}</Footnote></View>
+      </Sheet>
+      {dialogs}
+    </>
   )
 }
 

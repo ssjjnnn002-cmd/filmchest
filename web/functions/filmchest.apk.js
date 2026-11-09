@@ -8,10 +8,11 @@ export async function onRequest({ request, env }) {
     for (let i = 0; i < meta.parts; i++) await (await at(`/apk/part${i}.bin`)).body.pipeTo(writable, { preventClose: true })
     await writable.close()
   })()
+  const name = meta.version ? `filmchest-${meta.version}.apk` : 'filmchest.apk'
   return new Response(readable, {
     headers: {
       'Content-Type': 'application/vnd.android.package-archive',
-      'Content-Disposition': 'attachment; filename="filmchest.apk"',
+      'Content-Disposition': `attachment; filename="${name}"`,
       'Content-Length': String(meta.size),
       'Cache-Control': 'no-store',
     },

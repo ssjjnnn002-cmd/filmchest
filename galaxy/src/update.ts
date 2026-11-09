@@ -12,5 +12,5 @@ export async function checkUpdate(): Promise<{ newer: boolean; built?: number }>
   return { newer: built > APK_BUILT, built }
 }
 
-export const downloadUpdate = () => Linking.openURL(`${LATEST}/filmchest.apk`)
+export const downloadUpdate = () => Linking.openURL(`${LATEST}/filmchest.apk?v=${APK_BUILT}`)
 export const installedBuilt = () => APK_BUILT

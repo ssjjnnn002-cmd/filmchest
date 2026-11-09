@@ -12,6 +12,7 @@ struct FramePrintView: View {
     @State private var index = 0
     @State private var dark = false
     @State private var aspect: FrameAspect = .square
+    @State private var captionStyle: FrameCaptionStyle = .A
     @State private var showCamera = true
     @State private var showLens = true
     @State private var showFilm = true
@@ -84,7 +85,7 @@ struct FramePrintView: View {
 
     private var renderKey: String {
         let s = shot
-        return "\(index)|\(dark)|\(aspect.rawValue)|\(showCamera)|\(showLens)|\(showFilm)|\(showFilter)|\(showDate)|\(showPhotographer)|\(showExposure)|\(photographer)|\(s?.aperture ?? -1)|\(s?.shutter ?? -1)|\(s?.filters?.joined() ?? "")|\(roll.shotISO ?? 0)"
+        return "\(index)|\(dark)|\(aspect.rawValue)|\(captionStyle.rawValue)|\(showCamera)|\(showLens)|\(showFilm)|\(showFilter)|\(showDate)|\(showPhotographer)|\(showExposure)|\(photographer)|\(s?.aperture ?? -1)|\(s?.shutter ?? -1)|\(s?.filters?.joined() ?? "")|\(roll.shotISO ?? 0)"
     }
 
     private var controls: some View {
@@ -94,6 +95,15 @@ struct FramePrintView: View {
                 Text("검정").tag(true)
             }
             .pickerStyle(.segmented)
+            Picker("표기", selection: $captionStyle) {
+                ForEach(FrameCaptionStyle.allCases) { s in
+                    Text(s.title).tag(s)
+                }
+            }
+            .pickerStyle(.segmented)
+            Text(captionStyle.hint)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(FrameAspect.allCases) { item in
@@ -196,6 +206,7 @@ struct FramePrintView: View {
         let filter = shot?.filters?.filter { !$0.isEmpty }.joined(separator: ", ")
         return FramePrintCaption(
             dark: dark,
+            style: captionStyle,
             camera: showCamera ? roll.cameraName : nil,
             lens: showLens ? lensName : nil,
             film: showFilm ? roll.film.map { FilmCanisterLabel.shortName($0) } ?? roll.filmName : nil,

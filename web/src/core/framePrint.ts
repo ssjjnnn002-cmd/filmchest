@@ -1,5 +1,5 @@
 // 사진 한 장을 여백 프레임으로 그린다. 회사 로고는 넣지 않고 이름만 글씨로 쓴다.
-// 아이폰 FilmScanCore/FramePrintRenderer.swift와 같은 배치 (비율, 왼쪽·오른쪽 글줄, 사진과 글자 사이 고정 여백)
+// 아이폰 FilmScanCore/FramePrintRenderer.swift와 같은 배치
 
 export interface FrameCaption {
   camera?: string
@@ -10,6 +10,12 @@ export interface FrameCaption {
   photographer?: string
   exposure?: string
   dark: boolean
+  /**
+   * 하단 한 줄 표기.
+   * A — 왼쪽 정렬 · 얇은 한 줄
+   * B — 가운데 정렬 · 얇은 한 줄
+   */
+  style?: 'A' | 'B'
 }
 
 /** 아이폰 FrameAspect와 같은 순서·이름 (가로/세로) */
@@ -25,7 +31,19 @@ export const frameAspects: { id: string; title: string; ratio: number }[] = [
   { id: 'sixteenNine', title: '16:9', ratio: 16 / 9 },
 ]
 
+export const frameCaptionStyles: { id: 'A' | 'B'; title: string; hint: string }[] = [
+  { id: 'A', title: '타입 A', hint: '하단 · 왼쪽 · 한 줄' },
+  { id: 'B', title: '타입 B', hint: '하단 · 가운데 · 한 줄' },
+]
+
 const font = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
+
+/** 켜 둔 항목을 · 로 이은 한 줄 */
+export function frameCaptionLine(caption: FrameCaption) {
+  return [caption.camera, caption.lens, caption.film, caption.filter, caption.date, caption.photographer, caption.exposure]
+    .filter((s): s is string => !!s && !!s.trim())
+    .join('  ·  ')
+}
 
 export async function renderFramePrint(image: CanvasImageSource, caption: FrameCaption, ratio = 1, pixelWidth = 2400) {
   const owned = !(image instanceof ImageBitmap)
@@ -35,13 +53,12 @@ export async function renderFramePrint(image: CanvasImageSource, caption: FrameC
   const W = aspect >= 1 ? longSide : Math.ceil(longSide * aspect)
   const H = aspect >= 1 ? Math.ceil(longSide / aspect) : longSide
   const pad = Math.min(W, H) * 0.055
-  const left = [caption.camera, caption.lens, caption.film, caption.filter].filter((s): s is string => !!s)
-  const right = [caption.date, caption.photographer, caption.exposure].filter((s): s is string => !!s)
-  const rows = Math.max(left.length, right.length)
-  const line = Math.min(W, H) * 0.032
-  // 사진과 글자 사이는 항상 같은 여백
-  const gap = pad * 0.45
-  const footer = rows === 0 ? pad * 0.85 : pad * 0.6 + rows * line + gap
+  const lineText = frameCaptionLine(caption)
+  const style = caption.style === 'B' ? 'B' : 'A'
+  // 작고 얇은 한 줄
+  const line = Math.min(W, H) * 0.018
+  const gap = pad * 0.35
+  const footer = lineText ? pad * 0.45 + line + gap : pad * 0.85
 
   const canvas = document.createElement('canvas')
   canvas.width = W
@@ -50,7 +67,6 @@ export async function renderFramePrint(image: CanvasImageSource, caption: FrameC
   ctx.fillStyle = caption.dark ? '#111111' : '#F7F6F2'
   ctx.fillRect(0, 0, W, H)
 
-  // 사진 칸: 위 여백 pad, 아래는 글자 자리
   const boxW = W - pad * 2
   const boxH = Math.max(1, H - pad - footer)
   const iw = bmp.width, ih = bmp.height
@@ -63,18 +79,26 @@ export async function renderFramePrint(image: CanvasImageSource, caption: FrameC
   ctx.drawImage(bmp, dx, dy, dw, dh)
   if (owned) (bmp as ImageBitmap).close()
 
-  // 첫 줄 글자 윗부분이 사진 아래에서 gap만큼 떨어지게
-  ctx.fillStyle = caption.dark ? '#F4F1EA' : '#1A1816'
+  if (!lineText) return canvas
+
+  ctx.fillStyle = caption.dark ? '#E8E4DC' : '#3A3632'
   ctx.textBaseline = 'alphabetic'
-  const top = dy + dh + gap + line * 0.8
-  left.forEach((text, i) => {
-    const lead = i === 0 && text === caption.camera
-    ctx.font = `${lead ? 600 : 400} ${lead ? line * 0.92 : line * 0.78}px ${font}`
-    ctx.fillText(text, pad, top + i * line, (W - pad * 2) * 0.62)
-  })
-  right.forEach((text, i) => {
-    ctx.font = `400 ${line * 0.78}px ${font}`
-    ctx.fillText(text, W - pad - ctx.measureText(text).width, top + i * line)
-  })
+  ctx.font = `300 ${line}px ${font}`
+  const maxW = W - pad * 2
+  // 한 줄이 길면 살짝 줄여 맞춤
+  let size = line
+  while (size > line * 0.72 && ctx.measureText(lineText).width > maxW) {
+    size -= line * 0.02
+    ctx.font = `300 ${size}px ${font}`
+  }
+  const y = H - pad * 0.55
+  if (style === 'B') {
+    ctx.textAlign = 'center'
+    ctx.fillText(lineText, W / 2, y, maxW)
+  } else {
+    ctx.textAlign = 'left'
+    ctx.fillText(lineText, pad, y, maxW)
+  }
+  ctx.textAlign = 'left'
   return canvas
 }

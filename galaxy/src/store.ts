@@ -35,6 +35,17 @@ const get = (o: Doc, path: string) => path.split('.').reduce((v, k) => v?.[k], o
 const cmp = (a: any, b: any) => (a === b ? 0 : a === undefined ? 1 : b === undefined ? -1 : a < b ? -1 : 1)
 const clone = <T,>(o: T): T => (o === undefined ? o : JSON.parse(JSON.stringify(o)))
 
+/** 예전에 JSON에 넣었던 큰 사진 문자열은 메모리에 두지 않는다. 파일(hasPhoto)로 본다. */
+function lightDoc<T extends Doc>(row: T): T {
+  const photo = row.photo
+  if (typeof photo === 'string' && photo.length > 512) {
+    const next = { ...row, hasPhoto: true as const }
+    delete next.photo
+    return next
+  }
+  return row
+}
+
 export class Collection<T extends Doc> {
   constructor(private table: Table<T, any>, private pick: (row: T) => boolean, private order?: string, private desc = false) {}
   private rows() {
@@ -122,23 +133,26 @@ export class Table<T extends Doc, K extends string = string> {
     changed()
   }
   async toArray() { return this.all().map(clone) }
-  /** 휴지통만. 카메라 사진까지 전부 풀지 않는다. */
+  /**
+   * 휴지통만. json_extract는 큰 사진 문자열이 든 줄을 통째로 풀다가 메모리가 터질 수 있어서
+   * 글자 검색으로 후보만 고르고, 캐시(all)도 건드리지 않는다.
+   */
   deletedOnly(): T[] {
     try {
       const rows = sql.getAllSync<{ data: string }>(
-        `SELECT data FROM docs WHERE coll = ? AND json_extract(data, '$.deletedAt') IS NOT NULL`,
+        `SELECT data FROM docs WHERE coll = ? AND instr(data, '"deletedAt":') > 0`,
         this.name,
       )
       const out: T[] = []
       for (const row of rows) {
         try {
-          const parsed = JSON.parse(row.data) as T
+          const parsed = lightDoc(JSON.parse(row.data) as T)
           if (parsed.deletedAt) out.push(parsed)
         } catch { /* 깨진 줄은 건너뛴다 */ }
       }
       return out
     } catch {
-      return this.all().filter((row) => row.deletedAt)
+      return []
     }
   }
   async count() { return this.all().length }

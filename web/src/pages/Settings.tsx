@@ -100,9 +100,9 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         <div className="section">
           <h2>안드로이드 앱</h2>
           <div className="group">
-            <a className="row accent" href="/filmchest.apk">
+            <a className="row accent" href={`/filmchest.apk?v=${__APP_VERSION__}`}>
               <span className="grow">안드로이드 앱 내려받기</span>
-              <span className="value">APK</span>
+              <span className="value">{__APP_VERSION__}</span>
             </a>
           </div>
           <p className="footnote">

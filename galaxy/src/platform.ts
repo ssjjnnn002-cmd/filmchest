@@ -20,8 +20,9 @@ function dirSize(dir: Directory): number {
   return total
 }
 
-/** 앱 안에 저장된 양 */
+/** 앱 안에 저장된 양 (다음 프레임에 세서 설정 시트를 먼저 그리게 한다) */
 export async function storageEstimate() {
+  await new Promise<void>((r) => setTimeout(r, 0))
   try { return { used: dirSize(Paths.document), quota: 0 } } catch { return undefined }
 }
 

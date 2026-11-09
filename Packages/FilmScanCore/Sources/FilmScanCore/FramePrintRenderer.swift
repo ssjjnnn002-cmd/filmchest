@@ -68,8 +68,17 @@ public enum FrameAspect: String, CaseIterable, Sendable, Identifiable {
     }
 }
 
+/// 하단 한 줄 표기. A 왼쪽, B 가운데.
+public enum FrameCaptionStyle: String, CaseIterable, Sendable, Identifiable {
+    case A, B
+    public var id: String { rawValue }
+    public var title: String { self == .A ? "타입 A" : "타입 B" }
+    public var hint: String { self == .A ? "하단 · 왼쪽 · 한 줄" : "하단 · 가운데 · 한 줄" }
+}
+
 public struct FramePrintCaption: Sendable {
     public var dark: Bool
+    public var style: FrameCaptionStyle
     public var camera: String?
     public var lens: String?
     public var film: String?
@@ -78,9 +87,10 @@ public struct FramePrintCaption: Sendable {
     public var photographer: String?
     public var exposure: String?
 
-    public init(dark: Bool, camera: String? = nil, lens: String? = nil, film: String? = nil, filter: String? = nil,
+    public init(dark: Bool, style: FrameCaptionStyle = .A, camera: String? = nil, lens: String? = nil, film: String? = nil, filter: String? = nil,
                 date: String? = nil, photographer: String? = nil, exposure: String? = nil) {
         self.dark = dark
+        self.style = style
         self.camera = camera
         self.lens = lens
         self.film = film
@@ -88,6 +98,13 @@ public struct FramePrintCaption: Sendable {
         self.date = date
         self.photographer = photographer
         self.exposure = exposure
+    }
+
+    public var line: String {
+        [camera, lens, film, filter, date, photographer, exposure]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "  ·  ")
     }
 }
 
@@ -106,17 +123,14 @@ public enum FramePrintRenderer {
             W = (longSide * aspect).rounded(.up)
         }
         let pad = min(W, H) * 0.055
-        let left = [caption.camera, caption.lens, caption.film, caption.filter].compactMap { $0 }
-        let right = [caption.date, caption.photographer, caption.exposure].compactMap { $0 }
-        let rows = max(left.count, right.count)
-        let line = min(W, H) * 0.032
-        // 사진과 글자 사이는 항상 같은 여백 (사진이 가로·세로 어느 쪽으로 차든)
-        let gap = pad * 0.45
-        let footer = rows == 0 ? pad * 0.85 : pad * 0.6 + CGFloat(rows) * line + gap
+        let lineText = caption.line
+        let line = min(W, H) * 0.018
+        let gap = pad * 0.35
+        let footer = lineText.isEmpty ? pad * 0.85 : pad * 0.45 + line + gap
         guard let ctx = Canvas.make(width: Int(W), height: Int(H)) else { return nil }
 
         let paper: CGColor = caption.dark ? .hex("#111111") : .hex("#F7F6F2")
-        let ink: CGColor = caption.dark ? .hex("#F4F1EA") : .hex("#1A1816")
+        let ink: CGColor = caption.dark ? .hex("#E8E4DC") : .hex("#3A3632")
         ctx.setFillColor(paper)
         ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
 
@@ -131,19 +145,21 @@ public enum FramePrintRenderer {
         let imageY = box.midY - dh / 2
         ctx.draw(image, in: CGRect(x: box.midX - dw / 2, y: imageY, width: dw, height: dh))
 
-        // 첫 줄 글자 윗부분이 사진 아래에서 gap만큼 떨어지게 (글자 높이 ≈ 줄 높이의 0.8)
-        let top = imageY - gap - line * 0.8
-        for (i, text) in left.enumerated() {
-            let lead = i == 0 && text == caption.camera
-            Canvas.text(ctx, text, at: CGPoint(x: pad, y: top - CGFloat(i) * line),
-                        font: lead ? "AppleSDGothicNeo-SemiBold" : "AppleSDGothicNeo-Regular",
-                        size: lead ? line * 0.92 : line * 0.78, color: ink)
+        guard !lineText.isEmpty else { return ctx.makeImage() }
+
+        let maxW = W - pad * 2
+        var size = line
+        let fontName = "AppleSDGothicNeo-Thin"
+        while size > line * 0.72 && Canvas.textWidth(lineText, font: fontName, size: size) > maxW {
+            size -= line * 0.02
         }
-        for (i, text) in right.enumerated() {
-            let size = line * 0.78
-            let width = Canvas.textWidth(text, font: "AppleSDGothicNeo-Regular", size: size)
-            Canvas.text(ctx, text, at: CGPoint(x: W - pad - width, y: top - CGFloat(i) * line),
-                        font: "AppleSDGothicNeo-Regular", size: size, color: ink)
+        // CoreGraphics y는 아래가 0. 글자 baseline을 하단 여백 쪽에.
+        let y = pad * 0.55
+        if caption.style == .B {
+            let width = Canvas.textWidth(lineText, font: fontName, size: size)
+            Canvas.text(ctx, lineText, at: CGPoint(x: (W - width) / 2, y: y), font: fontName, size: size, color: ink)
+        } else {
+            Canvas.text(ctx, lineText, at: CGPoint(x: pad, y: y), font: fontName, size: size, color: ink)
         }
         return ctx.makeImage()
     }

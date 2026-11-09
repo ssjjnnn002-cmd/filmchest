@@ -414,7 +414,7 @@ export function AccessoryLinkFields({ ids, setIds, bodyPrice }: { ids: string[];
         )}
       </Group>
       {picking && (
-        <Sheet title="액세서리 고르기" onClose={() => setPicking(false)} left={<span />} right={<SheetBtn label="완료" accent onPress={() => setPicking(false)} />}>
+        <Sheet title="액세서리 고르기" onClose={() => setPicking(false)} left={null} right={<SheetBtn label="완료" accent onPress={() => setPicking(false)} />}>
           <Group><Row onPress={() => setAdding(true)}><Text style={{ color: c.safelight, fontSize: 17 }}>＋ 새 액세서리 추가</Text></Row></Group>
           {items.length === 0 && <Sub>등록된 액세서리가 없어요. 추가하면 여기서 바로 골라져요.</Sub>}
           {kinds.map((k) => (

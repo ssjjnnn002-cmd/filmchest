@@ -1,6 +1,6 @@
 // 웹 common.tsx의 Sheet·Confirm·useToast, .menu 를 갤럭시로 옮긴 것
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { ActivityIndicator, Animated, findNodeHandle, Keyboard, Modal, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { ActivityIndicator, Animated, findNodeHandle, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native'
 import { Glass } from './glass'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from './theme'
@@ -69,6 +69,91 @@ function useKeyboard() {
   return h
 }
 
+type Layer = { id: number; node: ReactNode }
+type Host = { mount: (id: number, node: ReactNode) => void; unmount: (id: number) => void }
+const HostContext = createContext<Host | null>(null)
+let portalSeq = 1
+let boundarySeq = 1
+const boundaryStores = new Map<number, { layers: Layer[]; listeners: Set<() => void> }>()
+
+function getBoundary(bid: number) {
+  let s = boundaryStores.get(bid)
+  if (!s) { s = { layers: [], listeners: new Set() }; boundaryStores.set(bid, s) }
+  return s
+}
+function emitBoundary(bid: number) { getBoundary(bid).listeners.forEach((fn) => fn()) }
+
+/**
+ * Modal/Sheet 안쪽에 둔다. 자식 Sheet·Confirm이 새 Modal을 열지 않고 여기로 붙어서
+ * 삼성 기기에서 Modal이 겹쳐 앱이 죽는 일을 막는다.
+ */
+export function OverlayBoundary({ children, style }: { children: ReactNode; style?: object }) {
+  const bid = useRef(0)
+  if (!bid.current) bid.current = boundarySeq++
+  const host = useRef<Host>({
+    mount: (id, node) => {
+      const s = getBoundary(bid.current)
+      const i = s.layers.findIndex((x) => x.id === id)
+      if (i >= 0) s.layers[i] = { id, node }
+      else s.layers = [...s.layers, { id, node }]
+      emitBoundary(bid.current)
+    },
+    unmount: (id) => {
+      const s = getBoundary(bid.current)
+      s.layers = s.layers.filter((x) => x.id !== id)
+      emitBoundary(bid.current)
+    },
+  }).current
+  useEffect(() => () => { boundaryStores.delete(bid.current) }, [])
+  return (
+    <HostContext.Provider value={host}>
+      <View style={[{ flex: 1 }, style]}>
+        {children}
+        <OverlayLayers bid={bid.current} />
+      </View>
+    </HostContext.Provider>
+  )
+}
+
+function OverlayLayers({ bid }: { bid: number }) {
+  const [, bump] = useState(0)
+  useEffect(() => {
+    const s = getBoundary(bid)
+    const fn = () => bump((n) => n + 1)
+    s.listeners.add(fn)
+    return () => { s.listeners.delete(fn) }
+  }, [bid])
+  const layers = getBoundary(bid).layers
+  return (
+    <>
+      {layers.map((l) => (
+        <View key={l.id} style={StyleSheet.absoluteFill} pointerEvents="box-none">{l.node}</View>
+      ))}
+    </>
+  )
+}
+
+/** 이미 Modal 안에 있으면 포털로, 아니면 새 Modal로 띄운다. */
+function useOverlayPortal(node: ReactNode) {
+  const host = useContext(HostContext)
+  const id = useRef(0)
+  if (!id.current) id.current = portalSeq++
+  const nodeRef = useRef(node)
+  nodeRef.current = node
+  useLayoutEffect(() => {
+    if (!host) return
+    host.mount(id.current, nodeRef.current)
+    return () => host.unmount(id.current)
+  }, [host])
+  // props가 바뀌면 같은 칸만 고친다 (부모 children은 다시 그리지 않음)
+  useLayoutEffect(() => {
+    if (!host) return
+    host.mount(id.current, node)
+  })
+  if (host) return null
+  return node
+}
+
 /** 아래에서 올라오는 창. page면 화면을 꽉 채운다. */
 export function Sheet({ title, onClose, left, right, children, page, scroll = true }: {
   title: string; onClose: () => void; left?: ReactNode; right?: ReactNode; children: ReactNode; page?: boolean
@@ -80,11 +165,13 @@ export function Sheet({ title, onClose, left, right, children, page, scroll = tr
   const { height } = useWindowDimensions()
   const keyboard = useKeyboard()
   const scrollRef = useRef<ScrollView>(null)
+  const nested = !!useContext(HostContext)
   useScrollFocusedField(scrollRef)
   useOverlayBack(onClose)
+  // left === null 이면 왼쪽 닫기를 숨긴다(웹 span 자리). HTML span은 안드로이드에서 호스트가 없어 앱이 죽는다.
   const head = (
     <View style={{ minHeight: 64, paddingTop: 8, paddingBottom: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <View style={{ flex: 1, alignItems: 'flex-start' }}>{left ?? <SheetBtn label="닫기" onPress={onClose} />}</View>
+      <View style={{ flex: 1, alignItems: 'flex-start' }}>{left === undefined ? <SheetBtn label="닫기" onPress={onClose} /> : left}</View>
       <Text style={{ color: c.ink, fontSize: 17, fontWeight: '600', maxWidth: '46%', textAlign: 'center' }} numberOfLines={1}>{title}</Text>
       <View style={{ flex: 1, alignItems: 'flex-end' }}>{right}</View>
     </View>
@@ -95,19 +182,17 @@ export function Sheet({ title, onClose, left, right, children, page, scroll = tr
       {children}
     </ScrollView>
   ) : <View style={{ flex: 1 }}>{children}</View>
-  if (page) {
-    return (
-      <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-        <View style={{ flex: 1, backgroundColor: c.paper, paddingTop: insets.top, paddingBottom: keyboard }}>
-          {head}
-          {body}
-        </View>
-      </Modal>
-    )
-  }
+
   const max = Math.round(height - Math.max(insets.top, 12) - 12 - keyboard)
-  return (
-    <Modal transparent visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+  const inner = page ? (
+    <OverlayBoundary>
+      <View style={{ flex: 1, backgroundColor: c.paper, paddingTop: nested ? 0 : insets.top, paddingBottom: keyboard }}>
+        {head}
+        {body}
+      </View>
+    </OverlayBoundary>
+  ) : (
+    <OverlayBoundary>
       <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboard }}>
         <Pressable onPress={onClose} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)' }} />
         <View style={{ maxHeight: max, height: scroll ? undefined : max, backgroundColor: c.paper, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden',
@@ -117,7 +202,14 @@ export function Sheet({ title, onClose, left, right, children, page, scroll = tr
           {body}
         </View>
       </View>
-    </Modal>
+    </OverlayBoundary>
+  )
+  return useOverlayPortal(
+    nested ? inner : page ? (
+      <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>{inner}</Modal>
+    ) : (
+      <Modal transparent visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>{inner}</Modal>
+    ),
   )
 }
 
@@ -128,28 +220,32 @@ export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onC
   busy?: boolean
 }) {
   const c = useTheme()
+  const nested = !!useContext(HostContext)
   useOverlayBack(onCancel)
   const btn = (label: string, color: string, fn: () => void) => (
     <Pressable onPress={fn} style={({ pressed }) => ({ flex: 1, height: 48, borderRadius: 999, backgroundColor: c.fill, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.96 : 1 }] })}>
       <Text style={{ color, fontSize: 17, fontWeight: '600' }}>{label}</Text>
     </Pressable>
   )
-  return (
-    <Modal transparent visible animationType="fade" onRequestClose={onCancel} statusBarTranslucent>
-      <Pressable onPress={onCancel} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <Pressable style={{ width: '100%', maxWidth: 320, borderRadius: 28, overflow: 'hidden', elevation: 16 }}>
-          <Glass intensity={40} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass, paddingTop: 22, paddingHorizontal: 18, paddingBottom: 16 }}>
-            <Text style={{ color: c.ink, fontSize: 17, fontWeight: '600', textAlign: 'center', lineHeight: 23, marginBottom: 16 }}>{message}</Text>
-            {busy ? null : (
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                {btn('취소', c.ink, onCancel)}
-                {btn(action, safe ? c.safelight : c.danger, onConfirm)}
-              </View>
-            )}
-          </Glass>
-        </Pressable>
+  const inner = (
+    <Pressable onPress={onCancel} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <Pressable style={{ width: '100%', maxWidth: 320, borderRadius: 28, overflow: 'hidden', elevation: 16 }}>
+        <Glass intensity={40} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass, paddingTop: 22, paddingHorizontal: 18, paddingBottom: 16 }}>
+          <Text style={{ color: c.ink, fontSize: 17, fontWeight: '600', textAlign: 'center', lineHeight: 23, marginBottom: 16 }}>{message}</Text>
+          {busy ? null : (
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {btn('취소', c.ink, onCancel)}
+              {btn(action, safe ? c.safelight : c.danger, onConfirm)}
+            </View>
+          )}
+        </Glass>
       </Pressable>
-    </Modal>
+    </Pressable>
+  )
+  return useOverlayPortal(
+    nested ? inner : (
+      <Modal transparent visible animationType="fade" onRequestClose={onCancel} statusBarTranslucent>{inner}</Modal>
+    ),
   )
 }
 
@@ -157,25 +253,29 @@ export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onC
 export function Menu({ items, onClose }: { items: { label: string; danger?: boolean; onPress: () => void }[]; onClose: () => void }) {
   const c = useTheme()
   const insets = useSafeAreaInsets()
+  const nested = !!useContext(HostContext)
   useOverlayBack(onClose)
   const scale = useRef(new Animated.Value(0.9)).current
   useEffect(() => { Animated.timing(scale, { toValue: 1, duration: 180, useNativeDriver: true }).start() }, [scale])
-  return (
-    <Modal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable onPress={onClose} style={{ flex: 1 }}>
-        <Animated.View style={{ position: 'absolute', right: 16, top: insets.top + 10 + 52, minWidth: 200, borderRadius: 18, overflow: 'hidden', elevation: 14, transform: [{ scale }] }}>
-          <Glass intensity={40} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass }}>
-            {items.map((it, i) => (
-              <Pressable key={it.label} onPress={() => { onClose(); it.onPress() }}
-                style={({ pressed }) => ({ minHeight: 46, paddingVertical: 10, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: pressed ? c.fill : 'transparent',
-                  borderTopWidth: i ? 0.5 : 0, borderTopColor: c.sep })}>
-                <Text style={{ fontSize: 17, color: it.danger ? c.danger : c.ink }}>{it.label}</Text>
-              </Pressable>
-            ))}
-          </Glass>
-        </Animated.View>
-      </Pressable>
-    </Modal>
+  const inner = (
+    <Pressable onPress={onClose} style={{ flex: 1 }}>
+      <Animated.View style={{ position: 'absolute', right: 16, top: insets.top + 10 + 52, minWidth: 200, borderRadius: 18, overflow: 'hidden', elevation: 14, transform: [{ scale }] }}>
+        <Glass intensity={40} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass }}>
+          {items.map((it, i) => (
+            <Pressable key={it.label} onPress={() => { onClose(); it.onPress() }}
+              style={({ pressed }) => ({ minHeight: 46, paddingVertical: 10, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: pressed ? c.fill : 'transparent',
+                borderTopWidth: i ? 0.5 : 0, borderTopColor: c.sep })}>
+              <Text style={{ fontSize: 17, color: it.danger ? c.danger : c.ink }}>{it.label}</Text>
+            </Pressable>
+          ))}
+        </Glass>
+      </Animated.View>
+    </Pressable>
+  )
+  return useOverlayPortal(
+    nested ? inner : (
+      <Modal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>{inner}</Modal>
+    ),
   )
 }
 

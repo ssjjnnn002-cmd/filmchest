@@ -7,7 +7,7 @@ import type { Frame, Roll } from '../core/types'
 import { lensIdAt } from '../core/types'
 import { meterShotAt } from '../core/meter'
 import { exposureLine } from '../core/frameCaption'
-import { frameAspects, renderFramePrint } from '../core/framePrint'
+import { frameAspects, frameCaptionStyles, renderFramePrint } from '../core/framePrint'
 import { rotatedBlob } from '../core/importer'
 import { Icon, Sheet, cameraName, fmtDay, rollFilm, rollFilmName, rollTitle, sortedDays, useObjectURL } from '../ui/common'
 import { getPref, inClaudeHost, saveFile, saveFileNow, setPref } from '../platform'
@@ -20,6 +20,7 @@ export function FramePrint({ roll, frames, onClose }: { roll: Roll; frames: Fram
   const [index, setIndex] = useState(0)
   const [dark, setDark] = useState(false)
   const [aspect, setAspect] = useState('square')
+  const [captionStyle, setCaptionStyle] = useState<'A' | 'B'>((getPref('frameCaptionStyle', 'A') as 'A' | 'B') || 'A')
   const [show, setShow] = useState({ camera: true, lens: true, film: true, filter: true, date: true, photographer: true, exposure: true })
   const [photographer, setPhotographer] = useState<string>(getPref('photographer', ''))
   const [blob, setBlob] = useState<Blob>()
@@ -50,6 +51,7 @@ export function FramePrint({ roll, frames, onClose }: { roll: Roll; frames: Fram
       const bmp = await createImageBitmap(await rotatedBlob(src, turns), { imageOrientation: 'from-image' })
       const canvas = await renderFramePrint(bmp, {
         dark,
+        style: captionStyle,
         camera: show.camera ? cameraName(camera, roll).trim() || undefined : undefined,
         lens: show.lens ? (lens ? `${lens.brand} ${lens.model}`.trim() : camera?.fixedLens ?? roll.cameraFixedLens) : undefined,
         film: show.film ? (film?.name ?? rollFilmName(roll)) : undefined,
@@ -63,7 +65,7 @@ export function FramePrint({ roll, frames, onClose }: { roll: Roll; frames: Fram
     }, 120)
     return () => { cancelled = true; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frame?.id, original?.blob, turns, dark, aspect, show, photographer, camera, lenses.length])
+  }, [frame?.id, original?.blob, turns, dark, aspect, captionStyle, show, photographer, camera, lenses.length])
 
   const fileName = () => `${rollTitle(roll, camera)} 프레임.jpg`.replace(/[/\\:]/g, '-')
   const saveGallery = () => {
@@ -96,7 +98,7 @@ export function FramePrint({ roll, frames, onClose }: { roll: Roll; frames: Fram
         <h2>프레임 만들기</h2>
         <span style={{ width: 52 }} />
       </div>
-      <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', minHeight: 0, overflow: 'hidden' }}>
         <div className="chips" style={{ padding: '6px 16px 10px', gap: 8 }}>
           {frames.map((f, i) => (
             <button key={f.id} onClick={() => setIndex(i)} aria-label={`${f.index}번 컷`}
@@ -105,15 +107,21 @@ export function FramePrint({ roll, frames, onClose }: { roll: Roll; frames: Fram
             </button>
           ))}
         </div>
-        <div style={{ display: 'grid', placeItems: 'center', minHeight: 0, padding: 12, background: dark ? '#111' : 'var(--paper)' }}>
-          {url ? <img src={url} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', boxShadow: '0 2px 12px rgb(0 0 0 / .12)' }} /> : <div className="spinner" />}
+        <div style={{ display: 'grid', placeItems: 'center', minHeight: 0, overflow: 'hidden', padding: 12, background: dark ? '#111' : 'var(--paper)' }}>
+          {url ? <img src={url} alt="" style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain', boxShadow: '0 2px 12px rgb(0 0 0 / .12)' }} /> : <div className="spinner" />}
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 10, padding: '10px 16px calc(12px + env(safe-area-inset-bottom, 0px))' }}>
+      <div style={{ display: 'grid', gap: 10, padding: '10px 16px calc(12px + env(safe-area-inset-bottom, 0px))', maxHeight: '42vh', overflow: 'auto' }}>
         <div className="segmented slide" style={{ '--i': dark ? 1 : 0, '--n': 2 } as React.CSSProperties}>
           <button className={!dark ? 'on' : ''} onClick={() => setDark(false)}>흰색</button>
           <button className={dark ? 'on' : ''} onClick={() => setDark(true)}>검정</button>
         </div>
+        <div className="segmented slide" style={{ '--i': captionStyle === 'B' ? 1 : 0, '--n': 2 } as React.CSSProperties}>
+          {frameCaptionStyles.map((s) => (
+            <button key={s.id} className={captionStyle === s.id ? 'on' : ''} onClick={() => { setCaptionStyle(s.id); setPref('frameCaptionStyle', s.id) }}>{s.title}</button>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: -4 }}>{frameCaptionStyles.find((s) => s.id === captionStyle)?.hint}</div>
         <div className="chips">{frameAspects.map((a) => chip(a.title, aspect === a.id, () => setAspect(a.id)))}</div>
         <div className="chips">{meta.map(([k, label]) => chip(label, show[k], () => setShow((s) => ({ ...s, [k]: !s[k] }))))}</div>
         {show.photographer && (

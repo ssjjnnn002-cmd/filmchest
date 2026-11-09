@@ -37,8 +37,10 @@ export function Stats({ onClose }: { onClose: () => void }) {
       <Text style={{ fontSize: 13, color: c.muted }}>{label}</Text>
     </View>
   )
+  if (spending) return <Spending onClose={() => setSpending(false)} />
+
   return (
-    <Sheet title="통계" onClose={onClose} left={<View />} right={<SheetBtn label="완료" accent onPress={onClose} />}>
+    <Sheet title="통계" onClose={onClose} left={null} right={<SheetBtn label="완료" accent onPress={onClose} />}>
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 18 }}>
         {tile('총 롤', rolls.length)}
         {tile('총 사진', photos)}
@@ -74,7 +76,6 @@ export function Stats({ onClose }: { onClose: () => void }) {
       <Group>
         <Row chev onPress={() => setSpending(true)}><RowText>장비에 쓴 돈</RowText></Row>
       </Group>
-      {spending ? <Spending onClose={() => setSpending(false)} /> : null}
     </Sheet>
   )
 }

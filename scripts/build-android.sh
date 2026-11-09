@@ -18,14 +18,15 @@ export KSP=$(cat ~/tools/filmchest-keystore-password.txt)
 $BT/apksigner sign --ks ~/tools/filmchest.keystore --ks-key-alias filmchest --ks-pass env:KSP --key-pass env:KSP \
   --out galaxy/build/filmchest.apk /tmp/filmchest-aligned.apk
 rm -f galaxy/build/filmchest.apk.idsig
-printf '{"built": %s}\n' "$BUILT" > galaxy/build/apk.json
-echo "✓ galaxy/build/filmchest.apk"
+VERSION=$(node -p "require('./galaxy/app.json').expo.version")
+printf '{"built": %s, "version": "%s"}\n' "$BUILT" "$VERSION" > galaxy/build/apk.json
+echo "✓ galaxy/build/filmchest.apk ($VERSION)"
 # Cloudflare Pages는 파일 하나에 25MB까지라 20MB씩 나눈다
 rm -rf web/public/apk && mkdir -p web/public/apk
 split -b 20m -a 1 -d galaxy/build/filmchest.apk web/public/apk/part
 for f in web/public/apk/part?; do mv "$f" "$f.bin"; done
 PARTS=$(ls web/public/apk/part*.bin | wc -l | tr -d ' ')
 SIZE=$(stat -f%z galaxy/build/filmchest.apk)
-printf '{"parts": %s, "size": %s}\n' "$PARTS" "$SIZE" > web/public/apk/parts.json
+printf '{"parts": %s, "size": %s, "version": "%s"}\n' "$PARTS" "$SIZE" "$VERSION" > web/public/apk/parts.json
 cp galaxy/build/apk.json web/public/apk.json
-echo "✓ web/public/apk/ ($PARTS 조각) — 웹을 배포하면 올라가요"
+echo "✓ web/public/apk/ ($PARTS 조각, $VERSION) — 웹을 배포하면 올라가요"

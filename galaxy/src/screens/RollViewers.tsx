@@ -15,7 +15,7 @@ import { edgeMarking } from '../core/films'
 import { bytesText, cameraName, dateRangeText, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollTitle, sortedLocations } from '../core/display'
 import { Btn, Field, Group, Section, Toggle } from '../kit'
 import { Icon } from '../icons'
-import { Sheet, SheetBtn } from '../overlay'
+import { OverlayBoundary, Sheet, SheetBtn } from '../overlay'
 import { b64ToBytes, bytesToB64, readBytes, writeBytes } from '../files'
 import { saveFileNow } from '../platform'
 import { saveImagesToGallery } from '../gallery'
@@ -292,43 +292,45 @@ export function ContactSheetView({ roll, frames, onClose }: { roll: Roll; frames
 
   return (
     <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <GestureHandlerRootView style={{ flex: 1, backgroundColor: c.paper }}>
-        <View style={{ paddingTop: insets.top + 10, paddingBottom: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <Btn label="닫기" kind="ghost" onPress={onClose} />
-          <Text numberOfLines={1} style={{ flexShrink: 1, color: c.ink, fontSize: 17, fontWeight: '600' }}>{rollFilmName(roll)}</Text>
-          <View style={{ width: 60 }} />
-        </View>
-        <View style={{ flex: 1 }}>
-          {uri ? <ZoomView uri={uri} /> : (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-              <ActivityIndicator color={c.muted} />
-              <Text style={{ color: c.muted, fontSize: 17 }}>펼치는 중…</Text>
-            </View>
-          )}
-        </View>
-        <View style={{ paddingTop: 12, paddingHorizontal: 16, paddingBottom: insets.bottom + 12 }}>
-          <Btn label="밀착 인화지로 만들기" kind="primary" block disabled={!uri || !canMake} onPress={() => setExporting(true)} />
-        </View>
-        {exporting ? (
-          <Sheet title="밀착 인화지로 만들기" onClose={() => setExporting(false)} left={<span />} right={<SheetBtn label="완료" accent onPress={() => setExporting(false)} />}>
-            <Section foot={roll.note ? '롤 메모로 제목을 채웠어요.' : undefined}>
-              <Group>
-                <Toggle label="제목 넣기" value={useTitle} onChange={setUseTitle} />
-                {useTitle ? <Field label="제목" value={title} onChangeText={setTitle} /> : null}
-              </Group>
-            </Section>
-            <Section foot="필름, 카메라, 날짜, 장소, 현상소가 한 줄로 들어가요. 바꾸면 뒤의 미리보기에 바로 반영돼요.">
-              <Group>
-                <Toggle label="촬영 정보 넣기" value={info} onChange={setInfo} />
-              </Group>
-            </Section>
-            <View style={{ gap: 10 }}>
-              <Btn label="갤러리에 저장" icon="download" kind="primary" block disabled={!uri} onPress={saveGallery} />
-              <Btn label="파일로 저장" block disabled={!uri} onPress={saveAsFile} />
-            </View>
-          </Sheet>
-        ) : null}
-      </GestureHandlerRootView>
+      <OverlayBoundary>
+        <GestureHandlerRootView style={{ flex: 1, backgroundColor: c.paper }}>
+          <View style={{ paddingTop: insets.top + 10, paddingBottom: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <Btn label="닫기" kind="ghost" onPress={onClose} />
+            <Text numberOfLines={1} style={{ flexShrink: 1, color: c.ink, fontSize: 17, fontWeight: '600' }}>{rollFilmName(roll)}</Text>
+            <View style={{ width: 60 }} />
+          </View>
+          <View style={{ flex: 1 }}>
+            {uri ? <ZoomView uri={uri} /> : (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <ActivityIndicator color={c.muted} />
+                <Text style={{ color: c.muted, fontSize: 17 }}>펼치는 중…</Text>
+              </View>
+            )}
+          </View>
+          <View style={{ paddingTop: 12, paddingHorizontal: 16, paddingBottom: insets.bottom + 12 }}>
+            <Btn label="밀착 인화지로 만들기" kind="primary" block disabled={!uri || !canMake} onPress={() => setExporting(true)} />
+          </View>
+          {exporting ? (
+            <Sheet title="밀착 인화지로 만들기" onClose={() => setExporting(false)} left={null} right={<SheetBtn label="완료" accent onPress={() => setExporting(false)} />}>
+              <Section foot={roll.note ? '롤 메모로 제목을 채웠어요.' : undefined}>
+                <Group>
+                  <Toggle label="제목 넣기" value={useTitle} onChange={setUseTitle} />
+                  {useTitle ? <Field label="제목" value={title} onChangeText={setTitle} /> : null}
+                </Group>
+              </Section>
+              <Section foot="필름, 카메라, 날짜, 장소, 현상소가 한 줄로 들어가요. 바꾸면 뒤의 미리보기에 바로 반영돼요.">
+                <Group>
+                  <Toggle label="촬영 정보 넣기" value={info} onChange={setInfo} />
+                </Group>
+              </Section>
+              <View style={{ gap: 10 }}>
+                <Btn label="갤러리에 저장" icon="download" kind="primary" block disabled={!uri} onPress={saveGallery} />
+                <Btn label="파일로 저장" block disabled={!uri} onPress={saveAsFile} />
+              </View>
+            </Sheet>
+          ) : null}
+        </GestureHandlerRootView>
+      </OverlayBoundary>
     </Modal>
   )
 }

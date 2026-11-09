@@ -97,7 +97,7 @@ function NewSiteWelcome() {
               if (file) void run(() => importAll(file))
             }} />
           </label>
-          <button className="row accent" onClick={() => setGuide(true)}>백업 없이 지금 옮기기</button>
+          <button className="row accent" onClick={() => setGuide(true)}>예전 서버에서 바로 불러오기</button>
           <button className="row" onClick={close}>처음 써요</button>
         </div>
         {note && <p className="footnote">{note}</p>}
@@ -105,7 +105,7 @@ function NewSiteWelcome() {
       <div className="section">
         <h2>백업 파일이 없는 경우</h2>
         <p className="footnote">
-          위의 '백업 없이 지금 옮기기'를 눌러 안내에 따라 진행해 주세요. 기록과 사진이 새 주소로 그대로 옮겨집니다.
+          위의 '예전 서버에서 바로 불러오기'를 눌러 안내에 따라 진행해 주세요. 기록과 사진이 새 주소로 그대로 옮겨집니다.
           11월 30일 이후에는 예전 주소({oldHost})에 접속해 '기록 옮기고 새 주소로 가기' 버튼만 눌러도 됩니다.
         </p>
         <p className="footnote" style={{ color: 'var(--danger)' }}>
@@ -121,7 +121,7 @@ function NewSiteWelcome() {
 const bookmarklet = `javascript:(function(){var s=document.createElement('script');s.src='${NEW_SITE}/move-out.js?'+Date.now();document.body.appendChild(s)})()`
 const device = /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'ios' : /Android/.test(navigator.userAgent) ? 'android' : 'pc'
 
-/** 백업 없이 예전 주소의 기록을 옮기는 법: 북마크 하나 만들고 예전 주소에서 누르기 */
+/** 예전 vercel 서버가 중단돼도, 그 주소 브라우저 저장소를 북마크로 꺼내 새 주소로 옮긴다 */
 export function MoveGuide({ onClose }: { onClose: () => void }) {
   const [toastNode, toast] = useToast()
   const drag = useRef<HTMLAnchorElement>(null)
@@ -132,29 +132,29 @@ export function MoveGuide({ onClose }: { onClose: () => void }) {
   }
   const steps: Record<typeof device, string[]> = {
     ios: [
-      '아래 \'코드 복사\'를 눌러요.',
-      '사파리 아래쪽 공유 버튼 → \'북마크 추가\' → 이름을 \'필름함 옮기기\'로 저장해요.',
-      '책 모양 북마크 버튼 → \'편집\' → \'필름함 옮기기\'를 눌러 주소를 모두 지우고 붙여 넣어요.',
-      '아래 \'예전 주소 열기\'를 눌러요. 오류 화면이 떠도 괜찮아요.',
-      '그 화면에서 북마크 → \'필름함 옮기기\'를 누르고, 뜨는 \'기록 옮기기\'를 눌러요.',
+      '아래 \'코드 복사\' → 사파리 공유 → \'북마크 추가\'. 이름은 \'필름함 옮기기\'.',
+      '북마크 편집에서 주소를 모두 지우고 붙여 넣어요.',
+      '\'예전 주소 열기\'를 눌러요. 서버 오류 화면이 떠도 그대로 두세요.',
+      '그 화면에서 북마크 \'필름함 옮기기\' → \'기록 옮기기\'를 눌러요.',
     ],
     android: [
-      '아래 \'코드 복사\'를 눌러요.',
-      '크롬 오른쪽 위 ⋮ → ☆ 를 눌러 북마크하고, \'수정\'을 눌러요.',
-      '이름은 \'필름함 옮기기\', 주소는 모두 지우고 붙여 넣은 뒤 저장해요.',
-      '아래 \'예전 주소 열기\'를 눌러요. 오류 화면이 떠도 괜찮아요.',
-      '주소창에 \'필름함 옮기기\'를 쳐서 아래 뜨는 북마크(☆)를 누르고, 뜨는 \'기록 옮기기\'를 눌러요.',
+      '아래 \'코드 복사\' → 크롬 ⋮ → ☆ 북마크 → 수정. 이름은 \'필름함 옮기기\', 주소는 붙여 넣어요.',
+      '\'예전 주소 열기\'를 눌러요. 서버 오류 화면이 떠도 그대로 두세요.',
+      '주소창에 \'필름함 옮기기\'를 쳐 북마크를 누르고, \'기록 옮기기\'를 눌러요.',
     ],
     pc: [
-      '아래 \'필름함 옮기기\' 버튼을 브라우저 위쪽 북마크바로 끌어다 놓아요. (북마크바가 안 보이면 Ctrl+Shift+B, 맥은 ⌘+Shift+B)',
-      '아래 \'예전 주소 열기\'를 눌러요. 오류 화면이 떠도 괜찮아요.',
-      '그 화면에서 북마크바의 \'필름함 옮기기\'를 누르고, 뜨는 \'기록 옮기기\'를 눌러요.',
+      '아래 \'필름함 옮기기\'를 북마크바로 끌어다 놓아요. (안 보이면 Ctrl+Shift+B / ⌘+Shift+B)',
+      '\'예전 주소 열기\'를 눌러요. 서버 오류 화면이 떠도 그대로 두세요.',
+      '그 화면에서 북마크 \'필름함 옮기기\' → \'기록 옮기기\'를 눌러요.',
     ],
   }
   return (
-    <Sheet title="백업 없이 옮기기" onClose={onClose}>
+    <Sheet title="예전 서버에서 바로 불러오기" onClose={onClose}>
       <div className="section">
-        <p className="footnote">예전에 필름함을 쓰던 기기, 그 브라우저에서 해 주세요.</p>
+        <p className="footnote">
+          예전 주소({oldHost}) 서버는 사용량 초과로 지금은 열리지 않아요.
+          기록은 서버가 아니라 <b>예전에 쓰던 브라우저 안</b>에 남아 있어서, 북마크로 그 브라우저에서 바로 꺼낼 수 있어요.
+        </p>
         <ol className="move-steps">{steps[device].map((t, i) => <li key={i}>{t}</li>)}</ol>
         <div className="group">
           {device === 'pc'
@@ -162,7 +162,7 @@ export function MoveGuide({ onClose }: { onClose: () => void }) {
             : <button className="row accent" onClick={copy}>코드 복사</button>}
           <a className="row accent" href={OLD_SITE} target="_blank" rel="noopener">예전 주소 열기</a>
         </div>
-        <p className="footnote">기록과 사진이 새 주소로 옮겨지면 새 창에 '기록을 옮겼어요'가 떠요.</p>
+        <p className="footnote">새 창에 옮겨졌다는 안내가 뜨면 끝이에요. 반드시 예전에 필름함을 쓰던 같은 브라우저에서 해 주세요.</p>
       </div>
       {toastNode}
     </Sheet>

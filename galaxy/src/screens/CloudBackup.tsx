@@ -40,7 +40,7 @@ export function CloudBackup({ onClose }: { onClose: () => void }) {
     refresh()
   }) }
   return (
-    <Sheet title="클라우드 백업" onClose={onClose} left={<span />} right={<SheetBtn label="완료" accent onPress={onClose} />}>
+    <Sheet title="클라우드 백업" onClose={onClose} left={null} right={<SheetBtn label="완료" accent onPress={onClose} />}>
       <Section title="구글 드라이브" foot={`내 드라이브의 '필름함' 폴더에 기록과 스캔 사진을 올려요. 바뀌면 바로 올리고, 앱을 보는 동안 다른 기기에서 고친 기록을 받아요. 장비 기록은 '${backupFileName}' 하나에 덮어써서 여러 번 불러와도 늘어나지 않아요.`}>
         <Group>
           {msg ? <Row static><Text style={{ color: msg.ok ? '#30a46c' : c.danger, fontSize: 15 }}>{msg.ok ? '✓ ' : '✕ '}{msg.text}</Text></Row> : null}
