@@ -1,4 +1,5 @@
 import StoreKit
+import SwiftData
 import SwiftUI
 
 /// 12롤을 넘긴 뒤 롤을 추가할 때. 심사에 필요한 기간, 가격, 자동 갱신, 약관 링크를 이 화면에 둔다.

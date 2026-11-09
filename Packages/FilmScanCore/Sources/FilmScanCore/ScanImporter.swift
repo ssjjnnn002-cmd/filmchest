@@ -134,7 +134,7 @@ public extension ScanImporter {
     }
 
     /// 가져오기 전에 보여줄 몇 장. 가능하면 JPG 묶음에서 고른다.
-    public static func peek(zipURL: URL, maxFrames: Int = 8) throws -> (paths: [String], samples: [URL]) {
+    static func peek(zipURL: URL, maxFrames: Int = 8) throws -> (paths: [String], samples: [URL]) {
         let archive = try ZipArchive(url: zipURL)
         let images = archive.entries.filter { isScanImage(path: $0.path) && !$0.isDirectory }
         let groups = Dictionary(grouping: images) { entry -> String in

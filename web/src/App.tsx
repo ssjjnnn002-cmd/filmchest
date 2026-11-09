@@ -302,7 +302,7 @@ export function App() {
     <NavContext.Provider value={nav}>
       <div className="app">
         <nav className="sidebar" aria-label="메뉴" style={{ '--ti': tabIndex } as React.CSSProperties}>
-          <div className="brand"><b>필름함</b><small>Filmchest</small></div>
+          <div className="brand"><b>필름함</b></div>
           {tabButtons}
         </nav>
         <main className="main" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>

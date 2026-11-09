@@ -23,6 +23,18 @@
         "prototypes/meter"
       ],
       "port": 5288
+    },
+    {
+      "name": "site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5300",
+        "--directory",
+        "site/public"
+      ],
+      "port": 5300
     }
   ]
 }

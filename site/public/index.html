@@ -59,12 +59,27 @@
   .cta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 32px; }
   .note { margin-top: 12px; color: var(--muted); font-size: 14px; }
 
-  .phones { position: relative; display: flex; justify-content: center; align-items: flex-end; gap: 0; margin: 56px auto 0; height: clamp(420px, 70vw, 640px); }
-  .phone { width: clamp(190px, 30vw, 290px); aspect-ratio: 390 / 844; border-radius: clamp(30px, 4.6vw, 44px); padding: clamp(6px, .9vw, 9px); background: #0b0b0c; box-shadow: 0 30px 60px -20px rgb(25 31 40 / .35), 0 0 0 1px rgb(0 0 0 / .06); flex-shrink: 0; }
-  /* 폰은 늘 같은 비율(캡처와 같은 390:844). 칸 높이에 맞춰 늘어나지 않게 높이는 비율로만 정한다 */
-  .phone { height: auto; align-self: flex-end; }
+  .phones { position: relative; display: flex; justify-content: center; align-items: flex-end; gap: 0; margin: 56px auto 0; height: clamp(470px, 80vw, 730px); }
+  /* 폰 틀: 모든 치수를 폰 너비(--w)에 비례해 잡아서 크기가 달라도 베젤 두께·모서리·버튼이 같은 모양 */
+  .phone { --w: clamp(190px, 30vw, 290px); position: relative; width: var(--w); flex-shrink: 0; align-self: flex-end;
+    padding: calc(var(--w) * .011); border-radius: calc(var(--w) * .175);
+    background: linear-gradient(150deg, #6b6d72 0%, #2b2c2f 22%, #4a4c50 52%, #222326 78%, #55575c 100%);
+    box-shadow: 0 calc(var(--w) * .12) calc(var(--w) * .22) calc(var(--w) * -.08) rgb(25 31 40 / .38), 0 calc(var(--w) * .02) calc(var(--w) * .05) rgb(25 31 40 / .14), inset 0 0 0 1px rgb(255 255 255 / .12); }
   .shots .phone { align-self: flex-start; }
-  .phone img { display: block; width: 100%; height: auto; aspect-ratio: 390 / 844; object-fit: cover; object-position: top; border-radius: clamp(24px, 3.8vw, 36px); }
+  /* 옆 버튼: 왼쪽 액션·볼륨 위·아래, 오른쪽 전원 */
+  .phone::before, .phone::after { content: ""; position: absolute; width: calc(var(--w) * .012); border-radius: 2px; }
+  .phone::before { left: calc(var(--w) * -.01); top: calc(var(--w) * .34); height: calc(var(--w) * .5);
+    background: linear-gradient(to bottom, #3d3e42 0 13%, transparent 13% 27%, #3d3e42 27% 61%, transparent 61% 68%, #3d3e42 68% 100%); }
+  .phone::after { right: calc(var(--w) * -.01); top: calc(var(--w) * .5); height: calc(var(--w) * .24); background: #3d3e42; }
+  .phone .bezel { background: #050505; padding: calc(var(--w) * .032); border-radius: calc(var(--w) * .165); }
+  .phone .display { position: relative; overflow: hidden; background: var(--sb, #141211); border-radius: calc(var(--w) * .135); }
+  .phone .sb { display: grid; grid-template-columns: 1fr calc(var(--w) * .3) 1fr; align-items: center; height: calc(var(--w) * .115); color: #fff;
+    font: 600 calc(var(--w) * .041)/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Pretendard", sans-serif; letter-spacing: -.01em; }
+  .phone .sb .t { justify-self: center; padding-left: calc(var(--w) * .02); }
+  .phone .sb .island { height: calc(var(--w) * .082); border-radius: 999px; background: #000; }
+  .phone .sb .ic { justify-self: center; display: flex; align-items: center; gap: calc(var(--w) * .012); padding-right: calc(var(--w) * .02); }
+  .phone .sb svg { display: block; height: calc(var(--w) * .033); width: auto; fill: #fff; }
+  .phone img { display: block; width: 100%; height: auto; aspect-ratio: 390 / 844; object-fit: cover; object-position: top; }
   .phones .phone:nth-child(1) { transform: translate(18%, -4%) rotate(-6deg) scale(.88); z-index: 1; }
   .phones .phone:nth-child(2) { z-index: 2; }
   .phones .phone:nth-child(3) { transform: translate(-18%, -4%) rotate(6deg) scale(.88); z-index: 1; }
@@ -81,7 +96,7 @@
   .points li { display: flex; gap: 10px; color: var(--ink); font-size: 16px; }
   .points li::before { content: ""; flex-shrink: 0; width: 20px; height: 20px; margin-top: 3px; border-radius: 50%; background: var(--accent-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6 10.3l2.6 2.5L14 7.5' fill='none' stroke='%23de542e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/20px no-repeat; }
   .shots { display: flex; justify-content: center; align-items: flex-start; gap: 18px; }
-  .shots .phone { width: clamp(200px, 26vw, 270px); }
+  .shots .phone { --w: clamp(200px, 26vw, 270px); }
   .shots .phone + .phone { margin-top: 56px; }
 
   /* 저장 방식 */
@@ -136,12 +151,12 @@
     .hero { padding-top: 44px; }
   }
   @media (max-width: 480px) {
-    .phones { height: 400px; margin-top: 44px; }
-    .phones .phone { width: 168px; }
+    .phones { height: 440px; margin-top: 44px; }
+    .phones .phone { --w: 168px; }
     .phones .phone:nth-child(1) { transform: translate(34%, -2%) rotate(-6deg) scale(.86); }
     .phones .phone:nth-child(3) { transform: translate(-34%, -2%) rotate(6deg) scale(.86); }
     .shots { gap: 12px; }
-    .shots .phone { width: 46%; }
+    .shots .phone { --w: min(42vw, 200px); }
     .cta .btn { flex: 1 1 100%; }
     .nav .btn.small { display: none; }
   }
@@ -168,9 +183,9 @@
       </div>
       <p class="note">아이폰은 웹앱을 <a href="#home-screen">홈 화면에 추가</a>해서 앱처럼 써요. 무료로 쓸 수 있어요.</p>
       <div class="phones" aria-hidden="true">
-        <div class="phone"><img src="img/shooting.webp?v=2" alt="" /></div>
-        <div class="phone"><img src="img/library.webp?v=2" alt="" /></div>
-        <div class="phone"><img src="img/roll.webp?v=2" alt="" /></div>
+        <div class="phone"><div class="bezel"><div class="display"><div class="sb" aria-hidden="true"><span class="t">9:41</span><span class="island"></span><span class="ic"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.7 8.7 0 0 1 8 2.2Zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4Zm0 3.6c.5 0 1 .2 1.3.5L8 11.3 6.7 10c.3-.3.8-.5 1.3-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill-opacity=".45"/></svg></span></div><img src="img/shooting.webp?v=2" alt="" /></div></div></div>
+        <div class="phone"><div class="bezel"><div class="display"><div class="sb" aria-hidden="true"><span class="t">9:41</span><span class="island"></span><span class="ic"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.7 8.7 0 0 1 8 2.2Zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4Zm0 3.6c.5 0 1 .2 1.3.5L8 11.3 6.7 10c.3-.3.8-.5 1.3-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill-opacity=".45"/></svg></span></div><img src="img/library.webp?v=2" alt="" /></div></div></div>
+        <div class="phone"><div class="bezel"><div class="display"><div class="sb" aria-hidden="true"><span class="t">9:41</span><span class="island"></span><span class="ic"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.7 8.7 0 0 1 8 2.2Zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4Zm0 3.6c.5 0 1 .2 1.3.5L8 11.3 6.7 10c.3-.3.8-.5 1.3-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill-opacity=".45"/></svg></span></div><img src="img/roll.webp?v=2" alt="" /></div></div></div>
       </div>
     </div>
   </section>
@@ -188,8 +203,8 @@
         </ul>
       </div>
       <div class="shots reveal">
-        <div class="phone"><img src="img/library.webp?v=2" alt="내 장비 화면: 카메라 목록과 필름 장착하기 버튼" /></div>
-        <div class="phone"><img src="img/load.webp?v=2" alt="필름 장착하기 화면: 카메라와 필름 고르기" /></div>
+        <div class="phone"><div class="bezel"><div class="display"><div class="sb" aria-hidden="true"><span class="t">9:41</span><span class="island"></span><span class="ic"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.7 8.7 0 0 1 8 2.2Zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4Zm0 3.6c.5 0 1 .2 1.3.5L8 11.3 6.7 10c.3-.3.8-.5 1.3-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill-opacity=".45"/></svg></span></div><img src="img/library.webp?v=2" alt="내 장비 화면: 카메라 목록과 필름 장착하기 버튼" /></div></div></div>
+        <div class="phone"><div class="bezel"><div class="display" style="--sb:#0d0d0d"><div class="sb" aria-hidden="true"><span class="t">9:41</span><span class="island"></span><span class="ic"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.7 8.7 0 0 1 8 2.2Zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4Zm0 3.6c.5 0 1 .2 1.3.5L8 11.3 6.7 10c.3-.3.8-.5 1.3-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill-opacity=".45"/></svg></span></div><img src="img/load.webp?v=2" alt="필름 장착하기 화면: 카메라와 필름 고르기" /></div></div></div>
       </div>
     </div>
   </section>
@@ -206,7 +221,7 @@
         </ul>
       </div>
       <div class="shots reveal">
-        <div class="phone"><img src="img/shooting.webp?v=2" alt="촬영 중 화면: 장착한 필름과 촬영 끝내기 버튼" /></div>
+        <div class="phone"><div class="bezel"><div class="display"><div class="sb" aria-hidden="true"><span class="t">9:41</span><span class="island"></span><span class="ic"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.7 8.7 0 0 1 8 2.2Zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4Zm0 3.6c.5 0 1 .2 1.3.5L8 11.3 6.7 10c.3-.3.8-.5 1.3-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill-opacity=".45"/></svg></span></div><img src="img/shooting.webp?v=2" alt="촬영 중 화면: 장착한 필름과 촬영 끝내기 버튼" /></div></div></div>
       </div>
     </div>
   </section>
@@ -223,8 +238,8 @@
         </ul>
       </div>
       <div class="shots reveal">
-        <div class="phone"><img src="img/frame.webp?v=2" alt="사진 크게 보기: 촬영 날짜와 장소가 함께 보이는 스캔 사진" /></div>
-        <div class="phone"><img src="img/roll.webp?v=2" alt="롤 화면: 필름 스트립으로 보이는 스캔 사진" /></div>
+        <div class="phone"><div class="bezel"><div class="display" style="--sb:#000000"><div class="sb" aria-hidden="true"><span class="t">9:41</span><span class="island"></span><span class="ic"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.7 8.7 0 0 1 8 2.2Zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4Zm0 3.6c.5 0 1 .2 1.3.5L8 11.3 6.7 10c.3-.3.8-.5 1.3-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill-opacity=".45"/></svg></span></div><img src="img/frame.webp?v=2" alt="사진 크게 보기: 촬영 날짜와 장소가 함께 보이는 스캔 사진" /></div></div></div>
+        <div class="phone"><div class="bezel"><div class="display"><div class="sb" aria-hidden="true"><span class="t">9:41</span><span class="island"></span><span class="ic"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.7 8.7 0 0 1 8 2.2Zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4Zm0 3.6c.5 0 1 .2 1.3.5L8 11.3 6.7 10c.3-.3.8-.5 1.3-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill-opacity=".45"/></svg></span></div><img src="img/roll.webp?v=2" alt="롤 화면: 필름 스트립으로 보이는 스캔 사진" /></div></div></div>
       </div>
     </div>
   </section>
@@ -241,8 +256,8 @@
         </ul>
       </div>
       <div class="shots reveal">
-        <div class="phone"><img src="img/contact.webp?v=2" alt="밀착 인화지 화면" /></div>
-        <div class="phone"><img src="img/rolls.webp?v=2" alt="롤 보관함 화면: 월별로 모인 롤 목록" /></div>
+        <div class="phone"><div class="bezel"><div class="display"><div class="sb" aria-hidden="true"><span class="t">9:41</span><span class="island"></span><span class="ic"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.7 8.7 0 0 1 8 2.2Zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4Zm0 3.6c.5 0 1 .2 1.3.5L8 11.3 6.7 10c.3-.3.8-.5 1.3-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill-opacity=".45"/></svg></span></div><img src="img/contact.webp?v=2" alt="밀착 인화지 화면" /></div></div></div>
+        <div class="phone"><div class="bezel"><div class="display"><div class="sb" aria-hidden="true"><span class="t">9:41</span><span class="island"></span><span class="ic"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.7 8.7 0 0 1 8 2.2Zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4Zm0 3.6c.5 0 1 .2 1.3.5L8 11.3 6.7 10c.3-.3.8-.5 1.3-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill-opacity=".45"/></svg></span></div><img src="img/rolls.webp?v=2" alt="롤 보관함 화면: 월별로 모인 롤 목록" /></div></div></div>
       </div>
     </div>
   </section>
@@ -255,7 +270,7 @@
         <p>달마다 찍은 롤, 컬러와 흑백 비율, 자주 쓴 필름과 카메라를 그래프로 보여 줘요. 장비에 쓴 돈도 정리돼요.</p>
       </div>
       <div class="shots reveal">
-        <div class="phone"><img src="img/stats.webp?v=2" alt="통계 화면: 월별 롤 그래프와 자주 쓴 필름 순위" /></div>
+        <div class="phone"><div class="bezel"><div class="display" style="--sb:#090808"><div class="sb" aria-hidden="true"><span class="t">9:41</span><span class="island"></span><span class="ic"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.7 8.7 0 0 1 8 2.2Zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4Zm0 3.6c.5 0 1 .2 1.3.5L8 11.3 6.7 10c.3-.3.8-.5 1.3-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill-opacity=".45"/></svg></span></div><img src="img/stats.webp?v=2" alt="통계 화면: 월별 롤 그래프와 자주 쓴 필름 순위" /></div></div></div>
       </div>
     </div>
   </section>

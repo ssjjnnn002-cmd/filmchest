@@ -226,7 +226,6 @@ struct ImportFlowView: View {
         .scrollContentBackground(.hidden)
     }
 
-    @ViewBuilder
     private func exposureSection(_ roll: RollItem, frames: Int) -> some View {
         let matched = roll.meterShots
             .filter { let n = $0.pos + meterOffset; return n >= 1 && n <= frames }
