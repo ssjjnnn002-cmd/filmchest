@@ -235,7 +235,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
       {cloud && <CloudBackup onClose={() => setCloud(false)} />}
       {purge && <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={async () => { const run = purge; setPurge(null); await run() }} />}
       {moveGuide && <MoveGuide onClose={() => setMoveGuide(false)} />}
-      {login && <Welcome onDone={() => setLogin(false)} />}
+      {login && <Welcome loginOnly onDone={() => setLogin(false)} />}
       {logout && <Confirm message="로그아웃할까요? 기록과 사진을 드라이브에 올린 뒤 이 기기에서 지워요. 다시 로그인하면 받아 와요." action="로그아웃"
         onCancel={() => setLogout(false)} onConfirm={async () => {
           setLogout(false)

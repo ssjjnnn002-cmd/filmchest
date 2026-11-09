@@ -10,7 +10,7 @@ export default defineConfig(({ command }) => ({
     __SAMPLE_ZIP__: JSON.stringify(command === 'serve'
       ? '/@fs' + path.resolve(__dirname, '../sample/MINOLTA_X-700_50mm_F1.7_ILFORD HP5 PLUS_400_망원동.zip')
       : ''),
-    __APP_VERSION__: JSON.stringify('1.5.6'),
+    __APP_VERSION__: JSON.stringify('1.5.7'),
   },
   server: { port: 5199, fs: { allow: ['..'] } },
   build: {

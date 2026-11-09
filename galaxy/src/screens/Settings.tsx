@@ -89,7 +89,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
             onClose()
           }} />
       ) : null}
-      {login ? <Welcome onDone={() => setLogin(false)} /> : null}
+      {login ? <Welcome loginOnly onDone={() => setLogin(false)} /> : null}
       {logout ? <Confirm message="로그아웃할까요? 기록과 사진을 드라이브에 올린 뒤 이 기기에서 지워요. 다시 로그인하면 받아 와요." action="로그아웃"
         onCancel={() => setLogout(false)} onConfirm={async () => {
           setLogout(false)

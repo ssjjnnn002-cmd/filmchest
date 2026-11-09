@@ -127,7 +127,7 @@ struct SettingsView: View {
             .formStyle(.grouped)
             .filmKeyboard()
             .sheet(isPresented: $showPaywall) { PaywallView() }
-            .sheet(isPresented: $showLogin, onDismiss: { accountRevision += 1 }) { WelcomeView() }
+            .sheet(isPresented: $showLogin, onDismiss: { accountRevision += 1 }) { WelcomeView(loginOnly: true) }
             .confirmationDialog("로그아웃할까요? 기록과 사진을 드라이브에 올린 뒤 이 기기에서 지워요. 다시 로그인하면 받아 와요. 사진 앱의 사진은 그대로예요.", isPresented: $confirmLogout, titleVisibility: .visible) {
                 Button("로그아웃", role: .destructive) {
                     logoutStep = "준비 중…"

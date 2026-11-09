@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import { NEW_SITE, OLD_SITE, isOldSite, receiveFromOldSite, sendToNewSite } from '../core/move'
+import { NEW_SITE, OLD_SITE, isOldSite, oldSiteDown, receiveFromOldSite, sendToNewSite } from '../core/move'
 import { importAll } from '../core/backup'
 import { driveAvailable, driveToken, restoreFromDrive } from '../core/drive'
 import { getPref, setPref } from '../platform'
@@ -83,11 +83,6 @@ function NewSiteWelcome() {
   return (
     <Sheet title="예전 기록 불러오기" onClose={close}>
       <div className="section">
-        <p className="footnote">
-          필름함 주소가 {oldHost}에서 {newHost}로 변경되었습니다.
-          서버 사용량 한도 초과로 예전 주소는 11월 30일까지 일시 중단된 상태입니다.
-          이용에 불편을 드려 죄송합니다.
-        </p>
         <div className="group">
           {driveAvailable && <button className="row accent" onClick={() => run(async () => { await driveToken('consent'); return restoreFromDrive() })}>구글 드라이브에서 불러오기</button>}
           <label className="row accent">백업 파일 불러오기
@@ -97,22 +92,12 @@ function NewSiteWelcome() {
               if (file) void run(() => importAll(file))
             }} />
           </label>
-          <button className="row accent" onClick={() => setGuide(true)}>예전 서버에서 바로 불러오기</button>
+          <button className="row accent" onClick={() => setGuide(true)}>예전 주소에서 바로 불러오기</button>
           <button className="row" onClick={close}>처음 써요</button>
         </div>
         {note && <p className="footnote">{note}</p>}
       </div>
-      <div className="section">
-        <h2>백업 파일이 없는 경우</h2>
-        <p className="footnote">
-          위의 '예전 서버에서 바로 불러오기'를 눌러 안내에 따라 진행해 주세요. 기록과 사진이 새 주소로 그대로 옮겨집니다.
-          11월 30일 이후에는 예전 주소({oldHost})에 접속해 '기록 옮기고 새 주소로 가기' 버튼만 눌러도 됩니다.
-        </p>
-        <p className="footnote" style={{ color: 'var(--danger)' }}>
-          기록은 예전 주소를 사용하던 브라우저 안에만 저장되어 있습니다.
-          옮기기 전까지 해당 브라우저의 방문 기록, 쿠키, 사이트 데이터를 삭제하지 마세요. 삭제하면 복구할 수 없습니다.
-        </p>
-      </div>
+      <MoveInfo />
     </Sheet>
   )
 }
@@ -134,26 +119,26 @@ export function MoveGuide({ onClose }: { onClose: () => void }) {
     ios: [
       '아래 \'코드 복사\' → 사파리 공유 → \'북마크 추가\'. 이름은 \'필름함 옮기기\'.',
       '북마크 편집에서 주소를 모두 지우고 붙여 넣어요.',
-      '\'예전 주소 열기\'를 눌러요. 서버 오류 화면이 떠도 그대로 두세요.',
+      '\'예전 주소 열기\'를 눌러요. 오류 화면이 떠도 그대로 두세요.',
       '그 화면에서 북마크 \'필름함 옮기기\' → \'기록 옮기기\'를 눌러요.',
     ],
     android: [
       '아래 \'코드 복사\' → 크롬 ⋮ → ☆ 북마크 → 수정. 이름은 \'필름함 옮기기\', 주소는 붙여 넣어요.',
-      '\'예전 주소 열기\'를 눌러요. 서버 오류 화면이 떠도 그대로 두세요.',
+      '\'예전 주소 열기\'를 눌러요. 오류 화면이 떠도 그대로 두세요.',
       '주소창에 \'필름함 옮기기\'를 쳐 북마크를 누르고, \'기록 옮기기\'를 눌러요.',
     ],
     pc: [
       '아래 \'필름함 옮기기\'를 북마크바로 끌어다 놓아요. (안 보이면 Ctrl+Shift+B / ⌘+Shift+B)',
-      '\'예전 주소 열기\'를 눌러요. 서버 오류 화면이 떠도 그대로 두세요.',
+      '\'예전 주소 열기\'를 눌러요. 오류 화면이 떠도 그대로 두세요.',
       '그 화면에서 북마크 \'필름함 옮기기\' → \'기록 옮기기\'를 눌러요.',
     ],
   }
   return (
-    <Sheet title="예전 서버에서 바로 불러오기" onClose={onClose}>
+    <Sheet title="예전 주소에서 바로 불러오기" onClose={onClose}>
       <div className="section">
         <p className="footnote">
-          예전 주소({oldHost}) 서버는 사용량 초과로 지금은 열리지 않아요.
-          기록은 서버가 아니라 <b>예전에 쓰던 브라우저 안</b>에 남아 있어서, 북마크로 그 브라우저에서 바로 꺼낼 수 있어요.
+          {oldSiteDown() ? `예전 주소(${oldHost})는 지금 열리지 않아요. ` : ''}
+          기록은 <b>예전에 쓰던 브라우저 안</b>에 남아 있어서, 북마크로 그 브라우저에서 바로 꺼낼 수 있어요.
         </p>
         <ol className="move-steps">{steps[device].map((t, i) => <li key={i}>{t}</li>)}</ol>
         <div className="group">
@@ -166,5 +151,22 @@ export function MoveGuide({ onClose }: { onClose: () => void }) {
       </div>
       {toastNode}
     </Sheet>
+  )
+}
+
+/** 주소 이사 안내 (시작 화면·새 주소 첫 화면 공통). 11월 30일까지는 예전 주소가 멈춰 있다 */
+export function MoveInfo() {
+  return (
+    <>
+      <p className="footnote">
+        필름함 주소가 {oldHost}에서 {newHost}로 바뀌었어요.{' '}
+        {oldSiteDown()
+          ? <>예전 주소는 서버 사용량 한도로 11월 30일까지 열리지 않아요. 백업 파일이 없으면 '예전 주소에서 바로 불러오기'로 옮기세요.</>
+          : <>예전 주소({oldHost})에 들어가 '기록 옮기고 새 주소로 가기'를 누르면 기록과 사진이 그대로 옮겨져요.</>}
+      </p>
+      <p className="footnote" style={{ color: 'var(--danger)' }}>
+        기록은 예전 주소를 쓰던 브라우저 안에만 있어요. 옮기기 전에 그 브라우저의 방문 기록·쿠키·사이트 데이터를 지우면 복구할 수 없어요.
+      </p>
+    </>
   )
 }

@@ -7,6 +7,8 @@ import { cameraPhotoBlob, saveCameraPhoto } from '../photoStore'
 export const OLD_SITE: string = import.meta.env.VITE_OLD_SITE ?? 'https://filmchest.vercel.app'
 export const NEW_SITE: string = import.meta.env.VITE_NEW_SITE ?? 'https://filmchest.pages.dev'
 export const isOldSite = location.origin === OLD_SITE
+/** 예전 주소(Vercel)가 사용량 한도로 멈춰 있는 동안 (11월 30일까지). 그 뒤에는 예전 주소에서 버튼만 누르면 된다 */
+export const oldSiteDown = () => Date.now() < Date.parse('2026-12-01T00:00:00+09:00')
 
 type Payload = { tables: Record<string, unknown[]>; photos: Record<string, Blob>; prefs: Record<string, string> }
 // 기기마다 다른 값(드라이브 연결, 받아 둔 표시)은 옮기지 않는다
