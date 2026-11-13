@@ -435,13 +435,14 @@ const INIT = window.FILMCHEST_METER_INIT || (() => {
 const HOSTED = !!INIT
 const NATIVE_CAM = !!INIT?.nativeCamera
 window.meterBias = Number(INIT?.bias) || 0
-function meterBias() {
+// 함수 이름이 window.meterBias(숫자)와 같으면 숫자로 덮여서 측광이 멈춘다. 이름을 따로 둔다
+function readMeterBias() {
   const n = Number(window.meterBias)
   return Number.isFinite(n) ? n : 0
 }
 function applyMeterBias(v) {
   if (v == null || !Number.isFinite(v)) return v
-  return clamp(v + meterBias(), -4, 22)
+  return clamp(v + readMeterBias(), -4, 22)
 }
 function post(msg) {
   if (!HOSTED) return
