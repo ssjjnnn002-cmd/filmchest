@@ -305,6 +305,14 @@
     font-size: 14px; font-weight: 700; padding: 8px 12px; border-radius: 99px; font-variant-numeric: tabular-nums; }
   .head .lensbtn svg { width: 9px; height: 9px; opacity: .6; }
   .head .lensbtn.fixed svg { display: none; }
+  .head .lensbtn.fixed { pointer-events: none; }
+  .lenslist { display: grid; gap: 6px; margin-top: 12px; }
+  .lensitem { display: flex; align-items: center; gap: 10px; width: 100%; border: 1.5px solid transparent; background: #2a2a2e; border-radius: 12px; padding: 12px 14px; text-align: left; }
+  .lensitem span { flex: 1; min-width: 0; }
+  .lensitem b { display: block; font-size: 15px; }
+  .lensitem small { font-size: 12px; color: var(--sub); }
+  .lensitem i { font-style: normal; font-size: 12px; font-weight: 700; color: var(--orange); }
+  .lensitem.on { border-color: var(--orange); background: rgb(255 107 31 / .12); }
   .head .lensbtn small { font-size: 11px; font-weight: 600; color: var(--sub); }
   .endbtn, #counterSub { display: none !important; }
   .flash:not(.filt):not(.mtr) span { display: none; }
@@ -497,6 +505,14 @@
   <p class="body">아직 찍는 중이면 지금 상태 그대로 두고 돌아가요.<br>찍은 컷은 그대로 남아 있어요.</p>
   <div class="yn wide"><button id="exitCancel">아직 촬영 중</button><button class="save" id="exitGo">촬영 끝내기</button></div>
   <button class="textbtn" id="exitBack">취소</button>
+</div>
+
+<div class="sheet" id="gearSheet">
+  <div class="grab"></div>
+  <h2>렌즈 교체</h2>
+  <div class="meta">장비에 등록된 렌즈 중 이 카메라에 맞는 렌즈예요</div>
+  <div class="lenslist" id="gearList"></div>
+  <div class="actions one"><button id="gearClose">닫기</button></div>
 </div>
 
 <div class="sheet over" id="lensSheet">
@@ -1320,7 +1336,7 @@ function placeStrip(instant) {
 function sendShots() {
   const list = Object.values(shots).sort((a, b) => a.pos - b.pos).map((f) => ({
     pos: f.pos, order: f.order, mode: f.mode, aperture: f.aperture ?? null, shutter: f.shutter ?? null,
-    comp: f.comp || 0, flash: !!f.flash, ev: Math.round(f.ev * 10) / 10, focal: f.focal ?? null, at: f.at ?? null, edited: !!f.edited,
+    comp: f.comp || 0, flash: !!f.flash, ev: Math.round(f.ev * 10) / 10, focal: f.focal ?? null, lensId: f.lensId ?? null, at: f.at ?? null, edited: !!f.edited,
     filters: f.filters || [], tags: f.tags || [], memo: f.memo || '',
   }))
   post({ type: 'shots', prewind, shots: list })
@@ -1366,7 +1382,7 @@ async function fire() {
   }
   shots[pos] = {
     pos, order: shotCount + 1, mode, ev: meterEV, comp: comp(), focal: Math.round(PHONE_MM * zoom.z),
-    flash, at: new Date().toISOString(), filters: [...filters], tags: [], memo: '',
+    flash, at: new Date().toISOString(), filters: [...filters], tags: [], memo: '', lensId,
     aperture: mode === 'A' || mode === 'M' ? ringA.value : null,
     shutter: mode === 'S' || mode === 'M' ? ringS.value : null,
   }
@@ -1798,7 +1814,36 @@ $('lnDone').addEventListener('click', () => {
 // 렌즈 고정형 카메라(컴팩트·레인지파인더)는 렌즈를 바꿀 수 없다
 const FIXED_LENS = !!INIT?.camera?.lens?.fixed
 if (FIXED_LENS) $('focal').classList.add('fixed')
-$('focal').addEventListener('click', () => FIXED_LENS ? toast('렌즈 고정형 카메라예요') : openLens())
+// 렌즈 교체: 앱이 장비 탭에 등록된, 이 카메라에 맞는 렌즈 목록을 넘기면 그중에서 고른다 (없으면 화각을 직접 정하는 시트)
+const GEAR_LENSES = (Array.isArray(INIT?.lenses) ? INIT.lenses : []).filter((l) => +l.min > 0)
+let lensId = INIT?.camera?.lens?.id ?? null
+const rangeText = (l) => `${+l.max > +l.min ? `${l.min}–${l.max}mm` : `${l.min}mm`}${l.open ? ` f/${l.open}` : ''}`
+function openGear() {
+  const box = $('gearList'); box.innerHTML = ''
+  for (const l of GEAR_LENSES) {
+    const b = document.createElement('button'); b.className = 'lensitem' + (l.id === lensId ? ' on' : '')
+    b.innerHTML = `<span><b></b><small></small></span><i>${l.id === lensId ? '끼움' : ''}</i>`
+    b.querySelector('b').textContent = l.name; b.querySelector('small').textContent = rangeText(l)
+    b.addEventListener('click', () => setGearLens(l))
+    box.appendChild(b)
+  }
+  showSheet('gearSheet'); detent()
+}
+function setGearLens(l) {
+  lensId = l.id
+  lens = { min: +l.min, max: Math.max(+l.min, +l.max || +l.min) }
+  const keep = ringA.value
+  cam.ap = aps(parseFloat(l.open) || 1.4, parseFloat(l.close) || 22)
+  ringA.setValues(cam.ap, nearest(cam.ap, keep || 8))
+  setMode(mode)
+  applyLens()
+  post({ type: 'lens', id: l.id, min: lens.min, max: lens.max })
+  $('gearSheet').classList.remove('on'); $('dim').classList.remove('on')
+  toast(`${l.name}로 바꿨어요 · 다음 컷부터 기록돼요`)
+}
+// 렌즈 고정형은 눌러도 아무 일 없음
+$('focal').addEventListener('click', () => { if (FIXED_LENS) return; if (GEAR_LENSES.length) openGear(); else openLens() })
+$('gearClose').addEventListener('click', closeSheets)
 $('stLens').addEventListener('click', openLens)
 
 // 진짜 접안부처럼 변이 살짝 부푼 둥근 네모, 가장자리는 흐리게

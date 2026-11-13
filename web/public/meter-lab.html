@@ -41,7 +41,8 @@
   .row .check { width: 20px; color: var(--safelight); font-weight: 700; }
   .row small { display: block; color: var(--muted); font-size: 12px; }
   .note { color: var(--muted); font-size: 12px; margin: 8px 4px 0; }
-  .overlay { position: fixed; inset: 0; z-index: 50; background: #0b0b0c; }
+  /* 홈 화면 앱에선 위 상태 표시줄을 누르면 페이지로 안 가서, 노출계를 그 아래부터 띄운다 (iframe 안에선 safe-area 값을 모름) */
+  .overlay { position: fixed; inset: 0; z-index: 50; background: #0b0b0c; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
   .overlay iframe { width: 100%; height: 100%; border: 0; display: block; }
   .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translate(-50%, 16px); opacity: 0; background: rgb(40 38 36 / .96); color: var(--ink);
     padding: 10px 14px; border-radius: 12px; font-size: 14px; transition: .25s; pointer-events: none; z-index: 60; max-width: calc(100% - 32px); text-align: center; }
@@ -97,18 +98,26 @@ const PRESETS = [
   { id: 'af600', name: 'Nikon AF600', modes: ['P'], fastest: 250, slowest: 2, prewind: false,
     lens: { name: 'Nikon 28mm f/3.5 (고정 렌즈)', min: 28, max: 28, open: '3.5', close: '22', fixed: true } },
   { id: 'x700', name: 'Minolta X-700', modes: ['P', 'A', 'M'], fastest: 1000, slowest: 4, prewind: false,
-    lens: { name: 'MD Rokkor 50mm f/1.7', min: 50, max: 50, open: '1.7', close: '22' } },
+    lens: { id: 'md50', name: 'MD Rokkor 50mm f/1.7', min: 50, max: 50, open: '1.7', close: '22' },
+    // 장비 탭에 등록된 같은 마운트(미놀타 MD) 렌즈들 흉내
+    lenses: [
+      { id: 'md50', name: 'MD Rokkor 50mm f/1.7', min: 50, max: 50, open: '1.7', close: '22' },
+      { id: 'md28', name: 'MD W.Rokkor 28mm f/2.8', min: 28, max: 28, open: '2.8', close: '22' },
+      { id: 'md3570', name: 'MD Zoom 35–70mm f/3.5', min: 35, max: 70, open: '3.5', close: '22' },
+      { id: 'md135', name: 'MD Tele Rokkor 135mm f/3.5', min: 135, max: 135, open: '3.5', close: '22' },
+    ] },
 ]
 const FILM = { name: 'Kodak Portra 400', short: 'PORTRA', iso: 400, format: '135', frames: 36, color: '#f0b43a' }
 let pick = store.get('preset', 'x700')
 const cur = () => PRESETS.find((p) => p.id === pick) || PRESETS[2]
 const rollKey = () => 'roll.' + cur().id
+const curLens = () => { const p = cur(), id = store.get('lens.' + p.id, null); return p.lenses?.find((l) => l.id === id) || p.lens }
 
 function render() {
   const p = cur(), roll = store.get(rollKey(), { shots: [], prewind: null })
   $('camName').textContent = p.name
   $('filmName').textContent = FILM.name
-  $('lensName').textContent = `${p.lens.name}${p.prewind ? ' · 역순 감기' : ''}`
+  $('lensName').textContent = `${curLens().name}${p.prewind ? ' · 역순 감기' : ''}`
   $('shotInfo').textContent = roll.shots.length ? `기록 ${roll.shots.length}컷` : '아직 기록 없음'
   $('presets').innerHTML = ''
   for (const q of PRESETS) {
@@ -126,7 +135,8 @@ function open(only) {
   const init = {
     test: true,
     only: only ? 'meter' : undefined,
-    camera: { id: 'lab-' + p.id, name: p.name, modes: p.modes, fastest: p.fastest, slowest: p.slowest, lens: p.lens },
+    camera: { id: 'lab-' + p.id, name: p.name, modes: p.modes, fastest: p.fastest, slowest: p.slowest, lens: curLens() },
+    lenses: p.lenses,
     film: FILM,
     prewind: p.prewind,
     rollPrewind: roll.prewind,
@@ -143,6 +153,7 @@ addEventListener('message', (e) => {
   if (!frame || e.source !== frame.contentWindow || e.data?.source !== 'filmchest-meter') return
   const m = e.data
   if (m.type === 'shots') store.set(rollKey(), { shots: m.shots || [], prewind: !!m.prewind })
+  else if (m.type === 'lens' && m.id) store.set('lens.' + cur().id, m.id)
   else if (m.type === 'close') closeMeter()
   else if (m.type === 'end') { store.set(rollKey(), { shots: [], prewind: null }); closeMeter(); toast('실제 앱에선 여기서 현상 맡기기로 넘어가요') }
 })
