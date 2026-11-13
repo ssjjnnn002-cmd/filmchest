@@ -92,18 +92,16 @@ const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.a
 
 // 실제 앱의 카메라·렌즈 등록 정보 대신 쓰는 예시 장비
 const PRESETS = [
-  { id: 'fm2', name: 'Nikon FM2', modes: ['M'], fastest: 4000, slowest: 1, prewind: false,
-    lens: { name: 'Nikkor 50mm f/1.4', min: 50, max: 50, open: '1.4', close: '16' } },
-  { id: 'eos5', name: 'Canon EOS 5', modes: ['P', 'A', 'S', 'M'], fastest: 8000, slowest: 30, prewind: false,
-    lens: { name: 'Canon EF 28–105mm f/3.5–4.5', min: 28, max: 105, open: '3.5', close: '22' } },
-  { id: 'kiss', name: 'Canon EOS Kiss 7', modes: ['P', 'A', 'S', 'M'], fastest: 4000, slowest: 30, prewind: true,
-    lens: { name: 'Canon EF 28–80mm f/3.5–5.6', min: 28, max: 80, open: '3.5', close: '22' } },
-  { id: 't3', name: 'Contax T3', modes: ['P', 'A'], fastest: 500, slowest: 16, prewind: false,
-    lens: { name: 'Sonnar 35mm f/2.8 (고정 렌즈)', min: 35, max: 35, open: '2.8', close: '16' } },
+  { id: 'rc35', name: 'Olympus 35 RC', modes: ['S', 'M'], fastest: 500, slowest: 1 / 15, prewind: false,
+    lens: { name: 'E.Zuiko 42mm f/2.8 (고정 렌즈)', min: 42, max: 42, open: '2.8', close: '22', fixed: true } },
+  { id: 'af600', name: 'Nikon AF600', modes: ['P'], fastest: 250, slowest: 2, prewind: false,
+    lens: { name: 'Nikon 28mm f/3.5 (고정 렌즈)', min: 28, max: 28, open: '3.5', close: '22', fixed: true } },
+  { id: 'x700', name: 'Minolta X-700', modes: ['P', 'A', 'M'], fastest: 1000, slowest: 4, prewind: false,
+    lens: { name: 'MD Rokkor 50mm f/1.7', min: 50, max: 50, open: '1.7', close: '22' } },
 ]
 const FILM = { name: 'Kodak Portra 400', short: 'PORTRA', iso: 400, format: '135', frames: 36, color: '#f0b43a' }
-let pick = store.get('preset', 'eos5')
-const cur = () => PRESETS.find((p) => p.id === pick) || PRESETS[1]
+let pick = store.get('preset', 'x700')
+const cur = () => PRESETS.find((p) => p.id === pick) || PRESETS[2]
 const rollKey = () => 'roll.' + cur().id
 
 function render() {

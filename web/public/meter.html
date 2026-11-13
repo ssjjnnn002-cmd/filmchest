@@ -302,6 +302,7 @@
   .head .lensbtn { flex: none; display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--text);
     font-size: 14px; font-weight: 700; padding: 8px 12px; border-radius: 99px; font-variant-numeric: tabular-nums; }
   .head .lensbtn svg { width: 9px; height: 9px; opacity: .6; }
+  .head .lensbtn.fixed svg { display: none; }
   .head .lensbtn small { font-size: 11px; font-weight: 600; color: var(--sub); }
   .endbtn, #counterSub { display: none !important; }
   .flash:not(.filt):not(.mtr) span { display: none; }
@@ -1793,7 +1794,10 @@ $('lnDone').addEventListener('click', () => {
   if (!$('startSheet').classList.contains('on')) $('dim').classList.remove('on')
   toast(lensText())
 })
-$('focal').addEventListener('click', openLens)
+// 렌즈 고정형 카메라(컴팩트·레인지파인더)는 렌즈를 바꿀 수 없다
+const FIXED_LENS = !!INIT?.camera?.lens?.fixed
+if (FIXED_LENS) $('focal').classList.add('fixed')
+$('focal').addEventListener('click', () => FIXED_LENS ? toast('렌즈 고정형 카메라예요') : openLens())
 $('stLens').addEventListener('click', openLens)
 
 // 진짜 접안부처럼 변이 살짝 부푼 둥근 네모, 가장자리는 흐리게
