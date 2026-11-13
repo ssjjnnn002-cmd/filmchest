@@ -7,31 +7,37 @@
 <meta name="theme-color" content="#0b0b0c" />
 <title>노출계 테스트</title>
 <style>
+  /* iOS 다크 모드 색: 시스템 배경·채움·글자, 강조는 시스템 주황 */
   :root {
-    --bg: #0b0b0c; --panel: #161618; --line: #2a2a2e; --text: #f2f0ec; --sub: #8d8a85;
-    --orange: #ff6b1f; --ok: #4cd964; --warn: #ff453a; --print: #f3a256;
+    --bg: #000; --panel: rgb(118 118 128 / .2); --panel2: rgb(118 118 128 / .32); --line: rgb(84 84 88 / .6);
+    --sheet: #1c1c1e; --fill: #2c2c2e; --fill2: #3a3a3c;
+    --text: #fff; --sub: rgb(235 235 245 / .6); --sub2: rgb(235 235 245 / .32);
+    --orange: #ff9f0a; --ok: #30d158; --warn: #ff453a; --blue: #64d2ff; --yellow: #ffd60a; --print: #f3a256;
+    --ease: cubic-bezier(.32,.72,0,1);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--bg); color: var(--text); }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased; letter-spacing: -.01em;
     -webkit-user-select: none; user-select: none; overscroll-behavior: none;
     padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 10px);
     height: 100dvh; box-sizing: border-box; overflow: hidden;
   }
-  button { font-family: inherit; color: inherit; }
-  .wrap { max-width: 440px; height: 100%; margin: 0 auto; padding: 8px 16px 0; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; }
+  button { font-family: inherit; color: inherit; letter-spacing: inherit; cursor: pointer; }
+  button:active { opacity: .7; }
+  .wrap { max-width: 440px; height: 100%; margin: 0 auto; padding: 8px 16px 0; display: flex; flex-direction: column; gap: 9px; box-sizing: border-box; }
   .wrap > * { flex: none; min-width: 0; }
   /* 한 화면에 다 들어가게: 남는 높이만큼 파인더가 줄어든다 */
   .wrap > .finderbox { flex: 1 1 0; min-height: 90px; display: flex; align-items: center; justify-content: center; container-type: size; }
   .finderbox .finder { height: min(100cqh, calc(100cqw / 1.5)); width: auto; flex: none; }
 
   /* 헤더 */
-  .head { display: flex; align-items: center; gap: 8px; }
+  .head { display: flex; align-items: center; gap: 10px; }
   .head .t { flex: 1; min-width: 0; }
-  .head h1 { margin: 0; font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .back { flex: none; width: 36px; height: 36px; margin-left: -6px; border: 0; border-radius: 50%; background: var(--panel); display: grid; place-items: center; }
-  .back svg { width: 20px; height: 20px; }
+  .head h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .back { flex: none; width: 34px; height: 34px; margin-left: -4px; border: 0; border-radius: 50%; background: var(--panel); display: grid; place-items: center; }
+  .back svg { width: 18px; height: 18px; }
   .back[hidden] { display: none; }
   /* 앱 안 아이폰: 카메라 화면은 웹 화면 아래에 깔린다. 파인더 자리만 비우고, 모서리는 흐린 접안부 모양으로 덮는다 */
   html.native, html.native body { background: transparent; }
@@ -41,98 +47,118 @@
   html.native .finder .feather { display: block; position: absolute; inset: -1px; pointer-events: none; background: var(--bg);
     -webkit-mask: linear-gradient(#000 0 0), var(--eyepiece) center / 100% 100% no-repeat; -webkit-mask-composite: xor;
     mask: linear-gradient(#000 0 0) exclude, var(--eyepiece) center / 100% 100% no-repeat; }
-  .head .film { font-size: 12px; color: var(--sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tog { position: relative; display: grid; grid-template-columns: 1fr 1fr 1fr; width: 162px; border: 0; padding: 3px; border-radius: 99px; background: var(--panel); flex: none; }
-  .tog i { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); border-radius: 99px; background: #3a3a3e; box-shadow: 0 1px 4px rgb(0 0 0 / .4);
-    transition: transform .32s cubic-bezier(.3,1.35,.5,1); }
+  .head .film { font-size: 13px; color: var(--sub); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* iOS 세그먼트 컨트롤 */
+  .tog { position: relative; display: grid; grid-template-columns: 1fr 1fr 1fr; width: 156px; border: 0; padding: 2px; border-radius: 9px; background: var(--panel2); flex: none; }
+  .tog:active { opacity: 1; }
+  .tog i { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / 3); border-radius: 7px; background: #636366;
+    box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04); transition: transform .3s var(--ease); }
   .tog.center i { transform: translateX(100%); }
   .tog.avg i { transform: translateX(200%); }
-  .tog span { position: relative; padding: 7px 0; font-size: 13px; font-weight: 700; color: var(--sub); transition: color .25s; }
-  .tog.spot span:nth-of-type(1), .tog.center span:nth-of-type(2), .tog.avg span:nth-of-type(3) { color: var(--text); }
+  .tog span { position: relative; padding: 6px 0; font-size: 13px; font-weight: 500; color: var(--text); opacity: .75; transition: opacity .2s, font-weight .2s; }
+  .tog.spot span:nth-of-type(1), .tog.center span:nth-of-type(2), .tog.avg span:nth-of-type(3) { opacity: 1; font-weight: 600; }
 
   /* 파인더: 둥근 네모 접안부 안에 바늘·화각 다이얼·테스트 밝기까지 */
   .finder { position: relative; aspect-ratio: 3 / 2; background: #000; touch-action: none; -webkit-mask: var(--eyepiece) center / 100% 100% no-repeat; mask: var(--eyepiece) center / 100% 100% no-repeat; }
   .finder:not(.spot) .cross { opacity: 0; }
   /* 중앙 중점 측광: 가운데 동그라미 쪽을 더 많이 본다 */
   .finder .ccircle { position: absolute; left: 50%; top: 50%; width: 34%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%;
-    border: 1px solid rgb(255 238 190 / .75); pointer-events: none; opacity: 0; transition: opacity .2s; }
+    border: 1px solid rgb(255 255 255 / .7); pointer-events: none; opacity: 0; transition: opacity .2s; }
   .finder.center .ccircle { opacity: 1; }
-  .finder .cammsg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 62%; text-align: center; background: rgb(0 0 0 / .6); border-radius: 14px; padding: 12px; z-index: 2; }
+  .finder .cammsg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64%; text-align: center; background: rgb(30 30 32 / .7);
+    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-radius: 16px; padding: 14px 12px 12px; z-index: 2; }
   .finder .cammsg[hidden] { display: none; }
-  .finder .cammsg p { margin: 0 0 8px; font-size: 12px; line-height: 1.4; }
-  .finder .cammsg button { border: 0; background: var(--orange); color: #111; font-size: 13px; font-weight: 700; padding: 8px 14px; border-radius: 99px; }
+  .finder .cammsg p { margin: 0 0 10px; font-size: 13px; line-height: 1.4; }
+  .finder .cammsg button { border: 0; background: var(--orange); color: #000; font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 99px; }
   .finder .cammsg button[hidden] { display: none; }
-  .finder .evflash { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: #fff; background: rgb(0 0 0 / .45); padding: 4px 8px; border-radius: 99px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .finder .evflash { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); font-size: 12px; font-weight: 600; color: #fff; background: rgb(0 0 0 / .45);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); padding: 4px 10px; border-radius: 99px; opacity: 0; transition: opacity .3s; pointer-events: none; }
   .finder .evflash.on { opacity: 1; transition: none; }
   .finder .scene { position: absolute; inset: 0; }
   .finder video, .finder canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: filter .25s; }
   .finder .vignette { position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(ellipse 75% 78% at 50% 50%, transparent 52%, rgb(0 0 0 / .32) 74%, rgb(0 0 0 / .78) 100%); }
+    background: radial-gradient(ellipse 75% 78% at 50% 50%, transparent 55%, rgb(0 0 0 / .28) 76%, rgb(0 0 0 / .72) 100%); }
   .finder .bright { position: absolute; left: 50%; top: 50%; width: 64%; height: 70%; transform: translate(-50%, -50%); pointer-events: none;
-    border: 1.5px solid rgb(255 226 140 / .9); border-radius: 3px; box-shadow: 0 0 6px rgb(255 220 140 / .35); }
-  .finder .bright::before { content: ""; position: absolute; left: -1px; top: 8%; width: 10%; border-top: 1px dashed rgb(255 226 140 / .55); }
-  .finder .cross { position: absolute; width: 22px; height: 22px; transform: translate(-50%, -50%); pointer-events: none; transition: left .25s cubic-bezier(.2,.8,.2,1), top .25s cubic-bezier(.2,.8,.2,1), opacity .2s; }
-  .finder .cross.drag { transition: none; }
-  .finder .cross::before, .finder .cross::after { content: ""; position: absolute; background: rgb(255 238 190 / .95); box-shadow: 0 0 3px rgb(0 0 0 / .5); }
-  .finder .cross::before { left: 50%; top: 0; bottom: 0; width: 1.5px; margin-left: -.75px; }
-  .finder .cross::after { top: 50%; left: 0; right: 0; height: 1.5px; margin-top: -.75px; }
+    border: 1px solid rgb(255 255 255 / .75); border-radius: 4px; }
+  .finder .bright::before { content: ""; position: absolute; left: -1px; top: 8%; width: 10%; border-top: 1px dashed rgb(255 255 255 / .45); }
+  /* 스팟: 아이폰 카메라의 노출 상자처럼 노란 네모 */
+  .finder .cross { position: absolute; width: 30px; height: 30px; transform: translate(-50%, -50%); pointer-events: none; border: 1.5px solid var(--yellow); border-radius: 3px;
+    box-shadow: 0 0 2px rgb(0 0 0 / .35); transition: left .25s var(--ease), top .25s var(--ease), opacity .2s, transform .2s var(--ease); }
+  .finder .cross.drag { transition: none; transform: translate(-50%, -50%) scale(1.15); }
+  .finder .cross::before, .finder .cross::after { content: ""; position: absolute; background: var(--yellow); }
+  .finder .cross::before { left: 50%; top: -1px; height: 5px; width: 1.5px; margin-left: -.75px; }
+  .finder .cross::after { top: 50%; left: -1px; width: 5px; height: 1.5px; margin-top: -.75px; }
   .finder .gauge { position: absolute; left: 4%; top: 6%; bottom: 6%; width: 12%; pointer-events: none; opacity: .92; }
   .finder .gauge svg { width: 100%; height: 100%; display: block; }
-  .finder .zoomdial { position: absolute; right: 0; top: 0; bottom: 0; width: 18%; opacity: .82; touch-action: none; cursor: ns-resize; z-index: 3; background: rgb(0 0 0 / .02); }
+  .finder .zoomdial { position: absolute; right: 0; top: 0; bottom: 0; width: 18%; opacity: .85; touch-action: none; cursor: ns-resize; z-index: 3; background: rgb(0 0 0 / .02); }
+  .finder .zoomdial[hidden] { display: none; }
   .finder .zoomdial svg { position: absolute; right: 8%; top: 6%; width: 78%; height: 88%; display: block; }
   .finder .led { position: absolute; left: 19%; bottom: 12%; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 10px var(--ok); transition: background .2s, box-shadow .2s; }
   .finder .led.red { background: var(--warn); box-shadow: 0 0 10px var(--warn); }
-  .finder .focal { position: absolute; right: calc(18% + 7px); top: calc(15% + 6px); font-size: 12px; font-weight: 700; color: rgb(255 238 190 / .95); text-shadow: 0 1px 3px rgb(0 0 0 / .6); font-variant-numeric: tabular-nums; pointer-events: none; }
+  /* 화각: 누르면 렌즈 설정 */
+  .finder .focal { position: absolute; right: calc(18% + 6px); top: calc(15% + 6px); z-index: 4; border: 0; display: flex; align-items: center; gap: 3px;
+    font-size: 12px; font-weight: 600; color: #fff; background: rgb(0 0 0 / .38); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    padding: 4px 8px; border-radius: 99px; font-variant-numeric: tabular-nums; }
+  .finder .focal svg { width: 9px; height: 9px; opacity: .7; }
+  .finder.prime .focal { right: 8%; }
+  /* 측광 고정: 아이폰 카메라의 AE 잠금처럼 위에 노란 표시 */
+  .finder .lockbadge { position: absolute; left: 50%; top: 7%; transform: translate(-50%, -6px); z-index: 4; pointer-events: none; opacity: 0;
+    background: var(--yellow); color: #000; font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 4px; transition: opacity .2s, transform .25s var(--ease); }
+  .finder .lockbadge.on { opacity: 1; transform: translate(-50%, 0); }
   .finder .simbar { position: absolute; left: 50%; bottom: 4%; width: 46%; transform: translateX(-50%); display: flex; align-items: center; gap: 6px;
-    font-size: 10px; font-weight: 700; color: rgb(255 255 255 / .7); text-shadow: 0 1px 2px rgb(0 0 0 / .7); font-variant-numeric: tabular-nums; }
+    font-size: 10px; font-weight: 600; color: rgb(255 255 255 / .7); text-shadow: 0 1px 2px rgb(0 0 0 / .7); font-variant-numeric: tabular-nums; }
   .finder .simbar input { flex: 1; min-width: 0; height: 14px; margin: 0; accent-color: #d8d3cb; opacity: .8; }
   .finder .fire { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
   .finder .fire.go { animation: fire .16s ease-out; }
   @keyframes fire { 30% { opacity: .55 } 100% { opacity: 0 } }
 
   .info { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px; }
-  .info .state { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
-  .state.over { color: #ffb340; } .state.under { color: #64b5ff; } .state.ok { color: var(--ok); }
-  .info .ev { font-size: 12px; color: var(--sub); margin-top: 2px; font-variant-numeric: tabular-nums; }
-  .hold { border: 1px solid var(--line); background: var(--panel); font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 99px; flex: none; }
-  .hold.on { background: var(--orange); border-color: var(--orange); color: #111; }
+  .info > div:first-child { min-width: 0; }
+  .info .state { font-size: 22px; font-weight: 700; letter-spacing: -.02em; transition: color .2s; }
+  .state.over { color: var(--orange); } .state.under { color: var(--blue); } .state.ok { color: var(--ok); }
+  .info .ev { font-size: 12px; color: var(--sub); margin-top: 1px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .info .ev b { color: var(--text); font-weight: 600; }
   .infobtns { display: flex; gap: 6px; flex: none; }
-  .flash { display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--sub); font-size: 13px; font-weight: 600; padding: 0 10px; border-radius: 99px; transition: background .2s, color .2s, border-color .2s; }
-  .flash svg { width: 15px; height: 15px; }
-  .flash.on { background: #ffd23f; border-color: #ffd23f; color: #111; }
-  .filt.on { background: #9ec9ff; border-color: #9ec9ff; color: #111; }
-  .chips button small { font-size: 10px; font-weight: 700; opacity: .7; margin-left: 3px; }
+  .pill { display: flex; align-items: center; gap: 4px; height: 34px; border: 0; background: var(--panel); color: var(--text); font-size: 13px; font-weight: 600;
+    padding: 0 11px; border-radius: 99px; transition: background .2s, color .2s; white-space: nowrap; }
+  .pill svg { width: 15px; height: 15px; flex: none; }
+  .flash.on { background: var(--yellow); color: #000; }
+  .filt.on { background: var(--blue); color: #000; }
+  .hold.on { background: var(--yellow); color: #000; }
+  .chips button small { font-size: 10px; font-weight: 600; opacity: .65; margin-left: 3px; }
   .chips button.rec { box-shadow: inset 0 0 0 1.5px var(--orange); }
-  .chips.wrap { flex-wrap: wrap; overflow: visible; }
-  .sheet .memo { width: 100%; margin-top: 8px; border: 0; border-radius: 10px; background: #2a2a2e; color: var(--text); font: 15px/1.4 inherit; font-family: inherit; padding: 10px 12px; }
-  .cell .fl { position: absolute; right: 4px; top: 3px; width: 11px; height: 11px; color: #ffd23f; }
+  /* 화면 틀(.wrap)과 이름이 같아서 틀 설정을 되돌린다 */
+  .chips.wrap { flex-direction: row; flex-wrap: wrap; overflow: visible; max-width: none; height: auto; margin: 0; padding: 0 0 2px; }
+  .sheet .memo { width: 100%; margin-top: 8px; border: 0; border-radius: 10px; background: var(--fill); color: var(--text); font: 16px/1.4 inherit; font-family: inherit; padding: 11px 12px; outline: none; }
+  .sheet .memo::placeholder { color: var(--sub2); }
+  .cell .fl { position: absolute; right: 4px; top: 3px; width: 11px; height: 11px; color: var(--yellow); }
   .cell .fl svg { width: 100%; height: 100%; display: block; }
 
   /* 링 */
   .rings { display: grid; gap: 6px; }
-  .ringrow { display: grid; grid-template-columns: 66px minmax(0, 1fr); gap: 6px; }
-  .mbtn { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 0 2px; display: grid; place-content: center; gap: 3px; text-align: center; transition: background .2s, border-color .2s; }
-  .mbtn span { font-size: 13px; font-weight: 700; }
-  .mbtn small { font-size: 10px; font-weight: 700; color: var(--sub); min-height: 12px; white-space: nowrap; }
-  .mbtn.on { background: rgb(255 107 31 / .16); border-color: var(--orange); }
-  .mbtn.on span { color: var(--orange); }
-  .ring { position: relative; height: 50px; border-radius: 10px; overflow: hidden; background: #101011; touch-action: none; cursor: grab; }
+  .ringrow { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 6px; }
+  .mbtn { border: 0; background: var(--panel); border-radius: 12px; padding: 0 2px; display: grid; place-content: center; gap: 2px; text-align: center; transition: background .2s; }
+  .mbtn span { font-size: 13px; font-weight: 600; transition: color .2s; }
+  .mbtn small { font-size: 10.5px; font-weight: 500; color: var(--sub); min-height: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mbtn.on { background: rgb(255 159 10 / .18); }
+  .mbtn.on span, .mbtn.on small { color: var(--orange); }
+  .ring { position: relative; height: 50px; border-radius: 12px; overflow: hidden; background: #111113; touch-action: none; cursor: grab; }
   .ring.short { height: 44px; }
   .ring .ridges, .ring .labels { position: absolute; left: 0; right: 0; }
-  .ring .ridges { top: 0; height: 16px; background: #1c1c1e; }
+  .ring .ridges { top: 0; height: 15px; background: #1c1c1e; }
   .ring.short .ridges { height: 12px; }
-  .ring .labels { top: 16px; bottom: 0; background: linear-gradient(#141415, #0d0d0e); }
+  .ring .labels { top: 15px; bottom: 0; background: linear-gradient(#18181a, #0e0e10); }
   .ring.short .labels { top: 12px; }
-  .ring .ridge { position: absolute; top: 2px; bottom: 2px; width: 3px; margin-left: -1.5px; border-radius: 1px; background: #3d3d41; }
-  .ring .lab { position: absolute; top: 50%; font: 700 16px/1 -apple-system, sans-serif; color: #e9e6e0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ring .ridge { position: absolute; top: 3px; bottom: 3px; width: 2px; margin-left: -1px; border-radius: 1px; background: #3a3a3c; }
+  .ring .lab { position: absolute; top: 50%; font: 600 16px/1 -apple-system, "SF Pro Text", sans-serif; color: rgb(235 235 245 / .78); white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
   .ring .shade { position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(90deg, rgb(0 0 0 / .92), rgb(0 0 0 / .1) 28%, rgb(255 255 255 / .04) 50%, rgb(0 0 0 / .1) 72%, rgb(0 0 0 / .92)),
-                linear-gradient(rgb(255 255 255 / .06), transparent 30%, transparent 75%, rgb(0 0 0 / .4)); }
-  .ring .mark { position: absolute; left: 50%; top: 16px; margin-left: -5px; border: 5px solid transparent; border-top-color: var(--orange); }
+    background: linear-gradient(90deg, #000 0, rgb(0 0 0 / .1) 30%, transparent 50%, rgb(0 0 0 / .1) 70%, #000 100%),
+                linear-gradient(rgb(255 255 255 / .05), transparent 30%, transparent 75%, rgb(0 0 0 / .35)); }
+  .ring .mark { position: absolute; left: 50%; top: 15px; margin-left: -4px; border: 4px solid transparent; border-top: 5px solid var(--orange); }
   .ring.short .mark { top: 12px; }
   .ringrow.auto .ring { cursor: default; }
-  .ringrow.auto .lab { color: #8f8b84; }
-  .ringrow.auto .ring .mark { border-top-color: #666; }
+  .ringrow.auto .lab { color: rgb(235 235 245 / .38); }
+  .ringrow.auto .ring .mark { border-top-color: #636366; }
 
   /* 조작부: 되감기 노브 · 카운터 · 셔터+레버 */
   .controls { position: relative; z-index: 3; }
@@ -157,15 +183,15 @@
     background: repeating-linear-gradient(90deg, #2a1a0f 0 6px, var(--bg) 6px 13px, #2a1a0f 13px 17.33px); }
   .cell::before { top: 4px; } .cell::after { bottom: 4px; }
   .cell .num { position: absolute; top: 14px; left: 8px; font: 700 9px/1 ui-monospace, "SF Mono", Menlo, monospace; color: var(--print); opacity: .85; }
-  .cell .frame { position: absolute; left: 6px; right: 6px; top: 26px; height: 60px; border-radius: 4px; background: #1a100a;
+  .cell .frame { position: absolute; left: 6px; right: 6px; top: 26px; height: 60px; border-radius: 5px; background: #1a100a;
     display: grid; place-content: center; gap: 2px; text-align: center; border: 1.5px solid transparent; transition: border-color .2s, background .2s; }
-  .cell .frame b { font: 800 17px/1.1 -apple-system, sans-serif; color: #f6e6d4; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-  .cell .frame i { font-style: normal; font: 700 13px/1.1 -apple-system, sans-serif; color: #f6e6d4; opacity: .85; font-variant-numeric: tabular-nums; }
-  .cell .frame em { font-style: normal; font: 800 11px/1.2 -apple-system, sans-serif; color: var(--print); }
-  .cell .frame .auto { font: 800 13px/1 -apple-system, sans-serif; color: #f6e6d4; opacity: .5; letter-spacing: .08em; }
+  .cell .frame b { font: 700 16px/1.1 -apple-system, sans-serif; color: #f6e6d4; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .cell .frame i { font-style: normal; font: 600 13px/1.1 -apple-system, sans-serif; color: #f6e6d4; opacity: .85; font-variant-numeric: tabular-nums; }
+  .cell .frame em { font-style: normal; font: 700 10.5px/1.2 -apple-system, sans-serif; color: var(--print); }
+  .cell .frame .auto { font: 700 13px/1 -apple-system, sans-serif; color: #f6e6d4; opacity: .5; letter-spacing: .08em; }
   .cell.shot .frame { background: #3a2414; }
-  .cell.next .frame { border-color: rgb(255 255 255 / .55); border-style: dashed; }
-  .cell.next .frame::after { content: "다음"; font: 700 11px/1 -apple-system, sans-serif; color: rgb(255 255 255 / .55); }
+  .cell.next .frame { border-color: rgb(255 255 255 / .5); border-style: dashed; }
+  .cell.next .frame::after { content: "다음"; font: 600 11px/1 -apple-system, sans-serif; color: rgb(255 255 255 / .55); }
   .cell.leader:not(.shot) .frame { background: #4a2810; }
   .cell.leader:not(.shot) .num { opacity: .5; }
   .tongue { flex: none; height: 100%; }
@@ -183,68 +209,76 @@
     .ring { height: 42px; }
     .ring.short { height: 38px; }
     .rings { gap: 4px; }
-    .info .state { font-size: 17px; }
+    .info .state { font-size: 18px; }
+    .pill { height: 30px; padding: 0 9px; }
     .controls svg { max-height: 74px; }
     .endbtn { padding: 11px 0 !important; }
   }
-  .endbtn { border: 0; border-radius: 14px; padding: 15px 0; font-size: 16px; font-weight: 700; background: var(--panel); color: var(--text); margin-top: 4px; }
-  .endbtn:disabled { color: var(--sub); }
+  .endbtn { border: 0; border-radius: 14px; padding: 15px 0; font-size: 17px; font-weight: 600; background: var(--panel); color: var(--text); margin-top: 4px; }
+  .endbtn:disabled { color: var(--sub2); }
   .striphint { text-align: center; font-size: 11px; color: var(--sub); margin-top: -4px; }
 
   .src { font-size: 11px; color: var(--sub); text-align: center; }
 
-  /* 시트 */
-  .dim { position: fixed; inset: 0; background: rgb(0 0 0 / .5); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 20; }
+  /* 시트 (iOS 시트) */
+  .dim { position: fixed; inset: 0; background: rgb(0 0 0 / .45); opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 20; }
   .dim.on { opacity: 1; pointer-events: auto; }
-  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; background: #1c1c1e; border-radius: 18px 18px 0 0; padding: 10px 16px calc(env(safe-area-inset-bottom) + 16px);
-    transform: translateY(105%); transition: transform .32s cubic-bezier(.2,.8,.2,1); max-width: 480px; margin: 0 auto; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; background: var(--sheet); border-radius: 14px 14px 0 0; padding: 6px 16px calc(env(safe-area-inset-bottom) + 16px);
+    transform: translateY(105%); transition: transform .45s var(--ease); max-width: 480px; margin: 0 auto; max-height: 92dvh; overflow-y: auto; }
   .sheet.on { transform: none; }
-  .sheet .grab { width: 36px; height: 5px; border-radius: 3px; background: #48484c; margin: 0 auto 12px; }
-  .sheet.down { max-height: 92dvh; overflow-y: auto; top: 0; bottom: auto; border-radius: 0 0 18px 18px; padding: calc(env(safe-area-inset-top) + 16px) 16px 10px; transform: translateY(-105%); }
+  .sheet.over { z-index: 23; }
+  .sheet .grab { width: 36px; height: 5px; border-radius: 3px; background: #5a5a5f; margin: 0 auto 14px; }
+  .sheet.down { top: 0; bottom: auto; border-radius: 0 0 14px 14px; padding: calc(env(safe-area-inset-top) + 16px) 16px 8px; transform: translateY(-105%); }
   .sheet.down.on { transform: none; }
   .sheet.down .grab { margin: 14px auto 0; }
-  .sheet h2 { margin: 0 0 2px; font-size: 18px; }
-  .sheet .meta { font-size: 12px; color: var(--sub); margin-bottom: 4px; }
-  .sheet .lbl { font-size: 12px; color: var(--sub); font-weight: 600; margin: 12px 0 6px; }
-  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: #2a2a2e; border-radius: 10px; padding: 2px; }
-  .seg button { border: 0; background: none; color: var(--sub); font-size: 13px; font-weight: 600; padding: 9px 0; border-radius: 8px; line-height: 1.25; }
-  .seg button small { display: block; font-size: 10px; font-weight: 600; opacity: .8; }
-  .seg button.on { background: #48484c; color: var(--text); }
+  .sheet h2 { margin: 0 0 2px; font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+  .sheet .meta { font-size: 13px; color: var(--sub); margin-bottom: 4px; }
+  .sheet .lbl { font-size: 13px; color: var(--sub); font-weight: 500; margin: 14px 0 6px; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--panel2); border-radius: 9px; padding: 2px; }
+  .seg button { border: 0; background: none; color: var(--text); opacity: .8; font-size: 13px; font-weight: 500; padding: 7px 0; border-radius: 7px; line-height: 1.25; transition: background .2s; }
+  .seg button:active { opacity: .8; }
+  .seg button small { display: block; font-size: 10px; font-weight: 500; opacity: .7; }
+  .seg button.on { background: #636366; opacity: 1; font-weight: 600; box-shadow: 0 3px 8px rgb(0 0 0 / .12); }
   .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
-  .chips button { flex: none; border: 0; background: #2a2a2e; font-size: 14px; font-weight: 600; padding: 9px 12px; border-radius: 10px; font-variant-numeric: tabular-nums; }
-  .chips button.on { background: var(--orange); color: #111; }
+  .chips button { flex: none; border: 0; background: var(--fill); font-size: 15px; font-weight: 500; padding: 8px 13px; border-radius: 99px; font-variant-numeric: tabular-nums; transition: background .15s, color .15s; }
+  .chips button.on { background: var(--orange); color: #000; font-weight: 600; }
   .sheet .note { font-size: 12px; color: var(--sub); padding: 8px 0 0; }
-  .sheet .actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 18px; }
+  .sheet .actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin-top: 20px; }
   .sheet .actions.one { grid-template-columns: 1fr; }
-  .modal { position: fixed; left: 50%; top: 50%; z-index: 21; width: min(340px, calc(100% - 40px)); background: #1c1c1e; border-radius: 20px; padding: 18px 16px 16px;
-    transform: translate(-50%, -46%) scale(.94); opacity: 0; pointer-events: none; transition: transform .28s cubic-bezier(.2,.9,.3,1.15), opacity .2s; box-shadow: 0 20px 60px rgb(0 0 0 / .5); }
+  .modal { position: fixed; left: 50%; top: 50%; z-index: 21; width: min(330px, calc(100% - 40px)); background: rgb(44 44 46 / .86);
+    -webkit-backdrop-filter: blur(40px) saturate(1.6); backdrop-filter: blur(40px) saturate(1.6); border-radius: 22px; padding: 18px 16px 16px;
+    transform: translate(-50%, -46%) scale(.96); opacity: 0; pointer-events: none; transition: transform .35s var(--ease), opacity .2s; box-shadow: 0 20px 60px rgb(0 0 0 / .5); }
   .modal.on { transform: translate(-50%, -50%); opacity: 1; pointer-events: auto; }
   .modal .pair { display: grid; gap: 6px; }
-  .modal .pcam { background: #2a2a2e; border-radius: 14px; padding: 10px 12px; }
-  .modal .pcam small { display: block; font-size: 11px; color: var(--sub); }
-  .modal .pcam b { font-size: 15px; }
+  .modal .pcam { display: block; width: 100%; text-align: left; border: 0; background: rgb(118 118 128 / .24); border-radius: 12px; padding: 10px 12px; }
+  .modal .pcam small { display: block; font-size: 12px; color: var(--sub); }
+  .modal .pcam b { font-size: 16px; font-weight: 600; }
+  .modal .lensrow { display: flex; align-items: center; gap: 8px; }
+  .modal .lensrow > div { flex: 1; }
+  .modal .lensrow > span { font-size: 14px; color: var(--orange); font-weight: 500; }
   .modal .roll { margin-top: 0; }
-  .modal h3 { margin: 18px 0 6px; font-size: 17px; text-align: center; }
-  .modal .hint { margin: 0 0 14px; font-size: 12px; line-height: 1.45; color: var(--sub); text-align: center; }
+  .modal h3 { margin: 18px 0 4px; font-size: 17px; font-weight: 600; text-align: center; }
+  .modal .hint { margin: 0 0 14px; font-size: 13px; line-height: 1.4; color: var(--sub); text-align: center; }
   .modal .yn { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .modal .yn button { border: 1.5px solid var(--line); background: #2a2a2e; border-radius: 12px; padding: 12px 0; font-size: 15px; font-weight: 700; transition: border-color .2s, background .2s, color .2s; }
-  .modal .yn button.on { border-color: var(--orange); background: rgb(255 107 31 / .16); color: var(--orange); }
-  .modal .known { margin: 14px 0 0; font-size: 12px; color: var(--sub); text-align: center; }
-  .modal .go { width: 100%; margin-top: 12px; border: 0; border-radius: 12px; padding: 14px 0; font-size: 15px; font-weight: 700; background: var(--orange); color: #111; transition: opacity .2s; }
+  .modal .yn button { border: 0; background: rgb(118 118 128 / .24); border-radius: 12px; padding: 12px 0; font-size: 16px; font-weight: 600; transition: background .2s, color .2s; }
+  .modal .yn button.on { background: rgb(255 159 10 / .22); color: var(--orange); }
+  .modal .known { margin: 14px 0 0; font-size: 13px; color: var(--sub); text-align: center; }
+  .modal .go { width: 100%; margin-top: 12px; border: 0; border-radius: 14px; padding: 14px 0; font-size: 17px; font-weight: 600; background: var(--orange); color: #000; transition: opacity .2s; }
   .modal .go:disabled { opacity: .35; }
-  .roll { display: flex; align-items: center; gap: 12px; background: #2a2a2e; border-radius: 14px; padding: 12px; margin-top: 10px; }
+  .roll { display: flex; align-items: center; gap: 12px; background: rgb(118 118 128 / .24); border-radius: 12px; padding: 12px; margin-top: 10px; }
   .roll .can { width: 34px; height: 46px; border-radius: 6px; background: linear-gradient(90deg, #c9c4ba, #f6f3ec 45%, #bdb8ae); position: relative; flex: none; }
   .roll .can::before, .roll .can::after { content: ""; position: absolute; left: -2px; right: -2px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #333, #777 45%, #222); }
   .roll .can::before { top: -2px; } .roll .can::after { bottom: -2px; }
   .roll .can i { position: absolute; left: 0; right: 0; top: 17px; height: 12px; background: linear-gradient(90deg, #c9861c, #f2b33d 45%, #b97a17); }
-  .roll b { display: block; font-size: 16px; }
-  .roll span { font-size: 12px; color: var(--sub); }
-  .sheet .actions button { border: 0; border-radius: 12px; padding: 14px 0; font-size: 15px; font-weight: 700; background: #2a2a2e; }
-  .sheet .actions .save { background: var(--orange); color: #111; }
+  .roll b { display: block; font-size: 16px; font-weight: 600; }
+  .roll span { font-size: 13px; color: var(--sub); }
+  .sheet .actions button { border: 0; border-radius: 14px; padding: 14px 0; font-size: 17px; font-weight: 600; background: var(--fill); }
+  .sheet .actions .save { background: var(--orange); color: #000; }
 
-  .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translate(-50%, 20px); opacity: 0; max-width: calc(100% - 32px);
-    background: rgb(40 40 44 / .96); color: var(--text); font-size: 13px; padding: 10px 14px; border-radius: 12px; transition: .25s; pointer-events: none; z-index: 30; text-align: center; }
+  .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 92px); transform: translate(-50%, 20px); opacity: 0; max-width: calc(100% - 32px);
+    background: rgb(58 58 60 / .82); -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
+    color: var(--text); font-size: 14px; font-weight: 500; padding: 11px 16px; border-radius: 18px; transition: .3s var(--ease); pointer-events: none; z-index: 30; text-align: center; }
   .toast.on { opacity: 1; transform: translate(-50%, 0); }
 </style>
 </head>
@@ -283,25 +317,26 @@
       <div class="zoomdial" id="zoomDial">
         <svg viewBox="0 0 50 200" preserveAspectRatio="xMaxYMid meet">
           <g id="zoomTicks"></g>
-          <line x1="1" y1="100" x2="20" y2="100" stroke="#ff6b1f" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="1" y1="100" x2="20" y2="100" stroke="#ff9f0a" stroke-width="2.5" stroke-linecap="round"/>
         </svg>
       </div>
       <div class="led" id="led"></div>
-      <div class="focal" id="focal">26mm</div>
+      <button class="focal" id="focal" aria-label="렌즈"><span id="focalText">26mm</span><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 6.5 5 3 8.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="lockbadge" id="lockBadge">측광 고정</div>
       <div class="evflash" id="evFlash"></div>
       <div class="cammsg" id="camMsg" hidden><p></p><button>카메라 켜기</button></div>
       <div class="fire" id="fire"></div>
     </div>
   </div>
 
-  <div class="ringrow" id="rowC"><button class="mbtn" id="btnC"><span id="btnCText">보정 없음</span><small id="tagC"></small></button><div class="ring short" id="ringC"></div></div>
+  <div class="ringrow" id="rowC"><button class="mbtn" id="btnC"><span id="btnCText">노출 보정</span><small id="tagC"></small></button><div class="ring short" id="ringC"></div></div>
 
   <div class="info">
     <div>
       <div class="state ok" id="state">적정</div>
       <div class="ev" id="ev">EV —</div>
     </div>
-    <div class="infobtns"><button class="flash" id="flashBtn" aria-pressed="false" aria-label="플래시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9 22l10-12.5h-6.6L13.5 2Z" fill="currentColor"/></svg><span>끔</span></button><button class="flash filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button><button class="hold" id="hold">측광 고정</button></div>
+    <div class="infobtns"><button class="pill flash" id="flashBtn" aria-pressed="false" aria-label="플래시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9 22l10-12.5h-6.6L13.5 2Z" fill="currentColor"/></svg><span>끔</span></button><button class="pill filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button><button class="pill hold" id="hold" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>고정</span></button></div>
   </div>
 
   <div class="rings">
@@ -314,7 +349,7 @@
       <defs>
         <linearGradient id="chrome" x1="0" x2="1"><stop offset="0" stop-color="#8c8c8f"/><stop offset=".35" stop-color="#f0f0f0"/><stop offset=".6" stop-color="#a9a9ac"/><stop offset="1" stop-color="#6d6d70"/></linearGradient>
         <radialGradient id="chromeR" cx=".38" cy=".35" r=".8"><stop offset="0" stop-color="#fafafa"/><stop offset=".6" stop-color="#a5a5a8"/><stop offset="1" stop-color="#5d5d60"/></radialGradient>
-        <radialGradient id="orange" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ff9a55"/><stop offset=".55" stop-color="#ff6b1f"/><stop offset="1" stop-color="#d4480a"/></radialGradient>
+        <radialGradient id="orange" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ffc061"/><stop offset=".55" stop-color="#ff9f0a"/><stop offset="1" stop-color="#d97a00"/></radialGradient>
       </defs>
       <!-- 되감기 노브 (손잡이 접힌 상태) -->
       <g id="rewind">
@@ -327,8 +362,8 @@
       </g>
       <!-- 카운터 -->
       <rect x="132" y="14" width="96" height="62" rx="14" fill="#151517" stroke="#2c2c30"/>
-      <text id="counterText" x="180" y="57" text-anchor="middle" font-size="32" font-weight="800" fill="#f2f0ec" font-family="-apple-system, Helvetica, Arial">1</text>
-      <text id="counterSub" x="180" y="96" text-anchor="middle" font-size="10" fill="#77736d" font-family="-apple-system, sans-serif"></text>
+      <text id="counterText" x="180" y="57" text-anchor="middle" font-size="32" font-weight="700" fill="#fff" font-family="-apple-system, 'SF Pro Display', Helvetica, Arial">1</text>
+      <text id="counterSub" x="180" y="96" text-anchor="middle" font-size="10.5" font-weight="500" fill="rgb(235 235 245 / .55)" font-family="-apple-system, sans-serif"></text>
       <!-- 와인딩 레버: 셔터와 같은 축, 쉼표 모양 -->
       <g id="lever">
         <path d="M 270 64 Q 262 86 242 94 Q 233 97 233 90 Q 234 85 240 82 Q 254 74 258 58 Z" fill="url(#chrome)" stroke="#5d5d60" stroke-width=".6"/>
@@ -375,6 +410,7 @@
 <div class="modal" id="startSheet" role="dialog" aria-modal="true">
   <div class="pair">
     <div class="pcam"><small>카메라</small><b id="stCam">테스트용 카메라</b></div>
+    <button class="pcam lensrow" id="stLens"><div><small>렌즈</small><b id="stLensText"></b></div><span>바꾸기</span></button>
     <div class="roll"><div class="can"><i id="stCanBand"></i></div><div><b id="stFilm">Kodak Portra 400</b><span id="stFilmSub">ISO 400 · 135 · 36컷</span></div></div>
   </div>
   <div id="stAsk">
@@ -395,6 +431,17 @@
   <div class="actions one"><button class="save" id="fDone">완료</button></div>
 </div>
 
+<div class="sheet over" id="lensSheet">
+  <div class="grab"></div>
+  <h2>렌즈</h2>
+  <div class="meta">줌렌즈는 컷마다 화각이 기록돼요</div>
+  <div class="lbl">종류</div>
+  <div class="seg" id="lnType"><button data-v="prime">단렌즈</button><button data-v="zoom">줌렌즈</button></div>
+  <div class="lbl" id="lnMinLbl">초점 거리</div><div class="chips" id="lnMin"></div>
+  <div id="lnMaxBox"><div class="lbl">가장 길게</div><div class="chips" id="lnMax"></div></div>
+  <div class="actions one"><button class="save" id="lnDone">완료</button></div>
+</div>
+
 <div class="sheet" id="endSheet">
   <div class="grab"></div>
   <h2>촬영을 끝낼까요?</h2>
@@ -409,6 +456,7 @@
   <div class="seg" id="shModes">
     <button data-m="P">자동</button><button data-m="A">조리개 우선</button><button data-m="S">셔터 우선</button><button data-m="M">수동</button>
   </div>
+  <div id="shFocalBox"><div class="lbl">화각</div><div class="chips" id="shFocal"></div></div>
   <div id="shA"><div class="lbl">조리개</div><div class="chips" id="shAChips"></div></div>
   <div id="shS"><div class="lbl">셔터</div><div class="chips" id="shSChips"></div></div>
   <div class="lbl">노출 보정</div><div class="chips" id="shCChips"></div>
@@ -492,7 +540,21 @@ let shotCount = 0
 let prewind = false
 let busy = false, ended = false, flash = false
 let hw = null
-let zoom = { z: 1, min: 1, max: 4.6, hw: false } // 폰 배율
+let zoom = { z: 1, min: 1, max: 4.6, hw: false } // z: 렌즈 화각(26mm 기준 배율), min·max: 폰이 보여 줄 수 있는 배율
+// 렌즈: 단렌즈면 화각 고정, 줌렌즈면 그 범위 안에서만 다이얼이 돈다 (카메라마다 기억)
+const LENS_MM = [16, 18, 20, 21, 24, 28, 35, 38, 40, 45, 50, 55, 58, 70, 80, 85, 90, 100, 105, 135, 150, 180, 200, 250, 300]
+const LENS_KEY = `lens:${CAM_ID}`
+let lens = (() => {
+  const g = INIT?.camera?.lens
+  if (g && +g.min > 0) return { min: +g.min, max: Math.max(+g.min, +g.max || +g.min) }
+  try { const v = JSON.parse(store.get(LENS_KEY) || 'null'); if (v && v.min > 0 && v.max >= v.min) return v } catch {}
+  return { min: 24, max: 105 }
+})()
+const isZoomLens = () => lens.max > lens.min
+const lensText = (l = lens) => l.max > l.min ? `${l.min}–${l.max}mm 줌` : `${l.min}mm 단렌즈`
+const zLo = () => lens.min / PHONE_MM, zHi = () => lens.max / PHONE_MM
+// 파인더에 실제로 보여 주는 배율 (폰이 못 따라가는 화각은 끝에서 멈춘다)
+const vis = () => clamp(zoom.z, zoom.min, zoom.max)
 
 // ───────── 소리 ─────────
 let ac = null
@@ -651,8 +713,7 @@ $('btnS').addEventListener('click', () => toggle('s'))
 // 보정: 버튼을 누르면 0으로
 ringC.onChange = () => {
   const c = comp()
-  $('tagC').textContent = `ISO ${effIso(c)}`
-  $('btnCText').textContent = c ? '보정 됨' : '보정 없음'
+  $('tagC').textContent = c ? fmtC(c) : '없음'
   $('btnC').classList.toggle('on', !!c)
 }
 $('btnC').addEventListener('click', () => { if (comp()) { ringC.set(6); toast('보정을 껐어요') } else toast('링을 돌려서 보정해요') })
@@ -663,7 +724,7 @@ const sampler = document.createElement('canvas'); sampler.width = 60; sampler.he
 const smp = sampler.getContext('2d', { willReadFrequently: true })
 const live = () => video.readyState >= 2 && video.videoWidth > 0
 const source = () => live() ? [video, video.videoWidth, video.videoHeight] : [sim, sim.width, sim.height]
-const cssZoom = () => zoom.hw || zoom.native ? 1 : zoom.z
+const cssZoom = () => zoom.hw || zoom.native ? 1 : vis()
 function drawCrop(ctx, frac, dw, dh) {
   const [src, sw, sh] = source()
   const bw = sw / sh > 1.5 ? sh * 1.5 : sw
@@ -915,8 +976,8 @@ async function startCamera() {
       // 실제 폰 배율. 시작 화면(st.zoom)을 1배로 보고 상대값으로 다룬다
       // (아이폰은 초광각이 묶여 있어 시작 값이 2인 경우가 있어서, 1을 넣으면 초광각으로 넓어진다)
       const base = st.zoom
-      zoom = { z: 1, min: caps.zoom.min / base, max: Math.min(caps.zoom.max / base, 10), hw: true, track, base }
-      setZoom(1, true)
+      zoom = { z: zoom.z, min: caps.zoom.min / base, max: Math.min(caps.zoom.max / base, 10), hw: true, track, base }
+      setZoom(zoom.z, true)
     }
     hw = { track }
     camEV = null; camEVSeen = null; camEVLive = false
@@ -948,12 +1009,14 @@ async function startCamera() {
 let needleA = 0, needleV = 0
 
 // ───────── 화각 다이얼 (오른쪽, 위아래로 돌림) ─────────
-const FOCALS = [13, 18, 24, 28, 35, 40, 50, 60, 75, 85, 105, 135, 200, 260]
+const FOCALS = [13, 16, 18, 20, 24, 28, 35, 40, 50, 60, 70, 85, 105, 135, 200, 300]
+// 다이얼 숫자: 자주 쓰는 화각 + 렌즈 양 끝 (38–90mm 같은 렌즈도 끝이 보이게). 끝과 너무 붙은 숫자는 뺀다
+const dialMarks = () => [lens.min, lens.max, ...FOCALS.filter((f) => f > lens.min && f < lens.max && log2(f / lens.min) > .2 && log2(lens.max / f) > .2)].sort((a, b) => a - b)
 const DEG_PER_STOP = 46 // 화각이 두 배 될 때 돌아가는 각도
 let zoomTimer = 0
 let zoomTarget = 1, zoomVel = 0
 function setZoom(z, instant) {
-  zoomTarget = clamp(z, zoom.min, zoom.max)
+  zoomTarget = clamp(z, zLo(), zHi())
   if (instant) { zoomVel = 0; applyZoom(zoomTarget) }
 }
 // 임계 감쇠 스프링: 출발은 천천히, 중간은 빠르게, 도착은 천천히
@@ -966,14 +1029,14 @@ function stepZoom(dt) {
   applyZoom(2 ** (tgt + (ch + tmp) * k))
 }
 function applyZoom(z) {
-  zoom.z = clamp(z, zoom.min, zoom.max)
+  zoom.z = clamp(z, zLo(), zHi())
   const mm = Math.round(PHONE_MM * zoom.z)
-  $('focal').textContent = `${mm}mm`
+  $('focalText').textContent = `${mm}mm`
   $('scene').style.transform = `scale(${cssZoom().toFixed(3)})`
   if (zoom.hw && !zoomTimer) {
     zoomTimer = setTimeout(() => {
       zoomTimer = 0
-      const want = zoom.z * zoom.base
+      const want = vis() * zoom.base
       zoom.track.applyConstraints({ advanced: [{ zoom: want, ...(manualExp ? { exposureMode: 'manual', exposureTime: manualExp.t, iso: manualExp.iso } : {}) }] }).then(() => {
         const got = zoom.track.getSettings?.().zoom
         if (typeof got === 'number' && Math.abs(Math.log(got / want)) > 0.2) {
@@ -983,12 +1046,12 @@ function applyZoom(z) {
       }).catch(() => { zoom.hw = false; applyZoom(zoom.z) })
     }, 60)
   }
-  if (zoom.native && !zoomTimer) zoomTimer = setTimeout(() => { zoomTimer = 0; post({ type: 'zoom', z: zoom.z }) }, 33)
+  if (zoom.native && !zoomTimer) zoomTimer = setTimeout(() => { zoomTimer = 0; post({ type: 'zoom', z: vis() }) }, 33)
   drawZoomDial()
 }
 function drawZoomDial() {
   const cur = log2(PHONE_MM * zoom.z)
-  const lo = PHONE_MM * zoom.min, hi = PHONE_MM * zoom.max
+  const lo = lens.min, hi = lens.max
   let html = ''
   // 1/6스톱 간격 눈금
   for (let s = Math.floor(log2(lo) * 6); s <= Math.ceil(log2(hi) * 6); s++) {
@@ -1000,7 +1063,7 @@ function drawZoomDial() {
     const [x1, y1] = p(66), [x2, y2] = p(74)
     html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#b5b0a8" stroke-width="1"/>`
   }
-  for (const f of FOCALS) {
+  for (const f of dialMarks()) {
     if (f < lo - .5 || f > hi + .5) continue
     const a = (log2(f) - cur) * DEG_PER_STOP * Math.PI / 180
     if (Math.abs(a) > .85) continue
@@ -1027,11 +1090,11 @@ function drawZoomDial() {
     const p = pt.matrixTransform(m.inverse())
     const a = Math.atan2(100 - p.y, 76 - p.x)
     const f = 2 ** (log2(PHONE_MM * zoom.z) + a / (DEG_PER_STOP * Math.PI / 180))
-    const lo = PHONE_MM * zoom.min, hi = PHONE_MM * zoom.max
-    const near = FOCALS.filter((n) => n >= lo - .5 && n <= hi + .5)
+    const lo = lens.min, hi = lens.max
+    const near = dialMarks().filter((n) => n >= lo - .5 && n <= hi + .5)
       .reduce((best, n) => Math.abs(log2(n / f)) < Math.abs(log2(best / f)) ? n : best, f)
     const pick = Math.abs(log2(near / f)) < .35 ? near : f
-    return clamp(pick / PHONE_MM, zoom.min, zoom.max)
+    return clamp(pick / PHONE_MM, zLo(), zHi())
   }
   const dragTo = (y) => {
     moved = Math.max(moved, Math.abs(y - y0))
@@ -1157,12 +1220,16 @@ function renderCell(pos) {
   if (f.aperture) parts.push(`<b>${fmtA(f.aperture)}</b>`)
   if (f.shutter) parts.push(f.aperture ? `<i>${fmtS(f.shutter)}</i>` : `<b>${fmtS(f.shutter)}</b>`)
   if (!parts.length) parts.push('<span class="auto">AUTO</span>')
-  const extra = [f.comp ? `${fmtC(f.comp)} · ISO ${effIso(f.comp)}` : '', ...(f.filters || [])].filter(Boolean)
+  const extra = [showFocal(f) ? `${f.focal}mm` : '', f.comp ? `${fmtC(f.comp)} · ISO ${effIso(f.comp)}` : '', ...(f.filters || [])].filter(Boolean)
   if (extra.length) parts.push(`<em>${extra.join(' · ')}</em>`)
   cell.querySelector('.frame').innerHTML = parts.join('') + (f.flash ? `<span class="fl"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9 22l10-12.5h-6.6L13.5 2Z" fill="currentColor"/></svg></span>` : '')
   cell.querySelector('.pen')?.remove()
   if (f.edited) cell.insertAdjacentHTML('beforeend', '<div class="pen">✎</div>')
 }
+
+// 화각은 줌렌즈이거나, 이 롤에 화각이 여러 개일 때(렌즈를 바꿔 끼움)만 칸에 적는다
+const showFocal = (f) => !!f.focal && (isZoomLens() || new Set(Object.values(shots).map((x) => x.focal).filter(Boolean)).size > 1)
+const renderCells = () => Object.keys(shots).forEach((k) => renderCell(+k))
 
 // ───────── 찍기 ─────────
 async function fire() {
@@ -1194,7 +1261,7 @@ async function fire() {
     const sl = strip.scrollLeft
     buildStrip(true)
     strip.scrollLeft = sl
-  } else renderCell(pos)
+  } else renderCells()
   if (!cellOf(nextPos())) {
     // 정해진 컷 수를 넘겨 찍으면 칸을 늘린다 (보던 위치는 그대로)
     const keep = cellOf(pos).offsetLeft - strip.scrollLeft
@@ -1253,6 +1320,12 @@ function renderSheet() {
   document.querySelectorAll('#shModes button').forEach((b) => b.classList.toggle('on', b.dataset.m === draft.mode))
   const needA = draft.mode === 'A' || draft.mode === 'M', needS = draft.mode === 'S' || draft.mode === 'M'
   $('shA').hidden = !needA; $('shS').hidden = !needS
+  // 화각: 줌렌즈면 그 범위의 화각들, 단렌즈인데 다른 화각으로 찍힌 컷이면 그 둘
+  const fl = isZoomLens() ? [...new Set([...dialMarks(), ...LENS_MM.filter((m) => m > lens.min && m < lens.max)])] : [lens.min]
+  if (draft.focal && !fl.includes(draft.focal)) fl.push(draft.focal)
+  fl.sort((a, b) => a - b)
+  $('shFocalBox').hidden = fl.length < 2
+  if (fl.length > 1) chipRow($('shFocal'), fl, draft.focal, (v) => `${v}mm`, (v) => { draft.focal = v; renderSheet() })
   if (needA) chipRow($('shAChips'), cam.ap, draft.aperture, fmtA, (v) => { draft.aperture = v; renderSheet() })
   if (needS) chipRow($('shSChips'), cam.sh, draft.shutter, fmtS, (v) => { draft.shutter = v; renderSheet() })
   document.querySelectorAll('#shFlash button').forEach((b) => b.classList.toggle('on', (b.dataset.v === '1') === !!draft.flash))
@@ -1311,7 +1384,7 @@ $('shSave').addEventListener('click', () => {
   if (!(d.mode === 'A' || d.mode === 'M')) d.aperture = null
   if (!(d.mode === 'S' || d.mode === 'M')) d.shutter = null
   shots[editing] = { ...d, edited: true }
-  renderCell(editing); sendShots(); toast(`${label(editing)}번 컷을 고쳤어요`); closeSheets()
+  renderCells(); sendShots(); toast(`${label(editing)}번 컷을 고쳤어요`); closeSheets()
 })
 $('shCancel').addEventListener('click', closeSheets)
 $('endBtn').addEventListener('click', () => {
@@ -1429,7 +1502,7 @@ function sendFinder() {
 // 앱(아이폰)이 부르는 함수
 window.meterNative = {
   ev(v) { nativeEV = v },
-  zoomRange(min, max) { zoom = { z: 1, min, max, hw: false, native: true }; setZoom(1, true) },
+  zoomRange(min, max) { zoom = { z: zoom.z, min, max, hw: false, native: true }; setZoom(zoom.z, true) },
   error(msg) { camMessage(msg, false) },
 }
 // 누른 칸으로 바꾼다 (토글 어디를 눌렀는지)
@@ -1446,9 +1519,15 @@ $('flashBtn').addEventListener('click', () => {
   detent()
   toast(flash ? '플래시 켬 · 끌 때까지 찍는 컷에 기록돼요' : '플래시 끔')
 })
+function setHeld(v) {
+  held = v
+  $('hold').classList.toggle('on', v); $('hold').setAttribute('aria-pressed', v)
+  $('hold').querySelector('span').textContent = v ? '고정됨' : '고정'
+  $('lockBadge').classList.toggle('on', v)
+}
 $('hold').addEventListener('click', () => {
-  held = !held; $('hold').classList.toggle('on', held); $('hold').textContent = held ? '고정됨' : '측광 고정'
-  toast(held ? '측광값을 고정했어요 · 구도를 바꾸거나 폰을 내려도 값이 그대로예요' : '고정을 풀었어요 · 다시 실시간으로 재요')
+  setHeld(!held); detent()
+  toast(held ? '측광값을 고정했어요 · 구도를 바꿔도 값이 그대로예요' : '고정을 풀었어요')
 })
 // 노란 가이드(.bright: 가운데 64% × 70%) 안에만 스팟을 둔다
 function placeSpot(clientX, clientY) {
@@ -1460,13 +1539,13 @@ function placeSpot(clientX, clientY) {
   sendSpot()
 }
 $('finder').addEventListener('pointerdown', (e) => {
-  if (e.target.closest('#zoomDial, #camMsg')) return
+  if (e.target.closest('#zoomDial, #camMsg, #focal')) return
   if (metering !== 'spot') return // 중앙·평균 측광은 지점이 없다
   if (e.pointerType === 'touch') return
   const mark = $('spot')
   mark.classList.add('drag')
   placeSpot(e.clientX, e.clientY)
-  if (held) { held = false; $('hold').classList.remove('on'); $('hold').textContent = '측광 고정' }
+  if (held) setHeld(false)
   const move = (ev) => { if (ev.cancelable) ev.preventDefault(); placeSpot(ev.clientX, ev.clientY) }
   const up = () => {
     mark.classList.remove('drag')
@@ -1480,13 +1559,13 @@ $('finder').addEventListener('pointerdown', (e) => {
   audio()
 })
 $('finder').addEventListener('touchstart', (e) => {
-  if (e.target.closest('#zoomDial, #camMsg')) return
+  if (e.target.closest('#zoomDial, #camMsg, #focal')) return
   if (metering !== 'spot' || e.touches.length !== 1) return
   if (e.cancelable) e.preventDefault()
   const mark = $('spot')
   mark.classList.add('drag')
   placeSpot(e.touches[0].clientX, e.touches[0].clientY)
-  if (held) { held = false; $('hold').classList.remove('on'); $('hold').textContent = '측광 고정' }
+  if (held) setHeld(false)
   const move = (ev) => {
     if (!ev.touches.length) return
     if (ev.cancelable) ev.preventDefault()
@@ -1527,9 +1606,47 @@ function loop(now) {
   else { st.textContent = `−${a.toFixed(1)} 언더`; st.className = 'state under' }
   $('led').classList.toggle('red', a >= 1)
   const c = comp()
-  $('ev').textContent = `EV ${meterEV.toFixed(1)} · ISO ${cam.iso}${c ? ` → ${effIso(c)}` : ''}${filters.length ? ` · ${filters.join('+')}` : ''}`
+  $('ev').innerHTML = `<b>${MODE_NAME[mode]}</b> · EV ${meterEV.toFixed(1)}${c ? ` · ISO ${effIso(c)}` : ''}${filters.length ? ` · ${filters.join('+')}` : ''}`
   requestAnimationFrame(loop)
 }
+
+// ───────── 렌즈 (파인더의 화각 표시나 시작 화면에서) ─────────
+function applyLens() {
+  $('zoomDial').hidden = !isZoomLens()
+  $('finder').classList.toggle('prime', !isZoomLens())
+  $('stLensText').textContent = lensText()
+  setZoom(zoom.z, true)
+  drawZoomDial()
+  renderCells()
+}
+let lensDraft = null
+const nextMM = (v, k = 1) => LENS_MM.find((m) => m >= v * k + .5) || LENS_MM[LENS_MM.length - 1]
+function renderLens() {
+  const d = lensDraft, zoomy = d.type === 'zoom'
+  document.querySelectorAll('#lnType button').forEach((b) => b.classList.toggle('on', b.dataset.v === d.type))
+  $('lnMinLbl').textContent = zoomy ? '가장 넓게' : '초점 거리'
+  const mins = [...new Set([...LENS_MM.slice(0, zoomy ? -1 : undefined), d.min])].sort((a, b) => a - b)
+  chipRow($('lnMin'), mins, d.min, (v) => `${v}mm`, (v) => { d.min = v; if (d.max <= v) d.max = nextMM(v, 2.5); renderLens() })
+  $('lnMaxBox').hidden = !zoomy
+  if (zoomy) chipRow($('lnMax'), [...new Set([...LENS_MM.filter((m) => m > d.min), d.max])].filter((m) => m > d.min).sort((a, b) => a - b), d.max, (v) => `${v}mm`, (v) => { d.max = v; renderLens() })
+}
+function openLens() {
+  lensDraft = { type: isZoomLens() ? 'zoom' : 'prime', min: lens.min, max: isZoomLens() ? lens.max : nextMM(lens.min, 2.5) }
+  renderLens(); showSheet('lensSheet'); detent()
+}
+document.querySelectorAll('#lnType button').forEach((b) => b.addEventListener('click', () => { lensDraft.type = b.dataset.v; if (lensDraft.max <= lensDraft.min) lensDraft.max = nextMM(lensDraft.min, 2.5); renderLens() }))
+$('lnDone').addEventListener('click', () => {
+  const d = lensDraft
+  lens = { min: d.min, max: d.type === 'zoom' ? Math.max(d.max, d.min) : d.min }
+  store.set(LENS_KEY, JSON.stringify(lens))
+  post({ type: 'lens', min: lens.min, max: lens.max })
+  applyLens()
+  $('lensSheet').classList.remove('on')
+  if (!$('startSheet').classList.contains('on')) $('dim').classList.remove('on')
+  toast(lensText())
+})
+$('focal').addEventListener('click', openLens)
+$('stLens').addEventListener('click', openLens)
 
 // 진짜 접안부처럼 변이 살짝 부푼 둥근 네모, 가장자리는 흐리게
 {
@@ -1545,6 +1662,7 @@ applySimLook()
 setMode('A')
 ringC.onChange()
 setZoom(1, true)
+applyLens()
 buildStrip()
 $('filmLine').textContent = `${cam.film} · ISO ${cam.iso} · ${cam.frames}컷`
 addEventListener('resize', () => placeStrip(true))
