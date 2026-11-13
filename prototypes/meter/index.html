@@ -257,7 +257,7 @@
     mask: linear-gradient(#000 0 0) exclude, linear-gradient(#000 0 0) center / 84% 74.67% no-repeat; }
   html.native .finder .mask { background: rgb(6 6 7 / .6); }
   .finder .bright { width: 84%; height: 74.67%; border-color: rgb(255 226 140 / .95); }
-  .finder .gauge { left: .5%; top: 12%; bottom: 12%; width: 10%; opacity: 1; }
+  .finder .gauge { left: 2.5%; top: 12%; bottom: 12%; width: 10%; opacity: 1; }
   .finder .zoomdial { width: 12%; opacity: 1; background: transparent; }
   .finder .zoomdial svg { right: 4%; width: 90%; }
   .finder .zoomdial[hidden] { display: none; }
@@ -297,6 +297,39 @@
   /* 노출계만: 필름·셔터·기록 없이 */
   .meteronly .controls, .meteronly .stripwrap, .meteronly .endbtn, .meteronly #flashBtn { display: none !important; }
   .meteronly .finderbox { flex-grow: 1; }
+
+  /* ── 2차: 헤더 화각 버튼, 측광 버튼, 끝내기 버튼 없앰, 카운터 아래 글씨 없앰 ── */
+  .head .lensbtn { flex: none; display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--text);
+    font-size: 14px; font-weight: 700; padding: 8px 12px; border-radius: 99px; font-variant-numeric: tabular-nums; }
+  .head .lensbtn svg { width: 9px; height: 9px; opacity: .6; }
+  .head .lensbtn small { font-size: 11px; font-weight: 600; color: var(--sub); }
+  .endbtn, #counterSub { display: none !important; }
+  .flash:not(.filt):not(.mtr) span { display: none; }
+  .filt:not(.on) span { display: none; }
+  .flash.mtr { flex-direction: column; justify-content: center; gap: 0; padding: 0 11px; line-height: 1.05; color: var(--text); }
+  .flash.mtr small { font-size: 9px; font-weight: 700; color: var(--sub); }
+  .flash.mtr span { font-size: 13px; font-weight: 700; }
+  .finder .lcd .lock { color: #ffc24a; text-shadow: 0 0 6px rgb(255 190 60 / .6); }
+  .modal .textbtn { display: block; width: 100%; margin-top: 10px; border: 0; background: none; color: var(--sub); font-size: 14px; font-weight: 600; padding: 6px 0; }
+  /* 사진 칸: 렌즈 화각에 맞춰 넓어지거나 좁아진다 (레인지파인더의 프레임처럼) */
+  :root { --fw: 84%; --fh: 74.67%; }
+  .finder .mask { -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0) center / var(--fw) var(--fh) no-repeat; -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) exclude, linear-gradient(#000 0 0) center / var(--fw) var(--fh) no-repeat; }
+  .finder .bright { width: var(--fw); height: var(--fh); }
+
+  /* 링: 라이카·후지 수동 렌즈처럼 — 금속 널링 띠 + 검은 경통에 새긴 숫자 + 주황 기준선 */
+  .ring { background: #0a0a0b; border-radius: 9px; box-shadow: inset 0 1px 0 rgb(255 255 255 / .07), inset 0 -1px 0 rgb(0 0 0 / .7), 0 1px 2px rgb(0 0 0 / .5); }
+  .ring .ridges { height: 15px; background: linear-gradient(#4a4a4e, #26262a 45%, #121214); box-shadow: inset 0 -1px 0 rgb(255 255 255 / .12); }
+  .ring.short .ridges { height: 12px; }
+  .ring .ridge { top: 1px; bottom: 1px; width: 1.6px; margin-left: -.8px; border-radius: 0; background: linear-gradient(#e6e6ea, #8d8d92 40%, #36363a); opacity: .9; }
+  .ring .labels { top: 15px; background: linear-gradient(#18181a 0%, #232326 30%, #131315 70%, #09090a 100%); }
+  .ring.short .labels { top: 12px; }
+  .ring .lab { font: 500 15.5px/1 "Futura", "Avenir Next", -apple-system, sans-serif; color: #f1eee8; letter-spacing: .03em; }
+  .ring .shade { background: linear-gradient(90deg, #000 0, rgb(0 0 0 / .55) 14%, rgb(0 0 0 / .05) 36%, rgb(255 255 255 / .05) 50%, rgb(0 0 0 / .05) 64%, rgb(0 0 0 / .55) 86%, #000 100%); }
+  .ring .mark { top: 15px; margin-left: -1px; width: 2px; height: 7px; border: 0; border-radius: 1px; background: var(--orange); box-shadow: 0 0 4px rgb(255 107 31 / .6); }
+  .ring.short .mark { top: 12px; }
+  .ringrow.auto .ring .mark { background: #6d6d72; box-shadow: none; }
+  .ringrow.auto .lab { color: #7d7a75; }
 </style>
 </head>
 <body>
@@ -307,7 +340,7 @@
       <h1 id="camTitle">테스트용 카메라</h1>
       <div class="film" id="filmLine"></div>
     </div>
-    <button class="tog spot" id="meterMode" aria-label="측광 방식"><i></i><span>스팟</span><span>중앙</span><span>평균</span></button>
+    <button class="lensbtn" id="focal" aria-label="렌즈"><span id="focalText">28mm</span><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 6.5 5 3 8.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </div>
 
   <div class="finderbox">
@@ -339,9 +372,9 @@
         </svg>
       </div>
       <div class="led" id="led"></div>
-      <button class="focal" id="focal" aria-label="렌즈"><span id="focalText">26mm</span><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 6.5 5 3 8.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      
       <div class="modeltr" id="modeLtr">A</div>
-      <div class="lcd" id="lcd"><span id="lcdS">125</span><span class="scale" id="lcdScale"></span><span id="lcdA">8</span><span id="lcdL" class="dimmed">AEL</span></div>
+      <div class="lcd" id="lcd"><span id="lcdS">125</span><span class="scale" id="lcdScale"></span><span id="lcdA">8</span><span id="lcdL">EV 12.0</span></div>
       <div class="evflash" id="evFlash"></div>
       <div class="cammsg" id="camMsg" hidden><p></p><button>카메라 켜기</button></div>
       <div class="fire" id="fire"></div>
@@ -355,7 +388,7 @@
       <div class="state ok" id="state">적정</div>
       <div class="ev" id="ev">EV —</div>
     </div>
-    <div class="infobtns"><button class="flash" id="flashBtn" aria-pressed="false" aria-label="플래시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9 22l10-12.5h-6.6L13.5 2Z" fill="currentColor"/></svg><span>끔</span></button><button class="flash filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button><button class="hold" id="hold" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>고정</span></button></div>
+    <div class="infobtns"><button class="flash" id="flashBtn" aria-pressed="false" aria-label="플래시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9 22l10-12.5h-6.6L13.5 2Z" fill="currentColor"/></svg><span>끔</span></button><button class="flash filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button><button class="flash mtr" id="meterMode" aria-label="측광 방식"><small>측광</small><span id="meterText">스팟</span></button><button class="hold" id="hold" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>고정</span></button></div>
   </div>
 
   <div class="rings">
@@ -368,7 +401,7 @@
       <defs>
         <linearGradient id="chrome" x1="0" x2="1"><stop offset="0" stop-color="#8c8c8f"/><stop offset=".35" stop-color="#f0f0f0"/><stop offset=".6" stop-color="#a9a9ac"/><stop offset="1" stop-color="#6d6d70"/></linearGradient>
         <radialGradient id="chromeR" cx=".38" cy=".35" r=".8"><stop offset="0" stop-color="#fafafa"/><stop offset=".6" stop-color="#a5a5a8"/><stop offset="1" stop-color="#5d5d60"/></radialGradient>
-        <radialGradient id="orange" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ffc061"/><stop offset=".55" stop-color="#ff9f0a"/><stop offset="1" stop-color="#d97a00"/></radialGradient>
+        <radialGradient id="orange" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ff9a55"/><stop offset=".55" stop-color="#ff6b1f"/><stop offset="1" stop-color="#d4480a"/></radialGradient>
       </defs>
       <!-- 되감기 노브 (손잡이 접힌 상태) -->
       <g id="rewind">
@@ -385,14 +418,20 @@
       <text id="counterSub" x="180" y="96" text-anchor="middle" font-size="10.5" font-weight="500" fill="rgb(235 235 245 / .55)" font-family="-apple-system, sans-serif"></text>
       <!-- 와인딩 레버: 셔터와 같은 축, 쉼표 모양 -->
       <g id="lever">
-        <path d="M 270 64 Q 262 86 242 94 Q 233 97 233 90 Q 234 85 240 82 Q 254 74 258 58 Z" fill="url(#chrome)" stroke="#5d5d60" stroke-width=".6"/>
-        <circle cx="290" cy="52" r="29" fill="url(#chrome)"/>
+        <path d="M 274 66 L 230 88 Q 224 91 222 86 Q 220 81 226 78 L 268 54 Z" fill="url(#chrome)" stroke="#5d5d60" stroke-width=".6"/>
+        <g transform="rotate(-27 214 86)">
+          <rect x="198" y="78" width="28" height="16" rx="8" fill="#1b1b1d" stroke="#3c3c40" stroke-width=".8"/>
+          <path d="M205 81v10M209 81v10M213 81v10M217 81v10M221 81v10" stroke="#3a3a3e" stroke-width="1.2" stroke-linecap="round"/>
+        </g>
+        <circle cx="290" cy="52" r="31" fill="url(#chrome)"/>
+        <circle cx="290" cy="52" r="27.5" fill="none" stroke="rgb(0 0 0 / .25)" stroke-width="1"/>
       </g>
       <!-- 셔터 -->
       <g id="shutterBtn">
         <circle cx="290" cy="52" r="34" fill="transparent"/>
-        <circle cx="290" cy="52" r="25" fill="#2a2a2c"/>
-        <circle class="disc" cx="290" cy="52" r="22" fill="url(#orange)"/>
+        <circle cx="290" cy="52" r="25.5" fill="#141415"/>
+        <circle class="disc" cx="290" cy="52" r="23" fill="url(#orange)"/>
+        <circle class="disc" cx="290" cy="52" r="16" fill="none" stroke="rgb(255 255 255 / .16)" stroke-width="1"/>
       </g>
     </svg>
   </div>
@@ -451,9 +490,10 @@
 </div>
 
 <div class="modal" id="exitSheet" role="dialog" aria-modal="true">
-  <h3 style="margin-top:4px">노출계를 닫을까요?</h3>
-  <p class="body">지금까지 찍은 컷은 그대로 남아 있어요.<br>다시 열면 이어서 찍을 수 있어요.</p>
-  <div class="yn wide"><button id="exitCancel">계속 찍기</button><button class="save" id="exitGo">닫기</button></div>
+  <h3 style="margin-top:4px">촬영을 끝냈나요?</h3>
+  <p class="body">아직 찍는 중이면 지금 상태 그대로 두고 돌아가요.<br>찍은 컷은 그대로 남아 있어요.</p>
+  <div class="yn wide"><button id="exitCancel">아직 촬영 중</button><button class="save" id="exitGo">촬영 끝내기</button></div>
+  <button class="textbtn" id="exitBack">취소</button>
 </div>
 
 <div class="sheet over" id="lensSheet">
@@ -587,8 +627,22 @@ let lens = (() => {
 const isZoomLens = () => lens.max > lens.min
 const lensText = (l = lens) => l.max > l.min ? `${l.min}–${l.max}mm 줌` : `${l.min}mm 단렌즈`
 const zLo = () => lens.min / PHONE_MM, zHi = () => lens.max / PHONE_MM
-// 파인더에 실제로 보여 주는 배율 (폰이 못 따라가는 화각은 끝에서 멈춘다)
-const vis = () => clamp(zoom.z, zoom.min, zoom.max)
+// 실제 화각 맞추기. 폰 1배 = 26mm(4:3 센서 긴 변 34.6mm 환산). 화면(video)은 센서의 일부만 담고,
+// 파인더는 그중 4:3만, 사진 칸은 다시 그 폭의 FW만 보여 준다 → 그 칸이 필름 가로 36mm일 때 몇 mm 렌즈인지 계산한다
+function frameMM1() {
+  const [, sw, sh] = source()
+  const shown = (sw / sh > FA ? sh * FA : sw) / Math.max(sw, sh) // 센서 긴 변 중 파인더 폭에 보이는 비율
+  return PHONE_MM * 36 / (34.6 * shown * FW_BASE)
+}
+// 렌즈 화각을 보여 주는 폰 배율(s)과 사진 칸 폭(w). 폰이 그만큼 넓게(좁게) 못 보면 칸을 넓혀(좁혀) 맞춘다 (레인지파인더 프레임처럼)
+function fit() {
+  if (zoom.native) return { s: clamp(zoom.z, zoom.min, zoom.max), w: FW_BASE, cut: false }
+  const need = zoom.z * PHONE_MM / frameMM1()
+  if (need < zoom.min) { const w = FW_BASE * zoom.min / need; return { s: zoom.min, w: Math.min(FW_MAX, w), cut: w > FW_MAX + .005 } }
+  if (need > zoom.max) return { s: zoom.max, w: Math.max(.3, FW_BASE * zoom.max / need), cut: false }
+  return { s: need, w: FW_BASE, cut: false }
+}
+const vis = () => fit().s
 
 // ───────── 소리 ─────────
 let ac = null
@@ -614,7 +668,7 @@ class Ring {
     el.innerHTML = '<div class="ridges"></div><div class="labels"></div><div class="mark"></div><div class="shade"></div>'
     const ridges = el.querySelector('.ridges')
     this.labels = el.querySelector('.labels')
-    this.ridgeEls = Array.from({ length: 90 }, () => ridges.appendChild(Object.assign(document.createElement('div'), { className: 'ridge' })))
+    this.ridgeEls = Array.from({ length: 160 }, () => ridges.appendChild(Object.assign(document.createElement('div'), { className: 'ridge' })))
     this.bind()
     const loop = () => { this.tick(); requestAnimationFrame(loop) }
     requestAnimationFrame(loop)
@@ -674,7 +728,7 @@ class Ring {
       el.style.opacity = (k * k).toFixed(3)
       el.style.color = i === idx && !this.auto ? '#fff' : ''
     })
-    const rs = this.step / 3
+    const rs = this.step / 5 // 촘촘한 널링
     this.ridgeEls.forEach((el, i) => {
       const th = ((i * rs - this.pos * this.step) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI
       if (Math.abs(th) > 1.52) { el.style.visibility = 'hidden'; return }
@@ -757,11 +811,14 @@ const video = $('video'), sim = $('simCanvas'), sctx = sim.getContext('2d')
 const sampler = document.createElement('canvas'); sampler.width = 60; sampler.height = 40
 const smp = sampler.getContext('2d', { willReadFrequently: true })
 const live = () => video.readyState >= 2 && video.videoWidth > 0
+video.addEventListener('resize', () => applyZoom(zoom.z))
 const source = () => live() ? [video, video.videoWidth, video.videoHeight] : [sim, sim.width, sim.height]
 // 화면 확대는 늘 CSS로 부드럽게 하고, 폰 카메라 배율은 멈춘 뒤에 따라와서(hwRel) 그만큼 CSS 확대를 줄인다
 const cssZoom = () => zoom.native ? 1 : vis() / (zoom.hw ? zoom.hwRel : 1)
 // 파인더는 4:3, 그 안에서 사진에 담기는 칸(밝은 테두리)은 가운데 3:2 = 폭 84%
-const FA = 4 / 3, FW = .84, FH = FW * FA / 1.5
+const FA = 4 / 3, FW_BASE = .84, FW_MAX = .9
+let FW = FW_BASE // 지금 사진 칸 폭 (화각에 따라 바뀜)
+const fhOf = (w) => w * FA / 1.5
 function drawCrop(ctx, frac, dw, dh) {
   const [src, sw, sh] = source()
   const vw = sw / sh > FA ? sh * FA : sw
@@ -862,7 +919,7 @@ function measure() {
   } else drawCrop(smp, 1 / cssZoom(), 60, 40)
   const d = smp.getImageData(0, 0, 60, 40).data
   let sum = 0, sp = 0, spN = 0, cw = 0, cwN = 0
-  const cx = (spot.x - (1 - FW) / 2) / FW * 60, cy = (spot.y - (1 - FH) / 2) / FH * 40
+  const FH = fhOf(FW), cx = (spot.x - (1 - FW) / 2) / FW * 60, cy = (spot.y - (1 - FH) / 2) / FH * 40
   for (let y = 0; y < 40; y++) for (let x = 0; x < 60; x++) {
     const i = (y * 60 + x) * 4
     const L = .2126 * lin(d[i]) + .7152 * lin(d[i + 1]) + .0722 * lin(d[i + 2])
@@ -1002,13 +1059,14 @@ async function startCamera() {
   try {
     let stream
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } }, audio: false })
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, aspectRatio: { ideal: 4 / 3 } }, audio: false })
     } catch (e) {
       if (e.name !== 'OverconstrainedError') throw e
       stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     }
     video.srcObject = stream
     await video.play()
+    applyZoom(zoom.z)
     sim.style.display = 'none'
     camMessage('')
     const track = stream.getVideoTracks()[0]
@@ -1088,8 +1146,15 @@ function stepZoom(dt) {
 }
 function applyZoom(z) {
   zoom.z = clamp(z, zLo(), zHi())
-  const mm = Math.round(PHONE_MM * zoom.z)
-  $('focalText').textContent = `${mm}mm`
+  const mm = Math.round(PHONE_MM * zoom.z), f = fit()
+  if (Math.abs(f.w - FW) > .001) {
+    FW = f.w
+    $('finder').style.setProperty('--fw', `${(FW * 100).toFixed(2)}%`)
+    $('finder').style.setProperty('--fh', `${(fhOf(FW) * 100).toFixed(2)}%`)
+  }
+  // 폰이 그만큼 넓게 못 보면 실제로 보이는 화각도 같이 적는다
+  const shownMM = Math.round(frameMM1() * zoom.min * FW_BASE / FW_MAX)
+  $('focalText').innerHTML = f.cut ? `${mm}mm <small>화면 ${shownMM}mm</small>` : `${mm}mm`
   $('scene').style.transform = `scale(${cssZoom().toFixed(4)})`
   if (zoom.hw) { clearTimeout(hwTimer); hwTimer = setTimeout(syncHwZoom, 220) }
   if (zoom.native && !zoomTimer) zoomTimer = setTimeout(() => { zoomTimer = 0; post({ type: 'zoom', z: vis() }) }, 33)
@@ -1478,7 +1543,8 @@ function motorSound(dur) {
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.12, t + .05); g.gain.setValueAtTime(.12, t + dur - .08); g.gain.linearRampToValueAtTime(0, t + dur)
   o.connect(f).connect(g).connect(a.destination); o.start(t); o.stop(t + dur)
 }
-$('endGo').addEventListener('click', async () => {
+$('endGo').addEventListener('click', () => endRoll())
+async function endRoll() {
   // 실제 앱에선 여기서 현상소 맡기기 화면으로 넘어간다. 테스트에선 새 롤로 다시 시작
   ended = true; closeSheets()
   await sleep(250)
@@ -1487,7 +1553,7 @@ $('endGo').addEventListener('click', async () => {
   try { localStorage.removeItem(ROLL_KEY) } catch {}
   toast(`${shotCount}컷으로 촬영을 끝냈어요 · 테스트라서 새 롤로 다시 시작해요`)
   setTimeout(startRoll, 600)
-})
+}
 $('dim').addEventListener('click', () => { if (!$('startSheet').classList.contains('on')) closeSheets() })
 
 // ───────── 시작: 이 카메라가 프리와인딩인지 처음 한 번만 묻고, 다음부터는 기억한 값으로 바로 시작 ─────────
@@ -1532,9 +1598,11 @@ function beginRoll(pw) {
 const startRoll = openStart
 let metering = 'spot' // 'spot' 스팟 | 'center' 중앙 중점 | 'avg' 평균
 const METERINGS = ['spot', 'center', 'avg']
+const METER_NAME = { spot: '스팟', center: '중앙', avg: '평균' }
 function setMetering(m) {
   metering = m
-  for (const k of METERINGS) { $('meterMode').classList.toggle(k, k === m); $('finder').classList.toggle(k, k === m) }
+  for (const k of METERINGS) $('finder').classList.toggle(k, k === m)
+  $('meterText').textContent = METER_NAME[m]
   sendSpot()
 }
 function sendSpot() { if (NATIVE_CAM) post({ type: 'spot', x: spot.x, y: spot.y, mode: metering, avg: metering !== 'spot' }) }
@@ -1554,11 +1622,10 @@ window.meterNative = {
   zoomRange(min, max) { zoom = { z: zoom.z, min, max, hw: false, native: true }; setZoom(zoom.z, true) },
   error(msg) { camMessage(msg, false) },
 }
-// 누른 칸으로 바꾼다 (토글 어디를 눌렀는지)
-$('meterMode').addEventListener('click', (e) => {
-  const r = $('meterMode').getBoundingClientRect()
-  const i = clamp(Math.floor((e.clientX - r.left) / r.width * 3), 0, 2)
-  if (METERINGS[i] !== metering) { setMetering(METERINGS[i]); detent() }
+$('meterMode').addEventListener('click', () => {
+  const next = METERINGS[(METERINGS.indexOf(metering) + 1) % METERINGS.length]
+  setMetering(next); detent()
+  toast(`${METER_NAME[next]} 측광`)
 })
 
 $('flashBtn').addEventListener('click', () => {
@@ -1580,6 +1647,7 @@ $('hold').addEventListener('click', () => {
 // 노란 가이드(.bright: 가운데 64% × 70%) 안에만 스팟을 둔다
 function placeSpot(clientX, clientY) {
   const r = $('finder').getBoundingClientRect()
+  const FH = fhOf(FW)
   const x = clamp((clientX - r.left) / r.width, (1 - FW) / 2 + .03, 1 - (1 - FW) / 2 - .03)
   const y = clamp((clientY - r.top) / r.height, (1 - FH) / 2 + .04, 1 - (1 - FH) / 2 - .04)
   spot = { x, y }
@@ -1647,12 +1715,14 @@ function drawLcd(r) {
   const t = mode === 'S' || mode === 'M' ? ringS.value : cam.sh[nearest(cam.sh, r.t)]
   const n = mode === 'A' || mode === 'M' ? ringA.value : cam.ap[nearest(cam.ap, r.N)]
   const k = Math.round(clamp(r.diff, -2, 2) * 3), out = Math.abs(r.diff) > 2.1
-  const key = [t, n, k, out, held, mode].join()
+  const ev = meterEV.toFixed(1)
+  const key = [t, n, k, out, held, mode, ev].join()
   if (key === lcdKey) return
   lcdKey = key
   $('lcdS').textContent = t >= 1 ? `${t}"` : String(Math.round(1 / t))
   $('lcdA').textContent = `F${n}`
-  $('lcdL').classList.toggle('dimmed', !held)
+  $('lcdL').textContent = `EV ${ev}`
+  $('lcdL').classList.toggle('lock', held)
   $('lcdScale').classList.toggle('warn', out)
   ;[...$('lcdScale').children].forEach((el, i) => el.classList.toggle('on', i - 6 === k))
   $('modeLtr').textContent = mode
@@ -1676,7 +1746,7 @@ function loop(now) {
   else { st.textContent = `−${a.toFixed(1)} 언더`; st.className = 'state under' }
   $('led').classList.toggle('red', a >= 1)
   const c = comp()
-  $('ev').innerHTML = `<b>${MODE_NAME[mode]}</b> · EV ${meterEV.toFixed(1)}${c ? ` · ISO ${effIso(c)}` : ''}${filters.length ? ` · ${filters.join('+')}` : ''}`
+  $('ev').textContent = `ISO ${cam.iso}${c ? ` → ${effIso(c)}` : ''}${filters.length ? ` · ${filters.join('+')}` : ''}`
   // 노출 미리보기: 화면이 찍힌 밝기(frameEV)와, 고른 조리개·셔터·필름 감도·필터로 찍힐 밝기의 차이만큼
   if (frameEV != null && Number.isFinite(frameEV)) {
     const set = log2(r.N * r.N / r.t) - log2(cam.iso / 100) + filterStops(filters)
@@ -1765,9 +1835,10 @@ function leave() {
   if (HOSTED) { if (!METER_ONLY) sendShots(); post({ type: 'close' }) }
   else location.href = './'
 }
-$('backBtn').addEventListener('click', () => { if (METER_ONLY || !shotCount) leave(); else showSheet('exitSheet') })
-$('exitCancel').addEventListener('click', closeSheets)
-$('exitGo').addEventListener('click', leave)
+$('backBtn').addEventListener('click', () => { if (METER_ONLY || !shotCount || ended) leave(); else showSheet('exitSheet') })
+$('exitCancel').addEventListener('click', leave) // 아직 촬영 중: 그대로 두고 돌아감
+$('exitGo').addEventListener('click', endRoll)
+$('exitBack').addEventListener('click', closeSheets)
 function resume(saved, pw) {
   prewind = pw
   shots = {}

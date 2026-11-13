@@ -14,7 +14,8 @@
   html, body { margin: 0; background: var(--paper); color: var(--ink); }
   body { font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 24px); max-width: 560px; margin: 0 auto; }
   button { font: inherit; color: inherit; cursor: pointer; }
-  .test { margin: 10px 0 0; padding: 6px 10px; border-radius: 10px; background: #2c2417; color: #f3c56b; font-size: 12px; text-align: center; }
+  .test { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0 0; padding: 6px 6px 6px 12px; border-radius: 10px; background: #2c2417; color: #f3c56b; font-size: 12px; }
+  .test button { border: 0; background: #f3c56b; color: #2c2417; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 8px; }
   .head { display: flex; align-items: center; gap: 8px; padding: 14px 0 12px; }
   .head h1 { flex: 1; margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
   .glass { width: 44px; height: 44px; border-radius: 22px; border: .5px solid var(--sep); background: var(--card); color: var(--safelight); display: grid; place-items: center; }
@@ -48,7 +49,7 @@
 </style>
 </head>
 <body>
-<p class="test">시험 화면 · 실제 앱 기록에는 영향 없어요</p>
+<div class="test"><span>시험 화면 · 실제 앱 기록에는 영향 없어요</span><button id="reloadBtn">새로고침</button></div>
 <div class="head">
   <h1>촬영 중</h1>
   <button class="glass" id="meterOnly" aria-label="노출계"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 16a8 8 0 0 1 16 0"/><path d="M12 16l4-5"/><circle cx="12" cy="16" r="1.4" fill="currentColor"/></svg></button>
@@ -159,6 +160,10 @@ $('endBtn').onclick = () => {
   if (confirm(`${roll.shots.length}컷 기록으로 촬영을 끝낼까요? (시험이라 기록을 지우고 새 롤로 시작해요)`)) { store.set(rollKey(), { shots: [], prewind: null }); render() }
 }
 $('clearBtn').onclick = () => { if (confirm('이 장비의 시험 기록을 지울까요?')) { store.set(rollKey(), { shots: [], prewind: null }); render(); toast('지웠어요') } }
+$('reloadBtn').onclick = async () => {
+  try { for (const k of await caches.keys()) await caches.delete(k) } catch {}
+  location.replace(location.pathname + '?r=' + Date.now())
+}
 render()
 </script>
 </body>
