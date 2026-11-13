@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>측광 시험</title>
+<style>
+  :root { --bg:#111010; --card:#1c1a19; --line:#2c2927; --ink:#f2ede8; --sub:#9a928b; --accent:#e9a23b; --good:#7bc47f; --bad:#e2725b; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  body { padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 32px); max-width: 560px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 0 10px; }
+  header b { font-size: 19px; }
+  header span { color: var(--sub); font-size: 12px; }
+  h2 { font-size: 13px; color: var(--sub); font-weight: 600; margin: 22px 0 8px; }
+  button, select, input { font: inherit; color: inherit; }
+  button { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+  button.on { background: var(--accent); color: #1b1206; border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .4; }
+  .finder { position: relative; aspect-ratio: 3 / 2; background: #000; border-radius: 14px; overflow: hidden; }
+  .finder video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .finder .start { position: absolute; inset: 0; display: grid; place-items: center; background: transparent; border: 0; color: var(--ink); font-size: 16px; }
+  #spot { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border: 2px solid var(--accent); border-radius: 50%; pointer-events: none; display: none; }
+  .seg { display: flex; gap: 6px; margin-top: 10px; }
+  .seg button { flex: 1; }
+  .ref { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+  .refTop { display: flex; align-items: center; gap: 10px; }
+  .refTop .val { flex: 1; text-align: center; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .refTop button { width: 46px; font-size: 20px; padding: 4px 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chips button { padding: 5px 9px; font-size: 13px; }
+  .fromCam { display: flex; gap: 6px; margin-top: 10px; align-items: center; font-size: 13px; color: var(--sub); }
+  .fromCam select { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 5px 4px; }
+  .m { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 8px; }
+  .m .top { display: flex; align-items: baseline; gap: 8px; }
+  .m .name { flex: 1; font-weight: 600; }
+  .m .ev { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .m .diff { font-size: 13px; font-variant-numeric: tabular-nums; min-width: 64px; text-align: right; }
+  .m .note { color: var(--sub); font-size: 12.5px; margin-top: 4px; }
+  .m .act { margin-top: 8px; display: flex; gap: 6px; }
+  .m.off .ev { color: var(--sub); font-size: 16px; font-weight: 500; }
+  .good { color: var(--good); } .bad { color: var(--bad); }
+  #photoBox { margin-top: 8px; display: none; }
+  #photoBox canvas { width: 100%; border-radius: 12px; display: block; }
+  .bar { display: flex; gap: 6px; }
+  .bar button { flex: 1; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; margin-top: 8px; }
+  th, td { padding: 5px 4px; border-bottom: 1px solid var(--line); text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--sub); font-weight: 500; }
+  details { margin-top: 22px; }
+  summary { color: var(--sub); font-size: 13px; cursor: pointer; }
+  pre { white-space: pre-wrap; word-break: break-all; font-size: 11px; color: var(--sub); background: var(--card); border-radius: 10px; padding: 10px; }
+  .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+<header><b>측광 시험</b><span id="dev"></span></header>
+
+<section class="finder" id="finder">
+  <video id="video" playsinline muted autoplay></video>
+  <div id="spot"></div>
+  <button class="start" id="startBtn">카메라 켜기</button>
+</section>
+<div class="seg" id="modeSeg">
+  <button data-m="spot">스팟</button><button data-m="center" class="on">중앙</button><button data-m="avg">평균</button>
+</div>
+
+<h2>기준값 (진짜 노출계·카메라·써니16)</h2>
+<div class="ref">
+  <div class="refTop">
+    <button id="refDown">−</button>
+    <div class="val" id="refVal">EV 12</div>
+    <button id="refUp">+</button>
+  </div>
+  <div class="chips" id="sunny"></div>
+  <div class="fromCam">
+    <select id="cIso"></select><select id="cF"></select><select id="cT"></select>
+    <button id="cSet">넣기</button>
+  </div>
+</div>
+
+<h2>방법별 측정 (ISO 100 기준 EV)</h2>
+<div id="methods"></div>
+
+<div id="photoBox">
+  <canvas id="photo"></canvas>
+  <div class="note" id="photoNote" style="color:var(--sub);font-size:12.5px;margin-top:6px"></div>
+</div>
+<input type="file" id="photoIn" accept="image/jpeg,image/*" capture="environment" hidden>
+
+<h2>기록</h2>
+<div class="bar">
+  <button id="logAdd" class="on">지금 값 기록</button>
+  <button id="logCopy">복사</button>
+  <button id="logClear">지우기</button>
+</div>
+<table id="logTable"></table>
+
+<details>
+  <summary>카메라 정보</summary>
+  <pre id="diag">카메라를 켜면 보여요.</pre>
+</details>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id)
+const log2 = Math.log2
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v))
+const lin = (c) => { c /= 255; return c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4 }
+const PHONE_F = 1.8
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('meterLab.' + k); return v == null ? d : JSON.parse(v) } catch { return d } },
+  set(k, v) { try { localStorage.setItem('meterLab.' + k, JSON.stringify(v)) } catch {} },
+}
+const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => el.classList.remove('on'), 1600) }
+const fmtT = (s) => !s ? '—' : s >= 1 ? `${+s.toFixed(1)}초` : `1/${Math.round(1 / s)}`
+const fmtEV = (v) => v == null ? '—' : `EV ${v.toFixed(1)}`
+
+// 기기 이름
+$('dev').textContent = (() => {
+  const ua = navigator.userAgent
+  if (/iPhone/.test(ua)) return `아이폰 · ${/CriOS/.test(ua) ? '크롬' : /FxiOS/.test(ua) ? '파이어폭스' : '사파리'}`
+  const m = ua.match(/Android [\d.]+; ([^;)]+)/)
+  if (m) return `${m[1].replace(/ Build.*/, '')} · ${/SamsungBrowser/.test(ua) ? '삼성 인터넷' : /wv\)/.test(ua) ? '앱 안 브라우저' : '크롬'}`
+  return /Mac/.test(ua) ? '맥' : '기타'
+})()
+
+/* ---------- 기준값 ---------- */
+let ref = store.get('ref', 12)
+const showRef = () => { $('refVal').textContent = `EV ${(+ref).toFixed(1)}`; store.set('ref', ref); render() }
+$('refDown').onclick = () => { ref = Math.round((ref - 1 / 3) * 3) / 3; showRef() }
+$('refUp').onclick = () => { ref = Math.round((ref + 1 / 3) * 3) / 3; showRef() }
+const SUNNY = [['맑음', 15], ['엷은 구름', 14], ['흐림', 13], ['그늘·짙은 흐림', 12], ['해 질 녘', 10], ['밝은 실내', 8], ['실내', 6], ['밤거리', 4]]
+for (const [n, v] of SUNNY) { const b = document.createElement('button'); b.textContent = `${n} ${v}`; b.onclick = () => { ref = v; showRef() }; $('sunny').append(b) }
+const ISOS = [25, 50, 100, 200, 400, 800, 1600, 3200], FS = [1.4, 2, 2.8, 4, 5.6, 8, 11, 16, 22], TS = [1, 2, 4, 8, 15, 30, 60, 125, 250, 500, 1000, 2000, 4000]
+const fill = (sel, list, f, d) => { for (const v of list) { const o = document.createElement('option'); o.value = v; o.textContent = f(v); if (v === d) o.selected = true; sel.append(o) } }
+fill($('cIso'), ISOS, (v) => `ISO ${v}`, 100); fill($('cF'), FS, (v) => `f/${v}`, 8); fill($('cT'), TS, (v) => v === 1 ? '1초' : `1/${v}`, 250)
+$('cSet').onclick = () => {
+  const iso = +$('cIso').value, n = +$('cF').value, t = 1 / +$('cT').value
+  ref = Math.round((log2(n * n / t) - log2(iso / 100)) * 10) / 10
+  showRef()
+}
+
+/* ---------- 측광 모드 ---------- */
+let metering = 'center', spot = { x: .5, y: .5 }
+$('modeSeg').onclick = (e) => {
+  const m = e.target.dataset?.m; if (!m) return
+  metering = m
+  for (const b of $('modeSeg').children) b.classList.toggle('on', b.dataset.m === m)
+  $('spot').style.display = m === 'spot' ? 'block' : 'none'
+  measurePhoto()
+}
+$('finder').addEventListener('click', (e) => {
+  if (!track) return
+  const r = $('finder').getBoundingClientRect()
+  spot = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }
+  const s = $('spot'); s.style.left = `${spot.x * 100}%`; s.style.top = `${spot.y * 100}%`
+  if (metering !== 'spot') $('modeSeg').querySelector('[data-m=spot]').click()
+})
+
+/* ---------- 방법들 ---------- */
+// ev: 지금 값, note: 설명, off: 못 쓰는 이유
+const M = {
+  auto: { name: '카메라가 알려 주는 셔터·감도', ev: null, note: '' },
+  lock: { name: '셔터·감도 고정 + 화면 밝기', ev: null, note: '' },
+  screen: { name: '화면 밝기만 (지금 웹 방식)', ev: null, note: '셔터·감도를 모르면 EV 12로 짐작하고 화면 밝기만 더해요' },
+  photo: { name: '사진 한 장 찍어 재기', ev: null, note: '찍은 사진의 셔터·조리개·감도로 재요' },
+  lux: { name: '조도 센서', ev: null, note: '' },
+}
+const box = $('methods')
+for (const [k, m] of Object.entries(M)) {
+  const el = document.createElement('div')
+  el.className = 'm off'; el.id = 'm-' + k
+  el.innerHTML = `<div class="top"><span class="name">${m.name}</span><span class="ev">—</span><span class="diff"></span></div><div class="note"></div><div class="act"></div>`
+  box.append(el); m.el = el
+}
+const lockBtn = document.createElement('button'); lockBtn.textContent = '고정하기'; lockBtn.disabled = true
+M.lock.el.querySelector('.act').append(lockBtn)
+const photoBtn = document.createElement('button'); photoBtn.textContent = '사진 찍기'; photoBtn.className = 'on'
+const photoPick = document.createElement('button'); photoPick.textContent = '앨범에서'
+M.photo.el.querySelector('.act').append(photoBtn, photoPick)
+photoBtn.onclick = () => { $('photoIn').setAttribute('capture', 'environment'); $('photoIn').click() }
+photoPick.onclick = () => { $('photoIn').removeAttribute('capture'); $('photoIn').click() }
+for (const k of ['auto', 'lock', 'screen', 'lux']) M[k].el.querySelector('.act').childElementCount || M[k].el.querySelector('.act').remove()
+
+function render() {
+  for (const m of Object.values(M)) {
+    const ok = m.ev != null && Number.isFinite(m.ev)
+    m.el.classList.toggle('off', !ok)
+    m.el.querySelector('.ev').textContent = ok ? fmtEV(m.ev) : '안 됨'
+    const d = m.el.querySelector('.diff')
+    if (ok) {
+      const x = m.ev - ref
+      d.textContent = `${x >= 0 ? '+' : ''}${x.toFixed(1)}`
+      d.className = 'diff ' + (Math.abs(x) <= .5 ? 'good' : Math.abs(x) >= 1.5 ? 'bad' : '')
+    } else d.textContent = ''
+    m.el.querySelector('.note').textContent = m.note
+  }
+}
+
+/* ---------- 카메라 ---------- */
+const video = $('video')
+let track = null, ic = null, caps = {}, firstSettings = null
+const cv = document.createElement('canvas'); cv.width = 72; cv.height = 48
+const cx = cv.getContext('2d', { willReadFrequently: true })
+
+$('startBtn').onclick = async () => {
+  $('startBtn').textContent = '여는 중…'
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false })
+    video.srcObject = stream
+    await video.play().catch(() => {})
+    track = stream.getVideoTracks()[0]
+    caps = track.getCapabilities?.() || {}
+    firstSettings = { ...(track.getSettings?.() || {}) }
+    try { if (typeof ImageCapture === 'function') ic = new ImageCapture(track) } catch {}
+    $('startBtn').remove()
+    const canLock = caps.exposureMode?.includes?.('manual') && caps.exposureTime && caps.iso
+    lockBtn.disabled = !canLock
+    M.lock.note = canLock ? '고정하면 셔터·감도를 직접 정하고 화면 밝기로 재요' : '이 브라우저는 셔터·감도를 고정하지 못해요'
+    lockBtn.onclick = toggleLock
+    loop()
+    setInterval(readAuto, 200)
+    setInterval(showDiag, 1000)
+  } catch (e) {
+    $('startBtn').textContent = `카메라를 못 열었어요 (${e.name})`
+  }
+}
+
+// 1보다 작으면 초, 아니면 100µs 단위 (표준은 100µs)
+const secs = (raw) => !(raw > 0) || !Number.isFinite(raw) ? 0 : raw < 1 ? raw : raw / 10000
+function evOf(rawT, iso, n) {
+  const t = secs(rawT); if (!t || !(iso > 0)) return null
+  const N = n > 0 ? n : PHONE_F
+  return log2(N * N / t) - log2(iso / 100)
+}
+
+// 화면 밝기: 보이는 3:2 범위에서 평균·중앙·스팟 (선형 밝기)
+let light = null
+function sampleFrame() {
+  const vw = video.videoWidth, vh = video.videoHeight
+  if (!vw || !vh) return null
+  const a = 1.5
+  let sw = vw, sh = vh, sx = 0, sy = 0
+  if (vw / vh > a) { sw = vh * a; sx = (vw - sw) / 2 } else { sh = vw / a; sy = (vh - sh) / 2 }
+  cx.drawImage(video, sx, sy, sw, sh, 0, 0, 72, 48)
+  return lightOf(cx.getImageData(0, 0, 72, 48).data, 72, 48, spot)
+}
+function lightOf(d, W, H, sp) {
+  let sum = 0, cw = 0, cwN = 0, s = 0, sN = 0, hi = 0
+  const px = sp.x * W, py = sp.y * H, r2 = (Math.max(W, H) * .06) ** 2
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4
+    const L = .2126 * lin(d[i]) + .7152 * lin(d[i + 1]) + .0722 * lin(d[i + 2])
+    sum += L
+    if (d[i] > 250 || d[i + 1] > 250 || d[i + 2] > 250) hi++
+    const w = .15 + Math.exp(-(((x / W - .5) / .23) ** 2 + ((y / H - .5) / .27) ** 2))
+    cw += L * w; cwN += w
+    if ((x - px) ** 2 + (y - py) ** 2 <= r2) { s += L; sN++ }
+  }
+  const avg = Math.max(1e-4, sum / (W * H)), cen = Math.max(1e-4, cw / cwN), spt = sN ? Math.max(1e-4, s / sN) : cen
+  return { avg, cen, spot: spt, use: metering === 'spot' ? spt : metering === 'avg' ? avg : cen, clip: hi / (W * H) }
+}
+
+// 자동 노출 중 카메라 값. 처음 값만 계속 주는 브라우저가 있어서, 한 번이라도 바뀌어야 믿는다
+let autoNow = null, autoSeen = null, autoLive = false, autoCount = 0
+async function readAuto() {
+  if (!track || lock) return
+  const st = track.getSettings?.() || {}
+  let ev = evOf(st.exposureTime, st.iso, st.aperture), src = st
+  if (ev == null && ic) {
+    try { const p = await ic.getPhotoSettings(); ev = evOf(p.exposureTime, p.iso, p.aperture); if (ev != null) src = p } catch {}
+  }
+  if (ev == null) { autoNow = null; return }
+  autoCount++
+  if (autoSeen != null && Math.abs(ev - autoSeen) > .05) autoLive = true
+  autoSeen = ev
+  autoNow = { ev, t: secs(src.exposureTime), iso: src.iso, n: src.aperture }
+}
+
+// 셔터·감도 고정 (안드로이드 크롬 일부)
+let lock = null
+async function toggleLock() {
+  if (lock) {
+    lock = null; lockBtn.textContent = '고정하기'; lockBtn.classList.remove('on')
+    try { await track.applyConstraints({ advanced: [{ exposureMode: 'continuous' }] }) } catch {}
+    return
+  }
+  const m = { tMin: caps.exposureTime.min, tMax: Math.min(caps.exposureTime.max, 333), isoMin: caps.iso.min, isoMax: Math.min(caps.iso.max, 3200), t: 0, iso: 0, settle: 0, busy: false }
+  m.t = clamp(40, m.tMin, m.tMax); m.iso = clamp(100, m.isoMin, m.isoMax)
+  try {
+    await track.applyConstraints({ advanced: [{ exposureMode: 'manual', exposureTime: m.t, iso: m.iso }] })
+    m.settle = performance.now() + 500
+    lock = m; lockBtn.textContent = '풀기'; lockBtn.classList.add('on')
+  } catch (e) { M.lock.note = `고정이 안 돼요 (${e.name})`; render() }
+}
+async function stepLock(dir) {
+  const m = lock; if (!m || m.busy) return
+  let { t, iso } = m
+  if (dir > 0) { if (t * 2 <= m.tMax) t *= 2; else if (iso * 2 <= m.isoMax) iso *= 2; else return }
+  else { if (iso / 2 >= m.isoMin) iso /= 2; else if (t / 2 >= m.tMin) t /= 2; else return }
+  m.busy = true
+  try { await track.applyConstraints({ advanced: [{ exposureMode: 'manual', exposureTime: t, iso }] }); m.t = t; m.iso = iso } catch {}
+  m.settle = performance.now() + 400; m.busy = false
+}
+
+const ema = (prev, v, k = .3) => prev == null || !Number.isFinite(prev) ? v : prev + (v - prev) * k
+let lastDraw = 0
+function loop(now = 0) {
+  requestAnimationFrame(loop)
+  if (now - lastDraw < 120) return
+  lastDraw = now
+  light = sampleFrame()
+  if (!light) return
+
+  // 화면 밝기만
+  M.screen.ev = ema(M.screen.ev, 12 + log2(light.use / .18))
+
+  // 카메라 값 (자동 노출): 셔터·감도의 EV + 측광 자리와 화면 평균의 차이
+  if (lock) { M.auto.ev = null; M.auto.note = '고정 중에는 쉬어요' }
+  else if (!autoNow) { M.auto.ev = null; M.auto.note = '이 브라우저는 셔터·감도를 안 알려 줘요' }
+  else if (!autoLive) { M.auto.ev = null; M.auto.note = `처음 값만 줘요 (${fmtT(autoNow.t)} · ISO ${autoNow.iso}) — 밝은 곳·어두운 곳을 비춰 보세요` }
+  else {
+    M.auto.ev = ema(M.auto.ev, autoNow.ev + log2(light.use / light.avg))
+    M.auto.note = `${fmtT(autoNow.t)} · ISO ${Math.round(autoNow.iso)} · f/${autoNow.n || PHONE_F + '(짐작)'}`
+  }
+
+  // 고정 + 화면 밝기
+  if (lock) {
+    if (performance.now() > lock.settle && !lock.busy) {
+      if (light.avg > .4 || light.use > .85 || light.clip > .08) stepLock(-1)
+      else if (light.avg < .045 && light.use < .4) stepLock(1)
+      const st = track.getSettings?.() || {}
+      const fixed = evOf(lock.t, lock.iso, st.aperture)
+      if (fixed != null) M.lock.ev = ema(M.lock.ev, fixed + log2(light.use / .18))
+      M.lock.note = `고정 ${fmtT(secs(lock.t))} · ISO ${lock.iso}${light.clip > .02 ? ` · 날아간 곳 ${Math.round(light.clip * 100)}%` : ''}`
+    }
+  } else if (!lockBtn.disabled) { M.lock.ev = null; M.lock.note = '고정하면 셔터·감도를 직접 정하고 화면 밝기로 재요' }
+  render()
+}
+
+/* ---------- 사진으로 재기 ---------- */
+let photo = null // { base, exif, data, W, H, spot }
+$('photoIn').onchange = async (e) => {
+  const file = e.target.files?.[0]; e.target.value = ''
+  if (!file) return
+  const buf = await file.arrayBuffer()
+  const ex = readExif(buf)
+  const url = URL.createObjectURL(file)
+  const img = new Image()
+  img.onload = () => {
+    const cvs = $('photo'), W = 600, H = Math.round(W * img.naturalHeight / img.naturalWidth)
+    cvs.width = W; cvs.height = H
+    const g = cvs.getContext('2d', { willReadFrequently: true })
+    g.drawImage(img, 0, 0, W, H)
+    const sw = 72, sh = Math.max(2, Math.round(72 * H / W))
+    const tmp = document.createElement('canvas'); tmp.width = sw; tmp.height = sh
+    tmp.getContext('2d').drawImage(img, 0, 0, sw, sh)
+    photo = { exif: ex, data: tmp.getContext('2d').getImageData(0, 0, sw, sh).data, W: sw, H: sh, spot: { x: .5, y: .5 }, img, cW: W, cH: H }
+    URL.revokeObjectURL(url)
+    $('photoBox').style.display = 'block'
+    measurePhoto()
+  }
+  img.onerror = () => { M.photo.ev = null; M.photo.note = `사진을 못 열었어요 (${file.type || '알 수 없는 형식'})`; render() }
+  img.src = url
+}
+$('photo').addEventListener('click', (e) => {
+  if (!photo) return
+  const r = $('photo').getBoundingClientRect()
+  photo.spot = { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }
+  if (metering !== 'spot') $('modeSeg').querySelector('[data-m=spot]').click()
+  else measurePhoto()
+})
+function measurePhoto() {
+  if (!photo) return
+  const g = $('photo').getContext('2d')
+  g.drawImage(photo.img, 0, 0, photo.cW, photo.cH)
+  if (metering === 'spot') {
+    g.strokeStyle = '#e9a23b'; g.lineWidth = 3
+    g.beginPath(); g.arc(photo.spot.x * photo.cW, photo.spot.y * photo.cH, photo.cW * .06, 0, Math.PI * 2); g.stroke()
+  }
+  const ex = photo.exif
+  const base = ex ? evOf(ex.t, ex.iso, ex.n || PHONE_F) : null
+  if (base == null) {
+    M.photo.ev = null
+    M.photo.note = ex ? '사진에 셔터·감도 정보가 없어요' : '사진 정보를 못 읽었어요 (JPEG가 아니거나 정보가 지워짐)'
+    $('photoNote').textContent = ''
+  } else {
+    const l = lightOf(photo.data, photo.W, photo.H, photo.spot)
+    const bias = ex.bias || 0
+    M.photo.ev = base + bias + log2(l.use / l.avg)
+    M.photo.note = `${fmtT(ex.t)} · f/${ex.n ? +ex.n.toFixed(2) : PHONE_F + '(짐작)'} · ISO ${ex.iso}${bias ? ` · 보정 ${bias > 0 ? '+' : ''}${+bias.toFixed(1)}` : ''}`
+    $('photoNote').textContent = [ex.model, ex.lens].filter(Boolean).join(' · ') + (metering === 'spot' ? ' — 사진을 눌러 잴 곳을 고르세요' : '')
+  }
+  render()
+}
+
+// JPEG EXIF에서 셔터·조리개·감도만 읽는다
+function readExif(buf) {
+  try {
+    const d = new DataView(buf)
+    if (d.getUint16(0) !== 0xFFD8) return null
+    let o = 2
+    while (o + 4 < d.byteLength) {
+      const mk = d.getUint16(o)
+      if ((mk & 0xFF00) !== 0xFF00) return null
+      const len = d.getUint16(o + 2)
+      if (mk === 0xFFE1 && d.getUint32(o + 4) === 0x45786966) return tiff(d, o + 10)
+      if (mk === 0xFFDA) break
+      o += 2 + len
+    }
+  } catch {}
+  return null
+}
+function tiff(d, b) {
+  const le = d.getUint16(b) === 0x4949
+  const u16 = (p) => d.getUint16(p, le), u32 = (p) => d.getUint32(p, le)
+  const out = {}
+  const ifd = (off) => {
+    const n = u16(b + off)
+    for (let i = 0; i < n; i++) {
+      const e = b + off + 2 + i * 12, tag = u16(e), type = u16(e + 2), cnt = u32(e + 4)
+      let v
+      if (type === 5 || type === 10) {
+        const p = b + u32(e + 8)
+        const num = type === 5 ? u32(p) : d.getInt32(p, le), den = type === 5 ? u32(p + 4) : d.getInt32(p + 4, le)
+        v = den ? num / den : 0
+      } else if (type === 3) v = u16(e + 8)
+      else if (type === 4) v = u32(e + 8)
+      else if (type === 2) {
+        const p = cnt <= 4 ? e + 8 : b + u32(e + 8)
+        v = ''; for (let k = 0; k < cnt - 1 && p + k < d.byteLength; k++) v += String.fromCharCode(d.getUint8(p + k))
+      }
+      out[tag] = v
+    }
+  }
+  ifd(u32(b + 4))
+  if (out[0x8769]) ifd(out[0x8769])
+  return { t: out[0x829A], n: out[0x829D], iso: out[0x8827], bias: out[0x9204], model: out[0x0110], lens: out[0xA434] }
+}
+
+/* ---------- 조도 센서 ---------- */
+if ('AmbientLightSensor' in window) {
+  try {
+    const s = new AmbientLightSensor({ frequency: 4 })
+    s.onreading = () => {
+      const lux = s.illuminance
+      M.lux.ev = lux > 0 ? ema(M.lux.ev, log2(lux / 2.5)) : null
+      M.lux.note = `${Math.round(lux)} lux · 들어오는 빛(입사광)이라 반사광과 다를 수 있어요`
+      render()
+    }
+    s.onerror = (e) => { M.lux.note = `조도 센서를 못 켰어요 (${e.error?.name || '알 수 없음'})`; render() }
+    s.start()
+    M.lux.note = '조도 센서 켜는 중…'
+  } catch (e) { M.lux.note = `조도 센서를 못 켰어요 (${e.name})` }
+} else M.lux.note = '이 브라우저는 조도 센서를 못 읽어요'
+
+/* ---------- 기록 ---------- */
+let rows = store.get('rows', [])
+const KEYS = [['auto', '카메라값'], ['lock', '고정'], ['screen', '화면'], ['photo', '사진'], ['lux', '조도']]
+const MODE = { spot: '스팟', center: '중앙', avg: '평균' }
+function showRows() {
+  const t = $('logTable')
+  if (!rows.length) { t.innerHTML = ''; return }
+  t.innerHTML = `<tr><th>시각</th><th>기준</th>${KEYS.map(([, n]) => `<th>${n}</th>`).join('')}</tr>` +
+    rows.map((r) => `<tr><td>${r.time} ${MODE[r.mode] || ''}</td><td>${r.ref.toFixed(1)}</td>${KEYS.map(([k]) => {
+      const v = r[k]; if (v == null) return '<td>—</td>'
+      const x = v - r.ref
+      return `<td class="${Math.abs(x) <= .5 ? 'good' : Math.abs(x) >= 1.5 ? 'bad' : ''}">${x >= 0 ? '+' : ''}${x.toFixed(1)}</td>`
+    }).join('')}</tr>`).join('')
+}
+$('logAdd').onclick = () => {
+  const d = new Date()
+  const r = { time: `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`, mode: metering, ref: +ref }
+  for (const [k] of KEYS) r[k] = M[k].ev != null && Number.isFinite(M[k].ev) ? Math.round(M[k].ev * 100) / 100 : null
+  rows.push(r); store.set('rows', rows); showRows(); toast('기록했어요')
+}
+$('logClear').onclick = () => { if (!rows.length || !confirm('기록을 지울까요?')) return; rows = []; store.set('rows', rows); showRows() }
+$('logCopy').onclick = async () => {
+  const text = [
+    `측광 시험 · ${$('dev').textContent}`,
+    navigator.userAgent,
+    `고정 가능: ${!lockBtn.disabled ? '예' : '아니요'} · 카메라값: ${autoNow ? (autoLive ? '바뀜' : '처음 값만') : '없음'} (${autoCount}번 읽음)`,
+    '',
+    `시각\t모드\t기준\t${KEYS.map(([, n]) => n).join('\t')}`,
+    ...rows.map((r) => `${r.time}\t${MODE[r.mode]}\t${r.ref.toFixed(1)}\t${KEYS.map(([k]) => r[k] == null ? '-' : r[k].toFixed(2)).join('\t')}`),
+    '',
+    $('diag').textContent,
+  ].join('\n')
+  try { await navigator.clipboard.writeText(text); toast('복사했어요') }
+  catch {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.append(ta); ta.select()
+    try { document.execCommand('copy'); toast('복사했어요') } catch { toast('복사하지 못했어요') }
+    ta.remove()
+  }
+}
+showRows()
+
+/* ---------- 카메라 정보 ---------- */
+function showDiag() {
+  if (!track) return
+  const pick = (o) => { const r = {}; for (const k of Object.keys(o).sort()) if (!/deviceId|groupId/.test(k)) r[k] = o[k]; return r }
+  $('diag').textContent = [
+    `카메라: ${track.label || '—'}`,
+    `ImageCapture: ${ic ? '있음' : '없음'} · 조도 센서: ${'AmbientLightSensor' in window ? '있음' : '없음'}`,
+    `지금 설정 ${JSON.stringify(pick(track.getSettings?.() || {}))}`,
+    `처음 설정 ${JSON.stringify(pick(firstSettings || {}))}`,
+    `할 수 있는 것 ${JSON.stringify(pick(caps))}`,
+  ].join('\n\n')
+}
+
+showRef()
+</script>
+</body>
+</html>
