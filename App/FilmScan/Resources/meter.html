@@ -135,7 +135,8 @@
   .ringrow.auto .ring .mark { border-top-color: #666; }
 
   /* 조작부: 되감기 노브 · 카운터 · 셔터+레버 */
-  .controls { position: relative; z-index: 3; }
+  .controls { position: relative; z-index: 6; transform: translateZ(0); }
+  .stripwrap { z-index: 1; }
   .controls svg { display: block; width: 100%; height: auto; max-height: 92px; overflow: visible; }
   #shutterBtn { cursor: pointer; }
   #shutterBtn .disc { transition: transform .09s ease-out, filter .09s; transform-box: fill-box; transform-origin: center; }
@@ -151,6 +152,7 @@
   .strip { position: relative; height: 112px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity;
     scrollbar-width: none; -webkit-overflow-scrolling: touch; touch-action: pan-x; }
   .strip::-webkit-scrollbar { display: none; }
+  .strip { overscroll-behavior-x: none; }
   .track { display: flex; height: 100%; width: max-content; padding: 0 calc(50% - 52px) 0 0; }
   .cell { position: relative; flex: 0 0 104px; height: 100%; background: #2a1a0f; scroll-snap-align: center; }
   .cell::before, .cell::after { content: ""; position: absolute; left: 0; right: 0; height: 8px;
@@ -248,11 +250,11 @@
   .toast.on { opacity: 1; transform: translate(-50%, 0); }
 
   /* ── 추가: 실제 카메라 파인더처럼 (사진에 담기는 칸 밖은 어둡게, 아래 띠에 LED 표시) ── */
-  .finder { aspect-ratio: 4 / 3; }
+  .finder { aspect-ratio: 5 / 4; }
   .wrap > .finderbox { margin: 0 -16px; }
-  .finderbox .finder { height: min(100cqh, calc(100cqw * .75)); }
+  .finderbox .finder { height: min(100cqh, calc(100cqw * .8)); }
   /* 칸 밖 가리개: 칸(.bright)과 같은 자리만 뚫는다 */
-  .finder .mask { position: absolute; inset: 0; pointer-events: none; background: rgb(6 6 7 / .74);
+  .finder .mask { position: absolute; inset: 0; pointer-events: none; background: rgb(4 4 5 / .86);
     -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0) center / 84% 74.67% no-repeat; -webkit-mask-composite: xor;
     mask: linear-gradient(#000 0 0) exclude, linear-gradient(#000 0 0) center / 84% 74.67% no-repeat; }
   html.native .finder .mask { background: rgb(6 6 7 / .6); }
@@ -264,11 +266,11 @@
   /* 노출 미리보기: 고른 조리개·셔터로 찍히면 이 밝기 */
   .finder .scene { transition: filter .12s linear; }
   /* LED 띠 */
-  .finder .lcd { position: absolute; left: 15%; right: 15%; bottom: 4.4%; height: 8%; display: flex; align-items: center; justify-content: space-between; gap: 6px; pointer-events: none;
-    font: 700 clamp(10px, 3.4cqw, 15px)/1 ui-monospace, "SF Mono", Menlo, monospace; color: #7dff8a; text-shadow: 0 0 6px rgb(90 255 120 / .55); letter-spacing: .02em; }
+  .finder .lcd { position: absolute; left: 13%; right: 13%; bottom: 5.2%; height: 8.6%; display: flex; align-items: center; justify-content: space-between; gap: 6px; pointer-events: none;
+    font: 700 clamp(13px, 4.2cqw, 18px)/1 ui-monospace, "SF Mono", Menlo, monospace; color: #9dffa8; text-shadow: 0 0 4px rgb(90 255 120 / .9), 0 0 10px rgb(90 255 120 / .5); letter-spacing: .02em; }
   .finder .lcd .dimmed { opacity: .22; text-shadow: none; }
   .finder .lcd .scale { display: flex; align-items: center; gap: 2px; font-size: .8em; }
-  .finder .lcd .scale i { display: block; width: 3px; height: .9em; border-radius: 1px; background: currentColor; opacity: .2; }
+  .finder .lcd .scale i { display: block; width: 3.5px; height: .9em; border-radius: 1px; background: currentColor; opacity: .25; }
   .finder .lcd .scale i.c { height: 1.2em; opacity: .45; }
   .finder .lcd .scale i.on { opacity: 1; box-shadow: 0 0 5px rgb(90 255 120 / .7); }
   .finder .lcd .warn { color: #ff5a4a; text-shadow: 0 0 6px rgb(255 80 60 / .6); }
@@ -313,7 +315,7 @@
   .finder .lcd .lock { color: #ffc24a; text-shadow: 0 0 6px rgb(255 190 60 / .6); }
   .modal .textbtn { display: block; width: 100%; margin-top: 10px; border: 0; background: none; color: var(--sub); font-size: 14px; font-weight: 600; padding: 6px 0; }
   /* 사진 칸: 렌즈 화각에 맞춰 넓어지거나 좁아진다 (레인지파인더의 프레임처럼) */
-  :root { --fw: 84%; --fh: 74.67%; }
+  :root { --fw: 84%; --fh: 70%; }
   .finder .mask { -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0) center / var(--fw) var(--fh) no-repeat; -webkit-mask-composite: xor;
     mask: linear-gradient(#000 0 0) exclude, linear-gradient(#000 0 0) center / var(--fw) var(--fh) no-repeat; }
   .finder .bright { width: var(--fw); height: var(--fh); }
@@ -374,7 +376,6 @@
       </div>
       <div class="led" id="led"></div>
       
-      <div class="modeltr" id="modeLtr">A</div>
       <div class="lcd" id="lcd"><span id="lcdS">125</span><span class="scale" id="lcdScale"></span><span id="lcdA">8</span><span id="lcdL">EV 12.0</span></div>
       <div class="evflash" id="evFlash"></div>
       <div class="cammsg" id="camMsg" hidden><p></p><button>카메라 켜기</button></div>
@@ -389,7 +390,7 @@
       <div class="state ok" id="state">적정</div>
       <div class="ev" id="ev">EV —</div>
     </div>
-    <div class="infobtns"><button class="flash" id="flashBtn" aria-pressed="false" aria-label="플래시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9 22l10-12.5h-6.6L13.5 2Z" fill="currentColor"/></svg><span>끔</span></button><button class="flash filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button><button class="flash mtr" id="meterMode" aria-label="측광 방식"><small>측광</small><span id="meterText">스팟</span></button><button class="hold" id="hold" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>고정</span></button></div>
+    <div class="infobtns"><button class="flash" id="flashBtn" aria-pressed="false" aria-label="플래시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9 22l10-12.5h-6.6L13.5 2Z" fill="currentColor"/></svg><span>끔</span></button><button class="flash filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button><button class="flash mtr" id="meterMode" aria-label="측광 방식"><span id="meterText">스팟</span></button><button class="hold" id="hold" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>고정</span></button></div>
   </div>
 
   <div class="rings">
@@ -402,6 +403,8 @@
       <defs>
         <linearGradient id="chrome" x1="0" x2="1"><stop offset="0" stop-color="#8c8c8f"/><stop offset=".35" stop-color="#f0f0f0"/><stop offset=".6" stop-color="#a9a9ac"/><stop offset="1" stop-color="#6d6d70"/></linearGradient>
         <radialGradient id="chromeR" cx=".38" cy=".35" r=".8"><stop offset="0" stop-color="#fafafa"/><stop offset=".6" stop-color="#a5a5a8"/><stop offset="1" stop-color="#5d5d60"/></radialGradient>
+        <linearGradient id="leverBlack" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#2a2a2d"/><stop offset=".6" stop-color="#18181a"/><stop offset="1" stop-color="#0f0f10"/></linearGradient>
+        <radialGradient id="orangeMatte" cx=".45" cy=".4" r=".7"><stop offset="0" stop-color="#ff7a35"/><stop offset=".7" stop-color="#f2621f"/><stop offset="1" stop-color="#d9531a"/></radialGradient>
         <radialGradient id="orange" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ff9a55"/><stop offset=".55" stop-color="#ff6b1f"/><stop offset="1" stop-color="#d4480a"/></radialGradient>
       </defs>
       <!-- 되감기 노브 (손잡이 접힌 상태) -->
@@ -419,20 +422,19 @@
       <text id="counterSub" x="180" y="96" text-anchor="middle" font-size="10.5" font-weight="500" fill="rgb(235 235 245 / .55)" font-family="-apple-system, sans-serif"></text>
       <!-- 와인딩 레버: 셔터와 같은 축, 쉼표 모양 -->
       <g id="lever">
-        <path d="M 274 66 L 230 88 Q 224 91 222 86 Q 220 81 226 78 L 268 54 Z" fill="url(#chrome)" stroke="#5d5d60" stroke-width=".6"/>
-        <g transform="rotate(-27 214 86)">
-          <rect x="198" y="78" width="28" height="16" rx="8" fill="#1b1b1d" stroke="#3c3c40" stroke-width=".8"/>
-          <path d="M205 81v10M209 81v10M213 81v10M217 81v10M221 81v10" stroke="#3a3a3e" stroke-width="1.2" stroke-linecap="round"/>
+        <!-- 아그파 옵티마 센서: 셔터를 감싼 검은 판이 왼쪽 아래로 이어져 홈 파인 손잡이로 끝난다 -->
+        <path d="M 290 18 A 34 34 0 1 1 278.4 84 C 266 92 250 98 236 98 H 202 A 10 10 0 0 1 202 78 H 230 C 244 78 254 70 258.5 64.7 A 34 34 0 0 1 290 18 Z" fill="url(#leverBlack)" stroke="#3d3d42" stroke-width=".8"/>
+        <path d="M 290 18.6 A 33.4 33.4 0 0 1 322 44" fill="none" stroke="rgb(255 255 255 / .14)" stroke-width="1.2" stroke-linecap="round"/>
+        <g stroke="#47474d" stroke-width="1.5" stroke-linecap="round">
+          <path d="M197 82.5H226"/><path d="M195 86.5H228"/><path d="M195 90.5H228"/><path d="M197 94.5H226"/>
         </g>
-        <circle cx="290" cy="52" r="31" fill="url(#chrome)"/>
-        <circle cx="290" cy="52" r="27.5" fill="none" stroke="rgb(0 0 0 / .25)" stroke-width="1"/>
       </g>
       <!-- 셔터 -->
       <g id="shutterBtn">
         <circle cx="290" cy="52" r="34" fill="transparent"/>
-        <circle cx="290" cy="52" r="25.5" fill="#141415"/>
-        <circle class="disc" cx="290" cy="52" r="23" fill="url(#orange)"/>
-        <circle class="disc" cx="290" cy="52" r="16" fill="none" stroke="rgb(255 255 255 / .16)" stroke-width="1"/>
+        <circle cx="290" cy="52" r="26.5" fill="url(#chromeR)"/>
+        <circle cx="290" cy="52" r="23.2" fill="#2a2a2c"/>
+        <circle class="disc" cx="290" cy="52" r="22.4" fill="url(#orangeMatte)"/>
       </g>
     </svg>
   </div>
@@ -816,8 +818,8 @@ video.addEventListener('resize', () => applyZoom(zoom.z))
 const source = () => live() ? [video, video.videoWidth, video.videoHeight] : [sim, sim.width, sim.height]
 // 화면 확대는 늘 CSS로 부드럽게 하고, 폰 카메라 배율은 멈춘 뒤에 따라와서(hwRel) 그만큼 CSS 확대를 줄인다
 const cssZoom = () => zoom.native ? 1 : vis() / (zoom.hw ? zoom.hwRel : 1)
-// 파인더는 4:3, 그 안에서 사진에 담기는 칸(밝은 테두리)은 가운데 3:2 = 폭 84%
-const FA = 4 / 3, FW_BASE = .84, FW_MAX = .9
+// 파인더는 5:4, 그 안에서 사진에 담기는 칸(밝은 테두리)은 가운데 3:2 = 폭 84%
+const FA = 5 / 4, FW_BASE = .84, FW_MAX = .9
 let FW = FW_BASE // 지금 사진 칸 폭 (화각에 따라 바뀜)
 const fhOf = (w) => w * FA / 1.5
 function drawCrop(ctx, frac, dw, dh) {
@@ -1257,9 +1259,9 @@ function drawZoomDial() {
 // ───────── 필름 ─────────
 const track = $('track'), strip = $('strip')
 // 필름 맨 끝 리더(텅): 아래쪽 절반이 곡선으로 잘려 나간 실제 35mm 필름 모양
-const TONGUE = `<div class="leadfog" aria-hidden="true"></div><div class="tongue" aria-hidden="true"><svg viewBox="0 0 170 112" width="170" height="112">
-  <path d="M0 0 H128 C150 0 166 10 166 28 C166 46 152 56 132 56 H76 C52 56 40 68 32 84 C25 99 14 112 0 112 Z" fill="#3b2210"/>
-  <rect x="6.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="23.3" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="40.7" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="58.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="75.3" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="92.6" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="110.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="6" y="100" width="7" height="8" rx="1.5" fill="#0b0b0c"/>
+const TONGUE = `<div class="leadfog" aria-hidden="true"></div><div class="tongue" aria-hidden="true"><svg viewBox="0 0 232 112" width="232" height="112">
+  <path d="M0 0 H206 Q226 0 227 18 V42 Q227 60 207 60 H122 C 94 60 76 67 60 84 C 46 100 28 112 0 112 Z" fill="#3b2210"/>
+  <rect x="6.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="23.3" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="40.7" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="58.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="75.3" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="92.6" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="110.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="127.3" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="144.6" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="162.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="179.3" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="196.6" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="6" y="100" width="7" height="8" rx="1.5" fill="#0b0b0c"/>
 </svg></div>`
 // 칸 번호 표기: 1 이상은 숫자, 그 앞(프리와인딩으로 더 찍은 경우)은 0, 00, E1…
 // 역순은 36컷을 넘겨 찍으면 마지막 컷이 1번이 되도록 앞 컷 번호를 하나씩 민다. 그래서 다음 칸(0)은 아직 번호가 없다
@@ -1274,7 +1276,7 @@ function buildStrip(noScroll) {
   const lo = Math.min(1, ...ps), hi = Math.max(prewind ? cam.frames : cam.frames + 2, ...ps)
   track.innerHTML = ''
   // 필름통까지 이어지는 필름 (칸·번호 없이). 첫 칸이 가운데 올 수 있을 만큼 길게
-  track.insertAdjacentHTML('beforeend', `<div class="tail" aria-hidden="true" style="width:${Math.max(120, strip.clientWidth / 2 - 52)}px"></div>`)
+  track.insertAdjacentHTML('beforeend', `<div class="tail" aria-hidden="true" style="width:${Math.max(240, strip.clientWidth)}px"></div>`)
   track.style.transition = 'none'; track.style.transform = ''; strip.style.scrollSnapType = ''
   // 카메라 뒤에서 본 방향: 왼쪽이 필름통, 오른쪽이 감는 스풀. 필름 번호는 스풀 쪽(오른쪽)이 1
   // 정순은 통에서 빠져나와 오른쪽으로 흐르고, 프리와인딩은 통으로 되감기며 왼쪽으로 흐른다
@@ -1726,7 +1728,6 @@ function drawLcd(r) {
   $('lcdL').classList.toggle('lock', held)
   $('lcdScale').classList.toggle('warn', out)
   ;[...$('lcdScale').children].forEach((el, i) => el.classList.toggle('on', i - 6 === k))
-  $('modeLtr').textContent = mode
 }
 function loop(now) {
   stepZoom(Math.min(.05, (now - (lastFrame || now)) / 1000) || .016); lastFrame = now
