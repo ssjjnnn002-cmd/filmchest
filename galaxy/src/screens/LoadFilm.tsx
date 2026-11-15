@@ -1,5 +1,5 @@
 // 웹 pages/LoadFilm.tsx
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { db, kept } from '../data'
 import { useLiveQuery } from '../store'
@@ -94,8 +94,11 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const lensReady = !camera?.mount || (lensId === '__new' ? !!newLens.trim() : !!lensId)
   const shotISO = film && push !== 0 ? Math.round(film.iso * 2 ** push) : undefined
 
+  // '장착'을 빠르게 여러 번 눌러도 롤은 하나만 만든다
+  const loading = useRef(false)
   const load = async () => {
-    if (!camera || !film) return
+    if (!camera || !film || loading.current) return
+    loading.current = true
     let lens = mountLenses.find((l) => l.id === lensId)
     if (!lens && newLens.trim() && camera.mount) {
       lens = { id: uid(), brand: camera.brand, model: newLens.trim(), mount: camera.mount, createdAt: Date.now() }

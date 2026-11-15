@@ -7,7 +7,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { Animated, BackHandler, Easing, Pressable, Text, View } from 'react-native'
 import { Glass } from './glass'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { db, kept, purgeOldCameras, purgeOldRolls } from './data'
+import { db, kept, purgeOldCameras, purgeOldRolls, removeDoubleLoads } from './data'
 import { useLiveQuery } from './store'
 import { Icon } from './icons'
 import { useTheme } from './theme'
@@ -146,6 +146,7 @@ export function App() {
   useEffect(() => {
     void purgeOldRolls()
     void purgeOldCameras()
+    void removeDoubleLoads()
     void db.zipQueue.orderBy('addedAt').toArray().then((rows) => {
       if (!rows.length || zipQueueRef.current.length) return
       setQueue(rows.map((r) => ({ id: r.id, file: { uri: r.blob, name: r.name }, index: r.index, total: r.total })), null)

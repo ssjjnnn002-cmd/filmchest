@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, kept, purgeOldCameras, purgeOldRolls } from './db'
+import { db, kept, purgeOldCameras, purgeOldRolls, removeDoubleLoads } from './db'
 import { migrateCameraPhotos } from './photoStore'
 import { Icon, useToast, WorkBanner } from './ui/common'
 import { Library } from './pages/Library'
@@ -127,6 +127,7 @@ export function App() {
   useEffect(() => {
     void purgeOldRolls()
     void purgeOldCameras()
+    void removeDoubleLoads()
     void migrateCameraPhotos()
     void db.zipQueue.orderBy('addedAt').toArray().then((rows) => {
       if (!rows.length || zipQueueRef.current.length) return

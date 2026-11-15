@@ -75,6 +75,22 @@ export async function purgeOldRolls() {
   }
 }
 
+/** '장착'을 여러 번 눌러 같은 카메라에 같은 필름 롤이 1분 안에 여러 개 생긴 것을 하나만 남긴다.
+ *  남는 것은 처음 것, 지우는 것은 사진이 없는 것만 (삭제한 롤로 옮겨 24시간 안에는 되돌릴 수 있다) */
+export async function removeDoubleLoads() {
+  const loaded = (await db.rolls.toArray()).filter((r) => !r.deletedAt && r.status === 'loaded').sort((a, b) => a.loadedAt - b.loadedAt)
+  const firsts: Roll[] = []
+  let removed = 0
+  for (const roll of loaded) {
+    const first = firsts.find((f) => f.cameraId === roll.cameraId && f.filmId === roll.filmId && roll.loadedAt - f.loadedAt < 60_000)
+    if (!first) { firsts.push(roll); continue }
+    if ((await db.frames.where('rollId').equals(roll.id).toArray()).length) continue
+    await deleteRoll(roll.id)
+    removed += 1
+  }
+  return removed
+}
+
 /** 장비 목록에서 빼 둔다. 롤의 카메라 연결은 끊지 않는다. */
 export async function deleteCamera(id: string) {
   const camera = await db.cameras.get(id)
