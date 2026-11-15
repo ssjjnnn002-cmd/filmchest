@@ -1,6 +1,6 @@
 // 웹 pages/CameraEdit.tsx
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Image, PanResponder, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { Image, PanResponder, Pressable, ScrollView, Text, View } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { db, rememberCamera } from '../data'
 import type { BodyStyle, Camera, FilmFormat } from '../core/types'

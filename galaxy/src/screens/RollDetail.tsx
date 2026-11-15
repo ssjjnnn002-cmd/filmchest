@@ -1,6 +1,7 @@
 // 웹 pages/RollDetail.tsx
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, Switch, Text, TextInput, View } from 'react-native'
+import { Pressable, Switch, Text, View } from 'react-native'
+import { TextInput } from '../textInput'
 import Svg, { Path } from 'react-native-svg'
 import { db, deleteRoll } from '../data'
 import { useLiveQuery } from '../store'

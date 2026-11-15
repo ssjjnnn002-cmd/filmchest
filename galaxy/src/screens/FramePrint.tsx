@@ -1,6 +1,7 @@
 // 웹 pages/FramePrint.tsx — 스캔 한 장을 프레임으로 저장한다 (그림은 웹 framePrint.ts)
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Text, View } from 'react-native'
+import { TextInput } from '../textInput'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { db } from '../data'
 import { getPref, setPref, useLiveQuery } from '../store'

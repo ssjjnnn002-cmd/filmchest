@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Image, Pressable, Text, TextInput, View } from 'react-native'
+import { Image, Pressable, Text, View } from 'react-native'
+import { TextInput } from '../textInput'
 import { glassPresets, isLensFilter } from '../core/filterLook'
 import { FilterRing } from '../FilterRing'
 import { LensModel3D } from '../Model3D'
