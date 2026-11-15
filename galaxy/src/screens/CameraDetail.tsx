@@ -1,6 +1,7 @@
 // 웹 pages/CameraDetail.tsx
 import { useState } from 'react'
-import { Image, Pressable, Text, View } from 'react-native'
+import { Image, Pressable, View } from 'react-native'
+import { Text } from '../text'
 import { db, deleteCamera, kept } from '../data'
 import { useLiveQuery } from '../store'
 import { useNav } from '../App'

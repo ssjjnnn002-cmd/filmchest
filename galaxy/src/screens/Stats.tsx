@@ -1,6 +1,7 @@
 // 웹 pages/Stats.tsx — 통계: 숫자 타일, 월별 롤 그래프, 컬러·흑백, 많이 쓴 순위 막대
 import { useState, type ReactNode } from 'react'
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../text'
 import { db, kept } from '../data'
 import { useLiveQuery } from '../store'
 import { rollFilmName } from '../core/display'

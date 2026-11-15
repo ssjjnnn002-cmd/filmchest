@@ -1,6 +1,7 @@
 // 웹 pages/LoadFilm.tsx
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Pressable, ScrollView, View } from 'react-native'
+import { Text } from '../text'
 import { db, kept } from '../data'
 import { useLiveQuery } from '../store'
 import type { Roll } from '../core/types'

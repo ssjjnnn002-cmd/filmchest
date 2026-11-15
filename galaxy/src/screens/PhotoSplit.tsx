@@ -1,6 +1,7 @@
 // 웹 pages/PhotoSplit.tsx — 사진을 여러 장 공유받았을 때: 몇 롤인지 고르고 롤마다 나눈 뒤, 롤 하나씩 기존 롤 가져오기로
 import { useState } from 'react'
-import { Image, Pressable, Text, View, useWindowDimensions } from 'react-native'
+import { Image, Pressable, View, useWindowDimensions } from 'react-native'
+import { Text } from '../text'
 import { Btn, Chip, Chips, Footnote, Group, Section } from '../kit'
 import { Sheet, SheetBtn } from '../overlay'
 import type { PickedFile } from '../pick'

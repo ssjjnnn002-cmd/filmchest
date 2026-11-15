@@ -1,6 +1,7 @@
 // 웹 pages/RollDetail.tsx
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, Switch, Text, View } from 'react-native'
+import { Pressable, Switch, View } from 'react-native'
+import { Text } from '../text'
 import { TextInput } from '../textInput'
 import Svg, { Path } from 'react-native-svg'
 import { db, deleteRoll } from '../data'
@@ -64,7 +65,7 @@ export function RollDetail({ id }: { id: string }) {
   return (
     <Page title={rollName(roll)} onBack={nav.pop}
       actions={
-        <View style={{ height: 44, borderRadius: 22, paddingHorizontal: 4, flexDirection: 'row', backgroundColor: c.glass, borderWidth: 0.5, borderColor: c.glassLine, elevation: 3 }}>
+        <View style={{ height: 44, borderRadius: 22, paddingHorizontal: 4, flexDirection: 'row', backgroundColor: c.glass, borderWidth: 0.5, borderColor: c.glassLine, boxShadow: c.shadowGlass }}>
           <Pressable accessibilityLabel={roll.favorite ? '즐겨찾기 해제' : '즐겨찾기'} onPress={() => db.rolls.update(id, { favorite: !roll.favorite })}
             style={({ pressed }) => ({ width: 48, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
             <Svg width={23} height={23} viewBox="0 0 24 24">

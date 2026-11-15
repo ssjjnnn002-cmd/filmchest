@@ -1,9 +1,10 @@
 // 웹 styles.css의 기본 부품을 그대로 옮긴 것 (.section, .group, .row, .field, .toggle, .btn, .chip, .segmented, .search, .status ...)
-import { Children, Fragment, isValidElement, useEffect, useState, type ReactNode } from 'react'
+import { Children, createContext, Fragment, isValidElement, useContext, useEffect, useState, type ReactNode } from 'react'
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import Slider from '@react-native-community/slider'
 import { notifyFieldFocus } from './fieldFocus'
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Switch, Text, View, type TextInputProps, type ViewStyle } from 'react-native'
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Switch, View, type TextInputProps, type ViewStyle } from 'react-native'
+import { Text } from './text'
 import { TextInput } from './textInput'
 import { Icon } from './icons'
 import { watchWork } from './core/work'
@@ -42,18 +43,24 @@ export function Footnote({ children, warn }: { children: ReactNode; warn?: boole
 }
 
 /** .group: 흰 둥근 묶음. 줄 사이에 왼쪽 18 띄운 구분선 */
+/** 묶음 안에 있는지 (웹 .suggest: 묶음 안 칩 줄은 여백·작은 회색 칩) */
+const InGroup = createContext(false)
+const isChips = (x: unknown) => isValidElement(x) && x.type === Chips
 export function Group({ children, style, plain }: { children: ReactNode; style?: ViewStyle; /** 구분선 없이 */ plain?: boolean }) {
   const c = useTheme()
   const items = Children.toArray(children).filter((x) => isValidElement(x) || typeof x === 'string')
   return (
-    <View style={[{ backgroundColor: c.cell, borderRadius: 22, overflow: 'hidden' }, style]}>
-      {items.map((child, i) => (
-        <Fragment key={i}>
-          {i > 0 && !plain ? <View style={{ height: 0.5, marginLeft: 18, backgroundColor: c.sep }} /> : null}
-          {child}
-        </Fragment>
-      ))}
-    </View>
+    <InGroup.Provider value>
+      <View style={[{ backgroundColor: c.cell, borderRadius: 22, overflow: 'hidden' }, style]}>
+        {items.map((child, i) => (
+          <Fragment key={i}>
+            {/* 웹처럼 칩 줄 앞뒤에는 선을 긋지 않는다 (칩은 위 칸에 딸린 것) */}
+            {i > 0 && !plain && !isChips(child) && !isChips(items[i - 1]) ? <View style={{ height: 0.5, marginLeft: 18, backgroundColor: c.sep }} /> : null}
+            {child}
+          </Fragment>
+        ))}
+      </View>
+    </InGroup.Provider>
   )
 }
 
@@ -152,31 +159,37 @@ export function Btn({ label, onPress, kind, size, block, disabled, icon }: {
 }
 
 /** .chip */
-export function Chip({ label, active, icon, chevron, onPress, flat }: {
+export function Chip({ label, active, icon, chevron, onPress, flat: flatProp }: {
   label: string; active?: boolean; icon?: string; chevron?: boolean; onPress: () => void; flat?: boolean
 }) {
+  const groupFlat = useContext(ChipsFlat)
+  const flat = flatProp ?? groupFlat
   const c = useTheme()
   const color = active ? '#fff' : c.ink
   return (
     <Pressable onPress={onPress} style={({ pressed }) => ({
       height: flat ? 32 : 36, paddingHorizontal: 14, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 5,
       backgroundColor: active ? c.safelight : flat ? c.fill : c.cell, opacity: pressed ? 0.8 : 1,
-      shadowColor: '#28201a', shadowOpacity: flat || active ? 0 : 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: flat || active ? 0 : 1,
+      boxShadow: flat || active ? undefined : c.shadow,
     })}>
       {icon ? <Icon name={icon} size={16} color={color} /> : null}
       <Text style={{ color, fontSize: flat ? 14 : 15, fontWeight: '500' }} numberOfLines={1}>{label}</Text>
-      {chevron ? <Text style={{ color: active ? '#fff' : c.muted, fontSize: 11, marginLeft: 1 }}>▾</Text> : null}
+      {chevron ? <Icon name="chevDown" size={12} color={color} /> : null}
     </Pressable>
   )
 }
 
 export function Chips({ children }: { children: ReactNode }) {
+  const inGroup = useContext(InGroup)
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 2, paddingTop: 2, paddingBottom: 4 }}>
-      {children}
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
+      contentContainerStyle={inGroup ? { gap: 6, paddingHorizontal: 18, paddingBottom: 12 } : { gap: 8, paddingHorizontal: 2, paddingTop: 2, paddingBottom: 4 }}>
+      <ChipsFlat.Provider value={inGroup}>{children}</ChipsFlat.Provider>
     </ScrollView>
   )
 }
+/** 묶음 안 칩 줄의 칩은 웹 .suggest .chip처럼 낮고 회색 */
+const ChipsFlat = createContext(false)
 
 /** .segmented */
 export function Segmented<T extends string>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
@@ -189,7 +202,7 @@ export function Segmented<T extends string>({ value, options, onChange }: { valu
           <Pressable key={id} onPress={() => onChange(id)} style={{
             flex: 1, minWidth: 0, height: 34, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
             backgroundColor: on ? c.cell : 'transparent',
-            shadowColor: '#000', shadowOpacity: on ? 0.1 : 0, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: on ? 2 : 0,
+            boxShadow: on ? '0px 2px 8px rgba(0,0,0,0.1)' : undefined,
           }}>
             <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: on ? '600' : '500', color: c.ink }}>{name}</Text>
           </Pressable>
@@ -273,7 +286,7 @@ export function Card({ children, style }: { children: ReactNode; style?: ViewSty
   const c = useTheme()
   return (
     <View style={[{ backgroundColor: c.card, borderRadius: 22, padding: 16, gap: 10, minWidth: 0,
-      shadowColor: '#28201a', shadowOpacity: c.dark ? 0.4 : 0.06, shadowRadius: 20, shadowOffset: { width: 0, height: 6 }, elevation: 1 }, style]}>
+      boxShadow: c.shadow }, style]}>
       {children}
     </View>
   )

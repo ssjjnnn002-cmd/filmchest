@@ -1,7 +1,8 @@
 // 웹 common.tsx의 Sheet·Confirm·useToast, .menu 를 갤럭시로 옮긴 것
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { fieldFocusListeners } from './fieldFocus'
-import { ActivityIndicator, Animated, findNodeHandle, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native'
+import { ActivityIndicator, Animated, findNodeHandle, Keyboard, Modal, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native'
+import { Text } from './text'
 import { Glass } from './glass'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from './theme'
@@ -14,7 +15,7 @@ export function SheetBtn({ label, onPress, accent, disabled }: { label: string; 
     <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => ({
       height: 44, paddingHorizontal: 16, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
       backgroundColor: c.glass, borderWidth: 0.5, borderColor: c.glassLine,
-      shadowColor: '#28201a', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 4 }, elevation: 2,
+      boxShadow: c.shadowGlass,
       opacity: disabled ? 0.4 : 1, transform: [{ scale: pressed && !disabled ? 0.96 : 1 }],
     })}>
       <Text style={{ color: accent ? c.safelight : c.ink, fontSize: 17, fontWeight: accent ? '600' : '500' }}>{label}</Text>
@@ -211,7 +212,7 @@ export function Sheet({ title, onClose, left, right, children, page, scroll = tr
       <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: keyboard }}>
         <Pressable onPress={onClose} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)' }} />
         <View {...dismissOnTap} style={{ maxHeight: max, height: scroll ? undefined : max, backgroundColor: c.paper, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden',
-          shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 40, elevation: 12 }}>
+          boxShadow: '0px -8px 40px rgba(0,0,0,0.15)' }}>
           <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: c.faint, opacity: 0.6, alignSelf: 'center', marginTop: 6 }} />
           {head}
           {body}
@@ -244,7 +245,7 @@ export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onC
   )
   const inner = (
     <Pressable onPress={onCancel} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <Pressable style={{ width: '100%', maxWidth: 320, borderRadius: 28, overflow: 'hidden', elevation: 16 }}>
+      <Pressable style={{ width: '100%', maxWidth: 320, borderRadius: 28, overflow: 'hidden', boxShadow: '0px 20px 60px rgba(0,0,0,0.25)' }}>
         <Glass intensity={40} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass, paddingTop: 22, paddingHorizontal: 18, paddingBottom: 16 }}>
           <Text style={{ color: c.ink, fontSize: 17, fontWeight: '600', textAlign: 'center', lineHeight: 23, marginBottom: 16 }}>{message}</Text>
           {busy ? null : (
@@ -274,7 +275,7 @@ export function Menu({ items, onClose }: { items: { label: string; danger?: bool
   useEffect(() => { Animated.timing(scale, { toValue: 1, duration: 180, useNativeDriver: true }).start() }, [scale])
   const inner = (
     <Pressable onPress={onClose} style={{ flex: 1 }}>
-      <Animated.View style={{ position: 'absolute', right: 16, top: insets.top + 10 + 52, minWidth: 200, borderRadius: 18, overflow: 'hidden', elevation: 14, transform: [{ scale }] }}>
+      <Animated.View style={{ position: 'absolute', right: 16, top: insets.top + 10 + 52, minWidth: 200, borderRadius: 18, overflow: 'hidden', boxShadow: '0px 12px 40px rgba(0,0,0,0.2)', transform: [{ scale }] }}>
         <Glass intensity={40} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass }}>
           {items.map((it, i) => (
             <Pressable key={it.label} onPress={() => { onClose(); it.onPress() }}
@@ -313,7 +314,7 @@ export function useToast() {
   const node = msg ? (
     <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 96, alignItems: 'center',
       opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }] }}>
-      <View style={{ borderRadius: 999, overflow: 'hidden', borderWidth: 0.5, borderColor: c.glassLine, elevation: 6 }}>
+      <View style={{ borderRadius: 999, overflow: 'hidden', borderWidth: 0.5, borderColor: c.glassLine, boxShadow: c.shadowGlass }}>
         <Glass intensity={30} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass, paddingHorizontal: 20, paddingVertical: 12 }}>
           <Text style={{ color: c.ink, fontSize: 15, fontWeight: '600', textAlign: 'center' }}>{msg}</Text>
         </Glass>

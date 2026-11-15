@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Image, Pressable, Text, View } from 'react-native'
+import { Image, Pressable, View } from 'react-native'
+import { Text } from '../text'
 import { TextInput } from '../textInput'
 import { glassPresets, isLensFilter } from '../core/filterLook'
 import { FilterRing } from '../FilterRing'
@@ -360,7 +361,7 @@ export function FilterEdit({ filter, onClose, onSaved }: { filter?: GearFilter; 
       <Section title="액세서리">
         <Group>
           <Field label="유형"><Select value={kind} title="유형" options={[...kinds.map((k) => [k, k] as [string, string]), ['__add', '유형 추가…']]}
-            color={c.safelight} onChange={(v) => { if (v === '__add') setNewKind(''); else setKind(v) }} /></Field>
+            onChange={(v) => { if (v === '__add') setNewKind(''); else setKind(v) }} /></Field>
           {newKind !== null && (
             <Row>
               <TextInput value={newKind} onChangeText={setNewKind} autoFocus placeholder="새 유형 (예: 핫슈 수평계)" placeholderTextColor={c.faint}
@@ -547,9 +548,12 @@ function GlassPicker({ glass, setGlass }: { name: string; glass?: string; setGla
   }
   return (
     <Section title="필터 모양">
-      <Group style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 6 }}>
-        {glassPresets.filter((p) => p.kind !== 'star').map((p) => cell(p.kind, p.name, p.kind === 'clear' ? undefined : p.kind))}
-        {customGlasses.map(([hex, label]) => cell(hex, label, hex))}
+      {/* 웹처럼 한 줄에 4개: 여백은 바깥 묶음에, 칸 나누기는 안쪽 줄에 (여백까지 25%로 계산돼 3개씩 되던 것) */}
+      <Group style={{ padding: 6 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+          {glassPresets.filter((p) => p.kind !== 'star').map((p) => cell(p.kind, p.name, p.kind === 'clear' ? undefined : p.kind))}
+          {customGlasses.map(([hex, label]) => cell(hex, label, hex))}
+        </View>
       </Group>
     </Section>
   )

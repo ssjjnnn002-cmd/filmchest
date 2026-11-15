@@ -1,6 +1,7 @@
 // 웹 pages/Projects.tsx
 import { useState } from 'react'
-import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Pressable, ScrollView, View } from 'react-native'
+import { Text } from '../text'
 import Svg, { Path } from 'react-native-svg'
 import { db, kept } from '../data'
 import { useLiveQuery } from '../store'

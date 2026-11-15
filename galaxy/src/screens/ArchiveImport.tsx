@@ -1,6 +1,7 @@
 // 웹 pages/ArchiveImport.tsx — 예전에 찍어 스캔본을 받아 둔 롤을 롤 보관함에 넣는다. 모르는 정보는 '알 수 없음'.
 import { useEffect, useState } from 'react'
-import { FlatList, Image, Modal, Pressable, Text, useWindowDimensions, View } from 'react-native'
+import { FlatList, Image, Modal, Pressable, useWindowDimensions, View } from 'react-native'
+import { Text } from '../text'
 import { db } from '../data'
 import { useLiveQuery } from '../store'
 import { useNav } from '../App'

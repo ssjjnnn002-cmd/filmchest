@@ -22,6 +22,10 @@ export type Palette = {
   blue: string
   filmBase: string
   edgeInk: string
+  /** 웹 --shadow (카드·칩) */
+  shadow: string
+  /** 웹 --shadow-glass (떠 있는 유리 버튼·탭 막대·알림) */
+  shadowGlass: string
 }
 
 export function palette(dark: boolean): Palette {
@@ -46,6 +50,8 @@ export function palette(dark: boolean): Palette {
         blue: '#0A84FF',
         filmBase: '#0C0B0A',
         edgeInk: '#CFC4AD',
+        shadow: '0px 1px 2px rgba(0,0,0,0.4)',
+        shadowGlass: '0px 4px 18px rgba(0,0,0,0.45)',
       }
     : {
         dark: false,
@@ -67,6 +73,8 @@ export function palette(dark: boolean): Palette {
         blue: '#0A7AFF',
         filmBase: '#1C1A17',
         edgeInk: '#D9CFB8',
+        shadow: '0px 1px 1px rgba(40,30,20,0.03), 0px 6px 20px rgba(40,30,20,0.06)',
+        shadowGlass: '0px 4px 18px rgba(40,30,20,0.12)',
       }
 }
 

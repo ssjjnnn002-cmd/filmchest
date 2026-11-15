@@ -1,5 +1,6 @@
 import { useEffect, useReducer, useState } from 'react'
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from './text'
 import { db } from './data'
 import { useLiveQuery } from './store'
 import { backupNudge, onBackupChange, snoozeBackupNudge } from './core/backupNudge'
@@ -17,6 +18,8 @@ export function BackupNudge({ onBackup }: { onBackup: () => void }) {
   if (state === null) return null
   return (
     <Group style={{ marginBottom: 12 }}>
+      {/* Group은 자식 사이에 구분선을 그어서, 웹처럼 선 없이 한 덩어리로 묶는다 */}
+      <View>
       <View style={{ flexDirection: 'row', gap: 12, padding: 14, paddingBottom: 6 }}>
         <Icon name="download" size={20} color={c.safelight} />
         <View style={{ flex: 1 }}>
@@ -27,6 +30,7 @@ export function BackupNudge({ onBackup }: { onBackup: () => void }) {
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 4, padding: 8, paddingTop: 0 }}>
         <Btn label="나중에" kind="ghost" size="small" onPress={() => { snoozeBackupNudge(); setHidden(true) }} />
         <Btn label="백업하기" kind="ghost" size="small" onPress={onBackup} />
+      </View>
       </View>
     </Group>
   )

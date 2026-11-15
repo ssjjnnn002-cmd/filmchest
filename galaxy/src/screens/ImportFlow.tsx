@@ -1,6 +1,7 @@
 // 웹 pages/ImportFlow.tsx
 import { useEffect, useMemo, useState } from 'react'
-import { Image, ScrollView, Text, View } from 'react-native'
+import { Image, ScrollView, View } from 'react-native'
+import { Text } from '../text'
 import { db } from '../data'
 import { useLiveQuery } from '../store'
 import { useNav } from '../App'

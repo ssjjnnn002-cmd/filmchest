@@ -1,7 +1,8 @@
 // 웹 pages/Library.tsx
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { BackupNudge } from '../BackupNudge'
-import { Animated, Easing, LayoutAnimation, Pressable, Text, Vibration, View, type LayoutRectangle } from 'react-native'
+import { Animated, Easing, LayoutAnimation, Pressable, Vibration, View, type LayoutRectangle } from 'react-native'
+import { Text } from '../text'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { db, kept } from '../data'
 import { getPref, setPref, useLiveQuery } from '../store'
@@ -169,8 +170,8 @@ export function Library() {
           {gear !== 'film' ? (
             <Pressable accessibilityRole="button" accessibilityLabel="태그별로 묶기" accessibilityState={{ selected: grouped }}
               onPress={() => { setGrouped(!grouped); setPref('gearGrouped', grouped ? '' : '1') }}
-              style={{ height: 44, paddingHorizontal: 14, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: grouped ? c.safelight : c.fill }}>
-              <Text style={{ color: grouped ? '#fff' : c.safelight, fontWeight: '600', fontSize: 15 }}>태그별</Text>
+              style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: grouped ? c.safelight : c.card }}>
+              <Icon name="group" size={20} color={grouped ? '#fff' : c.safelight} />
             </Pressable>
           ) : null}
         </View>
@@ -225,7 +226,7 @@ export function Library() {
             {shown.map(item)}
             {drag && dragged ? (
               <View pointerEvents="none" style={{ position: 'absolute', left: drag.slot.x + drag.dx, top: drag.slot.y + drag.dy, width: drag.slot.width, height: drag.slot.height,
-                transform: [{ scale: grid ? 1.05 : 1.03 }, { rotate: grid ? '-1deg' : '0deg' }], zIndex: 10, elevation: 16,
+                transform: [{ scale: grid ? 1.05 : 1.03 }, { rotate: grid ? '-1deg' : '0deg' }], zIndex: 10, boxShadow: '0px 22px 50px rgba(0,0,0,0.22)',
                 shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 25, shadowOffset: { width: 0, height: 22 },
                 backgroundColor: grid ? undefined : c.cell, borderRadius: grid ? 22 : 14 }}>
                 {grid ? <CameraCard camera={dragged} roll={loadedFor(dragged)} editing /> : <CameraRow camera={dragged} roll={loadedFor(dragged)} editing />}
@@ -297,7 +298,7 @@ function CameraCard({ camera, roll, editing }: { camera: Camera; roll?: Roll; ed
   const open = () => nav.push({ type: 'camera', id: camera.id })
   return (
     <View style={{ backgroundColor: c.card, borderRadius: 22, padding: 16, gap: 10, minWidth: 0, overflow: 'hidden',
-      shadowColor: '#28201a', shadowOpacity: c.dark ? 0.4 : 0.06, shadowRadius: 20, shadowOffset: { width: 0, height: 6 }, elevation: 1 }}>
+      boxShadow: c.shadow }}>
       <Pressable disabled={editing} onPress={open} style={bleed
         ? { height: 136, marginHorizontal: -16, marginTop: -16, overflow: 'hidden' }
         : { height: 120, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>

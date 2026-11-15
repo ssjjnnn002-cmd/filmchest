@@ -1,6 +1,7 @@
 // 웹 pages/Shooting.tsx
 import { useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from '../text'
 import { db, kept } from '../data'
 import { useLiveQuery } from '../store'
 import { useNav } from '../App'
@@ -43,7 +44,7 @@ function LoadedCard({ roll }: { roll: Roll }) {
   const places = sortedLocations(roll).map((l) => l.name).filter(Boolean).join(' → ')
   return (
     <View style={{ backgroundColor: c.card, borderRadius: 22, overflow: 'hidden',
-      shadowColor: '#28201a', shadowOpacity: c.dark ? 0.4 : 0.06, shadowRadius: 20, shadowOffset: { width: 0, height: 6 }, elevation: 1 }}>
+      boxShadow: c.shadow }}>
       <Pressable onPress={() => nav.push({ type: 'roll', id: roll.id })} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, opacity: pressed ? 0.85 : 1 })}>
         <View style={{ width: 96 }}>
           {camera ? <CameraCover camera={camera} height={72} /> : <View style={{ height: 72 }} />}

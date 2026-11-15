@@ -1,6 +1,7 @@
 // 웹 PageHeader + .page: 위에 동그란 유리 버튼, 아래 큰 제목. 스크롤하면 가운데 작은 제목.
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Animated, Pressable, Text, View, type ScrollView } from 'react-native'
+import { Animated, Pressable, View, type ScrollView } from 'react-native'
+import { Text } from './text'
 import { dismissOnTap, useScrollFocusedField } from './overlay'
 import { Glass } from './glass'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -27,7 +28,7 @@ export function GlassBtn({ icon, label, onPress, prominent, back, disabled }: {
       paddingHorizontal: icon && !label ? 0 : 14, borderRadius: 22, flexDirection: 'row', gap: 4,
       alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
       backgroundColor: prominent ? c.safelight : c.glass, borderWidth: prominent ? 0 : 0.5, borderColor: c.glassLine,
-      shadowColor: '#28201a', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 4 }, elevation: 3,
+      boxShadow: prominent ? undefined : c.shadowGlass,
       opacity: disabled ? 0.4 : 1, transform: [{ scale: pressed && !disabled ? 0.94 : 1 }],
     })}>
       {icon ? <Icon name={icon} size={22} color={color} /> : null}
@@ -41,7 +42,7 @@ export function GlassGroup({ items }: { items: { icon: string; label: string; on
   const c = useTheme()
   return (
     <View style={{ height: 44, borderRadius: 22, paddingHorizontal: 4, flexDirection: 'row', backgroundColor: c.glass,
-      borderWidth: 0.5, borderColor: c.glassLine, shadowColor: '#28201a', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 4 }, elevation: 3 }}>
+      borderWidth: 0.5, borderColor: c.glassLine, boxShadow: c.shadowGlass }}>
       {items.map((it) => (
         <Pressable key={it.label} accessibilityLabel={it.label} onPress={it.onPress}
           style={({ pressed }) => ({ width: 48, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1, transform: [{ scale: pressed ? 0.88 : 1 }] })}>

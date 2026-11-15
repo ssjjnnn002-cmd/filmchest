@@ -1,6 +1,7 @@
 // 웹 pages/Editors.tsx
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Keyboard, Modal, Pressable, ScrollView, Text, View } from 'react-native'
+import { ActivityIndicator, Keyboard, Modal, Pressable, ScrollView, View } from 'react-native'
+import { Text } from '../text'
 import { TextInput } from '../textInput'
 import { WebView } from 'react-native-webview'
 import * as Location from 'expo-location'

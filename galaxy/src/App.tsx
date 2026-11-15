@@ -4,7 +4,8 @@ import { Welcome } from './Welcome'
 import { getPref } from './store'
 import { driveConnected } from './drive'
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Animated, BackHandler, Easing, Pressable, Text, View } from 'react-native'
+import { Animated, BackHandler, Easing, Pressable, View } from 'react-native'
+import { Text } from './text'
 import { Glass } from './glass'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { db, kept, purgeOldCameras, purgeOldRolls, removeDoubleLoads } from './data'
@@ -373,7 +374,7 @@ function TabBar({ tab, badge, onTab }: { tab: Tab; badge: Record<Tab, number>; o
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: insets.bottom + 14, paddingHorizontal: 20, alignItems: 'center' }}>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{
         width: '100%', maxWidth: 420, height: 64, borderRadius: 32, overflow: 'hidden',
-        borderWidth: 0.5, borderColor: c.glassLine, elevation: 8,
+        borderWidth: 0.5, borderColor: c.glassLine, boxShadow: c.shadowGlass,
       }}>
         <Glass intensity={c.dark ? 48 : 36} tint={c.dark ? 'dark' : 'light'} style={{ flex: 1, backgroundColor: c.glass }}>
           {pill > 0 ? (

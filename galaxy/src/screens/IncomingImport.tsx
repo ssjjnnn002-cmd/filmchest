@@ -1,6 +1,7 @@
 // 웹 pages/IncomingImport.tsx — 파일 앱 '다음으로 열기'·zip 열기로 받은 파일: 어디로 넣을지 고른 뒤 이어서 진행한다.
 import { useEffect, useState } from 'react'
-import { Image, ScrollView, Text, View } from 'react-native'
+import { Image, ScrollView, View } from 'react-native'
+import { Text } from '../text'
 import { db, kept } from '../data'
 import { useLiveQuery } from '../store'
 import { useNav } from '../App'

@@ -1,6 +1,7 @@
 // 웹 pages/Spending.tsx — 장비에 쓴 돈
 import { useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from '../text'
 import { db, kept } from '../data'
 import { useLiveQuery } from '../store'
 import type { Camera, Lens } from '../core/types'

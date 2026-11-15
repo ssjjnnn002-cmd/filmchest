@@ -1,6 +1,7 @@
 // 웹 pages/RollViewers.tsx + ui/Viewers.tsx ZoomView
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Animated, Image, Modal, Pressable, ScrollView, Text, View } from 'react-native'
+import { ActivityIndicator, Animated, Image, Modal, Pressable, ScrollView, View } from 'react-native'
+import { Text } from '../text'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'

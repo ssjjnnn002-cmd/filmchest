@@ -1,6 +1,7 @@
 // 웹 pages/CloudBackup.tsx 자리. 안드로이드는 클라우드 앱에 올린 백업 파일을 골라 연결한다.
 import { useState } from 'react'
-import { Text, View } from 'react-native'
+import { View } from 'react-native'
+import { Text } from '../text'
 import {
   backupFileName, importAll, cloudDays, cloudLast, cloudName, cloudUri, disconnectCloud, linkCloudFile, localBackupAt, openAppSettings, shareForCloud, verifyCloud, writeCloud,
 } from '../backup'

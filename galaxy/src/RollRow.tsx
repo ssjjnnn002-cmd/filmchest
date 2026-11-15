@@ -1,5 +1,6 @@
 // 웹 ui/RollRow.tsx
-import { Image, Pressable, Text, View } from 'react-native'
+import { Image, Pressable, View } from 'react-native'
+import { Text } from './text'
 import { db } from './data'
 import { useLiveQuery } from './store'
 import type { Roll } from './core/types'
@@ -44,7 +45,7 @@ export function RollCard({ roll, onPress }: { roll: Roll; onPress: () => void })
   const format = rollCameraFormat(camera, roll)
   return (
     <Pressable onPress={onPress} style={({ pressed }) => ({ flex: 1, minWidth: 0, backgroundColor: c.cell, borderRadius: 18, padding: 10, gap: 8,
-      shadowColor: '#28201a', shadowOpacity: 0.06, shadowRadius: 20, shadowOffset: { width: 0, height: 6 }, elevation: 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}>
+      boxShadow: c.shadow, transform: [{ scale: pressed ? 0.98 : 1 }] })}>
       <View style={{ height: 110, borderRadius: 12, backgroundColor: c.filmBase, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
         {first?.thumb ? <Image source={{ uri: first.thumb }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : <Canister film={rollFilm(roll)} format={format} size={84} />}
         {roll.favorite ? <Text style={{ position: 'absolute', top: 5, right: 6, color: '#F5B700', fontSize: 13 }}>★</Text> : null}

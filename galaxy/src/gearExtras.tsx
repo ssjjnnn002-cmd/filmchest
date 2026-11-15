@@ -1,6 +1,7 @@
 // 웹 ui/gearExtras.tsx와 같은 구성: 태그, 태그 거르기, 악세서리, 비워 둘 수 있는 날짜
 import { useMemo, useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
+import { Text } from './text'
 import { TextInput } from './textInput'
 import { DateTimePickerAndroid as Picker } from '@react-native-community/datetimepicker'
 import { db } from './data'

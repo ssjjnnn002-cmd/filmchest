@@ -1,6 +1,7 @@
 // 웹 ImportFlow ScanStrip: 가져올 사진 전체를 번호와 함께 훑어본다. 누르면 크게.
 import { useMemo, useState } from 'react'
-import { FlatList, Image, Modal, Pressable, Text, View } from 'react-native'
+import { FlatList, Image, Modal, Pressable, View } from 'react-native'
+import { Text } from '../text'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { bytesToB64 } from '../files'
 import { Btn } from '../kit'

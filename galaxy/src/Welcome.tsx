@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Image, Text, View } from 'react-native'
+import { Image, View } from 'react-native'
+import { Text } from './text'
 import { signInWithGoogle } from './drive'
 import { importBackupFile } from './backup'
 import { pickFiles } from './pick'
