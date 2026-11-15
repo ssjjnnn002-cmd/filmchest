@@ -13,6 +13,7 @@ struct LoadFilmView: View {
     @Query(sort: \LensItem.createdAt) private var lenses: [LensItem]
     @Query(sort: \RollItem.loadedAt, order: .reverse) private var rolls: [RollItem]
     @Query private var lots: [FilmLotItem]
+    @State private var loading = false
     @State private var confirmExpired = false
 
     @State private var cameraID: UUID?
@@ -225,7 +226,7 @@ struct LoadFilmView: View {
                         } else {
                             Task { await load() }
                         }
-                    }.disabled(camera == nil || film == nil || !lensReady)
+                    }.disabled(camera == nil || film == nil || !lensReady || loading)
                 }
             }
             .task { await Subscriptions.shared.refreshEntitlement() }
@@ -276,7 +277,10 @@ struct LoadFilmView: View {
     }
 
     private func load() async {
-        guard let camera, let film else { return }
+        // '장착'을 빠르게 여러 번 눌러도 롤은 하나만 (구독 확인을 기다리는 동안 다시 눌리는 것 막기)
+        guard !loading, let camera, let film else { return }
+        loading = true
+        defer { loading = false }
         await Subscriptions.shared.refreshEntitlement()
         guard Subscriptions.shared.allowNewRoll(in: context) else { return }
         if let old = camera.loadedRoll {

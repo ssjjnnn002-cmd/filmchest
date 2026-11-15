@@ -99,6 +99,10 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const load = async () => {
     if (!camera || !film || loading.current) return
     loading.current = true
+    try { await doLoad() } catch (e) { loading.current = false; throw e } // 실패하면 다시 누를 수 있게
+  }
+  const doLoad = async () => {
+    if (!camera || !film) return
     let lens = mountLenses.find((l) => l.id === lensId)
     if (!lens && newLens.trim() && camera.mount) {
       lens = { id: uid(), brand: camera.brand, model: newLens.trim(), mount: camera.mount, createdAt: Date.now() }
