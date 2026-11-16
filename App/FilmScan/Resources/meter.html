@@ -310,6 +310,7 @@
   .meteronly .head { margin-bottom: auto; }
   .meteronly .rings { margin-bottom: auto; }
   .meteronly #filmLine { display: none; }
+  .meteronly .finder .zoomdial { display: none !important; } /* 줌 링이 있어서 파인더 오른쪽 다이얼은 뺌 */
 
   /* ── 2차: 헤더 화각 버튼, 측광 버튼, 끝내기 버튼 없앰, 카운터 아래 글씨 없앰 ── */
   .head .lensbtn { flex: none; display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--text);
@@ -1271,7 +1272,8 @@ function applyZoom(z) {
   }
   if (f.cut) wantUltra()
   else if (usingUltra && mainCanShow()) wantMain()
-  $('focalText').textContent = `${mm}mm`
+  // 줌렌즈는 렌즈 범위(24–105mm), 지금 화각은 줌 링·다이얼에
+  $('focalText').textContent = isZoomLens() ? `${lens.min}–${lens.max}mm` : `${mm}mm`
   $('scene').style.transform = `scale(${cssZoom().toFixed(4)})`
   if (zoom.hw) { clearTimeout(hwTimer); hwTimer = setTimeout(syncHwZoom, 220) }
   if (zoom.native && !zoomTimer) zoomTimer = setTimeout(() => { zoomTimer = 0; post({ type: 'zoom', z: vis() }) }, 33)
