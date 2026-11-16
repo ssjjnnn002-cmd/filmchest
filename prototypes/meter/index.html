@@ -274,7 +274,7 @@
   /* 노출 미리보기: 고른 조리개·셔터로 찍히면 이 밝기 */
   .finder .scene { transition: filter .12s linear; }
   /* LED 띠 */
-  .lcd { position: absolute; z-index: 5; left: 13%; right: 13%; bottom: var(--lcd-bottom, 4.5%); height: 9%; display: grid; grid-template-columns: 4.6ch auto 1fr 4ch 7.2ch; align-items: center; column-gap: 8px; pointer-events: none;
+  .lcd { position: absolute; z-index: 5; left: 13%; right: 13%; bottom: var(--lcd-bottom, 3.6%); height: 8%; display: grid; grid-template-columns: 4.6ch auto 1fr 4ch 7.2ch; align-items: center; column-gap: 8px; pointer-events: none;
     font: 700 var(--lcd-font, clamp(12px, 3.8cqw, 16px))/1 ui-monospace, "SF Mono", Menlo, monospace; color: #9dffa8; text-shadow: 0 0 4px rgb(90 255 120 / .9), 0 0 10px rgb(90 255 120 / .5); letter-spacing: .02em; }
   .lcd .dimmed { opacity: .22; text-shadow: none; }
   .lcd .scale { display: flex; align-items: center; gap: 2px; font-size: .8em; }
@@ -320,6 +320,7 @@
   .head .lensbtn.iso { gap: 4px; font-weight: 600; color: var(--sub); }
   .head .lensbtn.iso b { color: var(--text); font-variant-numeric: tabular-nums; }
   .head .lensbtn[hidden] { display: none; }
+  .ringrow[hidden] { display: none; }
   .head .lensbtn.filt svg { width: 17px; height: 17px; opacity: 1; }
   .head .lensbtn.filt:not(.on) span { display: none; }
   .head .lensbtn.filt.on { background: #9ec9ff; border-color: #9ec9ff; color: #111; }
@@ -343,7 +344,7 @@
   .lcd .lock { color: #ffc24a; text-shadow: 0 0 6px rgb(255 190 60 / .6); }
   .modal .textbtn { display: block; width: 100%; margin-top: 10px; border: 0; background: none; color: var(--sub); font-size: 14px; font-weight: 600; padding: 6px 0; }
   /* 사진 칸: 렌즈 화각에 맞춰 넓어지거나 좁아진다 (레인지파인더의 프레임처럼) */
-  :root { --fw: 84%; --fh: 70%; }
+  :root { --fw: 90%; --fh: 75%; }
   .finder .mask { -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0) center / var(--fw) var(--fh) no-repeat; -webkit-mask-composite: xor;
     mask: linear-gradient(#000 0 0) exclude, linear-gradient(#000 0 0) center / var(--fw) var(--fh) no-repeat; }
   .finder .bright { width: var(--fw); height: var(--fh); }
@@ -432,6 +433,7 @@
   <div class="rings">
     <div class="ringrow" id="rowA"><button class="mbtn" id="btnA"><span>조리개</span><small id="tagA"></small></button><div class="ring" id="ringA"></div></div>
     <div class="ringrow" id="rowS"><button class="mbtn" id="btnS"><span>셔터</span><small id="tagS"></small></button><div class="ring" id="ringS"></div></div>
+    <div class="ringrow" id="rowZ" hidden><button class="mbtn" id="btnZ"><span>줌</span><small id="tagZ"></small></button><div class="ring" id="ringZ"></div></div>
   </div>
 
   <div class="controls">
@@ -735,12 +737,11 @@ function queueSwitch(ultra) {
   }, 400)
 }
 // 렌즈 화각을 보여 주는 폰 배율(s)과 사진 칸 폭(w). 폰이 그만큼 넓게(좁게) 못 보면 칸을 넓혀(좁혀) 맞춘다 (레인지파인더 프레임처럼)
+// 사진 칸은 늘 같은 크기 (확대·축소할 때 칸이 커졌다 작아졌다 하면 이상해서). 폰이 그만큼 넓게 못 보면 초광각으로
 function fit() {
   if (zoom.native) return { s: clamp(zoom.z, zoom.min, zoom.max), w: FW_BASE, cut: false }
   const need = zoom.z * PHONE_MM / frameMM1()
-  if (need < zoom.min) { const w = FW_BASE * zoom.min / need; return { s: zoom.min, w: Math.min(FW_MAX, w), cut: w > FW_MAX + .005 } }
-  if (need > zoom.max) return { s: zoom.max, w: Math.max(.3, FW_BASE * zoom.max / need), cut: false }
-  return { s: need, w: FW_BASE, cut: false }
+  return { s: clamp(need, zoom.min, zoom.max), w: FW_BASE, cut: need < zoom.min - .01 }
 }
 const vis = () => fit().s
 
@@ -916,7 +917,7 @@ const source = () => live() ? [video, video.videoWidth, video.videoHeight] : [si
 // 화면 확대는 늘 CSS로 부드럽게 하고, 폰 카메라 배율은 멈춘 뒤에 따라와서(hwRel) 그만큼 CSS 확대를 줄인다
 const cssZoom = () => zoom.native ? 1 : vis() / (zoom.hw ? zoom.hwRel : 1)
 // 파인더는 5:4, 그 안에서 사진에 담기는 칸(밝은 테두리)은 가운데 3:2 = 폭 84%
-const FA = 5 / 4, FW_BASE = .84, FW_MAX = .9
+const FA = 5 / 4, FW_BASE = .9, FW_MAX = .9
 let FW = FW_BASE // 지금 사진 칸 폭 (화각에 따라 바뀜)
 const fhOf = (w) => w * FA / 1.5
 function drawCrop(ctx, frac, dw, dh) {
@@ -1873,6 +1874,7 @@ function applyLens() {
   setZoom(zoom.z, true)
   drawZoomDial()
   renderCells()
+  if (window.zoomRingReady) syncZoomRing()
 }
 let lensDraft = null
 const nextMM = (v, k = 1) => LENS_MM.find((m) => m >= v * k + .5) || LENS_MM[LENS_MM.length - 1]
@@ -2011,6 +2013,23 @@ $('isoText').textContent = cam.iso
 function renderIso() { chipRow($('isoChips'), [25, 50, 64, 100, 125, 160, 200, 400, 800, 1600, 3200, 6400], cam.iso, (v) => String(v), (v) => { cam.iso = v; store.set('meterOnlyIso', String(v)); $('isoText').textContent = v; ringC.onChange(); renderIso() }) }
 $('isoBtn').addEventListener('click', () => { renderIso(); showSheet('isoSheet'); detent() })
 $('isoDone').addEventListener('click', closeSheets)
+// 노출계만: 줌렌즈면 화각 링 (파인더 오른쪽 다이얼과 같이 움직임)
+const ringZ = new Ring($('ringZ'), (v) => `${v}`, .42)
+let zTouched = 0, zVals = []
+window.zoomRingReady = true
+$('ringZ').addEventListener('pointerdown', () => { zTouched = performance.now() + 60000 })
+addEventListener('pointerup', () => { if (zTouched > performance.now()) zTouched = performance.now() + 1200 })
+ringZ.onChange = () => { if (performance.now() < zTouched && zVals.length) setZoom(ringZ.value / PHONE_MM) }
+function syncZoomRing() {
+  const show = METER_ONLY && isZoomLens()
+  $('rowZ').hidden = !show
+  if (!show) return
+  zVals = [...new Set([lens.min, ...LENS_MM.filter((m) => m > lens.min && m < lens.max), lens.max])].sort((a, b) => a - b)
+  ringZ.setValues(zVals, nearest(zVals, PHONE_MM * zoom.z))
+  $('tagZ').textContent = 'mm'
+}
+syncZoomRing()
+setInterval(() => { if (!$('rowZ').hidden && performance.now() > zTouched) ringZ.set(nearest(zVals, PHONE_MM * zoom.z)) }, 150)
 requestAnimationFrame(loop)
 </script>
 </body>
