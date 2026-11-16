@@ -141,8 +141,8 @@
   .controls { position: relative; z-index: 20; margin-top: var(--ctl-gap, 10px); }
   .controls svg { pointer-events: none; }
   #shutterBtn, #flashMark { pointer-events: auto; }
-  .stripwrap { z-index: 1; margin-top: var(--strip-gap, 0px) !important; }
-  .controls svg { display: block; width: min(100%, 318px); height: auto; margin: 0 auto; overflow: visible; }
+  .stripwrap { z-index: 1; margin-top: var(--strip-gap, 8px) !important; }
+  .controls svg { display: block; width: min(100%, 318px); height: auto; margin: 0 auto calc(min(100%, 318px) * -58 / 360); overflow: visible; }
   #shutterBtn { cursor: pointer; }
   #shutterBtn .disc { transition: transform .09s ease-out, filter .09s; transform-box: fill-box; transform-origin: center; }
   #shutterBtn.down .disc { transform: scale(.88); filter: brightness(.8); }
@@ -191,7 +191,7 @@
     .ring.short { height: 38px; }
     .rings { gap: 4px; }
     .info .state { font-size: 17px; }
-    .controls svg { width: min(100%, 256px); }
+    .controls svg { width: min(100%, 256px); margin-bottom: calc(min(100%, 256px) * -58 / 360); }
     .endbtn { padding: 11px 0 !important; }
   }
   .endbtn { border: 0; border-radius: 14px; padding: 15px 0; font-size: 16px; font-weight: 700; background: var(--panel); color: var(--text); margin-top: 4px; }
@@ -274,7 +274,7 @@
   /* 노출 미리보기: 고른 조리개·셔터로 찍히면 이 밝기 */
   .finder .scene { transition: filter .12s linear; }
   /* LED 띠 */
-  .lcd { position: absolute; z-index: 5; left: 13%; right: 13%; bottom: var(--lcd-bottom, 4.5%); height: 9%; display: flex; align-items: center; justify-content: space-between; gap: 6px; pointer-events: none;
+  .lcd { position: absolute; z-index: 5; left: 13%; right: 13%; bottom: var(--lcd-bottom, 4.5%); height: 9%; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; column-gap: 10px; pointer-events: none;
     font: 700 var(--lcd-font, clamp(12px, 3.8cqw, 16px))/1 ui-monospace, "SF Mono", Menlo, monospace; color: #9dffa8; text-shadow: 0 0 4px rgb(90 255 120 / .9), 0 0 10px rgb(90 255 120 / .5); letter-spacing: .02em; }
   .lcd .dimmed { opacity: .22; text-shadow: none; }
   .lcd .scale { display: flex; align-items: center; gap: 2px; font-size: .8em; }
@@ -282,7 +282,7 @@
   .lcd .scale i.c { height: 1.2em; opacity: .45; }
   .lcd .scale i.on { opacity: 1; box-shadow: 0 0 5px rgb(90 255 120 / .7); }
   .lcd .warn { color: #ff5a4a; text-shadow: 0 0 6px rgb(255 80 60 / .6); }
-  .finder .led { left: auto; right: 11%; bottom: auto; top: 5.4%; }
+  .finder .led { display: none !important; }
   /* 화각: 누르면 렌즈 설정 */
   .finder .focal { right: 12%; left: auto; top: 3.4%; z-index: 4; border: 0; display: flex; align-items: center; gap: 3px; background: rgb(0 0 0 / .35);
     padding: 3px 7px; border-radius: 99px; pointer-events: auto; margin-right: 14px; }
@@ -313,6 +313,10 @@
     font-size: 14px; font-weight: 700; padding: 8px 12px; border-radius: 99px; font-variant-numeric: tabular-nums; }
   .head .lensbtn svg { width: 9px; height: 9px; opacity: .6; }
   .head .lensbtn.fixed svg { display: none; }
+  .head .lensbtn.filt { padding: 7px 10px; gap: 4px; }
+  .head .lensbtn.filt svg { width: 17px; height: 17px; opacity: 1; }
+  .head .lensbtn.filt:not(.on) span { display: none; }
+  .head .lensbtn.filt.on { background: #9ec9ff; border-color: #9ec9ff; color: #111; }
   .head .lensbtn.fixed { pointer-events: none; }
   .lenslist { display: grid; gap: 6px; margin-top: 12px; }
   .lensitem { display: flex; align-items: center; gap: 10px; width: 100%; border: 1.5px solid transparent; background: #2a2a2e; border-radius: 12px; padding: 12px 14px; text-align: left; }
@@ -329,6 +333,8 @@
   .flash.mtr small { font-size: 9px; font-weight: 700; color: var(--sub); }
   .flash.mtr span { font-size: 13px; font-weight: 700; }
   .lcd > span { white-space: nowrap; flex: none; }
+  #lcdS { justify-self: start; }
+  .lcd .lcdR { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
   .lcd .lock { color: #ffc24a; text-shadow: 0 0 6px rgb(255 190 60 / .6); }
   .modal .textbtn { display: block; width: 100%; margin-top: 10px; border: 0; background: none; color: var(--sub); font-size: 14px; font-weight: 600; padding: 6px 0; }
   /* 사진 칸: 렌즈 화각에 맞춰 넓어지거나 좁아진다 (레인지파인더의 프레임처럼) */
@@ -364,13 +370,14 @@
       <h1 id="camTitle">테스트용 카메라</h1>
       <div class="film" id="filmLine"></div>
     </div>
+    <button class="lensbtn filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button>
     <button class="lensbtn" id="focal" aria-label="렌즈"><span id="focalText">28mm</span><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 6.5 5 3 8.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </div>
 
   <div class="finderbox">
     <!-- 파인더 + LED: LED는 파인더 아래 검은 띠 자리에 겹쳐 두지만, 파인더의 흐린 테두리 처리는 받지 않게 바깥에 둔다 -->
     <div class="findwrap">
-    <div class="lcd" id="lcd"><span id="lcdS">125</span><span class="scale" id="lcdScale"></span><span id="lcdA">8</span><span id="lcdL">EV 12.0</span></div>
+    <div class="lcd" id="lcd"><span id="lcdS">125</span><span class="scale" id="lcdScale"></span><span class="lcdR"><span id="lcdA">8</span><span id="lcdL">EV 12.0</span></span></div>
     <div class="finder spot" id="finder">
       <div class="scene" id="scene">
         <video id="video" playsinline muted autoplay></video>
@@ -414,7 +421,7 @@
       <div class="state ok" id="state">적정</div>
       <div class="ev" id="ev">EV —</div>
     </div>
-    <div class="infobtns"><button class="flash filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button><button class="flash mtr" id="meterMode" aria-label="측광 방식"><span id="meterText">스팟</span></button><button class="hold" id="hold" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>고정</span></button></div>
+    <div class="infobtns"><button class="flash mtr" id="meterMode" aria-label="측광 방식"><span id="meterText">스팟</span></button><button class="hold" id="hold" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>고정</span></button></div>
   </div>
 
   <div class="rings">
@@ -1981,6 +1988,7 @@ if (HOSTED) {
   else if (qs.has('go')) beginRoll(qs.has('pw')); else startRoll()
 }
 // 시험용: ?lever=-60 이면 레버를 그 각도에 멈춰 둔다 (감는 중 모습 확인)
+if (new URLSearchParams(location.search).has('leverloop')) setInterval(() => $('lever').classList.toggle('out'), 700)
 { const a = new URLSearchParams(location.search).get('lever'); if (a) { $('lever').style.transition = 'none'; $('lever').style.transform = `rotate(${+a}deg)` } }
 requestAnimationFrame(loop)
 </script>
