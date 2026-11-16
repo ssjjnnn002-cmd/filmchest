@@ -274,7 +274,7 @@
   /* 노출 미리보기: 고른 조리개·셔터로 찍히면 이 밝기 */
   .finder .scene { transition: filter .12s linear; }
   /* LED 띠 */
-  .lcd { position: absolute; z-index: 5; left: 13%; right: 13%; bottom: var(--lcd-bottom, 4.5%); height: 9%; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; column-gap: 10px; pointer-events: none;
+  .lcd { position: absolute; z-index: 5; left: 13%; right: 13%; bottom: var(--lcd-bottom, 4.5%); height: 9%; display: grid; grid-template-columns: 4.6ch auto 1fr 4ch 7.2ch; align-items: center; column-gap: 8px; pointer-events: none;
     font: 700 var(--lcd-font, clamp(12px, 3.8cqw, 16px))/1 ui-monospace, "SF Mono", Menlo, monospace; color: #9dffa8; text-shadow: 0 0 4px rgb(90 255 120 / .9), 0 0 10px rgb(90 255 120 / .5); letter-spacing: .02em; }
   .lcd .dimmed { opacity: .22; text-shadow: none; }
   .lcd .scale { display: flex; align-items: center; gap: 2px; font-size: .8em; }
@@ -306,7 +306,10 @@
   .toast { bottom: calc(env(safe-area-inset-bottom) + 92px); }
   /* 노출계만: 필름·셔터·기록 없이 */
   .meteronly .controls, .meteronly .stripwrap, .meteronly .endbtn, .meteronly #flashBtn { display: none !important; }
-  .meteronly .finderbox { flex-grow: 1; }
+  .meteronly .finderbox { flex: none; height: calc(min(100vw, 440px) * .8); }
+  .meteronly .head { margin-bottom: auto; }
+  .meteronly .rings { margin-bottom: auto; }
+  .meteronly #filmLine { display: none; }
 
   /* ── 2차: 헤더 화각 버튼, 측광 버튼, 끝내기 버튼 없앰, 카운터 아래 글씨 없앰 ── */
   .head .lensbtn { flex: none; display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--text);
@@ -314,6 +317,9 @@
   .head .lensbtn svg { width: 9px; height: 9px; opacity: .6; }
   .head .lensbtn.fixed svg { display: none; }
   .head .lensbtn.filt { padding: 7px 10px; gap: 4px; }
+  .head .lensbtn.iso { gap: 4px; font-weight: 600; color: var(--sub); }
+  .head .lensbtn.iso b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .head .lensbtn[hidden] { display: none; }
   .head .lensbtn.filt svg { width: 17px; height: 17px; opacity: 1; }
   .head .lensbtn.filt:not(.on) span { display: none; }
   .head .lensbtn.filt.on { background: #9ec9ff; border-color: #9ec9ff; color: #111; }
@@ -333,8 +339,7 @@
   .flash.mtr small { font-size: 9px; font-weight: 700; color: var(--sub); }
   .flash.mtr span { font-size: 13px; font-weight: 700; }
   .lcd > span { white-space: nowrap; flex: none; }
-  #lcdS { justify-self: start; }
-  .lcd .lcdR { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
+  #lcdS { justify-self: start; } #lcdA { justify-self: start; } #lcdL { justify-self: end; }
   .lcd .lock { color: #ffc24a; text-shadow: 0 0 6px rgb(255 190 60 / .6); }
   .modal .textbtn { display: block; width: 100%; margin-top: 10px; border: 0; background: none; color: var(--sub); font-size: 14px; font-weight: 600; padding: 6px 0; }
   /* 사진 칸: 렌즈 화각에 맞춰 넓어지거나 좁아진다 (레인지파인더의 프레임처럼) */
@@ -344,7 +349,7 @@
   .finder .bright { width: var(--fw); height: var(--fh); }
   /* 비네팅·노란 테두리 없이: 사진 칸 밖만 어둡게, 경계는 살짝 흐리게 */
   .finder .vignette, .finder .mask { display: none !important; }
-  .finder .bright { border: 0 !important; border-radius: 2px; box-shadow: 0 0 9px 600px rgb(4 4 5 / .86) !important; }
+  .finder .bright { border: 0 !important; border-radius: 2px; box-shadow: 0 0 9px 600px #000 !important; }
   .finder .bright::before { display: none; }
 
   /* 링: 라이카·후지 수동 렌즈처럼 — 금속 널링 띠 + 검은 경통에 새긴 숫자 + 주황 기준선 */
@@ -370,14 +375,14 @@
       <h1 id="camTitle">테스트용 카메라</h1>
       <div class="film" id="filmLine"></div>
     </div>
-    <button class="lensbtn filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button>
+    <button class="lensbtn iso" id="isoBtn" aria-label="감도">ISO <b id="isoText">400</b></button><button class="lensbtn filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button>
     <button class="lensbtn" id="focal" aria-label="렌즈"><span id="focalText">28mm</span><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1.5 6.5 5 3 8.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </div>
 
   <div class="finderbox">
     <!-- 파인더 + LED: LED는 파인더 아래 검은 띠 자리에 겹쳐 두지만, 파인더의 흐린 테두리 처리는 받지 않게 바깥에 둔다 -->
     <div class="findwrap">
-    <div class="lcd" id="lcd"><span id="lcdS">125</span><span class="scale" id="lcdScale"></span><span class="lcdR"><span id="lcdA">8</span><span id="lcdL">EV 12.0</span></span></div>
+    <div class="lcd" id="lcd"><span id="lcdS">125</span><span class="scale" id="lcdScale"></span><span></span><span id="lcdA">8</span><span id="lcdL">EV 12.0</span></div>
     <div class="finder spot" id="finder">
       <div class="scene" id="scene">
         <video id="video" playsinline muted autoplay></video>
@@ -548,6 +553,14 @@
   <div class="actions one"><button id="gearClose">닫기</button></div>
 </div>
 
+<div class="sheet" id="isoSheet">
+  <div class="grab"></div>
+  <h2>감도</h2>
+  <div class="meta">쓰는 필름의 ISO를 골라요</div>
+  <div class="chips wrap" id="isoChips"></div>
+  <div class="actions one"><button class="save" id="isoDone">완료</button></div>
+</div>
+
 <div class="sheet over" id="lensSheet">
   <div class="grab"></div>
   <h2>렌즈</h2>
@@ -628,14 +641,16 @@ if (NATIVE_CAM) document.documentElement.classList.add('native')
 const METER_ONLY = INIT?.only === 'meter' || new URLSearchParams(location.search).has('only')
 if (METER_ONLY) document.documentElement.classList.add('meteronly')
 const CAM_ID = INIT?.camera?.id || 'test-camera'
+// 노출계만 쓸 땐 카메라·필름을 고르지 않은 상태로 (감도는 화면에서 고른다)
+const CAMI = METER_ONLY ? null : INIT?.camera, FILMI = METER_ONLY ? null : INIT?.film
 const cam = {
-  modes: INIT?.camera?.modes?.length ? INIT.camera.modes : ['P', 'A', 'S', 'M'], ap: aps(parseFloat(INIT?.camera?.lens?.open) || 1.4, parseFloat(INIT?.camera?.lens?.close) || 22), sh: stops(1 / (INIT?.camera?.fastest || 4000), INIT?.camera?.slowest || 8), pLock: 0,
+  modes: CAMI?.modes?.length ? CAMI.modes : ['P', 'A', 'S', 'M'], ap: aps(parseFloat(CAMI?.lens?.open) || 1.4, parseFloat(CAMI?.lens?.close) || 22), sh: stops(1 / (CAMI?.fastest || 4000), CAMI?.slowest || 8), pLock: 0,
   // P 모드에서 조리개 링을 최소 조리개(가장 큰 f값)에 두면 카메라가 조리개·셔터를 둘 다 정하는 기종
-  programAtMin: !!INIT?.camera?.programAtMinAperture,
-  name: INIT?.camera?.name || '테스트용 카메라',
-  iso: INIT?.film?.iso || 400, frames: INIT?.film?.frames || 36,
-  film: INIT?.film?.name || 'Kodak Portra 400', filmShort: INIT?.film?.short || 'PORTRA',
-  format: INIT?.film?.format || '135', color: INIT?.film?.color || '#f0b43a',
+  programAtMin: !!CAMI?.programAtMinAperture,
+  name: METER_ONLY ? '노출계' : (CAMI?.name || '테스트용 카메라'),
+  iso: METER_ONLY ? (+(() => { try { return localStorage.getItem('meterOnlyIso') } catch { return 0 } })() || 400) : (FILMI?.iso || 400), frames: FILMI?.frames || 36,
+  film: FILMI?.name || 'Kodak Portra 400', filmShort: FILMI?.short || 'PORTRA',
+  format: FILMI?.format || '135', color: FILMI?.color || '#f0b43a',
 }
 // 최소 조리개 값은 렌즈를 바꾸면 달라진다
 const syncPLock = () => { cam.pLock = cam.programAtMin ? cam.ap[cam.ap.length - 1] : 0 }
@@ -676,7 +691,7 @@ let zoom = { z: 1, min: 1, max: 4.6, hw: false } // z: 렌즈 화각(26mm 기준
 const LENS_MM = [16, 18, 20, 21, 24, 28, 35, 38, 40, 45, 50, 55, 58, 70, 80, 85, 90, 100, 105, 135, 150, 180, 200, 250, 300]
 const LENS_KEY = `lens:${CAM_ID}`
 let lens = (() => {
-  const g = INIT?.camera?.lens
+  const g = CAMI?.lens
   if (g && +g.min > 0) return { min: +g.min, max: Math.max(+g.min, +g.max || +g.min) }
   try { const v = JSON.parse(store.get(LENS_KEY) || 'null'); if (v && v.min > 0 && v.max >= v.min) return v } catch {}
   return { min: 24, max: 105 }
@@ -1886,11 +1901,11 @@ $('lnDone').addEventListener('click', () => {
   toast(lensText())
 })
 // 렌즈 고정형 카메라(컴팩트·레인지파인더)는 렌즈를 바꿀 수 없다
-const FIXED_LENS = !!INIT?.camera?.lens?.fixed
+const FIXED_LENS = !!CAMI?.lens?.fixed
 if (FIXED_LENS) $('focal').classList.add('fixed')
 // 렌즈 교체: 앱이 장비 탭에 등록된, 이 카메라에 맞는 렌즈 목록을 넘기면 그중에서 고른다 (없으면 화각을 직접 정하는 시트)
-const GEAR_LENSES = (Array.isArray(INIT?.lenses) ? INIT.lenses : []).filter((l) => +l.min > 0)
-let lensId = INIT?.camera?.lens?.id ?? null
+const GEAR_LENSES = (!METER_ONLY && Array.isArray(INIT?.lenses) ? INIT.lenses : []).filter((l) => +l.min > 0)
+let lensId = CAMI?.lens?.id ?? null
 const rangeText = (l) => `${+l.max > +l.min ? `${l.min}–${l.max}mm` : `${l.min}mm`}${l.open ? ` f/${l.open}` : ''}`
 function openGear() {
   const box = $('gearList'); box.innerHTML = ''
@@ -1990,6 +2005,12 @@ if (HOSTED) {
 // 시험용: ?lever=-60 이면 레버를 그 각도에 멈춰 둔다 (감는 중 모습 확인)
 if (new URLSearchParams(location.search).has('leverloop')) setInterval(() => $('lever').classList.toggle('out'), 700)
 { const a = new URLSearchParams(location.search).get('lever'); if (a) { $('lever').style.transition = 'none'; $('lever').style.transform = `rotate(${+a}deg)` } }
+// 노출계만: 감도 고르기 (이 기기에 기억)
+if (!METER_ONLY) $('isoBtn').hidden = true
+$('isoText').textContent = cam.iso
+function renderIso() { chipRow($('isoChips'), [25, 50, 64, 100, 125, 160, 200, 400, 800, 1600, 3200, 6400], cam.iso, (v) => String(v), (v) => { cam.iso = v; store.set('meterOnlyIso', String(v)); $('isoText').textContent = v; ringC.onChange(); renderIso() }) }
+$('isoBtn').addEventListener('click', () => { renderIso(); showSheet('isoSheet'); detent() })
+$('isoDone').addEventListener('click', closeSheets)
 requestAnimationFrame(loop)
 </script>
 </body>
