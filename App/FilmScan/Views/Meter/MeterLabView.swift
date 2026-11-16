@@ -76,7 +76,7 @@ struct MeterLabView: View {
                 if which == .record { g.film = film } else { g.film = nil; g.lens = .generic; g.lenses = []; g.modes = ["P", "A", "S", "M"]; g.fastest = 4000; g.slowest = 8; g.programAtMinAperture = false }
                 return g
             }()
-            NativeMeterView(gear: gear, shots: which == .record ? saved : [],
+            NativeMeterView(gear: gear, shots: which == .record ? saved : [], session: "lab-\(which.id)",
                             onSave: { shots, _ in
                                 guard which == .record else { return }
                                 UserDefaults.standard.set(try? JSONEncoder().encode(shots), forKey: key); revision += 1

@@ -13,18 +13,46 @@ struct NativeMeterView: View {
     var onEnd: () -> Void = {}
 
     @State private var askExit = false
+    @State private var confirmEnd = false
     @State private var toast: String?
     @State private var sheet: SheetKind?
     @State private var previewOff = 0.0
     @State private var solved = MeterModel.Solved(n: 8, t: 1.0 / 125, diff: 0)
+    // 셔터 줄·필름 띠 (웹 시안과 같은 움직임: 셔터가 닫힌 뒤 레버가 돌고, 노브가 돌고, 필름이 한 칸 감긴다)
+    @State private var leverOut = false
+    @State private var shutterDown = false
+    @State private var busy = false
+    @State private var rewindAngle = 0.0
+    /// 감기 전까지는 찍기 전 칸을 보여 준다
+    @State private var shownNext: Int?
+    @State private var editing: EditTarget?
+    /// 새 롤: 카메라·필름을 보여 주고, 감기 방식을 모르면 묻고 시작
+    @State private var startOpen = false
+    @State private var startPrewind: Bool?
+    struct EditTarget: Identifiable { var pos: Int; var id: Int { pos } }
     @Environment(\.verticalSizeClass) private var vSize
     private let tick = Timer.publish(every: 1.0 / 12, on: .main, in: .common).autoconnect()
 
     enum SheetKind: String, Identifiable { case filter, iso, lens; var id: String { rawValue } }
+    /// 화각 직접 정하기 시트에서 고르는 중인 값 (완료를 눌러야 바뀐다)
+    @State private var lensDraft = (zoom: true, min: 24, max: 105)
 
-    init(gear: MeterGear, shots: [MeterShot] = [], rollPrewind: Bool? = nil,
+    /// 같은 노출계 화면의 상태를 이어 쓰는 이름 (롤 id, 노출계만은 "meter-only"). 닫을 때 지운다
+    private let session: String?
+
+    init(gear: MeterGear, shots: [MeterShot] = [], rollPrewind: Bool? = nil, session: String? = nil,
          onSave: @escaping ([MeterShot], Bool) -> Void = { _, _ in }, onClose: @escaping () -> Void, onEnd: @escaping () -> Void = {}) {
-        _m = StateObject(wrappedValue: MeterModel(gear: gear, shots: shots, rollPrewind: rollPrewind))
+        self.session = session
+        _m = StateObject(wrappedValue: {
+            if let session, let kept = MeterModel.live[session] { return kept }
+            let made = MeterModel(gear: gear, shots: shots, rollPrewind: rollPrewind)
+            if let session { MeterModel.live[session] = made }
+            return made
+        }())
+        let pw = rollPrewind ?? gear.prewind ?? false
+        _rewindAngle = State(initialValue: Double(shots.count) * (pw ? 150 : -150))
+        _startOpen = State(initialValue: !gear.meterOnly && shots.isEmpty && rollPrewind == nil)
+        _startPrewind = State(initialValue: gear.prewind)
         self.onSave = onSave; self.onClose = onClose; self.onEnd = onEnd
     }
 
@@ -64,15 +92,28 @@ struct NativeMeterView: View {
         .onReceive(tick) { _ in step() }
         .onChange(of: m.focal) { _, f in camera.setZoom(f / 40) }
         .onChange(of: m.metering) { _, _ in pointCamera() }
-        .confirmationDialog("촬영을 끝냈나요?", isPresented: $askExit, titleVisibility: .visible) {
-            Button("아직 촬영 중") { onSave(m.shots, m.prewind); onClose() }
-            Button("촬영 끝내기") { m.ended = true; onSave(m.shots, m.prewind); onEnd() }
+        .overlay { if askExit { exitCard } }
+        // 촬영 끝내기는 한 번 더 묻는다 (끝내면 되돌릴 수 없음)
+        .alert("촬영을 끝낼까요?", isPresented: $confirmEnd) {
             Button("취소", role: .cancel) {}
+            Button("끝내기", role: .destructive) { askExit = false; m.ended = true; onSave(m.shots, m.prewind); forget(); onEnd() }
         } message: {
-            Text("아직 찍는 중이면 지금 상태 그대로 두고 돌아가요. 찍은 컷은 그대로 남아 있어요.")
+            Text("\(m.shotCount)컷 찍었어요. 끝내면 이 롤에는 더 기록할 수 없고, 현상 맡기기로 넘어가요.")
         }
         .sheet(item: $sheet) { kind in sheetView(kind).presentationDetents([.medium]).preferredColorScheme(.dark) }
+        .sheet(item: $editing) { t in
+            if let shot = m.shots.first(where: { $0.pos == t.pos }) {
+                MeterShotEditor(shot: shot, m: m, title: "\(MeterFilmStrip.label(t.pos, prewind: m.prewind))번 컷 고치기") { edited in
+                    m.update(edited); onSave(m.shots, m.prewind); show("고쳤어요")
+                }
+                .presentationDetents([.large]).preferredColorScheme(.dark)
+            }
+        }
+        .overlay { if startOpen { startCard } }
     }
+
+    /// 닫을 때 이어 쓰던 상태를 버린다 (다음에 열면 새로)
+    private func forget() { if let session { MeterModel.live[session] = nil } }
 
     // MARK: 루프 (측광 → 계산 → 자동 링)
 
@@ -98,7 +139,7 @@ struct NativeMeterView: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            Button { if m.gear.meterOnly || m.shots.isEmpty || m.ended { onSave(m.shots, m.prewind); onClose() } else { askExit = true } } label: {
+            Button { if m.gear.meterOnly || m.shots.isEmpty || m.ended { onSave(m.shots, m.prewind); forget(); onClose() } else { askExit = true } } label: {
                 Image(systemName: "chevron.left").font(.system(size: 17, weight: .semibold)).frame(width: 36, height: 36)
                     .background(Color.meterPanel, in: Circle())
             }
@@ -108,7 +149,19 @@ struct NativeMeterView: View {
                     Text("\(film.displayName) · \(m.gear.frames)컷").font(.system(size: 12)).foregroundStyle(Color.meterSub).lineLimit(1)
                 }
             }
+            .layoutPriority(1)
             Spacer(minLength: 4)
+            // 오른쪽 버튼들은 늘 한 줄. 자리가 모자라면 줄바꿈 대신 옆으로 밀어 본다
+            ViewThatFits(in: .horizontal) {
+                headerPills
+                ScrollView(.horizontal, showsIndicators: false) { headerPills }
+            }
+        }
+        .foregroundStyle(.white)
+    }
+
+    private var headerPills: some View {
+        HStack(spacing: 6) {
             if m.gear.meterOnly {
                 pill { sheet = .iso } label: { HStack(spacing: 4) { Text("ISO").foregroundStyle(Color.meterSub); Text(MeterMath.trim(m.iso)).bold() } }
             }
@@ -118,19 +171,23 @@ struct NativeMeterView: View {
                     if !m.filters.isEmpty { Text(m.filters.count > 1 ? "\(m.filters[0])+\(m.filters.count - 1)" : m.filters[0]) }
                 }
             }
-            pill { if !m.lens.fixed { sheet = .lens } } label: {
+            pill {
+                guard !m.lens.fixed else { show("렌즈 고정형 카메라라 화각을 바꿀 수 없어요"); return }
+                lensDraft = (m.lens.isZoom, m.lens.min, m.lens.isZoom ? m.lens.max : MeterLens.nextMM(m.lens.min, 2.5))
+                sheet = .lens
+            } label: {
                 HStack(spacing: 3) {
                     Text(m.lens.isZoom ? m.lens.rangeText : "\(Int(m.focal))mm").monospacedDigit()
                     if !m.lens.fixed { Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold)).opacity(0.6) }
                 }
             }
         }
-        .foregroundStyle(.white)
+        .fixedSize()
     }
 
     private func pill(active: Bool = false, activeColor: Color = .meterOrange, action: @escaping () -> Void, @ViewBuilder label: () -> some View) -> some View {
         Button(action: action) {
-            label().font(.system(size: 14, weight: .bold)).padding(.horizontal, 12).frame(height: 36)
+            label().font(.system(size: 14, weight: .bold)).lineLimit(1).fixedSize().padding(.horizontal, 12).frame(height: 36)
                 .background(active ? activeColor : Color.meterPanel, in: Capsule())
                 .overlay(Capsule().stroke(Color.meterLine, lineWidth: active ? 0 : 1))
                 .foregroundStyle(active ? .black : .white)
@@ -246,7 +303,7 @@ struct NativeMeterView: View {
                           onLocked: { show("이 링은 카메라가 맞춰요") })
             }
             if m.gear.meterOnly && m.lens.isZoom { zoomRing }
-            if !m.gear.meterOnly { shutterRow.padding(.top, 10) }
+            if !m.gear.meterOnly { rollPart.padding(.top, 10) }
         }
     }
 
@@ -321,51 +378,156 @@ struct NativeMeterView: View {
         }
     }
 
-    /// 되감기 노브 · 카운터(왼쪽 플래시 칸) · 셔터 — 2단계에서 레버·필름·소리를 붙인다
-    private var shutterRow: some View {
-        HStack(spacing: 0) {
-            Circle().strokeBorder(LinearGradient(colors: [Color(white: 0.98), Color(white: 0.55), Color(white: 0.36)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 5)
-                .background(Circle().fill(Color(white: 0.11)))
-                .frame(width: 54, height: 54)
-            Spacer()
-            HStack(spacing: 0) {
-                Button { m.flash.toggle(); show(m.flash ? "플래시 켬 · 끌 때까지 찍는 컷에 기록돼요" : "플래시 끔") } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: "bolt.fill").font(.system(size: 18))
-                        Text(m.flash ? "켬" : "끔").font(.system(size: 10, weight: .bold))
-                    }
-                    .frame(width: 42, height: 58)
-                    .background(m.flash ? Color(red: 1, green: 0.82, blue: 0.25) : Color(white: 0.14), in: RoundedRectangle(cornerRadius: 11))
-                    .foregroundStyle(m.flash ? Color.black : Color.meterSub)
-                }
-                Text(counterText).font(.system(size: 32, weight: .bold)).monospacedDigit().frame(maxWidth: .infinity)
+    /// 되감기 노브 · 카운터(왼쪽 플래시 칸) · 셔터+레버 · 아래 필름 띠 (레버가 필름 위로 지나간다)
+    private var rollPart: some View {
+        let w: CGFloat = 318
+        return VStack(spacing: 0) {
+            MeterControls(counter: counterText, sub: "", flash: m.flash, leverOut: leverOut, rewindAngle: rewindAngle, shutterDown: shutterDown,
+                          onFlash: { m.flash.toggle(); show(m.flash ? "플래시 켬 · 끌 때까지 찍는 컷에 기록돼요" : "플래시 끔") },
+                          onShutter: fire)
+                .frame(width: w)
+                .padding(.bottom, -w * 58 / 360)
+                .zIndex(1)
+            MeterFilmStrip(shots: m.shots, frames: m.gear.frames, prewind: m.prewind, ended: m.ended, nextPos: shownNext ?? m.nextPos,
+                           showFocal: m.showFocal, effISO: m.effISO, film: m.gear.film) { p in
+                if m.shots.contains(where: { $0.pos == p }) { editing = EditTarget(pos: p) } else { show("아직 안 찍은 칸이에요") }
             }
-            .padding(4).frame(width: 140, height: 66)
-            .background(Color(white: 0.085), in: RoundedRectangle(cornerRadius: 15))
-            .overlay(RoundedRectangle(cornerRadius: 15).stroke(Color(white: 0.17)))
-            Spacer()
-            Button(action: fire) {
-                Circle().fill(RadialGradient(colors: [Color(red: 1, green: 0.48, blue: 0.21), Color(red: 0.95, green: 0.38, blue: 0.12), Color(red: 0.85, green: 0.33, blue: 0.1)], center: .init(x: 0.45, y: 0.4), startRadius: 0, endRadius: 30))
-                    .frame(width: 46, height: 46)
-                    .padding(4).background(Circle().fill(Color(white: 0.16)))
-                    .padding(3).background(Circle().fill(LinearGradient(colors: [Color(white: 0.98), Color(white: 0.6), Color(white: 0.36)], startPoint: .topLeading, endPoint: .bottomTrailing)))
-            }
-            .buttonStyle(PressScale())
+            .padding(.horizontal, -16)
+            .padding(.top, 8)
         }
-        .padding(.horizontal, 6)
     }
 
     private var counterText: String {
-        let pos = m.nextPos
-        return m.prewind && pos == 0 ? "1" : (pos >= 1 ? "\(pos)" : pos == 0 ? "0" : "00")
+        let pos = shownNext ?? m.nextPos
+        return MeterFilmStrip.label(pos, prewind: m.prewind).isEmpty ? "1" : MeterFilmStrip.label(pos, prewind: m.prewind)
     }
 
     private func fire() {
+        guard !busy, !startOpen else { return }
         guard !m.ended else { show("촬영을 끝낸 롤이에요"); return }
+        // 이번 컷의 셔터 속도 (자동이면 노출계가 고른 값)
+        let t = m.mode == "S" || m.mode == "M" ? m.shutter : solved.t
+        MeterSound.shared.shutter(t)
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        shutterDown = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { shutterDown = false }
+        shownNext = m.nextPos
         _ = m.fire()
         onSave(m.shots, m.prewind)
-        if m.shotCount == m.gear.frames { show("\(m.gear.frames)컷 다 찍었어요 · 필름이 남았으면 더 찍어도 돼요") }
+        busy = true
+        Task { @MainActor in
+            // 셔터가 닫힌 뒤에 감는다
+            try? await Task.sleep(for: .milliseconds(Int(max(150, min(t, 8) * 1000 + 140))))
+            leverOut = true
+            MeterSound.shared.ratchet()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            // 감을 때 되감기 노브는 시계 반대 방향 (프리와인딩은 필름이 통으로 들어가니 반대)
+            rewindAngle = Double(m.shotCount) * (m.prewind ? 150 : -150)
+            shownNext = nil
+            try? await Task.sleep(for: .milliseconds(360))
+            leverOut = false
+            try? await Task.sleep(for: .milliseconds(320))
+            busy = false
+            if m.shotCount == m.gear.frames { show("\(m.gear.frames)컷 다 찍었어요 · 필름이 남았으면 더 찍어도 돼요") }
+        }
+    }
+
+    /// 나가기: 아직 촬영 중(그대로 두고 나감)은 크게, 촬영 끝내기는 따로 떨어진 테두리 버튼 + 한 번 더 확인
+    private var exitCard: some View {
+        ZStack {
+            Color.black.opacity(0.6).ignoresSafeArea().onTapGesture { askExit = false }
+            VStack(spacing: 12) {
+                Text("촬영을 끝냈나요?").font(.system(size: 18, weight: .bold))
+                Text("아직 찍는 중이면 지금 상태 그대로 두고 돌아가요.\n찍은 컷은 그대로 남아 있어요.")
+                    .font(.system(size: 13)).foregroundStyle(Color.meterSub).multilineTextAlignment(.center)
+                Button { askExit = false; onSave(m.shots, m.prewind); forget(); onClose() } label: {
+                    Text("아직 촬영 중").font(.system(size: 17, weight: .bold)).frame(maxWidth: .infinity).frame(height: 52)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 14)).foregroundStyle(.black)
+                }
+                .padding(.top, 6)
+                Button { confirmEnd = true } label: {
+                    Text("촬영 끝내기").font(.system(size: 15, weight: .semibold)).frame(maxWidth: .infinity).frame(height: 44)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.meterOrange, lineWidth: 1.5)).foregroundStyle(Color.meterOrange)
+                }
+                .padding(.top, 10)
+                Button("취소") { askExit = false }.font(.system(size: 15)).foregroundStyle(Color.meterSub).padding(.top, 2)
+            }
+            .padding(20)
+            .background(Color(white: 0.08), in: RoundedRectangle(cornerRadius: 22))
+            .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.meterLine))
+            .padding(.horizontal, 28)
+            .foregroundStyle(.white)
+        }
+    }
+
+    /// 새 롤 시작 카드 (웹 시안 startSheet): 카메라 · 렌즈 · 필름, 감기 방식을 모르면 한 번만 묻는다
+    private var startCard: some View {
+        ZStack {
+            Color.black.opacity(0.6).ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
+                    startRow("카메라", m.gear.cameraName)
+                    startRow("렌즈", m.lens.fixed || m.gear.lenses.isEmpty ? m.lens.name : m.lens.name)
+                    if let film = m.gear.film {
+                        HStack(spacing: 10) {
+                            RoundedRectangle(cornerRadius: 3).fill(Color(meterHex: film.style.body)).frame(width: 18, height: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(film.displayName).font(.system(size: 15, weight: .bold))
+                                Text("ISO \(MeterMath.trim(m.iso)) · \(m.gear.frames)컷").font(.system(size: 12)).foregroundStyle(Color.meterSub)
+                            }
+                        }
+                    }
+                }
+                .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(white: 0.12), in: RoundedRectangle(cornerRadius: 14))
+                if m.gear.prewind == nil {
+                    VStack(spacing: 8) {
+                        Text("프리와인딩 지원 기종인가요?").font(.system(size: 17, weight: .bold))
+                        Text("카운트가 \(m.gear.frames)부터 거꾸로 줄어드는 카메라").font(.system(size: 13)).foregroundStyle(Color.meterSub)
+                        HStack(spacing: 8) {
+                            ynButton("아니오", on: startPrewind == false) { startPrewind = false }
+                            ynButton("예", on: startPrewind == true) { startPrewind = true }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    Text(m.gear.prewind == true ? "카운트 \(m.gear.frames) → 1 · 프리와인딩" : "카운트 1 → \(m.gear.frames)")
+                        .font(.system(size: 13)).foregroundStyle(Color.meterSub).frame(maxWidth: .infinity)
+                }
+                Button {
+                    guard let pw = startPrewind ?? m.gear.prewind else { return }
+                    m.prewind = pw
+                    rewindAngle = 0
+                    onSave(m.shots, pw)
+                    startOpen = false
+                } label: {
+                    Text("시작").font(.system(size: 17, weight: .bold)).frame(maxWidth: .infinity).frame(height: 50)
+                        .background((startPrewind ?? m.gear.prewind) == nil ? Color(white: 0.2) : Color.meterOrange, in: RoundedRectangle(cornerRadius: 14))
+                        .foregroundStyle((startPrewind ?? m.gear.prewind) == nil ? Color.meterSub : .black)
+                }
+                .disabled((startPrewind ?? m.gear.prewind) == nil)
+            }
+            .padding(18)
+            .background(Color(white: 0.08), in: RoundedRectangle(cornerRadius: 22))
+            .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.meterLine))
+            .padding(.horizontal, 24)
+            .foregroundStyle(.white)
+        }
+    }
+
+    private func startRow(_ k: String, _ v: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(k).font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.meterSub)
+            Text(v).font(.system(size: 15, weight: .bold)).lineLimit(1)
+        }
+    }
+
+    private func ynButton(_ t: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: { action(); UIImpactFeedbackGenerator(style: .light).impactOccurred() }) {
+            Text(t).font(.system(size: 15, weight: .bold)).frame(maxWidth: .infinity).frame(height: 44)
+                .background(on ? Color.meterOrange : Color(white: 0.16), in: RoundedRectangle(cornerRadius: 12))
+                .foregroundStyle(on ? .black : .white)
+        }
     }
 
     // MARK: 시트·알림
@@ -382,9 +544,11 @@ struct NativeMeterView: View {
                     chips([25, 50, 64, 100, 125, 160, 200, 400, 800, 1600, 3200, 6400].map { "\($0)" }, isOn: { Double($0) == m.iso }) { v in
                         m.setISO(Double(v) ?? 400); sheet = nil
                     }
+                case .lens where m.gear.lenses.isEmpty:
+                    customLens
                 case .lens:
                     VStack(spacing: 8) {
-                        ForEach(m.gear.lenses.isEmpty ? [m.lens] : m.gear.lenses) { l in
+                        ForEach(m.gear.lenses) { l in
                             Button { m.setLens(l); sheet = nil; show("\(l.name)로 바꿨어요 · 다음 컷부터 기록돼요") } label: {
                                 HStack {
                                     VStack(alignment: .leading) { Text(l.name).bold(); Text(l.rangeText + " f/\(MeterMath.trim(l.open))").font(.caption).foregroundStyle(Color.meterSub) }
@@ -400,10 +564,57 @@ struct NativeMeterView: View {
                     .padding(16)
                 }
             }
-            .navigationTitle(kind == .filter ? "필터" : kind == .iso ? "감도" : "렌즈 교체")
+            .navigationTitle(kind == .filter ? "필터" : kind == .iso ? "감도" : m.gear.lenses.isEmpty ? "렌즈" : "렌즈 교체")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("완료") { sheet = nil } } }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("완료") {
+                        if kind == .lens && m.gear.lenses.isEmpty {
+                            m.setCustomLens(min: lensDraft.min, max: lensDraft.zoom ? lensDraft.max : lensDraft.min)
+                            show(m.lens.isZoom ? "\(m.lens.min)–\(m.lens.max)mm 줌" : "\(m.lens.min)mm 단렌즈")
+                        }
+                        sheet = nil
+                    }
+                }
+            }
         }
+    }
+
+    /// 화각 직접 정하기 (웹 시안 lensSheet와 같음): 종류 · 초점 거리(가장 넓게) · 가장 길게
+    private var customLens: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("줌렌즈는 컷마다 화각이 기록돼요").font(.footnote).foregroundStyle(Color.meterSub)
+                .frame(maxWidth: .infinity).padding(.bottom, 6)
+            label("종류")
+            Picker("종류", selection: Binding(get: { lensDraft.zoom }, set: { z in
+                lensDraft.zoom = z
+                if lensDraft.max <= lensDraft.min { lensDraft.max = MeterLens.nextMM(lensDraft.min, 2.5) }
+            })) {
+                Text("단렌즈").tag(false); Text("줌렌즈").tag(true)
+            }
+            .pickerStyle(.segmented).padding(.horizontal, 16)
+            label(lensDraft.zoom ? "가장 넓게" : "초점 거리")
+            let mins = Array(Set((lensDraft.zoom ? MeterLens.mmList.dropLast() : MeterLens.mmList[...]) + [lensDraft.min])).sorted()
+            FlowChips(items: mins.map { "\($0)mm" }, isOn: { $0 == "\(lensDraft.min)mm" }) { s in
+                let v = Int(s.dropLast(2)) ?? lensDraft.min
+                lensDraft.min = v
+                if lensDraft.max <= v { lensDraft.max = MeterLens.nextMM(v, 2.5) }
+            }
+            .padding(.horizontal, 16)
+            if lensDraft.zoom {
+                label("가장 길게")
+                let maxes = Array(Set(MeterLens.mmList + [lensDraft.max])).filter { $0 > lensDraft.min }.sorted()
+                FlowChips(items: maxes.map { "\($0)mm" }, isOn: { $0 == "\(lensDraft.max)mm" }) { s in
+                    lensDraft.max = Int(s.dropLast(2)) ?? lensDraft.max
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+        .padding(.vertical, 16)
+    }
+
+    private func label(_ t: String) -> some View {
+        Text(t).font(.footnote.weight(.semibold)).foregroundStyle(Color.meterSub).padding(.horizontal, 16).padding(.top, 8)
     }
 
     private func chips(_ items: [String], isOn: @escaping (String) -> Bool, tap: @escaping (String) -> Void) -> some View {
@@ -437,10 +648,16 @@ private struct FlowChips: View {
     let items: [String]
     let isOn: (String) -> Bool
     let tap: (String) -> Void
+    /// 화면이 초당 여러 번 다시 그려지는 동안 한 번 누른 게 두 번 들어가 켜졌다 꺼지는 것 막기
+    @State private var last: (item: String, at: Date)?
     var body: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 8)], spacing: 8) {
             ForEach(items, id: \.self) { item in
-                Button { tap(item) } label: {
+                Button {
+                    if let last, last.item == item, Date().timeIntervalSince(last.at) < 0.4 { return }
+                    last = (item, Date())
+                    tap(item)
+                } label: {
                     Text(item).font(.system(size: 14, weight: .semibold)).frame(maxWidth: .infinity).frame(height: 38)
                         .background(isOn(item) ? Color.meterOrange : Color(white: 0.17), in: RoundedRectangle(cornerRadius: 10))
                         .foregroundStyle(isOn(item) ? .black : .white)

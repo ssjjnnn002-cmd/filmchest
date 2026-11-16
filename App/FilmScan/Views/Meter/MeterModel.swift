@@ -6,6 +6,8 @@ import FilmScanCore
 @MainActor
 final class MeterModel: ObservableObject {
     let gear: MeterGear
+    /// 열려 있는 노출계 상태 (뒤 화면이 다시 그려져 노출계 화면이 새로 만들어져도 필터·플래시·링 값이 그대로 남게)
+    static var live: [String: MeterModel] = [:]
 
     // 장비에서 오는 값
     @Published var lens: MeterLens
@@ -38,15 +40,21 @@ final class MeterModel: ObservableObject {
 
     init(gear: MeterGear, shots: [MeterShot] = [], rollPrewind: Bool? = nil) {
         self.gear = gear
-        lens = gear.lens
-        apertures = MeterMath.apertures(open: gear.lens.open, close: gear.lens.close)
+        // 노출계만: 직접 정한 화각을 기억한다 (웹 시안과 같음)
+        let start: MeterLens = {
+            guard gear.meterOnly, let a = UserDefaults.standard.array(forKey: "meterOnlyLens") as? [Int], a.count == 2, a[0] > 0, a[1] >= a[0]
+            else { return gear.lens }
+            return MeterLens.custom(min: a[0], max: a[1], base: gear.lens)
+        }()
+        lens = start
+        apertures = MeterMath.apertures(open: start.open, close: start.close)
         shutters = MeterMath.shutters(fastest: gear.fastest, slowest: gear.slowest)
         iso = gear.iso ?? gear.film.map { Double($0.iso) } ?? (UserDefaults.standard.double(forKey: "meterOnlyIso").nonZero ?? 400)
         mode = gear.modes.contains("A") ? "A" : (gear.modes.first ?? "P")
         aIndex = 0; sIndex = 0
-        focal = Double(gear.lens.min)
+        focal = Double(start.min)
         self.shots = shots
-        prewind = rollPrewind ?? gear.prewind
+        prewind = rollPrewind ?? gear.prewind ?? false
         aIndex = MeterMath.nearest(apertures, 8)
         sIndex = MeterMath.nearest(shutters, 1.0 / 125)
     }
@@ -112,9 +120,31 @@ final class MeterModel: ObservableObject {
         metering = metering == "spot" ? "center" : metering == "center" ? "avg" : "spot"
     }
 
+    /// 보정 c스톱일 때 실제로 맞춘 감도
+    func effISO(_ c: Double) -> Double { MeterMath.isoList[MeterMath.nearest(MeterMath.isoList, iso / pow(2, c))] }
+
+    /// 화각은 줌렌즈이거나, 이 롤에 화각이 여러 개일 때(렌즈를 바꿔 낌)만 칸에 적는다
+    func showFocal(_ f: MeterShot) -> Bool {
+        guard f.focal != nil else { return false }
+        return lens.isZoom || Set(shots.compactMap(\.focal)).count > 1
+    }
+
+    /// 고친 컷 저장 (번호는 그대로)
+    func update(_ shot: MeterShot) {
+        guard let i = shots.firstIndex(where: { $0.pos == shot.pos }) else { return }
+        var s = shot; s.edited = true
+        shots[i] = s
+    }
+
     func setISO(_ v: Double) {
         iso = v
         UserDefaults.standard.set(v, forKey: "meterOnlyIso")
+    }
+
+    /// 화각을 직접 정한다 (단렌즈면 min == max)
+    func setCustomLens(min lo: Int, max hi: Int) {
+        setLens(.custom(min: lo, max: Swift.max(lo, hi), base: lens))
+        if gear.meterOnly { UserDefaults.standard.set([lens.min, lens.max], forKey: "meterOnlyLens") }
     }
 
     func setLens(_ l: MeterLens) {

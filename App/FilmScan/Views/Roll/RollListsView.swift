@@ -13,6 +13,9 @@ struct ShootingView: View {
     @State private var dropOffHeld: RollItem?
     @State private var dropOffWasLoaded = false
     @State private var showMeterOnly = false
+    /// 상세 기록 (노출계로 컷마다 기록). 목록 줄 안에 두면 목록이 다시 그려질 때 노출계가 새로 만들어져 값이 풀린다
+    @State private var meterRoll: RollItem?
+    @State private var dropOffAfterMeter: RollItem?
     /// 노출계는 아직 개발자 모드에서만 (설정 > 버전 > 개발자 모드)
     @AppStorage("devMode") private var devMode = false
 
@@ -31,7 +34,7 @@ struct ShootingView: View {
             ForEach(visible) { roll in
                 Section {
                     NavigationLink(value: roll) { LoadedRollCard(roll: roll) }
-                    RollQuickActions(roll: roll) { openDropOff(roll) }
+                    RollQuickActions(roll: roll, onMeter: { meterRoll = roll }) { openDropOff(roll) }
                 }
             }
         }
@@ -48,7 +51,16 @@ struct ShootingView: View {
         #if os(iOS)
         // 노출계만: 카메라·필름 없이 재기만 (감도는 노출계에서 고른다)
         .fullScreenCover(isPresented: $showMeterOnly) {
-            NativeMeterView(gear: MeterGear(cameraName: "노출계"), onClose: { showMeterOnly = false })
+            NativeMeterView(gear: MeterGear(cameraName: "노출계"), session: "meter-only", onClose: { showMeterOnly = false })
+        }
+        // 노출계에서 촬영을 끝내면 닫히고 나서 현상 맡기기로 이어진다
+        .fullScreenCover(item: $meterRoll, onDismiss: {
+            if let roll = dropOffAfterMeter { dropOffAfterMeter = nil; openDropOff(roll) }
+        }) { roll in
+            RollMeterView(roll: roll) {
+                dropOffAfterMeter = roll
+                meterRoll = nil
+            }
         }
         #endif
         .settingsButton()
@@ -113,12 +125,10 @@ struct LoadedRollCard: View {
 
 struct RollQuickActions: View {
     let roll: RollItem
+    var onMeter: () -> Void = {}
     var onDropOff: () -> Void
     @State private var showPlace = false
-    @State private var showMeter = false
     @AppStorage("devMode") private var devMode = false
-    /// 노출계에서 촬영을 끝냈으면, 노출계가 완전히 닫힌 뒤 현상 맡기기를 연다
-    @State private var dropOffAfterMeter = false
 
     /// 촬영일 추가는 롤 화면에서. 장소가 이미 있으면 촬영 끝내기만.
     /// 촬영 끝내기는 현상 맡기기 창으로 이어진다. 닫으면 촬영 완료로 남긴다.
@@ -135,7 +145,7 @@ struct RollQuickActions: View {
             // 장소 추가 · 상세 기록(노출계로 컷마다 기록) · 촬영 끝내기
             if devMode {
                 Button {
-                    showMeter = true
+                    onMeter()
                 } label: {
                     Text("상세 기록").frame(maxWidth: .infinity)
                 }
@@ -161,17 +171,6 @@ struct RollQuickActions: View {
         .font(.subheadline.weight(.semibold))
         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 12, trailing: 16))
         .sheet(isPresented: $showPlace) { PlaceEditView(roll: roll, segment: nil) }
-        #if os(iOS)
-        // 노출계에서 촬영을 끝내면 닫히고 나서 현상 맡기기로 이어진다
-        .fullScreenCover(isPresented: $showMeter, onDismiss: {
-            if dropOffAfterMeter { dropOffAfterMeter = false; onDropOff() }
-        }) {
-            RollMeterView(roll: roll) {
-                dropOffAfterMeter = true
-                showMeter = false
-            }
-        }
-        #endif
     }
 }
 

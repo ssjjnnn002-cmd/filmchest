@@ -18,6 +18,13 @@ struct MeterLens: Hashable, Identifiable {
     var rangeText: String { isZoom ? "\(min)–\(max)mm" : "\(min)mm" }
 
     static let generic = MeterLens(id: "generic", name: "줌 렌즈", min: 24, max: 105, open: 1.4, close: 22)
+    /// 직접 정한 화각 (조리개 범위는 그대로)
+    static func custom(min: Int, max: Int, base: MeterLens) -> MeterLens {
+        MeterLens(id: "custom", name: max > min ? "\(min)–\(max)mm 줌" : "\(min)mm 단렌즈", min: min, max: max, open: base.open, close: base.close)
+    }
+    /// 화각 고르기 칸 (웹 시안 LENS_MM과 같음)
+    static let mmList = [16, 18, 20, 21, 24, 28, 35, 38, 40, 45, 50, 55, 58, 70, 80, 85, 90, 100, 105, 135, 150, 180, 200, 250, 300]
+    static func nextMM(_ v: Int, _ k: Double = 1) -> Int { mmList.first { Double($0) >= Double(v) * k + 0.5 } ?? mmList[mmList.count - 1] }
 }
 
 /// 노출계를 여는 쪽(촬영 중 카드·시험 화면)이 넘기는 정보
@@ -37,7 +44,8 @@ struct MeterGear {
     /// nil이면 노출계만 (필름·기록 없음)
     var film: FilmStock?
     var frames = 36
-    var prewind = false
+    /// 필름을 먼저 다 감아 두고 거꾸로 세는 카메라. nil이면 처음 시작할 때 묻는다
+    var prewind: Bool?
     /// 증감(푸시) 촬영 감도. 없으면 필름 감도
     var iso: Double?
     var meterOnly: Bool { film == nil }

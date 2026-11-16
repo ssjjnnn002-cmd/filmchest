@@ -315,7 +315,7 @@
   .meteronly .finder .zoomdial { display: none !important; } /* 줌 링이 있어서 파인더 오른쪽 다이얼은 뺌 */
 
   /* ── 2차: 헤더 화각 버튼, 측광 버튼, 끝내기 버튼 없앰, 카운터 아래 글씨 없앰 ── */
-  .head .lensbtn { flex: none; display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  .head .lensbtn { flex: none; white-space: nowrap; display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--text);
     font-size: 14px; font-weight: 700; padding: 8px 12px; border-radius: 99px; font-variant-numeric: tabular-nums; }
   .head .lensbtn svg { width: 9px; height: 9px; opacity: .6; }
   .head .lensbtn.fixed svg { display: none; }
@@ -327,7 +327,6 @@
   .head .lensbtn.filt svg { width: 17px; height: 17px; opacity: 1; }
   .head .lensbtn.filt:not(.on) span { display: none; }
   .head .lensbtn.filt.on { background: #9ec9ff; border-color: #9ec9ff; color: #111; }
-  .head .lensbtn.fixed { pointer-events: none; }
   .lenslist { display: grid; gap: 6px; margin-top: 12px; }
   .lensitem { display: flex; align-items: center; gap: 10px; width: 100%; border: 1.5px solid transparent; background: #2a2a2e; border-radius: 12px; padding: 12px 14px; text-align: left; }
   .lensitem span { flex: 1; min-width: 0; }
@@ -345,6 +344,8 @@
   .lcd > span { white-space: nowrap; flex: none; }
   #lcdS { justify-self: start; } #lcdA { justify-self: start; } #lcdL { justify-self: end; }
   .lcd .lock { color: #ffc24a; text-shadow: 0 0 6px rgb(255 190 60 / .6); }
+  .modal .stay { display: block; width: 100%; margin-top: 18px; height: 52px; border: 0; border-radius: 14px; background: #fff; color: #111; font-size: 17px; font-weight: 700; }
+  .modal .endline { display: block; width: 100%; margin-top: 16px; height: 44px; border: 1.5px solid var(--orange); border-radius: 12px; background: none; color: var(--orange); font-size: 15px; font-weight: 600; }
   .modal .textbtn { display: block; width: 100%; margin-top: 10px; border: 0; background: none; color: var(--sub); font-size: 14px; font-weight: 600; padding: 6px 0; }
   /* 사진 칸: 렌즈 화각에 맞춰 넓어지거나 좁아진다 (레인지파인더의 프레임처럼) */
   :root { --fw: 90%; --fh: 75%; }
@@ -589,7 +590,9 @@
 <div class="modal" id="exitSheet" role="dialog" aria-modal="true">
   <h3 style="margin-top:4px">촬영을 끝냈나요?</h3>
   <p class="body">아직 찍는 중이면 지금 상태 그대로 두고 돌아가요.<br>찍은 컷은 그대로 남아 있어요.</p>
-  <div class="yn wide"><button id="exitCancel">아직 촬영 중</button><button class="save" id="exitGo">촬영 끝내기</button></div>
+  <!-- 잘못 누르지 않게: 그대로 두고 나가기는 크게, 끝내기는 떨어진 테두리 버튼 + 한 번 더 확인 -->
+  <button class="stay" id="exitCancel">아직 촬영 중</button>
+  <button class="endline" id="exitGo">촬영 끝내기</button>
   <button class="textbtn" id="exitBack">취소</button>
 </div>
 
@@ -624,7 +627,7 @@
   <div class="grab"></div>
   <h2>촬영을 끝낼까요?</h2>
   <div class="meta" id="endMeta"></div>
-  <div class="actions"><button id="endCancel">계속 찍기</button><button class="save" id="endGo">촬영 끝내기</button></div>
+  <div class="actions"><button id="endCancel">취소</button><button class="save" id="endGo">끝내기</button></div>
 </div>
 
 <div class="sheet down" id="sheet">
@@ -2009,8 +2012,8 @@ function setGearLens(l) {
   $('gearSheet').classList.remove('on'); $('dim').classList.remove('on')
   toast(`${l.name}로 바꿨어요 · 다음 컷부터 기록돼요`)
 }
-// 렌즈 고정형은 눌러도 아무 일 없음
-$('focal').addEventListener('click', () => { if (FIXED_LENS) return; if (GEAR_LENSES.length) openGear(); else openLens() })
+// 렌즈 고정형은 바꿀 수 없다고만 알린다
+$('focal').addEventListener('click', () => { if (FIXED_LENS) { toast('렌즈 고정형 카메라라 화각을 바꿀 수 없어요'); return } if (GEAR_LENSES.length) openGear(); else openLens() })
 $('gearClose').addEventListener('click', closeSheets)
 $('stLens').addEventListener('click', openLens)
 
@@ -2060,7 +2063,12 @@ function leave() {
 }
 $('backBtn').addEventListener('click', () => { if (METER_ONLY || !shotCount || ended) leave(); else showSheet('exitSheet') })
 $('exitCancel').addEventListener('click', leave) // 아직 촬영 중: 그대로 두고 돌아감
-$('exitGo').addEventListener('click', endRoll)
+// 촬영 끝내기는 한 번 더 묻는다 (끝내면 되돌릴 수 없음)
+$('exitGo').addEventListener('click', () => {
+  $('exitSheet').classList.remove('on')
+  $('endMeta').textContent = `${shotCount}컷 찍었어요. 끝내면 이 롤에는 더 기록할 수 없고, 현상 맡기기로 넘어가요.`
+  showSheet('endSheet')
+})
 $('exitBack').addEventListener('click', closeSheets)
 function resume(saved, pw) {
   prewind = pw

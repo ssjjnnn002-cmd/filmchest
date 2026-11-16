@@ -39,7 +39,7 @@ extension MeterGear {
         }()
         let mount = camera?.mount ?? roll.lens?.mount
         let swappable = lens.fixed ? [] : lenses.filter { !$0.mount.isEmpty && $0.mount == mount }.map(MeterLens.init)
-        var gear = MeterGear(cameraName: roll.cameraName, lens: lens, lenses: swappable, film: roll.film, prewind: camera?.prewind ?? false)
+        var gear = MeterGear(cameraName: roll.cameraName, lens: lens, lenses: swappable, film: roll.film, prewind: camera?.prewind)
         gear.iso = roll.shotISO.map(Double.init)
         return gear
     }
@@ -53,8 +53,12 @@ struct RollMeterView: View {
     @Query private var lenses: [LensItem]
 
     var body: some View {
-        NativeMeterView(gear: .from(roll: roll, lenses: lenses), shots: roll.meterShots, rollPrewind: roll.meterPrewind,
-                        onSave: { shots, prewind in roll.meterShots = shots; roll.meterPrewind = prewind },
+        NativeMeterView(gear: .from(roll: roll, lenses: lenses), shots: roll.meterShots, rollPrewind: roll.meterPrewind, session: roll.id.uuidString,
+                        onSave: { shots, prewind in
+                            roll.meterShots = shots; roll.meterPrewind = prewind
+                            // 이 카메라의 감기 방식은 처음 한 번 정하면 기억한다
+                            if let cam = roll.camera, cam.prewind == nil { cam.prewind = prewind }
+                        },
                         onClose: { dismiss() },
                         onEnd: { onEnd() })
     }
