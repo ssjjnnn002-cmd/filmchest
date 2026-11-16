@@ -136,15 +136,18 @@
 
   /* 조작부: 되감기 노브 · 카운터 · 셔터+레버 */
   /* 감는 레버가 필름보다 위로 지나가게: 조작부를 맨 위 층으로, 필름은 아래 층 */
-  .controls { position: relative; z-index: 20; margin-top: var(--ctl-gap, 10px); padding-bottom: 46px; margin-bottom: -46px; pointer-events: none; transform: translateZ(0); will-change: transform; }
-  .controls svg > * { pointer-events: auto; }
+  /* 레버가 휘는 자리(아래로 58)까지 그림 안에 넣는다. 그림 밖으로 나가면 아이폰이 필름 밑에 그려서.
+     늘어난 만큼 아래 여백을 당겨 배치는 그대로. 빈 곳은 눌리지 않게 (셔터·플래시만 눌림) */
+  .controls { position: relative; z-index: 20; margin-top: var(--ctl-gap, 10px); }
+  .controls svg { pointer-events: none; }
+  #shutterBtn, #flashMark { pointer-events: auto; }
   .stripwrap { z-index: 1; margin-top: var(--strip-gap, 8px) !important; }
-  .controls svg { display: block; width: 100%; height: auto; max-height: 92px; overflow: visible; }
+  .controls svg { display: block; width: min(100%, 318px); height: auto; margin: 0 auto calc(min(100%, 318px) * -58 / 360); overflow: visible; }
   #shutterBtn { cursor: pointer; }
   #shutterBtn .disc { transition: transform .09s ease-out, filter .09s; transform-box: fill-box; transform-origin: center; }
   #shutterBtn.down .disc { transform: scale(.88); filter: brightness(.8); }
   #lever { transform-box: view-box; transform-origin: 290px 52px; transition: transform .34s cubic-bezier(.35,0,.25,1); }
-  #lever.out { transform: rotate(52deg); transition-timing-function: cubic-bezier(.4,.1,.3,1); }
+  #lever.out { transform: rotate(-105deg); transition-timing-function: cubic-bezier(.4,.1,.3,1); }
   #rewind { transform-box: view-box; transform-origin: 70px 52px; transition: transform .6s cubic-bezier(.35,0,.25,1); }
 
   /* 필름 */
@@ -188,7 +191,7 @@
     .ring.short { height: 38px; }
     .rings { gap: 4px; }
     .info .state { font-size: 17px; }
-    .controls svg { max-height: 74px; }
+    .controls svg { width: min(100%, 256px); margin-bottom: calc(min(100%, 256px) * -58 / 360); }
     .endbtn { padding: 11px 0 !important; }
   }
   .endbtn { border: 0; border-radius: 14px; padding: 15px 0; font-size: 16px; font-weight: 700; background: var(--panel); color: var(--text); margin-top: 4px; }
@@ -420,7 +423,7 @@
   </div>
 
   <div class="controls">
-    <svg viewBox="0 0 360 104" aria-label="셔터와 카운터">
+    <svg viewBox="0 0 360 162" aria-label="셔터와 카운터">
       <defs>
         <linearGradient id="chrome" x1="0" x2="1"><stop offset="0" stop-color="#8c8c8f"/><stop offset=".35" stop-color="#f0f0f0"/><stop offset=".6" stop-color="#a9a9ac"/><stop offset="1" stop-color="#6d6d70"/></linearGradient>
         <radialGradient id="chromeR" cx=".38" cy=".35" r=".8"><stop offset="0" stop-color="#fafafa"/><stop offset=".6" stop-color="#a5a5a8"/><stop offset="1" stop-color="#5d5d60"/></radialGradient>
@@ -1977,6 +1980,8 @@ if (HOSTED) {
   else if (saved?.shots?.length && !qs.has('reset')) resume(saved.shots, !!saved.prewind)
   else if (qs.has('go')) beginRoll(qs.has('pw')); else startRoll()
 }
+// 시험용: ?lever=-60 이면 레버를 그 각도에 멈춰 둔다 (감는 중 모습 확인)
+{ const a = new URLSearchParams(location.search).get('lever'); if (a) { $('lever').style.transition = 'none'; $('lever').style.transform = `rotate(${+a}deg)` } }
 requestAnimationFrame(loop)
 </script>
 </body>
