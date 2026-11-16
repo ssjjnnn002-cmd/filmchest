@@ -8,13 +8,13 @@ import { cameraName, rollCameraFormat, rollFilm } from '../ui/common'
 
 /** 장비 탭 렌즈 → 노출계 렌즈 (아이폰 MeterLens(LensItem)와 같은 규칙: 화각이 비면 50mm, 조리개가 비면 f/1.4–22) */
 const num = (s?: string) => { const m = s?.match(/\d+(\.\d+)?/); return m ? +m[0] : undefined }
-function meterLens(l: Lens) {
+export function meterLens(l: Lens) {
   const min = l.focalMin && l.focalMin > 0 ? l.focalMin : 50
   const max = l.zoom && l.focalMax && l.focalMax > min ? l.focalMax : min
   return { id: l.id, name: `${l.brand} ${l.model}`.trim(), min, max, open: num(l.apertureOpen) ?? 1.4, close: num(l.apertureClose) ?? 22 }
 }
 /** 렌즈 고정형: 이름(예: "Zuiko 42mm f/2.8")에서 화각·조리개를 읽는다 */
-function fixedLens(name: string) {
+export function fixedLens(name: string) {
   const mm = +(name.match(/(\d+)\s*mm/)?.[1] ?? 35)
   const f = num(name.match(/[fF]\s*\/?\s*\d+(\.\d+)?/)?.[0]) ?? 2.8
   return { id: 'fixed', name, min: mm, max: mm, open: f, close: 22, fixed: true }

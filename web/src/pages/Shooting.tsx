@@ -3,28 +3,21 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, kept } from '../db'
 import { useNav } from '../App'
 import type { Roll } from '../core/types'
-import { CameraCover, cameraName, Canister, GlassGroup, Icon, PageHeader, fmtDay, rollCameraFormat, rollFilm, rollFilmName, sortedLocations } from '../ui/common'
+import { CameraCover, cameraName, Canister, Icon, PageHeader, fmtDay, rollCameraFormat, rollFilm, rollFilmName, sortedLocations } from '../ui/common'
 import { LabDropOff, PlaceEdit } from './Editors'
-import { Meter } from './Meter'
+import { ManualRecord } from './ManualRecord'
 import { useMeterOn } from '../core/devMode'
 import { SettingsButton } from './Settings'
 
 export function Shooting() {
   const nav = useNav()
   const rolls = useLiveQuery(async () => (await db.rolls.where('status').equals('loaded').reverse().sortBy('loadedAt')).filter(kept), [])
-  const meterOn = useMeterOn()
-  const [meterOnly, setMeterOnly] = useState(false)
   return (
     <>
       <PageHeader title="촬영 중"
         left={<SettingsButton />}
-        actions={meterOn
-          ? <GlassGroup>
-              <button onClick={() => setMeterOnly(true)} aria-label="노출계"><Icon name="meter" /></button>
-              <button onClick={() => nav.loadFilm()} aria-label="필름 장착하기"><Icon name="plus" /></button>
-            </GlassGroup>
-          : <button className="glass-btn round" onClick={() => nav.loadFilm()} aria-label="필름 장착하기"><Icon name="plus" /></button>} />
-      {meterOnly && <Meter onClose={() => setMeterOnly(false)} />}
+        actions={<button className="glass-btn round" onClick={() => nav.loadFilm()} aria-label="필름 장착하기"><Icon name="plus" /></button>} />
+      {/* 노출계는 정확도 문제로 보류 (아이폰과 같음) */}
       {rolls === undefined && <div className="skeleton" style={{ height: 160 }} />}
       {rolls?.length === 0 && (
         <div className="empty">
@@ -70,7 +63,8 @@ function LoadedCard({ roll }: { roll: Roll }) {
       </div>
       {placing && <PlaceEdit roll={roll} onClose={() => setPlacing(false)} />}
       {dropOff && <LabDropOff roll={roll} onClose={(ended) => { setDropOff(false); if (ended) nav.toPending(roll.id) }} />}
-      {meter && <Meter roll={roll} onClose={() => setMeter(false)} onEnd={() => { setMeter(false); setDropOff(true) }} />}
+      {/* 상세 기록: 노출계 없이 다이얼로 셔터·조리개를 골라 컷마다 기록 (장소·시간 포함) */}
+      {meter && <ManualRecord roll={roll} onClose={() => setMeter(false)} />}
     </div>
   )
 }
