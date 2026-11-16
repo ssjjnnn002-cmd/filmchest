@@ -163,6 +163,7 @@ struct GearBrowser: View {
     var tag: String? = nil
     var search = ""
     var grouped = false
+    var filmGroup: GearGroup = .none
     @Query(sort: \LensItem.createdAt) private var allLenses: [LensItem]
     @Query(sort: \FilterItem.createdAt) private var allFilters: [FilterItem]
     @Query(sort: \FilmLotItem.createdAt, order: .reverse) private var allLots: [FilmLotItem]
@@ -222,10 +223,17 @@ struct GearBrowser: View {
             case .film:
                 if allLots.isEmpty { empty("필름 재고가 없어요", "가진 롤을 등록해 보세요.") }
                 else if lots.isEmpty { noMatch }
-                else if layout == .grid {
-                    grid(lots) { lot in Button { lotEdit = lot } label: { FilmGearCard(lot: lot) }.buttonStyle(.plain) }
-                } else {
-                    rows(lots) { lot in Button { lotEdit = lot } label: { FilmGearRow(lot: lot) }.buttonStyle(.plain) }
+                else {
+                    // 브랜드·ISO·흑백/컬러·35mm/120으로 묶어 볼 수 있다 (묶음 안은 이름순)
+                    let secs = filmGroup == .none ? [(title: String?.none, items: lots)]
+                        : groupSections(lots.sorted { $0.title.lowercased() < $1.title.lowercased() }) { $0.groupKey(filmGroup) }
+                    sections(secs) { items in
+                        if layout == .grid {
+                            grid(items) { lot in Button { lotEdit = lot } label: { FilmGearCard(lot: lot) }.buttonStyle(.plain) }
+                        } else {
+                            rows(items) { lot in Button { lotEdit = lot } label: { FilmGearRow(lot: lot) }.buttonStyle(.plain) }
+                        }
+                    }
                 }
             }
         }
@@ -817,6 +825,7 @@ private struct FilmLookPicker: View {
     @Query(sort: \RollItem.loadedAt, order: .reverse) private var rolls: [RollItem]
     @State private var search = ""
     @State private var showAll = false
+    @AppStorage("filmPickSort") private var pickSort = GearGroup.none.rawValue
     @State private var customEdit: CustomFilmTarget?
 
     private enum CustomFilmTarget: Identifiable {
@@ -857,9 +866,17 @@ private struct FilmLookPicker: View {
         Section {
             if showAll {
                 TextField("필름 검색", text: $search)
+                FilmPickSortBar(value: $pickSort)
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 6)], spacing: 10) {
-                ForEach(visibleStocks) { stock in
+            // 더보기에서 브랜드·ISO·흑백/컬러로 묶으면 묶음마다 제목을 달고 따로 늘어놓는다 (묶음마다 한 줄씩)
+            let secs = filmSections(visibleStocks, by: showAll ? GearGroup(rawValue: pickSort) ?? .none : .none)
+            ForEach(Array(secs.enumerated()), id: \.offset) { i, sec in
+                VStack(alignment: .leading, spacing: 6) {
+                    if let t = sec.title {
+                        Text("\(t) · \(sec.items.count)").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                    }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 6)], spacing: 10) {
+                        ForEach(sec.items) { stock in
                     Button { filmID = stock.id } label: {
                         VStack(spacing: 2) {
                             FilmCanisterView(stock: stock, format: format).frame(height: 84)
@@ -871,8 +888,9 @@ private struct FilmLookPicker: View {
                         .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(filmID == stock.id ? Theme.safelight : .clear, lineWidth: 2))
                     }
                     .buttonStyle(.plain)
-                }
-                Button { customEdit = .new } label: {
+                        }
+                        if i == secs.count - 1 {
+                            Button { customEdit = .new } label: {
                     VStack(spacing: 2) {
                         RoundedRectangle(cornerRadius: 16)
                             .strokeBorder(Theme.safelight.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
@@ -885,8 +903,11 @@ private struct FilmLookPicker: View {
                     .padding(4)
                 }
                 .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
             }
-            .padding(.vertical, 4)
             if let film = FilmStockCatalog.stock(id: filmID), film.isCustom, let item = customFilms.first(where: { $0.id == film.id }) {
                 Button("\(film.displayName) 수정", systemImage: "pencil") { customEdit = .edit(item) }
                     .frame(maxWidth: .infinity)

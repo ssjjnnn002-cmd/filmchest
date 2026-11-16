@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import type { CustomFilmRow } from '../core/films'
 import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films'
+import { filmSections, groupSections, lotKey, type GearGroup } from '../core/gearGroup'
 import { lensesFor } from '../core/lenses'
 import { lensSpec as lensBody } from '../core/lensSpecs'
 import { fallbackLensSnapshot, lensSnapshot } from '../core/model3d'
@@ -18,7 +19,7 @@ import { deleteCameraPhoto, saveCameraPhoto, useCameraPhoto, usePhotoIsCutout } 
 import { Canister, Confirm, Icon, Sheet } from '../ui/common'
 import { CustomFilmEdit } from './CustomFilmEdit'
 import { PhotoActions } from '../ui/PhotoActions'
-import { TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../ui/gearExtras'
+import { FilmPickSortBar, TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../ui/gearExtras'
 
 export type GearKind = 'lens' | 'filter' | 'film'
 const storageName: Record<FilmStorage, string> = { fridge: '냉장고', freezer: '냉동고', drawer: '서랍', room: '상온' }
@@ -137,7 +138,7 @@ function PhotoField({ id, hasPhoto, blob, setBlob, cleared, setCleared, placehol
   )
 }
 
-export function GearBoard({ kind, layout, tag, search = '', grouped = false }: { kind: GearKind; layout: string; tag?: string; search?: string; grouped?: boolean }) {
+export function GearBoard({ kind, layout, tag, search = '', grouped = false, filmGroup = 'none' }: { kind: GearKind; layout: string; tag?: string; search?: string; grouped?: boolean; filmGroup?: GearGroup }) {
   const allLenses = useLiveQuery(() => db.lenses.orderBy('createdAt').toArray(), [])
   const allFilters = useLiveQuery(() => db.filters.orderBy('createdAt').toArray(), [])
   const allLots = useLiveQuery(() => db.filmLots.orderBy('createdAt').reverse().toArray(), [])
@@ -195,7 +196,10 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false }: {
       {kind === 'lens' && lenses.length > 0 && sections(lenses, lensCell)}
       {kind === 'filter' && filters.length > 0 && sections(filters, filterCell, grouped ? undefined
         : [...new Set(filters.map(kindOf))].sort((a, b) => kindOrder(a) - kindOrder(b)).map((k) => ({ title: k, items: filters.filter((f) => kindOf(f) === k) })))}
-      {kind === 'film' && lots.length > 0 && box(lots.map((lot) => {
+      {/* 필름 재고: 브랜드·ISO·흑백/컬러·35mm/120으로 묶어 볼 수 있다 (묶음 안은 이름순) */}
+      {kind === 'film' && lots.length > 0 && (filmGroup === 'none' ? [{ title: undefined as string | undefined, items: lots }]
+        : groupSections([...lots].sort((a, b) => filmDisplayName(filmById(a.filmId)).localeCompare(filmDisplayName(filmById(b.filmId)))), (l) => lotKey(l, filmGroup)))
+        .map((sec, n) => <div key={sec.title ?? n}>{sec.title && <h3 className="group-title">{sec.title} · {sec.items.length}</h3>}{box(sec.items.map((lot) => {
         const film = filmById(lot.filmId)
         const late = !!lot.expiresAt && lot.expiresAt < Date.now()
         return (
@@ -208,7 +212,7 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false }: {
             </span>
           </button>
         )
-      }))}
+      }))}</div>)}
       {edit && kind === 'lens' && <LensEdit lens={(allLenses ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
       {edit && kind === 'filter' && <FilterEdit filter={(allFilters ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
       {edit && kind === 'film' && <FilmEdit lot={(allLots ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
@@ -516,6 +520,7 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
   const [seller, setSeller] = useState(lot?.seller ?? '')
   const [search, setSearch] = useState('')
   const [showAll, setShowAll] = useState(false)
+  const [pickSort, setPickSort] = useState<GearGroup>(() => getPref('filmPickSort', 'none' as string) as GearGroup)
   const [customEdit, setCustomEdit] = useState<CustomFilmRow | 'new' | null>(null)
   const [confirm, setConfirm] = useState(false)
   const stocks = useMemo(() => {
@@ -558,18 +563,27 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
         <h2>{showAll ? '필름' : '필름 · 최근 사용'}</h2>
         <div className="group">
           {showAll && <div className="field"><label htmlFor="lot-q">필름 검색</label><input id="lot-q" className="input" value={search} onChange={(e) => setSearch(e.target.value)} /></div>}
-          <div className="film-grid">
-            {visible.map((stock) => (
-              <button key={stock.id} type="button" className={`film-pick ${filmId === stock.id ? 'on' : ''}`} onClick={() => setFilmId(stock.id)}>
-                <Canister film={stock} format={format} size={84} />
-                <span>{filmDisplayName(stock)}</span>
-              </button>
-            ))}
-            <button type="button" className="film-pick custom-add" onClick={() => setCustomEdit('new')}>
-              <span className="custom-plus" aria-hidden="true">+</span>
-              <span>직접 추가</span>
-            </button>
-          </div>
+          {showAll && <FilmPickSortBar value={pickSort} onChange={setPickSort} />}
+          {/* 더보기에서 브랜드·ISO·흑백/컬러로 묶으면 묶음마다 제목을 단다 */}
+          {filmSections(visible, showAll ? pickSort : 'none').map((sec, i, all) => (
+            <div key={sec.title ?? i}>
+              {sec.title && <h3 className="group-title" style={{ margin: '10px 16px 0' }}>{sec.title} · {sec.items.length}</h3>}
+              <div className="film-grid">
+                {sec.items.map((stock) => (
+                  <button key={stock.id} type="button" className={`film-pick ${filmId === stock.id ? 'on' : ''}`} onClick={() => setFilmId(stock.id)}>
+                    <Canister film={stock} format={format} size={84} />
+                    <span>{filmDisplayName(stock)}</span>
+                  </button>
+                ))}
+                {i === all.length - 1 && (
+                  <button type="button" className="film-pick custom-add" onClick={() => setCustomEdit('new')}>
+                    <span className="custom-plus" aria-hidden="true">+</span>
+                    <span>직접 추가</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
           {pickedCustom && (
             <button type="button" className="row accent" style={{ justifyContent: 'center' }} onClick={() => setCustomEdit(pickedCustom)}>
               {pickedCustom.name} 수정

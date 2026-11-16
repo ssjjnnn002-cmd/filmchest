@@ -4,6 +4,8 @@ import { db } from '../db'
 import { defaultAccessoryKinds, uid } from '../core/types'
 import { getPref, setPref } from '../platform'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
+import { filmPickGroups, groupTitle, type GearGroup } from '../core/gearGroup'
+import { Icon } from './common'
 
 const cleanTag = (raw: string) => raw.trim().replace(/^#+/, '').trim()
 
@@ -156,4 +158,42 @@ export async function migrateAccessories() {
     }
     await db.cameras.update(c.id, { accessories: undefined, accessoryIds: ids })
   }
+}
+
+/** 검색 칸 옆 '묶어 보기' 버튼 (고른 기준이 있으면 주황으로 채움). 아이폰 GearGroupMenu와 같다 */
+export function GroupMenu({ value, options, onChange }: { value: GearGroup; options: GearGroup[]; onChange: (g: GearGroup) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ position: 'relative' }}>
+      <button type="button" className={`icon-toggle ${value !== 'none' ? 'on' : ''}`} aria-label="묶어 보기" title="묶어 보기"
+        aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name="group" size={20} />
+      </button>
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 29 }} onClick={() => setOpen(false)} />
+          <div className="menu" style={{ top: 46 }} role="menu">
+            {options.map((g) => (
+              <button key={g} type="button" role="menuitemradio" aria-checked={g === value} className="row"
+                onClick={() => { onChange(g); setOpen(false) }}>
+                <span style={{ width: 22, color: 'var(--safelight)' }}>{g === value ? '✓' : ''}</span>{groupTitle[g]}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** 필름 고르기 '더보기'에서 쓰는 기준 줄 (추천 · 브랜드 · ISO · 흑백·컬러). 고른 값은 기억한다 */
+export function FilmPickSortBar({ value, onChange }: { value: GearGroup; onChange: (g: GearGroup) => void }) {
+  return (
+    <div className="segmented" role="tablist" aria-label="정렬" style={{ margin: '8px 12px' }}>
+      {filmPickGroups.map((g) => (
+        <button key={g} type="button" role="tab" aria-selected={g === value} className={g === value ? 'on' : ''}
+          onClick={() => { onChange(g); setPref('filmPickSort', g) }}>{g === 'none' ? '추천' : groupTitle[g]}</button>
+      ))}
+    </div>
+  )
 }

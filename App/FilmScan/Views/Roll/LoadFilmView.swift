@@ -27,6 +27,8 @@ struct LoadFilmView: View {
     @State private var startDate = Date()
     @State private var search = ""
     @State private var showAllFilms = false
+    /// 더보기에서 필름을 묶는 기준 (추천·브랜드·ISO·흑백/컬러). 세 앱 같음
+    @AppStorage("filmPickSort") private var pickSort = GearGroup.none.rawValue
     @Query(sort: \CustomFilmItem.createdAt, order: .reverse) private var customFilms: [CustomFilmItem]
     /// 직접 만들 필름 편집 (nil이 아니면 시트). 새로 만들 땐 .new
     @State private var customEdit: CustomEditTarget?
@@ -131,9 +133,17 @@ struct LoadFilmView: View {
                 Section {
                     if showAllFilms {
                         TextField("필름 검색", text: $search)
+                        FilmPickSortBar(value: $pickSort)
                     }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 6)], spacing: 10) {
-                        ForEach(visibleStocks) { stock in
+                    // 더보기에서 브랜드·ISO·흑백/컬러로 묶으면 묶음마다 제목을 달고 따로 늘어놓는다 (묶음마다 한 줄씩)
+                    let secs = filmSections(visibleStocks, by: showAllFilms ? GearGroup(rawValue: pickSort) ?? .none : .none)
+                    ForEach(Array(secs.enumerated()), id: \.offset) { i, sec in
+                        VStack(alignment: .leading, spacing: 6) {
+                            if let t = sec.title {
+                                Text("\(t) · \(sec.items.count)").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                            }
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 6)], spacing: 10) {
+                                ForEach(sec.items) { stock in
                             Button { filmID = stock.id } label: {
                                 VStack(spacing: 2) {
                                     FilmCanisterView(stock: stock, format: camera?.format ?? .f135)
@@ -154,8 +164,9 @@ struct LoadFilmView: View {
                                     .strokeBorder(filmID == stock.id ? Theme.safelight : .clear, lineWidth: 2))
                             }
                             .buttonStyle(.plain)
-                        }
-                        Button { customEdit = .new } label: {
+                                }
+                                if i == secs.count - 1 {
+                                    Button { customEdit = .new } label: {
                             VStack(spacing: 2) {
                                 RoundedRectangle(cornerRadius: 16)
                                     .strokeBorder(Theme.safelight.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
@@ -168,8 +179,11 @@ struct LoadFilmView: View {
                             .padding(4)
                         }
                         .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
                     if let film, film.isCustom, let item = customFilms.first(where: { $0.id == film.id }) {
                         Button("\(film.displayName) 수정", systemImage: "pencil") { customEdit = .edit(item) }
                             .frame(maxWidth: .infinity)

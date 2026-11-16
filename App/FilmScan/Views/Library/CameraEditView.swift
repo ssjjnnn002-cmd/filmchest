@@ -443,25 +443,41 @@ struct CameraCatalogPicker: View {
     var onPick: (CatalogCamera) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
+    /// 브랜드별 또는 유형별(SLR·RF·P&S·중형)로 묶어 보기
+    @AppStorage("cameraPickGroup") private var byType = false
 
     private var grouped: [(brand: String, cameras: [CatalogCamera])] {
         let q = search.lowercased()
         let list = CameraCatalog.all.filter { q.isEmpty || $0.displayName.lowercased().contains(q) }
+        if byType {
+            let order: [CameraBodyStyle] = [.slr, .rangefinder, .compact, .mediumFormat]
+            return order.compactMap { st in
+                let cams = list.filter { $0.style == st }.sorted { $0.displayName < $1.displayName }
+                return cams.isEmpty ? nil : (st.displayName, cams)
+            }
+        }
         return Dictionary(grouping: list, by: \.brand).map { ($0.key, $0.value) }.sorted { $0.brand < $1.brand }
     }
 
     var body: some View {
         NavigationStack {
             List {
+                Picker("묶어 보기", selection: $byType) {
+                    Text("브랜드").tag(false); Text("유형").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
                 ForEach(grouped, id: \.brand) { group in
-                    Section(group.brand) {
+                    Section("\(group.brand) · \(group.cameras.count)") {
                         ForEach(group.cameras) { cam in
                             Button {
                                 onPick(cam)
                                 dismiss()
                             } label: {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(cam.model).foregroundStyle(.primary)
+                                    // 유형별로 볼 때는 브랜드까지 적는다
+                                    Text(byType ? cam.displayName : cam.model).foregroundStyle(.primary)
                                     Text([cam.kindText, cam.battery].compactMap { $0 }.joined(separator: " · "))
                                         .font(.caption).foregroundStyle(.secondary)
                                 }

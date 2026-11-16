@@ -1,4 +1,6 @@
 import { prepareCameraPhoto } from '../core/cutout'
+import { getPref, setPref } from '../platform'
+import { groupSections, styleKey } from '../core/gearGroup'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { db, rememberCamera } from '../db'
 import { cameraPhotoBlob, deleteCameraPhoto, saveCameraPhoto } from '../photoStore'
@@ -340,13 +342,19 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
 
 function CatalogPicker({ onPick, onClose }: { onPick: (c: CatalogCamera) => void; onClose: () => void }) {
   const [q, setQ] = useState('')
+  // 브랜드별 또는 유형별(SLR·RF·P&S·중형)로 묶어 보기 (아이폰과 같음)
+  const [byType, setByType] = useState(getPref('cameraPickGroup', '' as string) === 'type')
   const groups = useMemo(() => {
     const n = (x: string) => x.toLowerCase().replace(/\s+/g, '')
     const list = catalog.filter((c) => !q || n(catalogName(c)).includes(n(q)) || (c.aka ?? []).some((a) => n(a).includes(n(q))))
+    if (byType) {
+      return groupSections([...list].sort((a, b) => catalogName(a).localeCompare(catalogName(b))), (c) => styleKey(c.style))
+        .map((sec) => [sec.title ?? '', sec.items] as [string, CatalogCamera[]])
+    }
     const m = new Map<string, CatalogCamera[]>()
     for (const c of list) m.set(c.brand, [...(m.get(c.brand) ?? []), c])
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-  }, [q])
+  }, [q, byType])
   return (
     <Sheet title="카메라 목록" onClose={onClose}>
       <div className="group" style={{ marginBottom: 12 }}>
@@ -355,14 +363,21 @@ function CatalogPicker({ onPick, onClose }: { onPick: (c: CatalogCamera) => void
           <input id="cat-q" className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="제조사나 모델" autoFocus />
         </div>
       </div>
+      <div className="segmented" role="tablist" aria-label="묶어 보기" style={{ marginBottom: 12 }}>
+        {([['brand', '브랜드'], ['type', '유형']] as const).map(([k, label]) => (
+          <button key={k} type="button" role="tab" aria-selected={(k === 'type') === byType} className={(k === 'type') === byType ? 'on' : ''}
+            onClick={() => { setByType(k === 'type'); setPref('cameraPickGroup', k) }}>{label}</button>
+        ))}
+      </div>
       {groups.map(([brand, list]) => (
         <div className="section" key={brand}>
-          <h2>{brand}</h2>
+          <h2>{brand} · {list.length}</h2>
           <div className="group">
             {list.map((c) => (
-              <button key={c.model} className="row" onClick={() => onPick(c)}>
+              <button key={catalogName(c)} className="row" onClick={() => onPick(c)}>
                 <div className="grow">
-                  <div>{c.model}</div>
+                  {/* 유형별로 볼 때는 브랜드까지 적는다 */}
+                  <div>{byType ? catalogName(c) : c.model}</div>
                   <div className="sub">{[kindText(c), c.aka?.join(', '), c.battery].filter(Boolean).join(' · ')}</div>
                 </div>
               </button>

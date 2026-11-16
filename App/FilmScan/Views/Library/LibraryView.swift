@@ -30,6 +30,12 @@ struct LibraryView: View {
     @State private var tagFilter: String?
     @State private var search = ""
     @AppStorage("gearGrouped") private var grouped = false
+    /// 카메라·필름 재고 묶어 보기 (브랜드·유형·ISO…). 카메라는 예전 '태그별로 묶기'를 이어받는다
+    @AppStorage("gearGroupCamera") private var cameraGroupRaw = ""
+    @AppStorage("gearGroupFilm") private var filmGroupRaw = GearGroup.none.rawValue
+    private var cameraGroup: GearGroup {
+        cameraGroupRaw.isEmpty ? (grouped ? .tag : .none) : GearGroup(rawValue: cameraGroupRaw) ?? .none
+    }
     @Query private var lensTagSource: [LensItem]
     @Query private var filterTagSource: [FilterItem]
 
@@ -44,7 +50,10 @@ struct LibraryView: View {
     }
     private var hasCameras: Bool { cameras.contains { $0.deletedAt == nil } }
     /// 태그로 묶었을 때는 순서 바꾸기 없이 묶음마다 보여 준다
-    private var showGrouped: Bool { grouped && !editing && gear == .camera }
+    private var showGrouped: Bool { cameraGroup != .none && !editing && gear == .camera }
+    private var cameraSections: [(title: String?, items: [CameraItem])] {
+        cameraGroup == .tag ? tagSections(orderedCameras, grouped: true, tags: \.tags) : groupSections(orderedCameras) { $0.groupKey(cameraGroup) }
+    }
 
     /// 지금 탭의 장비에 붙은 태그 (많이 쓴 순)
     private var tabTags: [String] {
@@ -93,7 +102,11 @@ struct LibraryView: View {
                     }
                     .padding(.horizontal, 10).padding(.vertical, 8)
                     .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-                    if gear != .film {
+                    if gear == .camera {
+                        GearGroupMenu(value: Binding(get: { cameraGroup.rawValue }, set: { v in withAnimation { cameraGroupRaw = v } }), options: GearGroup.camera)
+                    } else if gear == .film {
+                        GearGroupMenu(value: Binding(get: { filmGroupRaw }, set: { v in withAnimation { filmGroupRaw = v } }), options: GearGroup.filmStock)
+                    } else {
                         Button {
                             withAnimation { grouped.toggle() }
                         } label: {
@@ -123,14 +136,15 @@ struct LibraryView: View {
                 }
             }
             if gear != .camera && !editing {
-                GearBrowser(tab: gear, layout: layout, tag: tagFilter, search: search, grouped: grouped)
+                GearBrowser(tab: gear, layout: layout, tag: tagFilter, search: search, grouped: grouped,
+                            filmGroup: GearGroup(rawValue: filmGroupRaw) ?? .none)
                     .padding(.horizontal)
                     .padding(.vertical, 8)
             } else if hasCameras && visible.isEmpty {
                 ContentUnavailableView("맞는 카메라가 없어요", systemImage: "magnifyingglass").padding(.top, 60)
             } else if showGrouped {
                 VStack(alignment: .leading, spacing: 16) {
-                    ForEach(Array(tagSections(orderedCameras, grouped: true, tags: \.tags).enumerated()), id: \.offset) { _, sec in
+                    ForEach(Array(cameraSections.enumerated()), id: \.offset) { _, sec in
                         Text("\(sec.title ?? "") · \(sec.items.count)")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                             .padding(.horizontal, 4)

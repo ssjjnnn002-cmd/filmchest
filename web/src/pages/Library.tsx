@@ -10,7 +10,8 @@ import { CameraCover, Canister, GlassGroup, Icon, PageHeader, rollFilmName } fro
 import { CameraEdit } from './CameraEdit'
 import { GearAdd, GearBoard, type GearKind } from './Gear'
 import { usePhotoIsCutout } from '../photoStore'
-import { TagFilter, TagLine, migrateAccessories, tagSections } from '../ui/gearExtras'
+import { GroupMenu, TagFilter, TagLine, migrateAccessories, tagSections } from '../ui/gearExtras'
+import { cameraGroups, cameraKey, filmStockGroups, groupSections, type GearGroup } from '../core/gearGroup'
 import { Settings } from './Settings'
 import { getPref, setPref } from '../platform'
 import { cameraPhotoURL } from '../photoStore'
@@ -40,6 +41,9 @@ export function Library() {
   const [tag, setTag] = useState<string>()
   const [search, setSearch] = useState('')
   const [grouped, setGrouped] = useState(getPref('gearGrouped', '' as string) === '1')
+  // 카메라·필름 재고 묶어 보기 (브랜드·유형·ISO…). 카메라는 예전 '태그별로 묶기'를 이어받는다 (아이폰과 같음)
+  const [cameraGroup, setCameraGroup] = useState<GearGroup>(() => (getPref('gearGroupCamera', '' as string) as GearGroup) || (grouped ? 'tag' : 'none'))
+  const [filmGroup, setFilmGroup] = useState<GearGroup>(() => (getPref('gearGroupFilm', 'none' as string) as GearGroup))
   const query = search.trim().toLowerCase()
   useEffect(() => { void migrateAccessories() }, [])
   const lensTags = useLiveQuery(async () => (await db.lenses.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
@@ -258,7 +262,9 @@ export function Library() {
             <input type="search" placeholder={`${({ camera: '카메라', lens: '렌즈', filter: '액세서리', film: '필름' } as const)[gear]} 검색`} value={search}
               onChange={(e) => setSearch(e.target.value)} aria-label="장비 검색" />
           </label>
-          {gear !== 'film' && (
+          {gear === 'camera' && <GroupMenu value={cameraGroup} options={cameraGroups} onChange={(g) => { setCameraGroup(g); setPref('gearGroupCamera', g) }} />}
+          {gear === 'film' && <GroupMenu value={filmGroup} options={filmStockGroups} onChange={(g) => { setFilmGroup(g); setPref('gearGroupFilm', g) }} />}
+          {(gear === 'lens' || gear === 'filter') && (
             <button type="button" className={`icon-toggle ${grouped ? 'on' : ''}`} aria-pressed={grouped} aria-label="태그별로 묶기" title="태그별로 묶기"
               onClick={() => { setGrouped(!grouped); setPref('gearGrouped', grouped ? '' : '1') }}>
               <Icon name="group" size={20} />
@@ -270,7 +276,7 @@ export function Library() {
         <TagFilter tags={gear === 'camera' ? (cameras ?? []).flatMap((c) => c.tags ?? []) : gear === 'lens' ? lensTags : filterTags} value={tag} onChange={setTag} />
       )}
 
-      {gear !== 'camera' && !editing && <GearBoard kind={gear} layout={layout} tag={tag} search={search} grouped={grouped} />}
+      {gear !== 'camera' && !editing && <GearBoard kind={gear} layout={layout} tag={tag} search={search} grouped={grouped} filmGroup={filmGroup} />}
 
       {gear === 'camera' && cameras && cameras.length === 0 && (
         <div className="empty">
@@ -296,8 +302,8 @@ export function Library() {
           </button>
 
           {shown.length === 0 && <div className="empty"><b>맞는 카메라가 없어요</b></div>}
-          {grouped && !editing
-            ? tagSections(shown, true).map((sec) => (
+          {cameraGroup !== 'none' && !editing
+            ? (cameraGroup === 'tag' ? tagSections(shown, true) : groupSections(shown, (c) => cameraKey(c, cameraGroup))).map((sec) => (
               <div key={sec.title}>
                 <h3 className="group-title">{sec.title} · {sec.items.length}</h3>
                 <div className={layout === 'grid' ? 'grid' : 'group'}>
