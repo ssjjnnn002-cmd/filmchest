@@ -176,11 +176,11 @@
   .cell.shot .frame { background: #3a2414; }
   .cell.next .frame { border-color: rgb(255 255 255 / .55); border-style: dashed; }
   .cell.next .frame::after { content: "다음"; font: 700 11px/1 -apple-system, sans-serif; color: rgb(255 255 255 / .55); }
-  .cell.leader:not(.shot) .frame { background: #4a2810; }
+  .cell.leader:not(.shot) .frame { background: #1a100a; }
   .cell.leader:not(.shot) .num { opacity: .5; }
   .tongue { flex: none; height: 100%; }
   .tail { background: #2a1a0f !important; }
-  .leadfog, .tail { flex: none; width: 30px; height: 100%; background: #3b2210;
+  .leadfog, .tail { flex: none; width: 30px; height: 100%; background: #2a1a0f;
     -webkit-mask: linear-gradient(#000 0 0) top / 100% 4px no-repeat, linear-gradient(#000 0 0) bottom / 100% 4px no-repeat, linear-gradient(#000 0 0) center / 100% 88px no-repeat,
       repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 13px, #000 13px 17.33px) top 4px left 0 / 100% 8px no-repeat, repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 13px, #000 13px 17.33px) bottom 4px left 0 / 100% 8px no-repeat;
     mask: linear-gradient(#000 0 0) top / 100% 4px no-repeat, linear-gradient(#000 0 0) bottom / 100% 4px no-repeat, linear-gradient(#000 0 0) center / 100% 88px no-repeat,
@@ -364,7 +364,7 @@
   .ring .labels { top: 15px; background: linear-gradient(#18181a 0%, #232326 30%, #131315 70%, #09090a 100%); }
   .ring.short .labels { top: 12px; }
   .ring .lab { font: 500 15.5px/1 "Futura", "Avenir Next", -apple-system, sans-serif; color: #f1eee8; letter-spacing: .03em; }
-  .ring .shade { background: linear-gradient(90deg, #000 0, rgb(0 0 0 / .55) 14%, rgb(0 0 0 / .05) 36%, rgb(255 255 255 / .05) 50%, rgb(0 0 0 / .05) 64%, rgb(0 0 0 / .55) 86%, #000 100%); }
+  .ring .shade { background: linear-gradient(90deg, rgb(0 0 0 / .9) 0, rgb(0 0 0 / .45) 18%, rgb(0 0 0 / .08) 38%, rgb(255 255 255 / .04) 50%, rgb(0 0 0 / .08) 62%, rgb(0 0 0 / .45) 82%, rgb(0 0 0 / .9) 100%); }
   .ring .mark { top: 15px; margin-left: -1px; width: 2px; height: 7px; border: 0; border-radius: 1px; background: var(--orange); box-shadow: 0 0 4px rgb(255 107 31 / .6); }
   .ring.short .mark { top: 12px; }
   .ringrow.auto .ring .mark { background: #6d6d72; box-shadow: none; }
@@ -1409,7 +1409,7 @@ function drawZoomDial() {
 const track = $('track'), strip = $('strip')
 // 필름 맨 끝 리더(텅): 아래쪽 절반이 곡선으로 잘려 나간 실제 35mm 필름 모양
 const TONGUE = `<div class="leadfog" aria-hidden="true"></div><div class="tongue" aria-hidden="true"><svg viewBox="0 0 232 112" width="232" height="112">
-  <path d="M0 0 H206 Q226 0 227 18 V42 Q227 60 207 60 H122 C 94 60 76 67 60 84 C 46 100 28 112 0 112 Z" fill="#3b2210"/>
+  <path d="M0 0 H206 Q226 0 227 18 V42 Q227 60 207 60 H122 C 94 60 76 67 60 84 C 46 100 28 112 0 112 Z" fill="#2a1a0f"/>
   <rect x="6.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="23.3" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="40.7" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="58.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="75.3" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="92.6" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="110.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="127.3" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="144.6" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="162.0" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="179.3" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="196.6" y="4" width="7" height="8" rx="1.5" fill="#0b0b0c"/><rect x="6" y="100" width="7" height="8" rx="1.5" fill="#0b0b0c"/>
 </svg></div>`
 // 칸 번호 표기: 1 이상은 숫자, 그 앞(프리와인딩으로 더 찍은 경우)은 0, 00, E1…
