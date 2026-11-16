@@ -726,6 +726,13 @@ struct FilmLotEditView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if let lot, filmID.isEmpty {
+                    Section {
+                        LabeledContent("지금 필름", value: lot.title)
+                    } footer: {
+                        Text("목록에서 찾을 수 없는 필름이에요. 그대로 저장해도 되고, 아래에서 다시 고를 수 있어요.")
+                    }
+                }
                 FilmLookPicker(filmID: $filmID, format: format)
                 Section("보관") {
                     Picker("포맷", selection: $format) {
@@ -750,7 +757,7 @@ struct FilmLotEditView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("저장") { save() }.disabled(filmID.isEmpty)
+                    Button("저장") { save() }.disabled(filmID.isEmpty && lot == nil)
                 }
             }
             .onAppear {
@@ -785,8 +792,11 @@ struct FilmLotEditView: View {
             context.insert(item)
             return item
         }()
-        target.filmStockID = filmID
-        target.customName = ""
+        // 목록에 없는 필름을 다시 고르지 않았으면 원래 필름 그대로
+        if !filmID.isEmpty {
+            target.filmStockID = filmID
+            target.customName = ""
+        }
         target.format = format
         target.count = count
         target.lowAt = lowAt
@@ -829,11 +839,16 @@ private struct FilmLookPicker: View {
         return list.sorted { rank($0) < rank($1) }
     }
 
+    /// 고른 필름은 포맷·검색·순서와 상관없이 늘 보이게 (수정할 때 저장된 필름이 안 보여 못 고치던 것)
     private var visibleStocks: [FilmStock] {
-        if showAll { return stocks }
+        let selected = FilmStockCatalog.stock(id: filmID)
+        if showAll {
+            guard let selected, !stocks.contains(selected) else { return stocks }
+            return [selected] + stocks
+        }
         var top = Array(stocks.prefix(6))
-        if let selected = FilmStockCatalog.stock(id: filmID), !top.contains(selected), stocks.contains(selected) {
-            if top.isEmpty { top = [selected] } else { top[top.count - 1] = selected }
+        if let selected, !top.contains(selected) {
+            if top.count < 6 { top.append(selected) } else { top[top.count - 1] = selected }
         }
         return top
     }

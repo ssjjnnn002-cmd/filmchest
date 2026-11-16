@@ -14,7 +14,7 @@ import { filmFits, filterDiameters, filterKinds, groupPrice, lensSpec, parseLens
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
 import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
 import { deleteCameraPhoto, readBytes, saveCameraPhoto, useCameraPhoto, usePhotoIsCutout } from '../files'
-import { Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Group, LensPicture, Row, Section, Segmented, Select, Sub } from '../kit'
+import { Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Footnote, Group, LensPicture, Row, Section, Segmented, Select, Sub } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { getPref, useLiveQuery } from '../store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
@@ -465,10 +465,12 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
   }, [rolls, format, custom])
   // 고른 필름은 접혀 있어도 늘 보이게 (수정할 때 다시 찾지 않도록)
   const visible = useMemo(() => {
-    if (showAll) return stocks
+    // 고른 필름은 포맷·검색·순서와 상관없이 늘 보이게 (수정할 때 저장된 필름이 안 보여 못 고치던 것)
+    const picked = filmById(filmId)
+    const has = (list: typeof stocks) => !!picked && list.some((s) => s.id === picked.id)
+    if (showAll) return picked && !has(stocks) ? [picked, ...stocks] : stocks
     const top = stocks.slice(0, 6)
-    const picked = stocks.find((s) => s.id === filmId)
-    if (picked && !top.includes(picked)) top[Math.min(5, top.length - 1)] = picked
+    if (picked && !has(top)) { if (top.length < 6) top.push(picked); else top[5] = picked }
     return top
   }, [stocks, showAll, filmId])
   const pickedCustom = custom.find((r) => r.id === filmId)
@@ -509,6 +511,7 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
           ) : null}
           <Row onPress={() => setShowAll(!showAll)}><Text style={{ color: '#ff6b1f' }}>{showAll ? '접기' : `더보기 (${stocks.length}종)`}</Text></Row>
         </Group>
+        {lot && filmId && !filmById(filmId) ? <Footnote>목록에서 찾을 수 없는 필름이에요. 그대로 저장해도 되고, 다시 고를 수 있어요.</Footnote> : null}
       </Section>
       <Section title="보관">
         <Group>

@@ -532,10 +532,12 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
   }, [rolls, format, search, custom])
   // 고른 필름은 접혀 있어도 늘 보이게 (수정할 때 다시 찾지 않도록)
   const visible = useMemo(() => {
-    if (showAll) return stocks
+    // 고른 필름은 포맷·검색·순서와 상관없이 늘 보이게 (수정할 때 저장된 필름이 안 보여 못 고치던 것)
+    const picked = filmById(filmId)
+    const has = (list: typeof stocks) => !!picked && list.some((s) => s.id === picked.id)
+    if (showAll) return picked && !has(stocks) ? [picked, ...stocks] : stocks
     const top = stocks.slice(0, 6)
-    const picked = stocks.find((s) => s.id === filmId)
-    if (picked && !top.includes(picked)) top[Math.min(5, top.length - 1)] = picked
+    if (picked && !has(top)) { if (top.length < 6) top.push(picked); else top[5] = picked }
     return top
   }, [stocks, showAll, filmId])
   const pickedCustom = custom.find((r) => r.id === filmId)
@@ -576,6 +578,7 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
           <button type="button" className="row" style={{ justifyContent: 'center', color: 'var(--safelight)' }}
             onClick={() => { setShowAll(!showAll); setSearch('') }}>{showAll ? '접기' : `더보기 (${stocks.length}종)`}</button>
         </div>
+        {lot && filmId && !filmById(filmId) && <p className="footnote warn">목록에서 찾을 수 없는 필름이에요. 그대로 저장해도 되고, 다시 고를 수 있어요.</p>}
       </div>
       <div className="section">
         <h2>보관</h2>
