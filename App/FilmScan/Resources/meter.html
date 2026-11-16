@@ -141,8 +141,8 @@
   .controls { position: relative; z-index: 20; margin-top: var(--ctl-gap, 10px); }
   .controls svg { pointer-events: none; }
   #shutterBtn, #flashMark { pointer-events: auto; }
-  .stripwrap { z-index: 1; margin-top: var(--strip-gap, 8px) !important; }
-  .controls svg { display: block; width: min(100%, 318px); height: auto; margin: 0 auto calc(min(100%, 318px) * -58 / 360); overflow: visible; }
+  .stripwrap { z-index: 1; margin-top: var(--strip-gap, 0px) !important; }
+  .controls svg { display: block; width: min(100%, 318px); height: auto; margin: 0 auto; overflow: visible; }
   #shutterBtn { cursor: pointer; }
   #shutterBtn .disc { transition: transform .09s ease-out, filter .09s; transform-box: fill-box; transform-origin: center; }
   #shutterBtn.down .disc { transform: scale(.88); filter: brightness(.8); }
@@ -191,7 +191,7 @@
     .ring.short { height: 38px; }
     .rings { gap: 4px; }
     .info .state { font-size: 17px; }
-    .controls svg { width: min(100%, 256px); margin-bottom: calc(min(100%, 256px) * -58 / 360); }
+    .controls svg { width: min(100%, 256px); }
     .endbtn { padding: 11px 0 !important; }
   }
   .endbtn { border: 0; border-radius: 14px; padding: 15px 0; font-size: 16px; font-weight: 700; background: var(--panel); color: var(--text); margin-top: 4px; }
