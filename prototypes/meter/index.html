@@ -137,7 +137,7 @@
   /* 조작부: 되감기 노브 · 카운터 · 셔터+레버 */
   /* 감는 레버가 필름보다 위로 지나가게: 조작부를 맨 위 층으로, 필름은 아래 층 */
   .controls { position: relative; z-index: 20; }
-  .stripwrap { z-index: 1; margin-top: 12px !important; }
+  .stripwrap { z-index: 1; margin-top: 30px !important; }
   .controls svg { display: block; width: 100%; height: auto; max-height: 92px; overflow: visible; }
   #shutterBtn { cursor: pointer; }
   #shutterBtn .disc { transition: transform .09s ease-out, filter .09s; transform-box: fill-box; transform-origin: center; }
@@ -427,13 +427,14 @@
         <circle cx="70" cy="52" r="3" fill="#555"/>
       </g>
       <!-- 카운터 -->
-      <rect x="132" y="14" width="96" height="62" rx="14" fill="#151517" stroke="#2c2c30"/>
+      <rect x="110" y="12" width="140" height="66" rx="15" fill="#151517" stroke="#2c2c30"/>
       <!-- 플래시: 실제 필름 카운터 창처럼 왼쪽 위 번개 표시. 누르면 켜고 끔 -->
       <g id="flashMark" role="button" aria-label="플래시" style="cursor:pointer">
-        <rect x="132" y="14" width="40" height="30" rx="10" fill="transparent"/>
-        <path id="flashBolt" d="M150.5 20.5 l-7.5 10 h5 l-1.5 8 l7.8-10.6 h-5.2 z" fill="#4a4743"/>
+        <rect x="114" y="16" width="42" height="58" rx="11" id="flashCell" fill="#232326"/>
+        <path id="flashBolt" d="M137.6 24 l-8.6 11.6 h5.8 l-1.7 9.4 l9-12.3 h-6 z" fill="#8d8a85"/>
+        <text id="flashText" x="135" y="62" text-anchor="middle" font-size="10" font-weight="700" fill="#8d8a85" font-family="-apple-system, sans-serif">끔</text>
       </g>
-      <text id="counterText" x="180" y="57" text-anchor="middle" font-size="32" font-weight="700" fill="#fff" font-family="-apple-system, 'SF Pro Display', Helvetica, Arial">1</text>
+      <text id="counterText" x="203" y="57" text-anchor="middle" font-size="32" font-weight="700" fill="#fff" font-family="-apple-system, 'SF Pro Display', Helvetica, Arial">1</text>
       <text id="counterSub" x="180" y="96" text-anchor="middle" font-size="10.5" font-weight="500" fill="rgb(235 235 245 / .55)" font-family="-apple-system, sans-serif"></text>
       <!-- 와인딩 레버: 셔터와 같은 축, 쉼표 모양 -->
       <g id="lever">
@@ -1694,8 +1695,11 @@ $('meterMode').addEventListener('click', () => {
 
 $('flashMark').addEventListener('click', () => {
   flash = !flash
-  $('flashBolt').setAttribute('fill', flash ? '#ffd23f' : '#4a4743')
-  $('flashBolt').style.filter = flash ? 'drop-shadow(0 0 3px rgb(255 210 63 / .8))' : ''
+  // 켜면 칸 전체가 노랗게: 누르는 버튼이라는 게 보이게
+  $('flashCell').setAttribute('fill', flash ? '#ffd23f' : '#232326')
+  $('flashBolt').setAttribute('fill', flash ? '#1a1300' : '#8d8a85')
+  $('flashText').setAttribute('fill', flash ? '#1a1300' : '#8d8a85')
+  $('flashText').textContent = flash ? '켬' : '끔'
   detent()
   toast(flash ? '플래시 켬 · 끌 때까지 찍는 컷에 기록돼요' : '플래시 끔')
 })
