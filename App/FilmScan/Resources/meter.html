@@ -16,7 +16,7 @@
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
     -webkit-user-select: none; user-select: none; overscroll-behavior: none;
-    padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 10px);
+    padding: env(safe-area-inset-top) 0 max(4px, calc(env(safe-area-inset-bottom) - 12px));
     height: 100dvh; box-sizing: border-box; overflow: hidden;
   }
   button { font-family: inherit; color: inherit; }
@@ -251,9 +251,10 @@
   .toast.on { opacity: 1; transform: translate(-50%, 0); }
 
   /* ── 추가: 실제 카메라 파인더처럼 (사진에 담기는 칸 밖은 어둡게, 아래 띠에 LED 표시) ── */
-  .finder { aspect-ratio: 5 / 4; }
+  .finder { aspect-ratio: 3 / 2; }
+  .finder .gauge { display: none !important; } /* 전자식 LED가 있어서 바늘은 뺌 */
   .wrap > .finderbox { margin: 0 -16px; }
-  .finderbox .finder { height: min(100cqh, calc(100cqw * .8)); }
+  .finderbox .finder { height: min(100cqh, calc(100cqw / 1.5)); }
   /* 칸 밖 가리개: 칸(.bright)과 같은 자리만 뚫는다 */
   .finder .mask { position: absolute; inset: 0; pointer-events: none; background: rgb(4 4 5 / .86);
     -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0) center / 84% 74.67% no-repeat; -webkit-mask-composite: xor;
@@ -267,14 +268,14 @@
   /* 노출 미리보기: 고른 조리개·셔터로 찍히면 이 밝기 */
   .finder .scene { transition: filter .12s linear; }
   /* LED 띠 */
-  .finder .lcd { position: absolute; left: 13%; right: 13%; bottom: 5.2%; height: 8.6%; display: flex; align-items: center; justify-content: space-between; gap: 6px; pointer-events: none;
-    font: 700 clamp(12px, 3.8cqw, 16px)/1 ui-monospace, "SF Mono", Menlo, monospace; color: #9dffa8; text-shadow: 0 0 4px rgb(90 255 120 / .9), 0 0 10px rgb(90 255 120 / .5); letter-spacing: .02em; }
-  .finder .lcd .dimmed { opacity: .22; text-shadow: none; }
-  .finder .lcd .scale { display: flex; align-items: center; gap: 2px; font-size: .8em; }
-  .finder .lcd .scale i { display: block; width: 3.5px; height: .9em; border-radius: 1px; background: currentColor; opacity: .25; }
-  .finder .lcd .scale i.c { height: 1.2em; opacity: .45; }
-  .finder .lcd .scale i.on { opacity: 1; box-shadow: 0 0 5px rgb(90 255 120 / .7); }
-  .finder .lcd .warn { color: #ff5a4a; text-shadow: 0 0 6px rgb(255 80 60 / .6); }
+  .lcd { position: relative; height: 32px; margin: -2px 4px 0; padding: 0 16px; border-radius: 9px; background: #050506; box-shadow: inset 0 1px 3px rgb(0 0 0 / .8), 0 0 0 1px #1c1c1e; display: flex; align-items: center; justify-content: space-between; gap: 6px; pointer-events: none;
+    font: 700 15px/1 ui-monospace, "SF Mono", Menlo, monospace; color: #9dffa8; text-shadow: 0 0 4px rgb(90 255 120 / .9), 0 0 10px rgb(90 255 120 / .5); letter-spacing: .02em; }
+  .lcd .dimmed { opacity: .22; text-shadow: none; }
+  .lcd .scale { display: flex; align-items: center; gap: 2px; font-size: .8em; }
+  .lcd .scale i { display: block; width: 3.5px; height: .9em; border-radius: 1px; background: currentColor; opacity: .25; }
+  .lcd .scale i.c { height: 1.2em; opacity: .45; }
+  .lcd .scale i.on { opacity: 1; box-shadow: 0 0 5px rgb(90 255 120 / .7); }
+  .lcd .warn { color: #ff5a4a; text-shadow: 0 0 6px rgb(255 80 60 / .6); }
   .finder .led { left: auto; right: 11%; bottom: auto; top: 5.4%; }
   /* 화각: 누르면 렌즈 설정 */
   .finder .focal { right: 12%; left: auto; top: 3.4%; z-index: 4; border: 0; display: flex; align-items: center; gap: 3px; background: rgb(0 0 0 / .35);
@@ -321,11 +322,11 @@
   .flash.mtr { flex-direction: column; justify-content: center; gap: 0; padding: 0 11px; line-height: 1.05; color: var(--text); }
   .flash.mtr small { font-size: 9px; font-weight: 700; color: var(--sub); }
   .flash.mtr span { font-size: 13px; font-weight: 700; }
-  .finder .lcd > span { white-space: nowrap; flex: none; }
-  .finder .lcd .lock { color: #ffc24a; text-shadow: 0 0 6px rgb(255 190 60 / .6); }
+  .lcd > span { white-space: nowrap; flex: none; }
+  .lcd .lock { color: #ffc24a; text-shadow: 0 0 6px rgb(255 190 60 / .6); }
   .modal .textbtn { display: block; width: 100%; margin-top: 10px; border: 0; background: none; color: var(--sub); font-size: 14px; font-weight: 600; padding: 6px 0; }
   /* 사진 칸: 렌즈 화각에 맞춰 넓어지거나 좁아진다 (레인지파인더의 프레임처럼) */
-  :root { --fw: 84%; --fh: 70%; }
+  :root { --fw: 84%; --fh: 84%; }
   .finder .mask { -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0) center / var(--fw) var(--fh) no-repeat; -webkit-mask-composite: xor;
     mask: linear-gradient(#000 0 0) exclude, linear-gradient(#000 0 0) center / var(--fw) var(--fh) no-repeat; }
   .finder .bright { width: var(--fw); height: var(--fh); }
@@ -385,13 +386,14 @@
         </svg>
       </div>
       <div class="led" id="led"></div>
-      
-      <div class="lcd" id="lcd"><span id="lcdS">125</span><span class="scale" id="lcdScale"></span><span id="lcdA">8</span><span id="lcdL">EV 12.0</span></div>
+
       <div class="evflash" id="evFlash"></div>
       <div class="cammsg" id="camMsg" hidden><p></p><button>카메라 켜기</button></div>
       <div class="fire" id="fire"></div>
     </div>
   </div>
+  <!-- 파인더 아래 LED 표시줄: 파인더 안에 두면 화면이 작을 때 흐린 가장자리에 걸려서 따로 뺀다 -->
+  <div class="lcd" id="lcd"><span id="lcdS">125</span><span class="scale" id="lcdScale"></span><span id="lcdA">8</span><span id="lcdL">EV 12.0</span></div>
 
   <div class="ringrow" id="rowC"><button class="mbtn" id="btnC"><span id="btnCText">노출 보정</span><small id="tagC"></small></button><div class="ring short" id="ringC"></div></div>
 
@@ -875,8 +877,8 @@ video.addEventListener('resize', () => applyZoom(zoom.z))
 const source = () => live() ? [video, video.videoWidth, video.videoHeight] : [sim, sim.width, sim.height]
 // 화면 확대는 늘 CSS로 부드럽게 하고, 폰 카메라 배율은 멈춘 뒤에 따라와서(hwRel) 그만큼 CSS 확대를 줄인다
 const cssZoom = () => zoom.native ? 1 : vis() / (zoom.hw ? zoom.hwRel : 1)
-// 파인더는 5:4, 그 안에서 사진에 담기는 칸(밝은 테두리)은 가운데 3:2 = 폭 84%
-const FA = 5 / 4, FW_BASE = .84, FW_MAX = .9
+// 파인더는 3:2, 그 안에서 사진에 담기는 칸(밝은 테두리)은 가운데 3:2 = 폭 84%
+const FA = 3 / 2, FW_BASE = .84, FW_MAX = .9
 let FW = FW_BASE // 지금 사진 칸 폭 (화각에 따라 바뀜)
 const fhOf = (w) => w * FA / 1.5
 function drawCrop(ctx, frac, dw, dh) {
