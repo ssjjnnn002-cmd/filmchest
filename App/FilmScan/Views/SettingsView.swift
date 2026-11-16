@@ -13,6 +13,9 @@ struct SettingsView: View {
     @State private var showLogin = false
     @State private var confirmLogout = false
     @State private var confirmWipe = false
+    /// 숨은 시험 화면: '앱 버전' 줄을 7번 누르면 열린다 (노출계 시험)
+    @AppStorage("meterLabUnlocked") private var labUnlocked = false
+    @State private var versionTaps = 0
     @State private var usedBytes: Int64?
     @State private var logoutStep: String?
     @State private var accountRevision = 0
@@ -112,6 +115,14 @@ struct SettingsView: View {
 
                 Section {
                     LabeledContent("앱 버전", value: Self.appVersion)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            versionTaps += 1
+                            if versionTaps >= 7 { labUnlocked = true }
+                        }
+                    if labUnlocked {
+                        NavigationLink("노출계 시험") { MeterLabView() }
+                    }
                 } header: {
                     Text("버전")
                 }
