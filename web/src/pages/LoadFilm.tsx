@@ -187,6 +187,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
               <button key={f.id} className={`film-pick ${f.id === filmId ? 'on' : ''}`} onClick={() => setFilmId(f.id)}>
                 <Canister film={f} format={camera?.format} size={84} />
                 <span>{filmDisplayName(f)}</span>
+                <small className="film-stock">{stockCount(lots, f.id) > 0 ? `재고 ${stockCount(lots, f.id)}롤` : ''}</small>
               </button>
             ))}
             <button className="film-pick custom-add" onClick={() => setCustomEdit('new')}>

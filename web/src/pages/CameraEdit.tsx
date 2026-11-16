@@ -12,11 +12,12 @@ import { TagField } from '../ui/gearExtras'
 import { PhotoActions } from '../ui/PhotoActions'
 import { groupPrice } from '../core/optics'
 import { AccessoryLinkFields, PurchaseFields, rememberSeller, useUsedSellers } from './Gear'
-import { features } from '../core/features'
+import { useMeterOn } from '../core/devMode'
 
 const BODY_COLOR = '#1C1C1E'
 
 export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () => void }) {
+  const meterOn = useMeterOn()
   const [brand, setBrand] = useState(camera?.brand ?? '')
   const [model, setModel] = useState(camera?.model ?? '')
   const [nickname, setNickname] = useState(camera?.nickname ?? '')
@@ -321,7 +322,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
         used={usedSellers} />
       <AccessoryLinkFields ids={accessoryIds} setIds={setAccessoryIds} bodyPrice={price} />
 
-      {features.meter && <div className="section">
+      {meterOn && <div className="section">
         <h2>필름 감기</h2>
         <div className="segmented" role="group" aria-label="필름 감기">
           <button type="button" className={prewind === false ? 'on' : ''} onClick={() => setPrewind(false)}>정순 · 1→끝</button>

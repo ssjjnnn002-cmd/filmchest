@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll } from '../db'
 import { useNav } from '../App'
 import { weatherText, type FilmFormat, type LocationSegment, type Roll, type ShootingDay } from '../core/types'
-import { features } from '../core/features'
+import { useMeterOn } from '../core/devMode'
 import { exposureText, meterProgress, meterShotMeta, meterShotsByOrder } from '../core/meter'
 import { RollGalleryButton } from '../ui/GallerySave'
 import { Canister, cameraName, Confirm, Sheet, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedDays, sortedLocations } from '../ui/common'
@@ -18,6 +18,7 @@ import { refreshRollPhotoMeta } from '../core/importer'
 
 export function RollDetail({ id }: { id: string }) {
   const nav = useNav()
+  const meterOn = useMeterOn()
   const roll = useLiveQuery(() => db.rolls.get(id), [id])
   usePhotoMetaSync(roll, nav.toast)
   const frames = useLiveQuery(() => db.frames.where('rollId').equals(id).sortBy('index'), [id]) ?? []
@@ -37,7 +38,7 @@ export function RollDetail({ id }: { id: string }) {
   const [tab, setTab] = useState<'log' | 'meter' | null>(null)
 
   if (!roll) return null
-  const view = tab ?? 'log'
+  const view = meterOn ? tab ?? 'log' : 'log'
   const locs = sortedLocations(roll)
   const rangeOf = (i: number) => {
     const s = locs[i].startFrame
@@ -83,7 +84,7 @@ export function RollDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      {features.meter && <div className="segmented" role="tablist" aria-label="롤 내용" style={{ margin: '8px 0 4px' }}>
+      {meterOn && <div className="segmented" role="tablist" aria-label="롤 내용" style={{ margin: '8px 0 4px' }}>
         <button role="tab" aria-selected={view === 'log'} className={view === 'log' ? 'on' : ''} onClick={() => setTab('log')}>기록</button>
         <button role="tab" aria-selected={view === 'meter'} className={view === 'meter' ? 'on' : ''} onClick={() => setTab('meter')}>노출</button>
       </div>}

@@ -13,9 +13,12 @@ struct SettingsView: View {
     @State private var showLogin = false
     @State private var confirmLogout = false
     @State private var confirmWipe = false
-    /// 숨은 시험 화면: '앱 버전' 줄을 7번 누르면 열린다 (노출계 시험)
-    @AppStorage("meterLabUnlocked") private var labUnlocked = false
-    @State private var versionTaps = 0
+    /// 개발자 모드: 관리자 코드를 넣으면 아직 모두에게 열지 않은 기능(노출계)이 열린다 (웹과 같음)
+    @AppStorage("devMode") private var devMode = false
+    @State private var askDevCode = false
+    @State private var confirmDevOff = false
+    @State private var devCode = ""
+    @State private var devWrong = false
     @State private var usedBytes: Int64?
     @State private var logoutStep: String?
     @State private var accountRevision = 0
@@ -115,12 +118,13 @@ struct SettingsView: View {
 
                 Section {
                     LabeledContent("앱 버전", value: Self.appVersion)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            versionTaps += 1
-                            if versionTaps >= 7 { labUnlocked = true }
-                        }
-                    if labUnlocked {
+                    Button {
+                        if devMode { confirmDevOff = true } else { devCode = ""; askDevCode = true }
+                    } label: {
+                        LabeledContent("개발자 모드", value: devMode ? "켜짐" : "")
+                    }
+                    .foregroundStyle(.primary)
+                    if devMode {
                         NavigationLink("노출계 시험") { MeterLabView() }
                     }
                 } header: {
@@ -179,6 +183,17 @@ struct SettingsView: View {
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
                     }
                 }
+            }
+            .alert("개발자 모드", isPresented: $askDevCode) {
+                SecureField("관리자 코드", text: $devCode).keyboardType(.numberPad)
+                Button("취소", role: .cancel) {}
+                Button("켜기") {
+                    if devCode.trimmingCharacters(in: .whitespaces) == "3372" { devMode = true } else { devWrong = true }
+                }
+            }
+            .alert("코드가 맞지 않아요.", isPresented: $devWrong) { Button("확인", role: .cancel) {} }
+            .confirmationDialog("개발자 모드를 끌까요?", isPresented: $confirmDevOff, titleVisibility: .visible) {
+                Button("끄기", role: .destructive) { devMode = false }
             }
             .alert("복구", isPresented: Binding(get: { note != nil }, set: { if !$0 { note = nil } })) {
                 Button("확인", role: .cancel) { note = nil }

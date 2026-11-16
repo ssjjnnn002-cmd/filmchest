@@ -41,7 +41,7 @@ final class MeterModel: ObservableObject {
         lens = gear.lens
         apertures = MeterMath.apertures(open: gear.lens.open, close: gear.lens.close)
         shutters = MeterMath.shutters(fastest: gear.fastest, slowest: gear.slowest)
-        iso = gear.film.map { Double($0.iso) } ?? (UserDefaults.standard.double(forKey: "meterOnlyIso").nonZero ?? 400)
+        iso = gear.iso ?? gear.film.map { Double($0.iso) } ?? (UserDefaults.standard.double(forKey: "meterOnlyIso").nonZero ?? 400)
         mode = gear.modes.contains("A") ? "A" : (gear.modes.first ?? "P")
         aIndex = 0; sIndex = 0
         focal = Double(gear.lens.min)

@@ -12,6 +12,9 @@ struct ShootingView: View {
     @State private var dropOff: RollItem?
     @State private var dropOffHeld: RollItem?
     @State private var dropOffWasLoaded = false
+    @State private var showMeterOnly = false
+    /// 노출계는 아직 개발자 모드에서만 (설정 > 버전 > 개발자 모드)
+    @AppStorage("devMode") private var devMode = false
 
     private var visible: [RollItem] { rolls.filter { $0.deletedAt == nil } }
 
@@ -37,8 +40,17 @@ struct ShootingView: View {
         .navigationTitle("촬영 중")
         .navigationDestination(for: RollItem.self) { RollDetailView(roll: $0) }
         .toolbar {
+            #if os(iOS)
+            if devMode { ToolbarItem { Button("노출계", systemImage: "camera.metering.spot") { showMeterOnly = true } } }
+            #endif
             ToolbarItem { Button("필름 장착하기", systemImage: "plus") { router.loadFilm() } }
         }
+        #if os(iOS)
+        // 노출계만: 카메라·필름 없이 재기만 (감도는 노출계에서 고른다)
+        .fullScreenCover(isPresented: $showMeterOnly) {
+            NativeMeterView(gear: MeterGear(cameraName: "노출계"), onClose: { showMeterOnly = false })
+        }
+        #endif
         .settingsButton()
         .sheet(item: $dropOff, onDismiss: endDropOffIfNeeded) { LabDropOffView(roll: $0) }
     }
@@ -104,6 +116,7 @@ struct RollQuickActions: View {
     var onDropOff: () -> Void
     @State private var showPlace = false
     @State private var showMeter = false
+    @AppStorage("devMode") private var devMode = false
     /// 노출계에서 촬영을 끝냈으면, 노출계가 완전히 닫힌 뒤 현상 맡기기를 연다
     @State private var dropOffAfterMeter = false
 
@@ -119,29 +132,22 @@ struct RollQuickActions: View {
                     .fixedSize(horizontal: true, vertical: false)
             }
             #if os(iOS)
-            if Features.meter {
-                Button {
-                    onDropOff()
-                } label: {
-                    Text("촬영 끝내기").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
+            // 장소 추가 · 상세 기록(노출계로 컷마다 기록) · 촬영 끝내기
+            if devMode {
                 Button {
                     showMeter = true
                 } label: {
-                    Text("노출계").frame(maxWidth: .infinity)
+                    Text("상세 기록").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.safelight)
-            } else {
-                Button {
-                    onDropOff()
-                } label: {
-                    Text("촬영 끝내기").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.safelight)
+                .buttonStyle(.bordered)
             }
+            Button {
+                onDropOff()
+            } label: {
+                Text("촬영 끝내기").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.safelight)
             #else
             Button {
                 onDropOff()
@@ -160,7 +166,7 @@ struct RollQuickActions: View {
         .fullScreenCover(isPresented: $showMeter, onDismiss: {
             if dropOffAfterMeter { dropOffAfterMeter = false; onDropOff() }
         }) {
-            MeterView(roll: roll) {
+            RollMeterView(roll: roll) {
                 dropOffAfterMeter = true
                 showMeter = false
             }

@@ -16,6 +16,7 @@ import { formatDateTime } from '../core/types'
 import { withWork } from '../core/work'
 import { Confirm, Icon, Sheet, bytesText } from '../ui/common'
 import { PrivacyPolicy } from './Privacy'
+import { lockDevMode, unlockDevMode, useDevMode } from '../core/devMode'
 import { applyTheme, getPref, inClaudeHost, refreshApp, saveFileNow, setPref } from '../platform'
 
 const themes: [string, string][] = [['system', '기기 설정'], ['light', '라이트'], ['dark', '다크']]
@@ -131,6 +132,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           <button className="row" onClick={() => { void withWork(async () => { await refreshApp() }) }}>
             <span className="grow">최신 버전 적용</span>
           </button>
+          <DevModeRow />
         </div>
         <p className="footnote">
           앱 버전은 아이폰, 갤럭시, 웹이 같습니다.
@@ -280,6 +282,44 @@ export function SettingsButton() {
     <>
       <button className="glass-btn round" onClick={() => setOpen(true)} aria-label="설정"><Icon name="gear" /></button>
       {open && <Settings onClose={() => setOpen(false)} />}
+    </>
+  )
+}
+
+/** 개발자 모드: 관리자 코드를 넣으면 아직 모두에게 열지 않은 기능(노출계)이 열린다 */
+function DevModeRow() {
+  const on = useDevMode()
+  const [asking, setAsking] = useState(false)
+  const [offAsk, setOffAsk] = useState(false)
+  const [code, setCode] = useState('')
+  const [wrong, setWrong] = useState(false)
+  const close = () => { setAsking(false); setCode(''); setWrong(false) }
+  const submit = () => { if (unlockDevMode(code)) close(); else setWrong(true) }
+  return (
+    <>
+      <button className="row" onClick={() => (on ? setOffAsk(true) : setAsking(true))}>
+        <span className="grow">개발자 모드</span>
+        {on && <span className="value">켜짐</span>}
+      </button>
+      {on && <a className="row" href={`${import.meta.env.BASE_URL}meter-lab.html`}><span className="grow">노출계 시험</span><Icon name="chev" size={18} /></a>}
+      {asking && (
+        <Sheet title="개발자 모드" onClose={close}
+          left={<button className="btn ghost" onClick={close}>취소</button>}
+          right={<button className="btn ghost" onClick={submit} disabled={!code}><b>켜기</b></button>}>
+          <div className="section">
+            <div className="group">
+              <div className="field">
+                <label htmlFor="dev-code">관리자 코드</label>
+                <input id="dev-code" className="input" type="password" inputMode="numeric" autoComplete="off" autoFocus value={code}
+                  onChange={(e) => { setCode(e.target.value); setWrong(false) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && code) submit() }} />
+              </div>
+            </div>
+            {wrong && <p className="footnote warn">코드가 맞지 않아요.</p>}
+          </div>
+        </Sheet>
+      )}
+      {offAsk && <Confirm message="개발자 모드를 끌까요?" action="끄기" onCancel={() => setOffAsk(false)} onConfirm={() => { lockDevMode(); setOffAsk(false) }} />}
     </>
   )
 }

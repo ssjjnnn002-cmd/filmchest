@@ -3,20 +3,28 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, kept } from '../db'
 import { useNav } from '../App'
 import type { Roll } from '../core/types'
-import { CameraCover, cameraName, Canister, Icon, PageHeader, fmtDay, rollCameraFormat, rollFilm, rollFilmName, sortedLocations } from '../ui/common'
+import { CameraCover, cameraName, Canister, GlassGroup, Icon, PageHeader, fmtDay, rollCameraFormat, rollFilm, rollFilmName, sortedLocations } from '../ui/common'
 import { LabDropOff, PlaceEdit } from './Editors'
 import { Meter } from './Meter'
-import { features } from '../core/features'
+import { useMeterOn } from '../core/devMode'
 import { SettingsButton } from './Settings'
 
 export function Shooting() {
   const nav = useNav()
   const rolls = useLiveQuery(async () => (await db.rolls.where('status').equals('loaded').reverse().sortBy('loadedAt')).filter(kept), [])
+  const meterOn = useMeterOn()
+  const [meterOnly, setMeterOnly] = useState(false)
   return (
     <>
       <PageHeader title="촬영 중"
         left={<SettingsButton />}
-        actions={<button className="glass-btn round" onClick={() => nav.loadFilm()} aria-label="필름 장착하기"><Icon name="plus" /></button>} />
+        actions={meterOn
+          ? <GlassGroup>
+              <button onClick={() => setMeterOnly(true)} aria-label="노출계"><Icon name="meter" /></button>
+              <button onClick={() => nav.loadFilm()} aria-label="필름 장착하기"><Icon name="plus" /></button>
+            </GlassGroup>
+          : <button className="glass-btn round" onClick={() => nav.loadFilm()} aria-label="필름 장착하기"><Icon name="plus" /></button>} />
+      {meterOnly && <Meter onClose={() => setMeterOnly(false)} />}
       {rolls === undefined && <div className="skeleton" style={{ height: 160 }} />}
       {rolls?.length === 0 && (
         <div className="empty">
@@ -38,6 +46,7 @@ function LoadedCard({ roll }: { roll: Roll }) {
   const [placing, setPlacing] = useState(false)
   const [dropOff, setDropOff] = useState(false)
   const [meter, setMeter] = useState(false)
+  const meterOn = useMeterOn()
   const places = sortedLocations(roll).map((l) => l.name).filter(Boolean).join(' → ')
   return (
     <div className="card shooting-card">
@@ -56,10 +65,8 @@ function LoadedCard({ roll }: { roll: Roll }) {
       </button>
       <div className="shooting-actions">
         {roll.locations.length === 0 && <button className="btn soft" onClick={() => setPlacing(true)}><Icon name="pin" size={18} /> 장소 추가</button>}
-        <button className={`btn ${features.meter ? 'soft' : 'primary'}`} onClick={() => setDropOff(true)}>
-          촬영 끝내기
-        </button>
-        {features.meter && <button className="btn primary" onClick={() => setMeter(true)}>노출계</button>}
+        {meterOn && <button className="btn soft" onClick={() => setMeter(true)}>상세 기록</button>}
+        <button className="btn primary" onClick={() => setDropOff(true)}>촬영 끝내기</button>
       </div>
       {placing && <PlaceEdit roll={roll} onClose={() => setPlacing(false)} />}
       {dropOff && <LabDropOff roll={roll} onClose={(ended) => { setDropOff(false); if (ended) nav.toPending(roll.id) }} />}

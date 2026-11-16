@@ -138,8 +138,14 @@ struct LoadFilmView: View {
                                 VStack(spacing: 2) {
                                     FilmCanisterView(stock: stock, format: camera?.format ?? .f135)
                                         .frame(height: 84)
-                                    Text(stock.displayName).font(.caption2).lineLimit(2).multilineTextAlignment(.center)
-                                        .frame(height: 28, alignment: .top)
+                                    VStack(spacing: 1) {
+                                        Text(stock.displayName).font(.caption2).lineLimit(2).multilineTextAlignment(.center)
+                                        if stockCount(stock.id) > 0 {
+                                            Text("재고 \(stockCount(stock.id))롤")
+                                                .font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    .frame(height: 42, alignment: .top)
                                 }
                                 .padding(4)
                                 .background(RoundedRectangle(cornerRadius: 10)
@@ -157,7 +163,7 @@ struct LoadFilmView: View {
                                     .frame(width: 76, height: 76)
                                     .frame(height: 84)
                                 Text("직접 추가").font(.caption2.weight(.semibold)).foregroundStyle(Theme.safelight)
-                                    .frame(height: 28, alignment: .top)
+                                    .frame(height: 42, alignment: .top)
                             }
                             .padding(4)
                         }

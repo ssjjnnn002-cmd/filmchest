@@ -419,6 +419,7 @@ select.input { appearance: none; -webkit-appearance: none; color: var(--muted); 
 .film-pick { border: 2px solid transparent; border-radius: 16px; background: none; padding: 6px 4px; display: grid; gap: 2px; justify-items: center; cursor: pointer; font-size: 12px; line-height: 1.25; text-align: center; min-width: 0; }
 .film-pick img { width: 84px; height: 84px; }
 .film-pick.on { border-color: var(--safelight); background: var(--safelight-soft); }
+.film-stock { font-size: 11px; line-height: 14px; min-height: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .camera-pick { border: 1px solid var(--sep); border-radius: 16px; background: var(--cell); padding: 8px 6px; width: 116px; flex: 0 0 auto; display: grid; gap: 2px; justify-items: center; cursor: pointer; font-size: 12px; min-width: 0; }
 .camera-pick img { height: 56px; object-fit: contain; }
 .camera-pick.on { border: 2px solid var(--safelight); background: var(--safelight-soft); padding: 7px 5px; }
@@ -657,7 +658,7 @@ a.row.accent { color: var(--safelight); }
 .card .cover { overflow: hidden; }
 
 /* 노출계 (전체 화면) */
-.meter-overlay { position: fixed; inset: 0; z-index: 1000; background: #0b0b0c; }
+.meter-overlay { position: fixed; inset: 0; z-index: 1000; background: #000; padding-top: env(safe-area-inset-top); overscroll-behavior: none; touch-action: none; }
 .meter-overlay iframe { display: block; width: 100%; height: 100%; border: 0; }
 
 /* 롤 보관함 프로젝트 */

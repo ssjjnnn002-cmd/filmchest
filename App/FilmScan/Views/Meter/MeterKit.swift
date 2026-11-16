@@ -38,6 +38,8 @@ struct MeterGear {
     var film: FilmStock?
     var frames = 36
     var prewind = false
+    /// 증감(푸시) 촬영 감도. 없으면 필름 감도
+    var iso: Double?
     var meterOnly: Bool { film == nil }
 }
 

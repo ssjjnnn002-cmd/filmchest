@@ -192,6 +192,9 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
                 })}>
                   <Canister film={f} format={camera?.format} size={84} />
                   <Text style={{ fontSize: 12, lineHeight: 15, textAlign: 'center', color: c.ink }}>{filmDisplayName(f)}</Text>
+                  <Text style={{ fontSize: 11, lineHeight: 14, minHeight: 14, color: c.muted, fontVariant: ['tabular-nums'] }}>
+                    {stockCount(lots, f.id) > 0 ? `재고 ${stockCount(lots, f.id)}롤` : ''}
+                  </Text>
                 </Pressable>
               )
             })}
