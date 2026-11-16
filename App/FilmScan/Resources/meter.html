@@ -372,6 +372,9 @@
   /* 보정 없음: 판 없이 검정, 이름만 */
   #btnC.none { background: transparent; border-color: transparent; }
   #btnC.none small { display: none; }
+  /* 줌: 누를 일이 없는 이름표라 판 없이 검정 */
+  #btnZ { background: transparent; border-color: transparent; pointer-events: none; }
+  #btnZ small { display: none; }
   /* 정노출 쪽 빛 세모 */
   .ring .hint { position: absolute; top: 50%; margin-top: 3px; width: 0; height: 0; border: 7px solid transparent; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .2s;
     filter: drop-shadow(0 0 4px rgb(255 190 70 / .95)) drop-shadow(0 0 9px rgb(255 160 40 / .6)); }
