@@ -1514,7 +1514,8 @@ async function fire() {
   busy = true
   await sleep(150)
   $('lever').classList.add('out'); sound(ratchetSound)
-  $('rewind').style.transform = `rotate(${shotCount * (prewind ? -150 : 150)}deg)`
+  // 감을 때 되감기 노브는 시계 반대 방향 (프리와인딩은 필름이 통으로 들어가니 반대)
+  $('rewind').style.transform = `rotate(${shotCount * (prewind ? 150 : -150)}deg)`
   placeStrip()
   await sleep(360)
   $('lever').classList.remove('out'); await sleep(320)
@@ -1647,9 +1648,10 @@ async function rewindFilm() {
   strip.style.scrollSnapType = 'none'
   track.style.transition = `transform ${dur}ms ${ease}`
   track.style.transform = `translateX(${-dist}px)`
-  const knob = $('rewind'), from = shotCount * (prewind ? -150 : 150)
+  const knob = $('rewind'), from = shotCount * (prewind ? 150 : -150)
   knob.style.transition = `transform ${dur}ms ${ease}`
-  knob.style.transform = `rotate(${from - dist * .9}deg)`
+  // 되감기는 시계 방향
+  knob.style.transform = `rotate(${from + dist * .9}deg)`
   $('counterSub').textContent = '되감는 중'
   // 되감기 소리: 처음엔 느리게, 중간엔 빠르게, 끝엔 다시 느리게
   sound(() => {
