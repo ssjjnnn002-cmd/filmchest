@@ -366,6 +366,9 @@
   .ring.short .mark { top: 12px; }
   .ringrow.auto .ring .mark { background: #6d6d72; box-shadow: none; }
   .ringrow.auto .lab { color: #7d7a75; }
+  /* 보정 없음: 판 없이 검정, 이름만 */
+  #btnC.none { background: transparent; border-color: transparent; }
+  #btnC.none small { display: none; }
   /* 정노출 쪽 빛 세모 */
   .ring .hint { position: absolute; top: 50%; margin-top: 3px; width: 0; height: 0; border: 7px solid transparent; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .2s;
     filter: drop-shadow(0 0 4px rgb(255 190 70 / .95)) drop-shadow(0 0 9px rgb(255 160 40 / .6)); }
@@ -909,7 +912,8 @@ $('btnS').addEventListener('click', () => toggle('s'))
 // 보정: 버튼을 누르면 0으로
 ringC.onChange = () => {
   const c = comp()
-  $('tagC').textContent = c ? fmtC(c) : '없음'
+  $('tagC').textContent = c ? fmtC(c) : ''
+  $('btnC').classList.toggle('none', !c)
   $('btnC').classList.toggle('on', !!c)
 }
 $('btnC').addEventListener('click', () => { if (comp()) { ringC.set(6); toast('보정을 껐어요') } else toast('링을 돌려서 보정해요') })
