@@ -136,8 +136,9 @@
 
   /* 조작부: 되감기 노브 · 카운터 · 셔터+레버 */
   /* 감는 레버가 필름보다 위로 지나가게: 조작부를 맨 위 층으로, 필름은 아래 층 */
-  .controls { position: relative; z-index: 20; }
-  .stripwrap { z-index: 1; margin-top: 30px !important; }
+  .controls { position: relative; z-index: 20; margin-top: var(--ctl-gap, 10px); padding-bottom: 46px; margin-bottom: -46px; pointer-events: none; transform: translateZ(0); will-change: transform; }
+  .controls svg > * { pointer-events: auto; }
+  .stripwrap { z-index: 1; margin-top: var(--strip-gap, 2px) !important; }
   .controls svg { display: block; width: 100%; height: auto; max-height: 92px; overflow: visible; }
   #shutterBtn { cursor: pointer; }
   #shutterBtn .disc { transition: transform .09s ease-out, filter .09s; transform-box: fill-box; transform-origin: center; }
@@ -251,10 +252,12 @@
   .toast.on { opacity: 1; transform: translate(-50%, 0); }
 
   /* ── 추가: 실제 카메라 파인더처럼 (사진에 담기는 칸 밖은 어둡게, 아래 띠에 LED 표시) ── */
-  .finder { aspect-ratio: 3 / 2; }
+  .finder { aspect-ratio: 5 / 4; }
+  .findwrap { position: relative; flex: none; height: min(100cqh, calc(100cqw * .8)); aspect-ratio: 5 / 4; }
+  .findwrap .finder { height: 100% !important; width: 100%; }
   .finder .gauge { display: none !important; } /* 전자식 LED가 있어서 바늘은 뺌 */
   .wrap > .finderbox { margin: 0 -16px; }
-  .finderbox .finder { height: min(100cqh, calc(100cqw / 1.5)); }
+  .finderbox .finder { height: min(100cqh, calc(100cqw * .8)); }
   /* 칸 밖 가리개: 칸(.bright)과 같은 자리만 뚫는다 */
   .finder .mask { position: absolute; inset: 0; pointer-events: none; background: rgb(4 4 5 / .86);
     -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0) center / 84% 74.67% no-repeat; -webkit-mask-composite: xor;
@@ -268,8 +271,8 @@
   /* 노출 미리보기: 고른 조리개·셔터로 찍히면 이 밝기 */
   .finder .scene { transition: filter .12s linear; }
   /* LED 띠 */
-  .lcd { position: relative; height: 32px; margin: -2px 4px 0; padding: 0 16px; border-radius: 9px; background: #050506; box-shadow: inset 0 1px 3px rgb(0 0 0 / .8), 0 0 0 1px #1c1c1e; display: flex; align-items: center; justify-content: space-between; gap: 6px; pointer-events: none;
-    font: 700 15px/1 ui-monospace, "SF Mono", Menlo, monospace; color: #9dffa8; text-shadow: 0 0 4px rgb(90 255 120 / .9), 0 0 10px rgb(90 255 120 / .5); letter-spacing: .02em; }
+  .lcd { position: absolute; z-index: 5; left: 13%; right: 13%; bottom: var(--lcd-bottom, 4.5%); height: 9%; display: flex; align-items: center; justify-content: space-between; gap: 6px; pointer-events: none;
+    font: 700 var(--lcd-font, clamp(12px, 3.8cqw, 16px))/1 ui-monospace, "SF Mono", Menlo, monospace; color: #9dffa8; text-shadow: 0 0 4px rgb(90 255 120 / .9), 0 0 10px rgb(90 255 120 / .5); letter-spacing: .02em; }
   .lcd .dimmed { opacity: .22; text-shadow: none; }
   .lcd .scale { display: flex; align-items: center; gap: 2px; font-size: .8em; }
   .lcd .scale i { display: block; width: 3.5px; height: .9em; border-radius: 1px; background: currentColor; opacity: .25; }
@@ -326,7 +329,7 @@
   .lcd .lock { color: #ffc24a; text-shadow: 0 0 6px rgb(255 190 60 / .6); }
   .modal .textbtn { display: block; width: 100%; margin-top: 10px; border: 0; background: none; color: var(--sub); font-size: 14px; font-weight: 600; padding: 6px 0; }
   /* 사진 칸: 렌즈 화각에 맞춰 넓어지거나 좁아진다 (레인지파인더의 프레임처럼) */
-  :root { --fw: 84%; --fh: 84%; }
+  :root { --fw: 84%; --fh: 70%; }
   .finder .mask { -webkit-mask: linear-gradient(#000 0 0), linear-gradient(#000 0 0) center / var(--fw) var(--fh) no-repeat; -webkit-mask-composite: xor;
     mask: linear-gradient(#000 0 0) exclude, linear-gradient(#000 0 0) center / var(--fw) var(--fh) no-repeat; }
   .finder .bright { width: var(--fw); height: var(--fh); }
@@ -358,6 +361,9 @@
   </div>
 
   <div class="finderbox">
+    <!-- 파인더 + LED: LED는 파인더 아래 검은 띠 자리에 겹쳐 두지만, 파인더의 흐린 테두리 처리는 받지 않게 바깥에 둔다 -->
+    <div class="findwrap">
+    <div class="lcd" id="lcd"><span id="lcdS">125</span><span class="scale" id="lcdScale"></span><span id="lcdA">8</span><span id="lcdL">EV 12.0</span></div>
     <div class="finder spot" id="finder">
       <div class="scene" id="scene">
         <video id="video" playsinline muted autoplay></video>
@@ -391,9 +397,8 @@
       <div class="cammsg" id="camMsg" hidden><p></p><button>카메라 켜기</button></div>
       <div class="fire" id="fire"></div>
     </div>
+    </div>
   </div>
-  <!-- 파인더 아래 LED 표시줄: 파인더 안에 두면 화면이 작을 때 흐린 가장자리에 걸려서 따로 뺀다 -->
-  <div class="lcd" id="lcd"><span id="lcdS">125</span><span class="scale" id="lcdScale"></span><span id="lcdA">8</span><span id="lcdL">EV 12.0</span></div>
 
   <div class="ringrow" id="rowC"><button class="mbtn" id="btnC"><span id="btnCText">노출 보정</span><small id="tagC"></small></button><div class="ring short" id="ringC"></div></div>
 
@@ -419,7 +424,8 @@
         <radialGradient id="orangeMatte" cx=".45" cy=".4" r=".7"><stop offset="0" stop-color="#ff7a35"/><stop offset=".7" stop-color="#f2621f"/><stop offset="1" stop-color="#d9531a"/></radialGradient>
         <radialGradient id="orange" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ff9a55"/><stop offset=".55" stop-color="#ff6b1f"/><stop offset="1" stop-color="#d4480a"/></radialGradient>
       </defs>
-      <!-- 되감기 노브 (손잡이 접힌 상태) -->
+      <!-- 되감기 노브 (손잡이 접힌 상태) — 카운터와 띄우는 거리는 --spread -->
+      <g style="transform: translateX(calc(var(--spread, 18) * -1px))">
       <g id="rewind">
         <circle cx="70" cy="52" r="30" fill="url(#chromeR)"/>
         <circle cx="70" cy="52" r="25" fill="#1d1d1f"/>
@@ -427,6 +433,7 @@
         <rect x="52" y="47" width="36" height="10" rx="5" fill="#2f2f33" stroke="#444" stroke-width=".8"/>
         <circle cx="84" cy="52" r="4.5" fill="#4a4a4e"/>
         <circle cx="70" cy="52" r="3" fill="#555"/>
+      </g>
       </g>
       <!-- 카운터 -->
       <rect x="110" y="12" width="140" height="66" rx="15" fill="#151517" stroke="#2c2c30"/>
@@ -438,7 +445,8 @@
       </g>
       <text id="counterText" x="203" y="57" text-anchor="middle" font-size="32" font-weight="700" fill="#fff" font-family="-apple-system, 'SF Pro Display', Helvetica, Arial">1</text>
       <text id="counterSub" x="180" y="96" text-anchor="middle" font-size="10.5" font-weight="500" fill="rgb(235 235 245 / .55)" font-family="-apple-system, sans-serif"></text>
-      <!-- 와인딩 레버: 셔터와 같은 축, 쉼표 모양 -->
+      <g style="transform: translateX(calc(var(--spread, 18) * 1px))">
+      <!-- 와인딩 레버: 셔터와 같은 축 -->
       <g id="lever">
         <!-- 아그파 옵티마 센서: 셔터를 감싼 검은 판이 왼쪽 아래로 이어져 홈 파인 손잡이로 끝난다 -->
         <path d="M 290 18 A 34 34 0 1 1 278.4 84 C 266 92 250 98 236 98 H 202 A 10 10 0 0 1 202 78 H 230 C 244 78 254 70 258.5 64.7 A 34 34 0 0 1 290 18 Z" fill="url(#leverBlack)" stroke="#3d3d42" stroke-width=".8"/>
@@ -453,6 +461,7 @@
         <circle cx="290" cy="52" r="26.5" fill="url(#chromeR)"/>
         <circle cx="290" cy="52" r="23.2" fill="#2a2a2c"/>
         <circle class="disc" cx="290" cy="52" r="22.4" fill="url(#orangeMatte)"/>
+      </g>
       </g>
     </svg>
   </div>
@@ -877,8 +886,8 @@ video.addEventListener('resize', () => applyZoom(zoom.z))
 const source = () => live() ? [video, video.videoWidth, video.videoHeight] : [sim, sim.width, sim.height]
 // 화면 확대는 늘 CSS로 부드럽게 하고, 폰 카메라 배율은 멈춘 뒤에 따라와서(hwRel) 그만큼 CSS 확대를 줄인다
 const cssZoom = () => zoom.native ? 1 : vis() / (zoom.hw ? zoom.hwRel : 1)
-// 파인더는 3:2, 그 안에서 사진에 담기는 칸(밝은 테두리)은 가운데 3:2 = 폭 84%
-const FA = 3 / 2, FW_BASE = .84, FW_MAX = .9
+// 파인더는 5:4, 그 안에서 사진에 담기는 칸(밝은 테두리)은 가운데 3:2 = 폭 84%
+const FA = 5 / 4, FW_BASE = .84, FW_MAX = .9
 let FW = FW_BASE // 지금 사진 칸 폭 (화각에 따라 바뀜)
 const fhOf = (w) => w * FA / 1.5
 function drawCrop(ctx, frac, dw, dh) {

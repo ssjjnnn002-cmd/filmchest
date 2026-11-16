@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>노출계 배치 조정</title>
+<!-- 시험용: 왼쪽 폰 화면(노출계)을 보면서 오른쪽 막대로 간격을 바로 바꿔 본다. 값은 이 브라우저에 기억되고 '값 복사'로 보낸다 -->
+<style>
+  :root { --bg: #111; --card: #1c1c1e; --line: #2c2c30; --ink: #f2f0ec; --sub: #8d8a85; --accent: #ff6b1f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; }
+  body { display: flex; gap: 16px; padding: 12px; align-items: flex-start; justify-content: center; }
+  .stage { flex: none; position: relative; }
+  .phone { position: absolute; left: 0; top: 0; width: 393px; height: 852px; border-radius: 44px; border: 10px solid #2a2a2c; overflow: hidden; background: #0b0b0c; transform-origin: 0 0; box-sizing: content-box; }
+  .phone iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .panel { width: 300px; max-height: calc(100vh - 24px); overflow-y: auto; background: var(--card); border-radius: 16px; padding: 16px; flex: none; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  .hint { color: var(--sub); font-size: 12px; margin: 0 0 14px; }
+  .item { margin-bottom: 14px; }
+  .item label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+  .item label b { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .item input { width: 100%; accent-color: var(--accent); }
+  .bar { display: flex; gap: 8px; margin-top: 6px; }
+  .bar button { flex: 1; border: 0; border-radius: 10px; padding: 10px 0; font: inherit; font-weight: 600; background: #2a2a2e; color: var(--ink); cursor: pointer; }
+  .bar .main { background: var(--accent); color: #111; }
+  .size { display: flex; gap: 6px; margin-bottom: 14px; }
+  .size button { flex: 1; border: 1px solid var(--line); background: none; color: var(--ink); border-radius: 8px; padding: 6px 0; font: inherit; font-size: 12px; cursor: pointer; }
+  .size button.on { border-color: var(--accent); color: var(--accent); }
+  pre { white-space: pre-wrap; font-size: 11px; color: var(--sub); background: #111; border-radius: 8px; padding: 8px; margin: 12px 0 0; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage"><div class="phone" id="phone"><iframe id="f" src="./meter.html?go"></iframe></div></div>
+<div class="panel" id="panel">
+  <h1>노출계 배치 조정</h1>
+  <p class="hint">막대를 움직이면 폰 화면이 바로 바뀌어요. 마음에 들면 '값 복사'로 보내 주세요.</p>
+  <div class="size" id="size"></div>
+  <div id="items"></div>
+  <div class="bar"><button id="wind">레버 감아 보기</button><button id="reset">처음 값</button></div>
+  <div class="bar"><button class="main" id="copy">값 복사</button></div>
+  <pre id="out"></pre>
+</div>
+<script>
+const $ = (id) => document.getElementById(id)
+// 노출계(meter.html)가 읽는 CSS 값들
+const ITEMS = [
+  { key: '--ctl-gap', name: '셔터 줄 ↔ 위 링 간격', min: -10, max: 40, step: 1, unit: 'px', def: 10 },
+  { key: '--strip-gap', name: '필름 ↔ 셔터 줄 간격 (음수면 겹침)', min: -40, max: 40, step: 1, unit: 'px', def: 2 },
+  { key: '--spread', name: '되감기·셔터를 카운터에서 벌리기', min: 0, max: 40, step: 1, unit: '', def: 18 },
+  { key: '--lcd-bottom', name: '초록 숫자 높이 (파인더 아래에서)', min: 0, max: 12, step: .2, unit: '%', def: 4.5 },
+  { key: '--lcd-font', name: '초록 숫자 크기', min: 10, max: 20, step: .5, unit: 'px', def: 0 },
+]
+// 창이 좁으면 폰 화면을 줄여서 막대와 나란히 보이게
+let pw = 393, ph = 852
+function fit() {
+  // 넓으면 폰 화면 옆에 막대, 좁으면(오른쪽 창 등) 위아래로
+  const narrow = innerWidth < 300 + 40 + (pw + 20) * .55
+  document.body.style.flexDirection = narrow ? 'column' : 'row'
+  document.body.style.alignItems = narrow ? 'center' : 'flex-start'
+  const k = Math.max(.35, narrow ? Math.min(1, (innerWidth - 24) / (pw + 20)) : Math.min(1, (innerWidth - 300 - 40) / (pw + 20), (innerHeight - 24) / (ph + 20)))
+  $('phone').style.transform = `scale(${k})`
+  $('stage').style.width = (pw + 20) * k + 'px'; $('stage').style.height = (ph + 20) * k + 'px'
+  $('panel').style.width = narrow ? Math.min(420, innerWidth - 24) + 'px' : '300px'
+  $('panel').style.maxHeight = narrow ? 'none' : ''
+}
+addEventListener('resize', fit)
+const SIZES = [['아이폰 15', 393, 852], ['아이폰 SE', 375, 667], ['프로 맥스', 430, 932], ['갤럭시', 412, 915]]
+let vals = {}
+try { vals = JSON.parse(localStorage.getItem('meterEdit') || '{}') } catch {}
+const save = () => { try { localStorage.setItem('meterEdit', JSON.stringify(vals)) } catch {} }
+function apply() {
+  const root = $('f').contentDocument?.documentElement
+  if (!root) return
+  for (const it of ITEMS) {
+    const v = vals[it.key]
+    if (v == null || (it.key === '--lcd-font' && !v)) root.style.removeProperty(it.key)
+    else root.style.setProperty(it.key, it.unit ? v + it.unit : String(v))
+  }
+  $('f').contentWindow.dispatchEvent(new Event('resize'))
+  $('out').textContent = ITEMS.map((it) => `${it.name}: ${it.key === '--lcd-font' && !(vals[it.key]) ? '자동' : (vals[it.key] ?? it.def) + it.unit}`).join('\n')
+}
+for (const it of ITEMS) {
+  const box = document.createElement('div'); box.className = 'item'
+  const cur = vals[it.key] ?? it.def
+  box.innerHTML = `<label><span>${it.name}</span><b>${it.key === '--lcd-font' && !cur ? '자동' : cur + it.unit}</b></label><input type="range" min="${it.min}" max="${it.max}" step="${it.step}" value="${it.key === '--lcd-font' && !cur ? 15 : cur}">`
+  const input = box.querySelector('input'), out = box.querySelector('b')
+  input.oninput = () => { vals[it.key] = +input.value; out.textContent = input.value + it.unit; save(); apply() }
+  $('items').append(box)
+}
+for (const [name, w, h] of SIZES) {
+  const b = document.createElement('button'); b.textContent = name
+  b.onclick = () => { pw = w; ph = h; $('phone').style.width = w + 'px'; $('phone').style.height = h + 'px'; fit(); document.querySelectorAll('#size button').forEach((x) => x.classList.toggle('on', x === b)) }
+  if (w === 393) b.classList.add('on')
+  $('size').append(b)
+}
+$('f').onload = () => setTimeout(apply, 300)
+fit()
+$('wind').onclick = () => $('f').contentWindow.fire?.()
+$('reset').onclick = () => { vals = {}; save(); location.reload() }
+$('copy').onclick = async () => {
+  const text = '노출계 배치 값\n' + $('out').textContent
+  try { await navigator.clipboard.writeText(text) } catch {}
+  $('copy').textContent = '복사했어요'; setTimeout(() => { $('copy').textContent = '값 복사' }, 1500)
+}
+</script>
+</body>
+</html>
