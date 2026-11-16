@@ -366,6 +366,13 @@
   .ring.short .mark { top: 12px; }
   .ringrow.auto .ring .mark { background: #6d6d72; box-shadow: none; }
   .ringrow.auto .lab { color: #7d7a75; }
+  /* 정노출 쪽 빛 세모 */
+  .ring .hint { position: absolute; top: 50%; margin-top: 3px; width: 0; height: 0; border: 7px solid transparent; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .2s;
+    filter: drop-shadow(0 0 4px rgb(255 190 70 / .95)) drop-shadow(0 0 9px rgb(255 160 40 / .6)); }
+  .ring .hint.l { left: 6px; transform: translateY(-50%); border-right: 10px solid #ffd27a; border-left-width: 0; }
+  .ring .hint.r { right: 6px; transform: translateY(-50%); border-left: 10px solid #ffd27a; border-right-width: 0; }
+  .ring .hint.on { opacity: 1; animation: hintPulse 1s ease-in-out infinite; }
+  @keyframes hintPulse { 50% { opacity: .35; } }
 </style>
 </head>
 <body>
@@ -766,7 +773,7 @@ const detent = () => { sound(() => noise(0, .008, 6000, .12)); navigator.vibrate
 class Ring {
   constructor(el, fmt, step) {
     Object.assign(this, { el, fmt, step, pos: 0, target: 0, vel: 0, auto: false, dragging: false, values: [], labEls: [] })
-    el.innerHTML = '<div class="ridges"></div><div class="labels"></div><div class="mark"></div><div class="shade"></div>'
+    el.innerHTML = '<div class="ridges"></div><div class="labels"></div><div class="mark"></div><div class="shade"></div><i class="hint l"></i><i class="hint r"></i>'
     const ridges = el.querySelector('.ridges')
     this.labels = el.querySelector('.labels')
     this.ridgeEls = Array.from({ length: 160 }, () => ridges.appendChild(Object.assign(document.createElement('div'), { className: 'ridge' })))
@@ -1812,6 +1819,21 @@ let toastT
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200) }
 
 let lastMeasure = 0, lastFrame = 0
+// 오버·언더일 때 정노출 쪽을 링 끝의 빛 세모로 알려 준다. 고를 수 있는 링에만 (조리개 우선=조리개, 셔터 우선=셔터, 수동=둘 다)
+// 오버면 조리개는 큰 f값(오른쪽), 셔터는 빠른 쪽(왼쪽). 언더는 반대
+let hintKey = ''
+function showTurnHints(diff) {
+  const off = Math.abs(diff) >= .34 ? Math.sign(diff) : 0
+  const a = (mode === 'A' || mode === 'M') && off ? (off > 0 ? 'r' : 'l') : ''
+  const t = (mode === 'S' || mode === 'M') && off ? (off > 0 ? 'l' : 'r') : ''
+  const key = a + '|' + t
+  if (key === hintKey) return
+  hintKey = key
+  for (const [ring, side] of [[$('ringA'), a], [$('ringS'), t]]) {
+    ring.querySelector('.hint.l').classList.toggle('on', side === 'l')
+    ring.querySelector('.hint.r').classList.toggle('on', side === 'r')
+  }
+}
 let previewOff = 0, lastSceneFilter = ''
 // 파인더 아래 LED: 셔터 · 노출 눈금(−2…+2, ⅓스톱) · 조리개 · 측광 고정
 {
@@ -1844,6 +1866,7 @@ function loop(now) {
     if (!held) meterEV += (measure() - meterEV) * .35
   }
   const r = solve()
+  showTurnHints(r.diff)
   const target = -clamp(r.diff, -2.15, 2.15) * 24
   needleV = needleV * .78 + (target - needleA) * .09
   needleA += needleV
