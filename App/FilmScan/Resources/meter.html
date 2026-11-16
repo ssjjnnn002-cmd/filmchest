@@ -768,7 +768,8 @@ const vis = () => fit().s
 
 // ───────── 소리 ─────────
 let ac = null
-const audio = () => (ac ||= new (window.AudioContext || window.webkitAudioContext)())
+// 아이폰은 소리가 처음엔 멈춘 상태로 시작해서, 누를 때마다 깨운다
+const audio = () => { ac ||= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume?.(); return ac }
 function noise(at, dur, freq, gain) {
   const a = audio(), len = Math.ceil(a.sampleRate * dur)
   const buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0)
@@ -779,7 +780,12 @@ function noise(at, dur, freq, gain) {
   s.connect(f).connect(g).connect(a.destination); s.start(a.currentTime + at)
 }
 const sound = (fn) => { try { fn() } catch {} }
-const shutterSound = () => { noise(0, .03, 3200, 1.1); noise(.045, .025, 2400, .8) }
+// 셔터: 앞막이 열리는 '철'과 뒷막이 닫히는 '컥' 사이를 실제 셔터 속도만큼 띄운다 (느린 셔터는 느리게 들림)
+const shutterSound = (t) => {
+  const gap = clamp(t, .012, 8)
+  noise(.01, .028, 2600, 1.6); noise(.012, .05, 900, .7)
+  noise(.01 + gap, .03, 2100, 1.5); noise(.012 + gap, .06, 700, .8)
+}
 const ratchetSound = () => { for (let i = 0; i < 7; i++) noise(i * .045, .012, 5200, .35) }
 const detent = () => { sound(() => noise(0, .008, 6000, .12)); navigator.vibrate?.(4) }
 
@@ -1480,7 +1486,9 @@ async function fire() {
   audio()
   const btn = $('shutterBtn')
   btn.classList.add('down'); setTimeout(() => btn.classList.remove('down'), 140)
-  sound(shutterSound); navigator.vibrate?.(12)
+  // 이번 컷의 셔터 속도 (자동이면 노출계가 고른 값)
+  const shotT = mode === 'S' || mode === 'M' ? ringS.value : solve().t
+  sound(() => shutterSound(shotT)); navigator.vibrate?.(12)
   const f = $('fire'); f.classList.remove('go'); f.offsetWidth; f.classList.add('go')
 
   let pos = nextPos()
@@ -1512,7 +1520,8 @@ async function fire() {
   }
 
   busy = true
-  await sleep(150)
+  // 셔터가 닫힌 뒤에 감는다
+  await sleep(Math.max(150, Math.min(shotT, 8) * 1000 + 140))
   $('lever').classList.add('out'); sound(ratchetSound)
   // 감을 때 되감기 노브는 시계 반대 방향 (프리와인딩은 필름이 통으로 들어가니 반대)
   $('rewind').style.transform = `rotate(${shotCount * (prewind ? 150 : -150)}deg)`
