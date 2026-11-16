@@ -135,8 +135,9 @@
   .ringrow.auto .ring .mark { border-top-color: #666; }
 
   /* 조작부: 되감기 노브 · 카운터 · 셔터+레버 */
-  .controls { position: relative; z-index: 6; transform: translateZ(0); }
-  .stripwrap { z-index: 1; }
+  /* 감는 레버가 필름보다 위로 지나가게: 조작부를 맨 위 층으로, 필름은 아래 층 */
+  .controls { position: relative; z-index: 20; }
+  .stripwrap { z-index: 1; margin-top: 12px !important; }
   .controls svg { display: block; width: 100%; height: auto; max-height: 92px; overflow: visible; }
   #shutterBtn { cursor: pointer; }
   #shutterBtn .disc { transition: transform .09s ease-out, filter .09s; transform-box: fill-box; transform-origin: center; }
@@ -150,7 +151,7 @@
   .canister { position: absolute; left: -34px; top: -10px; width: 72px; height: 132px; pointer-events: none; z-index: 2; filter: drop-shadow(4px 0 6px rgb(0 0 0 / .55)); }
   .canister svg { width: 100%; height: 100%; display: block; }
   .strip { position: relative; height: 112px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity;
-    scrollbar-width: none; -webkit-overflow-scrolling: touch; touch-action: pan-x; }
+    scrollbar-width: none; touch-action: pan-x; }
   .strip::-webkit-scrollbar { display: none; }
   .strip { overscroll-behavior-x: none; }
   .track { display: flex; height: 100%; width: max-content; padding: 0 calc(50% - 52px) 0 0; }
@@ -267,7 +268,7 @@
   .finder .scene { transition: filter .12s linear; }
   /* LED 띠 */
   .finder .lcd { position: absolute; left: 13%; right: 13%; bottom: 5.2%; height: 8.6%; display: flex; align-items: center; justify-content: space-between; gap: 6px; pointer-events: none;
-    font: 700 clamp(13px, 4.2cqw, 18px)/1 ui-monospace, "SF Mono", Menlo, monospace; color: #9dffa8; text-shadow: 0 0 4px rgb(90 255 120 / .9), 0 0 10px rgb(90 255 120 / .5); letter-spacing: .02em; }
+    font: 700 clamp(12px, 3.8cqw, 16px)/1 ui-monospace, "SF Mono", Menlo, monospace; color: #9dffa8; text-shadow: 0 0 4px rgb(90 255 120 / .9), 0 0 10px rgb(90 255 120 / .5); letter-spacing: .02em; }
   .finder .lcd .dimmed { opacity: .22; text-shadow: none; }
   .finder .lcd .scale { display: flex; align-items: center; gap: 2px; font-size: .8em; }
   .finder .lcd .scale i { display: block; width: 3.5px; height: .9em; border-radius: 1px; background: currentColor; opacity: .25; }
@@ -320,6 +321,7 @@
   .flash.mtr { flex-direction: column; justify-content: center; gap: 0; padding: 0 11px; line-height: 1.05; color: var(--text); }
   .flash.mtr small { font-size: 9px; font-weight: 700; color: var(--sub); }
   .flash.mtr span { font-size: 13px; font-weight: 700; }
+  .finder .lcd > span { white-space: nowrap; flex: none; }
   .finder .lcd .lock { color: #ffc24a; text-shadow: 0 0 6px rgb(255 190 60 / .6); }
   .modal .textbtn { display: block; width: 100%; margin-top: 10px; border: 0; background: none; color: var(--sub); font-size: 14px; font-weight: 600; padding: 6px 0; }
   /* 사진 칸: 렌즈 화각에 맞춰 넓어지거나 좁아진다 (레인지파인더의 프레임처럼) */
@@ -398,7 +400,7 @@
       <div class="state ok" id="state">적정</div>
       <div class="ev" id="ev">EV —</div>
     </div>
-    <div class="infobtns"><button class="flash" id="flashBtn" aria-pressed="false" aria-label="플래시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 13.5h6.5L9 22l10-12.5h-6.6L13.5 2Z" fill="currentColor"/></svg><span>끔</span></button><button class="flash filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button><button class="flash mtr" id="meterMode" aria-label="측광 방식"><span id="meterText">스팟</span></button><button class="hold" id="hold" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>고정</span></button></div>
+    <div class="infobtns"><button class="flash filt" id="filterBtn" aria-label="필터"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 9.5h11M5.5 13h13M7 16.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".7"/></svg><span>필터</span></button><button class="flash mtr" id="meterMode" aria-label="측광 방식"><span id="meterText">스팟</span></button><button class="hold" id="hold" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span>고정</span></button></div>
   </div>
 
   <div class="rings">
@@ -426,6 +428,11 @@
       </g>
       <!-- 카운터 -->
       <rect x="132" y="14" width="96" height="62" rx="14" fill="#151517" stroke="#2c2c30"/>
+      <!-- 플래시: 실제 필름 카운터 창처럼 왼쪽 위 번개 표시. 누르면 켜고 끔 -->
+      <g id="flashMark" role="button" aria-label="플래시" style="cursor:pointer">
+        <rect x="132" y="14" width="40" height="30" rx="10" fill="transparent"/>
+        <path id="flashBolt" d="M150.5 20.5 l-7.5 10 h5 l-1.5 8 l7.8-10.6 h-5.2 z" fill="#4a4743"/>
+      </g>
       <text id="counterText" x="180" y="57" text-anchor="middle" font-size="32" font-weight="700" fill="#fff" font-family="-apple-system, 'SF Pro Display', Helvetica, Arial">1</text>
       <text id="counterSub" x="180" y="96" text-anchor="middle" font-size="10.5" font-weight="500" fill="rgb(235 235 245 / .55)" font-family="-apple-system, sans-serif"></text>
       <!-- 와인딩 레버: 셔터와 같은 축, 쉼표 모양 -->
@@ -597,11 +604,16 @@ if (METER_ONLY) document.documentElement.classList.add('meteronly')
 const CAM_ID = INIT?.camera?.id || 'test-camera'
 const cam = {
   modes: INIT?.camera?.modes?.length ? INIT.camera.modes : ['P', 'A', 'S', 'M'], ap: aps(parseFloat(INIT?.camera?.lens?.open) || 1.4, parseFloat(INIT?.camera?.lens?.close) || 22), sh: stops(1 / (INIT?.camera?.fastest || 4000), INIT?.camera?.slowest || 8), pLock: 0,
+  // P 모드에서 조리개 링을 최소 조리개(가장 큰 f값)에 두면 카메라가 조리개·셔터를 둘 다 정하는 기종
+  programAtMin: !!INIT?.camera?.programAtMinAperture,
   name: INIT?.camera?.name || '테스트용 카메라',
   iso: INIT?.film?.iso || 400, frames: INIT?.film?.frames || 36,
   film: INIT?.film?.name || 'Kodak Portra 400', filmShort: INIT?.film?.short || 'PORTRA',
   format: INIT?.film?.format || '135', color: INIT?.film?.color || '#f0b43a',
 }
+// 최소 조리개 값은 렌즈를 바꾸면 달라진다
+const syncPLock = () => { cam.pLock = cam.programAtMin ? cam.ap[cam.ap.length - 1] : 0 }
+syncPLock()
 const COMPS = Array.from({ length: 13 }, (_, i) => (i - 6) / 3)  // −2 … +2, 1/3스톱
 const ISOS = [25, 32, 40, 50, 64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400]
 const MODE_NAME = { P: '자동', A: '조리개 우선', S: '셔터 우선', M: '수동' }
@@ -648,10 +660,38 @@ const lensText = (l = lens) => l.max > l.min ? `${l.min}–${l.max}mm 줌` : `${
 const zLo = () => lens.min / PHONE_MM, zHi = () => lens.max / PHONE_MM
 // 실제 화각 맞추기. 폰 1배 = 26mm(4:3 센서 긴 변 34.6mm 환산). 화면(video)은 센서의 일부만 담고,
 // 파인더는 그중 4:3만, 사진 칸은 다시 그 폭의 FW만 보여 준다 → 그 칸이 필름 가로 36mm일 때 몇 mm 렌즈인지 계산한다
-function frameMM1() {
-  const [, sw, sh] = source()
-  const shown = (sw / sh > FA ? sh * FA : sw) / Math.max(sw, sh) // 센서 긴 변 중 파인더 폭에 보이는 비율
-  return PHONE_MM * 36 / (34.6 * shown * FW_BASE)
+// 지금 쓰는 폰 카메라의 1배 화각 (기본 26mm, 초광각 13mm)
+let camMM = PHONE_MM
+const shownPart = () => { const [, sw, sh] = source(); return (sw / sh > FA ? sh * FA : sw) / Math.max(sw, sh) } // 센서 긴 변 중 파인더 폭에 보이는 비율
+function frameMM1() { return camMM * 36 / (34.6 * shownPart() * FW_BASE) }
+// 초광각 ↔ 기본 카메라: 화각이 기본 카메라로 안 되면 초광각으로, 되면 다시 기본으로 (사진이 더 선명하다)
+let ultraId = null, usingUltra = false, switchTimer = 0, switching = false
+const mainCanShow = () => zoom.z * PHONE_MM / (PHONE_MM * 36 / (34.6 * shownPart() * FW_BASE)) >= 1.02
+async function findUltra() {
+  try {
+    const list = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput')
+    ultraId = list.find((d) => /ultra ?wide|초광각/i.test(d.label))?.deviceId || null
+  } catch {}
+}
+function wantUltra() { if (ultraId && !usingUltra && !zoom.native && !(zoom.hw && zoom.min < .9)) queueSwitch(true) }
+function wantMain() { queueSwitch(false) }
+function queueSwitch(ultra) {
+  clearTimeout(switchTimer)
+  switchTimer = setTimeout(async () => {
+    if (switching || ultra === usingUltra) return
+    // 폰 카메라가 스스로 초광각까지 넓힐 수 있으면(배율 1 미만) 바꿀 필요 없음
+    if (ultra && zoom.hw && zoom.min < .9) return
+    switching = true
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: ultra
+        ? { deviceId: { exact: ultraId }, width: { ideal: 1920 }, aspectRatio: { ideal: 4 / 3 } }
+        : { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, aspectRatio: { ideal: 4 / 3 } }, audio: false })
+      video.srcObject?.getTracks?.().forEach((t) => t.stop())
+      usingUltra = ultra; camMM = ultra ? PHONE_MM / 2 : PHONE_MM
+      await attachStream(stream)
+    } catch {}
+    switching = false
+  }, 400)
 }
 // 렌즈 화각을 보여 주는 폰 배율(s)과 사진 칸 폭(w). 폰이 그만큼 넓게(좁게) 못 보면 칸을 넓혀(좁혀) 맞춘다 (레인지파인더 프레임처럼)
 function fit() {
@@ -811,10 +851,10 @@ function setMode(m) {
   ringS.auto = m === 'A' || m === 'P'
   $('btnA').classList.toggle('on', f.a); $('btnS').classList.toggle('on', f.s)
   $('rowA').classList.toggle('auto', ringA.auto); $('rowS').classList.toggle('auto', ringS.auto)
-  $('tagA').textContent = m === 'P' ? (cam.pLock ? `P · ${cam.pLock} 고정` : '자동') : m === 'A' ? '우선' : m === 'S' ? '자동' : '수동'
+  $('tagA').textContent = m === 'P' ? (cam.pLock ? `f/${cam.pLock}에 둠` : '자동') : m === 'A' ? '우선' : m === 'S' ? '자동' : '수동'
   $('tagS').textContent = m === 'P' ? '자동' : m === 'S' ? '우선' : m === 'A' ? '자동' : '수동'
 }
-ringA.onLocked = ringS.onLocked = () => toast(mode === 'P' && cam.pLock ? `P모드에선 조리개를 f/${cam.pLock}에 두고 카메라가 정해요` : '이 링은 카메라가 맞춰요')
+ringA.onLocked = ringS.onLocked = () => toast(mode === 'P' && cam.pLock ? `P 모드는 링을 f/${cam.pLock}에 두고, 조리개·셔터는 카메라가 정해요` : '이 링은 카메라가 맞춰요')
 $('btnA').addEventListener('click', () => toggle('a'))
 $('btnS').addEventListener('click', () => toggle('s'))
 // 보정: 버튼을 누르면 0으로
@@ -1083,8 +1123,20 @@ async function startCamera() {
       if (e.name !== 'OverconstrainedError') throw e
       stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     }
+    await attachStream(stream)
+    findUltra().then(() => applyZoom(zoom.z))
+  } catch (e) {
+    sim.style.display = SIM ? '' : 'none'
+    if (e.name === 'NotAllowedError') camMessage('카메라 권한이 꺼져 있어요. 허용한 뒤 다시 눌러 주세요.', true)
+    else camMessage('카메라를 열지 못했어요.', true)
+  } finally {
+    camStarting = false
+  }
+}
+async function attachStream(stream) {
     video.srcObject = stream
     await video.play()
+    zoom = { z: zoom.z, min: 1, max: 4.6, hw: false }
     applyZoom(zoom.z)
     sim.style.display = 'none'
     camMessage('')
@@ -1101,13 +1153,6 @@ async function startCamera() {
     camEV = null; camEVSeen = null; camEVLive = false
     watchCameraExposure(track)
     await lockExposure(track)
-  } catch (e) {
-    sim.style.display = SIM ? '' : 'none'
-    if (e.name === 'NotAllowedError') camMessage('카메라 권한이 꺼져 있어요. 허용한 뒤 다시 눌러 주세요.', true)
-    else camMessage('카메라를 열지 못했어요.', true)
-  } finally {
-    camStarting = false
-  }
 }
 
 // ───────── 노출 바늘 (왼쪽, 위가 오버) ─────────
@@ -1171,9 +1216,9 @@ function applyZoom(z) {
     $('finder').style.setProperty('--fw', `${(FW * 100).toFixed(2)}%`)
     $('finder').style.setProperty('--fh', `${(fhOf(FW) * 100).toFixed(2)}%`)
   }
-  // 폰이 그만큼 넓게 못 보면 실제로 보이는 화각도 같이 적는다
-  const shownMM = Math.round(frameMM1() * zoom.min * FW_BASE / FW_MAX)
-  $('focalText').innerHTML = f.cut ? `${mm}mm <small>화면 ${shownMM}mm</small>` : `${mm}mm`
+  if (f.cut) wantUltra()
+  else if (usingUltra && mainCanShow()) wantMain()
+  $('focalText').textContent = `${mm}mm`
   $('scene').style.transform = `scale(${cssZoom().toFixed(4)})`
   if (zoom.hw) { clearTimeout(hwTimer); hwTimer = setTimeout(syncHwZoom, 220) }
   if (zoom.native && !zoomTimer) zoomTimer = setTimeout(() => { zoomTimer = 0; post({ type: 'zoom', z: vis() }) }, 33)
@@ -1610,7 +1655,7 @@ function beginRoll(pw) {
   shots = {}; shotCount = 0; ended = false
   $('endBtn').disabled = false; $('endBtn').textContent = '촬영 끝내기'
   buildStrip(); setMode(mode)
-  $('filmLine').textContent = `${cam.film} · ISO ${cam.iso} · ${cam.frames}컷`
+  $('filmLine').textContent = `${cam.film} · ${cam.frames}컷`
   audio()
   sendShots()
 }
@@ -1647,10 +1692,10 @@ $('meterMode').addEventListener('click', () => {
   toast(`${METER_NAME[next]} 측광`)
 })
 
-$('flashBtn').addEventListener('click', () => {
+$('flashMark').addEventListener('click', () => {
   flash = !flash
-  $('flashBtn').classList.toggle('on', flash); $('flashBtn').setAttribute('aria-pressed', flash)
-  $('flashBtn').querySelector('span').textContent = flash ? '켬' : '끔'
+  $('flashBolt').setAttribute('fill', flash ? '#ffd23f' : '#4a4743')
+  $('flashBolt').style.filter = flash ? 'drop-shadow(0 0 3px rgb(255 210 63 / .8))' : ''
   detent()
   toast(flash ? '플래시 켬 · 끌 때까지 찍는 컷에 기록돼요' : '플래시 끔')
 })
@@ -1834,6 +1879,7 @@ function setGearLens(l) {
   lens = { min: +l.min, max: Math.max(+l.min, +l.max || +l.min) }
   const keep = ringA.value
   cam.ap = aps(parseFloat(l.open) || 1.4, parseFloat(l.close) || 22)
+  syncPLock()
   ringA.setValues(cam.ap, nearest(cam.ap, keep || 8))
   setMode(mode)
   applyLens()
@@ -1862,7 +1908,7 @@ ringC.onChange()
 setZoom(1, true)
 applyLens()
 buildStrip()
-$('filmLine').textContent = `${cam.film} · ISO ${cam.iso} · ${cam.frames}컷`
+$('filmLine').textContent = `${cam.film} · ${cam.frames}컷`
 addEventListener('resize', () => placeStrip(true))
 // 화면 크기가 정해지는 순간(처음 그릴 때 포함) 다음 칸을 가운데로
 if (window.ResizeObserver) new ResizeObserver(() => { if (track.children.length) placeStrip(true) }).observe(strip)
@@ -1878,7 +1924,7 @@ $('canIso').textContent = cam.iso
 $('canSub').textContent = `${cam.format}·${cam.frames}`
 $('canBand').setAttribute('fill', cam.color)
 $('stCanBand').style.background = cam.color
-$('filmLine').textContent = `${cam.film} · ISO ${cam.iso} · ${cam.frames}컷`
+$('filmLine').textContent = `${cam.film} · ${cam.frames}컷`
 // 나가기: 기록은 찍을 때마다 저장돼 있으니 닫아도 남는다고 알려 주고 묻는다 (노출계만 쓸 땐 묻지 않음)
 function leave() {
   closeSheets()

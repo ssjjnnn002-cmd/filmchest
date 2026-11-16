@@ -97,7 +97,8 @@ const PRESETS = [
     lens: { name: 'E.Zuiko 42mm f/2.8 (고정 렌즈)', min: 42, max: 42, open: '2.8', close: '22', fixed: true } },
   { id: 'af600', name: 'Nikon AF600', modes: ['P'], fastest: 250, slowest: 2, prewind: false,
     lens: { name: 'Nikon 28mm f/3.5 (고정 렌즈)', min: 28, max: 28, open: '3.5', close: '22', fixed: true } },
-  { id: 'x700', name: 'Minolta X-700', modes: ['P', 'A', 'M'], fastest: 1000, slowest: 4, prewind: false,
+  // X-700의 P 모드: 조리개 링을 최소 조리개에 두면 카메라가 조리개·셔터를 둘 다 정한다
+  { id: 'x700', name: 'Minolta X-700', modes: ['P', 'A', 'M'], fastest: 1000, slowest: 4, prewind: false, programAtMinAperture: true,
     lens: { id: 'md50', name: 'MD Rokkor 50mm f/1.7', min: 50, max: 50, open: '1.7', close: '22' },
     // 장비 탭에 등록된 같은 마운트(미놀타 MD) 렌즈들 흉내
     lenses: [
@@ -135,7 +136,7 @@ function open(only) {
   const init = {
     test: true,
     only: only ? 'meter' : undefined,
-    camera: { id: 'lab-' + p.id, name: p.name, modes: p.modes, fastest: p.fastest, slowest: p.slowest, lens: curLens() },
+    camera: { id: 'lab-' + p.id, name: p.name, modes: p.modes, fastest: p.fastest, slowest: p.slowest, programAtMinAperture: !!p.programAtMinAperture, lens: curLens() },
     lenses: p.lenses,
     film: FILM,
     prewind: p.prewind,
