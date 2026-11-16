@@ -71,19 +71,24 @@ struct NativeMeterView: View {
                         }
                     }
                 } else {
+                    // 파인더는 웹처럼 화면 끝에서 끝까지 (5:4). 상세 기록은 아래 필름 띠가 화면 맨 아래(홈 막대 자리)까지 내려가서
+                    // 파인더가 줄지 않는다. 화면이 작으면 그만큼만 줄인다
+                    let fullH = geo.size.width * 0.8
+                    let room = geo.size.height - (m.gear.meterOnly ? 400 : 492)
                     VStack(spacing: 9) {
                         header
                         if m.gear.meterOnly { Spacer(minLength: 0) }
-                        finder.layoutPriority(1)
+                        finder.frame(height: max(200, min(fullH, room))).padding(.horizontal, -16)
                         if m.gear.meterOnly { Spacer(minLength: 0) }
                         controlsColumn
-                        if m.gear.meterOnly { Spacer().frame(height: 44) }
+                        if m.gear.meterOnly { Spacer().frame(height: 44) } else { Spacer(minLength: 0) }
                     }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.top, 6)
         }
+        .ignoresSafeArea(.container, edges: m.gear.meterOnly ? [] : .bottom)
         .background(Color.black.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .overlay(alignment: .bottom) { toastView }
