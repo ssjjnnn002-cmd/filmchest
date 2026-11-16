@@ -383,6 +383,15 @@
   .ring .hint.on { opacity: 1; animation: hintPulse 1s ease-in-out infinite; }
   @keyframes hintPulse { 50% { opacity: .35; } }
 
+
+  /* 위 오른쪽 버튼(ISO·필터·화각)을 같은 높이·간격으로 */
+  .head .lensbtn { height: 36px; padding-top: 0; padding-bottom: 0; box-sizing: border-box; }
+  .head .lensbtn.filt { width: 36px; padding: 0; justify-content: center; }
+  .head .lensbtn.filt.on { width: auto; padding: 0 12px; }
+  .head { gap: 6px; }
+  .head .t { margin-right: 4px; }
+  /* 노출 보정 링을 초록 숫자에서 조금 띄움 */
+  .wrap > #rowC { margin-top: 10px; }
   /* ── 반응형: 넓은 폰·폴드·태블릿, 가로 화면 ── */
   body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
   /* 세로로 큰 화면(태블릿·펼친 폴드): 한 줄 폭을 조금 넓힌다 */
