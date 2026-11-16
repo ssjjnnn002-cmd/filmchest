@@ -382,6 +382,23 @@
   .ring .hint.r { right: 6px; transform: translateY(-50%); border-left: 10px solid #ffd27a; border-right-width: 0; }
   .ring .hint.on { opacity: 1; animation: hintPulse 1s ease-in-out infinite; }
   @keyframes hintPulse { 50% { opacity: .35; } }
+
+  /* ── 반응형: 넓은 폰·폴드·태블릿, 가로 화면 ── */
+  body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  /* 세로로 큰 화면(태블릿·펼친 폴드): 한 줄 폭을 조금 넓힌다 */
+  @media (orientation: portrait) and (min-width: 600px) { .wrap { max-width: 560px; } }
+  /* 가로 화면: 왼쪽 파인더, 오른쪽 링·셔터·필름. 오른쪽이 넘치면 그쪽만 스크롤 */
+  @media (orientation: landscape) and (min-width: 560px) {
+    .wrap { max-width: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); grid-auto-rows: auto;
+      column-gap: 20px; row-gap: 8px; align-content: start; padding: 6px 16px 10px; overflow-y: auto; overscroll-behavior: contain; }
+    .wrap > .head { grid-column: 1 / -1; }
+    .wrap > .finderbox { grid-column: 1; grid-row: 2 / span 20; align-self: start; position: sticky; top: 0; margin: 0;
+      height: calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+    .wrap > :not(.head):not(.finderbox) { grid-column: 2; }
+    .wrap > .stripwrap { margin: 6px 0 0 !important; }
+    .canister { left: -8px; }
+    .controls svg { width: min(100%, 300px); }
+  }
 </style>
 </head>
 <body>
@@ -516,11 +533,10 @@
           <linearGradient id="cVig" x1="0" x2="1"><stop offset=".22" stop-color="#000" stop-opacity=".7"/><stop offset=".62" stop-color="#000" stop-opacity="0"/></linearGradient>
         </defs>
         <rect x="2" y="9" width="64" height="114" fill="#0b0b0c"/>
-        <rect id="canBand" x="2" y="11" width="35" height="110" fill="#f0b43a"/>
-        <text id="canName" transform="translate(25 112) rotate(-90)" font-size="9" font-weight="800" fill="#1d1408" font-family="Helvetica, Arial" letter-spacing=".4">PORTRA</text>
-        <text transform="translate(34 104) rotate(-90)" font-size="5.2" font-weight="700" fill="#2a1d08" font-family="Helvetica, Arial" letter-spacing=".2">PROCESS C-41</text>
-        <text id="canIso" transform="translate(57 121) rotate(-90)" font-size="18" font-weight="700" fill="#f0b43a" font-family="Helvetica, Arial" letter-spacing="-.3">400</text>
-        <text id="canSub" transform="translate(57 80) rotate(-90)" font-size="18" font-weight="700" fill="#f0b43a" font-family="Helvetica, Arial" letter-spacing="-.3"><tspan id="canFrames">36</tspan><tspan font-size="9" dy="-1" letter-spacing=".2">exp.</tspan></text>
+        <rect id="canBand" x="2" y="11" width="33" height="110" fill="#f0b43a"/>
+        <!-- 사진처럼 숫자만: 아래 '400', 위 '36exp.' (검은 칸을 거의 채우는 크기, 필름 색) -->
+        <text id="canIso" transform="translate(62 117) rotate(-90)" font-size="22" font-weight="700" fill="#f0b43a" font-family="Helvetica, Arial" letter-spacing="-.6">400</text>
+        <text id="canSub" transform="translate(62 75) rotate(-90)" font-size="22" font-weight="700" fill="#f0b43a" font-family="Helvetica, Arial" letter-spacing="-.6"><tspan id="canFrames">36</tspan><tspan font-size="11" letter-spacing=".1">exp.</tspan></text>
         <path d="M63 8 C67 7.5 70 9 71.5 12 C70.5 15 72.5 18 71.8 22 L72.2 110 C73 114 71 117 71.8 121 C70 124.5 67 124.8 63 124 Z" fill="url(#cFelt)"/>
         <path d="M63 8 C67 7.5 70 9 71.5 12 C70.5 15 72.5 18 71.8 22 L72.2 110 C73 114 71 117 71.8 121 C70 124.5 67 124.8 63 124" fill="none" stroke="#55524e" stroke-width=".6"/>
         <rect x="2" y="9" width="70" height="114" fill="url(#cShade)"/>
@@ -2016,13 +2032,16 @@ $('stCam').textContent = cam.name
 $('stFilm').textContent = cam.film
 $('stFilmSub').textContent = `ISO ${cam.iso} · ${cam.format} · ${cam.frames}컷`
 $('stHint').textContent = `카운트가 ${cam.frames}부터 거꾸로 줄어드는 카메라`
-$('canName').textContent = cam.filmShort.toUpperCase().slice(0, 9)
 $('canIso').textContent = cam.iso
 $('canFrames').textContent = cam.frames
-$('canBand').setAttribute('fill', cam.color)
-$('canIso').setAttribute('fill', cam.color)
-$('canSub').setAttribute('fill', cam.color)
-$('stCanBand').style.background = cam.color
+// 필름통 색: 앱 필름 목록(커스텀 포함)의 색 그대로 — 라벨은 바탕색, 숫자도 바탕색(너무 어두우면 띠색)
+{
+  const st = FILMI?.style, lumOf = (h) => { const n = parseInt(String(h).replace('#', ''), 16); return (.299 * ((n >> 16) & 255) + .587 * ((n >> 8) & 255) + .114 * (n & 255)) / 255 }
+  const label = st?.body || cam.color, num = st && lumOf(st.body) < .25 ? st.band : label
+  $('canBand').setAttribute('fill', label)
+  $('canIso').setAttribute('fill', num); $('canSub').setAttribute('fill', num)
+  $('stCanBand').style.background = label
+}
 $('filmLine').textContent = `${cam.film} · ${cam.frames}컷`
 // 나가기: 기록은 찍을 때마다 저장돼 있으니 닫아도 남는다고 알려 주고 묻는다 (노출계만 쓸 땐 묻지 않음)
 function leave() {

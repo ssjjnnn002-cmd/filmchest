@@ -26,6 +26,7 @@ export function Meter({ roll, onClose, onEnd }: { roll: Roll; onClose: () => voi
         format: format.startsWith('120') ? '120' : '135',
         frames: framesPerRoll[format] ?? 36,
         color: film?.style.band ?? '#f0b43a',
+        style: film?.style,
       },
       prewind: camera?.prewind ?? null,
       rollPrewind: roll.meterPrewind ?? null,

@@ -78,6 +78,10 @@
 <div class="list" id="presets"></div>
 <p class="note">장비를 바꾸면 그 장비의 롤로 바뀌어요. 기록은 장비마다 따로 남아요.</p>
 
+<h2>시험용 필름 (앱 필름 목록과 같음)</h2>
+<div class="list"><label class="row"><span class="grow">필름</span><select id="filmSel" style="max-width:60%;background:none;border:0;color:var(--safelight);font:inherit;text-align:right"></select></label>
+<div class="row" id="customRow" style="gap:8px"><input id="cName" placeholder="커스텀 이름" style="flex:1;min-width:0;background:none;border:0;color:var(--ink);font:inherit"><input id="cIso" type="number" value="400" style="width:64px;background:none;border:0;color:var(--ink);font:inherit"><input id="cColor" type="color" value="#7a3fb8"></div></div>
+
 <h2>시험 기록</h2>
 <div class="list"><button class="row" id="clearBtn"><span class="grow">이 장비의 시험 기록 지우기</span></button></div>
 
@@ -108,7 +112,17 @@ const PRESETS = [
       { id: 'md135', name: 'MD Tele Rokkor 135mm f/3.5', min: 135, max: 135, open: '3.5', close: '22' },
     ] },
 ]
-const FILM = { name: 'Kodak Portra 400', short: 'PORTRA', iso: 400, format: '135', frames: 36, color: '#f0b43a' }
+// 필름: 앱과 같은 목록(/meter-films.json, web/src/core/films.ts에서 뽑음) + 커스텀 필름(앱과 같은 색 계산)
+let FILMS = []
+const lumOf = (h) => { const n = parseInt(h.replace('#', ''), 16); return (.299 * ((n >> 16) & 255) + .587 * ((n >> 8) & 255) + .114 * (n & 255)) / 255 }
+const shade = (h, a) => { const n = parseInt(h.replace('#', ''), 16); return '#' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.max(0, Math.min(255, Math.round(v + a * 255))).toString(16).padStart(2, '0')).join('') }
+function customStyle(color) { const light = lumOf(color) > .55, band = shade(color, light ? -.28 : .22); return { body: color, band, text: light ? '#1B1B1B' : '#F5F5F2', bandText: lumOf(band) > .55 ? '#1B1B1B' : '#FFFFFF', cap: '#2B2B2B' } }
+function curFilm() {
+  const c = store.get('custom', null)
+  if (store.get('film', 'kodak-portra-400') === 'custom' && c) return { name: c.name, short: c.name, iso: c.iso, format: '135', frames: 36, style: customStyle(c.color), color: c.color }
+  const f = FILMS.find((x) => x.id === store.get('film', 'kodak-portra-400')) || FILMS[0] || { brand: 'Kodak', name: 'Portra 400', iso: 400, style: { body: '#F4EFE4', band: '#F2A71B' } }
+  return { name: `${f.brand} ${f.name}`.trim(), short: f.name, iso: f.iso, format: '135', frames: 36, style: f.style, color: f.style.body }
+}
 let pick = store.get('preset', 'x700')
 const cur = () => PRESETS.find((p) => p.id === pick) || PRESETS[2]
 const rollKey = () => 'roll.' + cur().id
@@ -117,7 +131,7 @@ const curLens = () => { const p = cur(), id = store.get('lens.' + p.id, null); r
 function render() {
   const p = cur(), roll = store.get(rollKey(), { shots: [], prewind: null })
   $('camName').textContent = p.name
-  $('filmName').textContent = FILM.name
+  $('filmName').textContent = curFilm().name
   $('lensName').textContent = `${curLens().name}${p.prewind ? ' · 역순 감기' : ''}`
   $('shotInfo').textContent = roll.shots.length ? `기록 ${roll.shots.length}컷` : '아직 기록 없음'
   $('presets').innerHTML = ''
@@ -138,7 +152,7 @@ function open(only) {
     only: only ? 'meter' : undefined,
     camera: { id: 'lab-' + p.id, name: p.name, modes: p.modes, fastest: p.fastest, slowest: p.slowest, programAtMinAperture: !!p.programAtMinAperture, lens: curLens() },
     lenses: p.lenses,
-    film: FILM,
+    film: curFilm(),
     prewind: p.prewind,
     rollPrewind: roll.prewind,
     shots: roll.shots,
@@ -174,6 +188,19 @@ $('reloadBtn').onclick = async () => {
   try { for (const k of await caches.keys()) await caches.delete(k) } catch {}
   location.replace(location.pathname + '?r=' + Date.now())
 }
+fetch('./meter-films.json').then((r) => r.json()).then((list) => {
+  FILMS = list
+  const sel = $('filmSel')
+  sel.innerHTML = list.map((f) => `<option value="${f.id}">${f.brand} ${f.name}</option>`).join('') + '<option value="custom">커스텀 필름</option>'
+  sel.value = store.get('film', 'kodak-portra-400')
+  const c = store.get('custom', { name: '내 필름', iso: 400, color: '#7a3fb8' })
+  $('cName').value = c.name; $('cIso').value = c.iso; $('cColor').value = c.color
+  const syncCustom = () => { $('customRow').style.display = sel.value === 'custom' ? '' : 'none' }
+  sel.onchange = () => { store.set('film', sel.value); syncCustom(); render() }
+  const saveCustom = () => { store.set('custom', { name: $('cName').value || '내 필름', iso: +$('cIso').value || 400, color: $('cColor').value }); render() }
+  $('cName').oninput = saveCustom; $('cIso').oninput = saveCustom; $('cColor').oninput = saveCustom
+  syncCustom(); render()
+}).catch(() => {})
 render()
 </script>
 </body>
