@@ -159,6 +159,7 @@
   .strip { position: relative; height: 112px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity;
     scrollbar-width: none; touch-action: pan-x; }
   .strip::-webkit-scrollbar { display: none; }
+  .strip { filter: brightness(.84); } /* 필름이 너무 밝아 보여서 살짝 어둡게 */
   .strip { overscroll-behavior-x: none; }
   .track { display: flex; height: 100%; width: max-content; padding: 0 calc(50% - 52px) 0 0; }
   .cell { position: relative; flex: 0 0 104px; height: 100%; background: #2a1a0f; scroll-snap-align: center; }
@@ -308,9 +309,8 @@
   .toast { bottom: calc(env(safe-area-inset-bottom) + 92px); }
   /* 노출계만: 필름·셔터·기록 없이 */
   .meteronly .controls, .meteronly .stripwrap, .meteronly .endbtn, .meteronly #flashBtn { display: none !important; }
-  .meteronly .finderbox { flex: none; height: calc(min(100vw, 440px) * .8); }
-  .meteronly .head { margin-bottom: auto; }
-  .meteronly .rings { margin-bottom: auto; }
+  /* 노출계만: 링은 아래에서 조금 띄우고, 파인더는 헤더와 링 사이 가운데 */
+  .meteronly .rings { margin-bottom: 64px; }
   .meteronly #filmLine { display: none; }
   .meteronly .finder .zoomdial { display: none !important; } /* 줌 링이 있어서 파인더 오른쪽 다이얼은 뺌 */
 
