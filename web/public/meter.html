@@ -154,7 +154,7 @@
 
   /* 필름 */
   .stripwrap { position: relative; margin: 0 -16px; }
-  .canister { position: absolute; left: -34px; top: -10px; width: 72px; height: 132px; pointer-events: none; z-index: 2; filter: brightness(.8) drop-shadow(4px 0 6px rgb(0 0 0 / .55)); }
+  .canister { position: absolute; left: -18px; top: -10px; width: 80px; height: 132px; pointer-events: none; z-index: 2; filter: brightness(.8) drop-shadow(4px 0 6px rgb(0 0 0 / .55)); }
   .canister svg { width: 100%; height: 100%; display: block; }
   .strip { position: relative; height: 112px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity;
     scrollbar-width: none; touch-action: pan-x; }
@@ -507,27 +507,27 @@
     <div class="strip" id="strip"><div class="track" id="track"></div></div>
     <!-- 장착한 필름 통: 카메라 뒤에서 보면 왼쪽. 필름이 여기서 나오고(정순) 여기로 들어간다(프리와인딩) -->
     <div class="canister" aria-hidden="true">
-      <!-- 화면 왼쪽 끝에 걸친 필름통 (실제 135 필름통 사진 참고): 검은 몸통에 필름 색 띠가 왼쪽에 살짝, 세로 글자, 오른쪽은 빛 막는 검은 천, 위아래 검은 마개 -->
-      <svg viewBox="0 0 72 132">
+      <!-- 화면 왼쪽 끝에 걸친 필름통 (135 필름통 사진 그대로): 넓은 필름 색 라벨(검은 PROCESS C-41) · 검은 칸에 큰 '400 36exp.' · 구겨진 빛 막는 천 · 위아래 검은 마개 -->
+      <svg viewBox="0 0 80 132">
         <defs>
-          <linearGradient id="cCap" x1="0" x2="1"><stop offset="0" stop-color="#050505"/><stop offset=".62" stop-color="#2e2e30"/><stop offset=".8" stop-color="#3c3c3f"/><stop offset="1" stop-color="#0c0c0d"/></linearGradient>
-          <linearGradient id="cShade" x1="0" x2="1"><stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset=".74" stop-color="#fff" stop-opacity=".1"/><stop offset=".9" stop-color="#000" stop-opacity=".25"/></linearGradient>
-          <pattern id="cFelt" width="3" height="3" patternUnits="userSpaceOnUse"><rect width="3" height="3" fill="#262524"/><circle cx="1" cy="1" r=".7" fill="#383634"/><circle cx="2.3" cy="2.2" r=".6" fill="#151413"/></pattern>
-          <linearGradient id="cVig" x1="0" x2="1"><stop offset=".3" stop-color="#000" stop-opacity=".75"/><stop offset=".75" stop-color="#000" stop-opacity="0"/></linearGradient>
+          <linearGradient id="cCap" x1="0" x2="1"><stop offset="0" stop-color="#050505"/><stop offset=".55" stop-color="#262628"/><stop offset=".78" stop-color="#3a3a3d"/><stop offset="1" stop-color="#0b0b0c"/></linearGradient>
+          <linearGradient id="cShade" x1="0" x2="1"><stop offset="0" stop-color="#000" stop-opacity=".5"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset=".72" stop-color="#fff" stop-opacity=".08"/><stop offset=".86" stop-color="#000" stop-opacity=".2"/></linearGradient>
+          <pattern id="cFelt" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="4" fill="#232221"/><circle cx="1" cy="1.2" r=".8" fill="#3b3936"/><circle cx="3" cy="3" r=".7" fill="#121110"/><circle cx="3.2" cy=".6" r=".4" fill="#4a4744"/></pattern>
+          <linearGradient id="cVig" x1="0" x2="1"><stop offset=".22" stop-color="#000" stop-opacity=".7"/><stop offset=".62" stop-color="#000" stop-opacity="0"/></linearGradient>
         </defs>
-        <rect x="5" y="10" width="58" height="112" fill="#0c0c0d"/>
-        <rect id="canBand" x="5" y="13" width="35" height="106" fill="#f0b43a"/>
-        <text id="canName" transform="translate(31 112) rotate(-90)" font-size="9" font-weight="800" fill="#1d1408" font-family="Helvetica, Arial" letter-spacing=".4">PORTRA</text>
-        <text id="canIso" transform="translate(56 118) rotate(-90)" font-size="13" font-weight="800" fill="#f0b43a" font-family="Helvetica, Arial">400</text>
-        <text id="canSub" transform="translate(56 82) rotate(-90)" font-size="10" font-weight="800" fill="#f0b43a" font-family="Helvetica, Arial">36exp.</text>
-        <text transform="translate(45 118) rotate(-90)" font-size="4.2" font-weight="700" fill="#b9b4ac" font-family="Helvetica, Arial" letter-spacing=".3">PROCESS C-41</text>
-        <path d="M61 11 Q67.5 12 68 19 V113 Q67.5 120 61 121 Z" fill="url(#cFelt)"/>
-        <path d="M61 11 Q67.5 12 68 19 V113 Q67.5 120 61 121" fill="none" stroke="#4a4846" stroke-width=".6"/>
-        <rect x="5" y="10" width="63" height="112" fill="url(#cShade)"/>
-        <rect x="2" y="4" width="64" height="9" rx="3.5" fill="url(#cCap)"/>
-        <rect x="2" y="119" width="64" height="9" rx="3.5" fill="url(#cCap)"/>
-        <rect x="18" y="127" width="16" height="5" fill="#0a0a0a"/>
-        <rect x="0" y="0" width="72" height="132" fill="url(#cVig)"/>
+        <rect x="2" y="9" width="64" height="114" fill="#0b0b0c"/>
+        <rect id="canBand" x="2" y="11" width="35" height="110" fill="#f0b43a"/>
+        <text id="canName" transform="translate(25 112) rotate(-90)" font-size="9" font-weight="800" fill="#1d1408" font-family="Helvetica, Arial" letter-spacing=".4">PORTRA</text>
+        <text transform="translate(34 104) rotate(-90)" font-size="5.2" font-weight="700" fill="#2a1d08" font-family="Helvetica, Arial" letter-spacing=".2">PROCESS C-41</text>
+        <text id="canIso" transform="translate(57 121) rotate(-90)" font-size="18" font-weight="700" fill="#f0b43a" font-family="Helvetica, Arial" letter-spacing="-.3">400</text>
+        <text id="canSub" transform="translate(57 80) rotate(-90)" font-size="18" font-weight="700" fill="#f0b43a" font-family="Helvetica, Arial" letter-spacing="-.3"><tspan id="canFrames">36</tspan><tspan font-size="9" dy="-1" letter-spacing=".2">exp.</tspan></text>
+        <path d="M63 8 C67 7.5 70 9 71.5 12 C70.5 15 72.5 18 71.8 22 L72.2 110 C73 114 71 117 71.8 121 C70 124.5 67 124.8 63 124 Z" fill="url(#cFelt)"/>
+        <path d="M63 8 C67 7.5 70 9 71.5 12 C70.5 15 72.5 18 71.8 22 L72.2 110 C73 114 71 117 71.8 121 C70 124.5 67 124.8 63 124" fill="none" stroke="#55524e" stroke-width=".6"/>
+        <rect x="2" y="9" width="70" height="114" fill="url(#cShade)"/>
+        <rect x="0" y="3" width="66" height="9" rx="3.5" fill="url(#cCap)"/>
+        <rect x="0" y="120" width="66" height="9" rx="3.5" fill="url(#cCap)"/>
+        <rect x="16" y="128" width="16" height="4" fill="#0a0a0a"/>
+        <rect x="0" y="0" width="80" height="132" fill="url(#cVig)"/>
       </svg>
     </div>
   </div>
@@ -2009,7 +2009,7 @@ $('stFilmSub').textContent = `ISO ${cam.iso} · ${cam.format} · ${cam.frames}�
 $('stHint').textContent = `카운트가 ${cam.frames}부터 거꾸로 줄어드는 카메라`
 $('canName').textContent = cam.filmShort.toUpperCase().slice(0, 9)
 $('canIso').textContent = cam.iso
-$('canSub').textContent = `${cam.frames}exp.`
+$('canFrames').textContent = cam.frames
 $('canBand').setAttribute('fill', cam.color)
 $('canIso').setAttribute('fill', cam.color)
 $('canSub').setAttribute('fill', cam.color)
