@@ -299,6 +299,10 @@ export interface MeterShot {
   /** 메모 템플릿 태그 */
   tags?: string[]
   memo?: string
+  /** 찍은 장소 (상세 기록: 기본은 그때 현재 위치, 고칠 수 있음) */
+  place?: string
+  lat?: number
+  lon?: number
 }
 
 /** 규격별 한 롤 컷 수 */

@@ -44,7 +44,7 @@ struct ShootingView: View {
         .navigationDestination(for: RollItem.self) { RollDetailView(roll: $0) }
         .toolbar {
             #if os(iOS)
-            if devMode { ToolbarItem { Button("노출계", systemImage: "camera.metering.spot") { showMeterOnly = true } } }
+            // 노출계는 정확도 문제로 보류 (설정 > 노출계 시험에서만)
             #endif
             ToolbarItem { Button("필름 장착하기", systemImage: "plus") { router.loadFilm() } }
         }
@@ -57,10 +57,8 @@ struct ShootingView: View {
         .fullScreenCover(item: $meterRoll, onDismiss: {
             if let roll = dropOffAfterMeter { dropOffAfterMeter = nil; openDropOff(roll) }
         }) { roll in
-            RollMeterView(roll: roll) {
-                dropOffAfterMeter = roll
-                meterRoll = nil
-            }
+            // 상세 기록: 노출계 없이 다이얼로 셔터·조리개를 골라 컷마다 기록 (장소·시간 포함)
+            RollManualRecordView(roll: roll)
         }
         #endif
         .settingsButton()

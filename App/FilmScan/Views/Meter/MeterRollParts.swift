@@ -358,15 +358,40 @@ struct MeterShotEditor: View {
     @State var shot: MeterShot
     @ObservedObject var m: MeterModel
     var title: String
+    /// 상세 기록(노출계 없이)에서 열면 장소·촬영 시간도 고친다
+    var showPlaceTime = false
     var onSave: (MeterShot) -> Void
+    var onDelete: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @State private var placeSheet = false
+    @State private var askDelete = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(shot.order)번째로 찍음 · 측정 EV \(String(format: "%.1f", shot.ev))").font(.footnote).foregroundStyle(Color.meterSub)
+                    Text(shot.ev == 0 ? "\(shot.order)번째로 기록" : "\(shot.order)번째로 찍음 · 측정 EV \(String(format: "%.1f", shot.ev))").font(.footnote).foregroundStyle(Color.meterSub)
                         .frame(maxWidth: .infinity).padding(.bottom, 8)
+                    if showPlaceTime {
+                        group("촬영 시간") {
+                            DatePicker("촬영 시간", selection: Binding(
+                                get: { shot.at.flatMap { ISO8601DateFormatter().date(from: $0) } ?? Date() },
+                                set: { shot.at = ISO8601DateFormatter().string(from: $0) }))
+                                .labelsHidden()
+                        }
+                        group("장소") {
+                            Button { placeSheet = true } label: {
+                                HStack {
+                                    Image(systemName: "mappin.and.ellipse")
+                                    Text(shot.place ?? "없음").lineLimit(1)
+                                    Spacer()
+                                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.meterSub)
+                                }
+                                .padding(12).background(Color(white: 0.16), in: RoundedRectangle(cornerRadius: 10))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                     group("모드") {
                         Picker("모드", selection: Binding(get: { shot.mode }, set: { md in
                             shot.mode = md
@@ -408,11 +433,29 @@ struct MeterShotEditor: View {
                         TextField("메모", text: Binding(get: { shot.memo ?? "" }, set: { shot.memo = $0.isEmpty ? nil : $0 }), axis: .vertical)
                             .padding(12).background(Color(white: 0.16), in: RoundedRectangle(cornerRadius: 10))
                     }
+                    if onDelete != nil {
+                        Button("이 칸 기록 지우기", role: .destructive) { askDelete = true }
+                            .frame(maxWidth: .infinity).padding(.top, 18)
+                    }
                 }
                 .padding(16)
             }
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $placeSheet) {
+                NavigationStack {
+                    Form {
+                        PlacePickerSection(name: Binding(get: { shot.place ?? "" }, set: { shot.place = $0.isEmpty ? nil : $0 }),
+                                           point: Binding(get: { shot.lat.flatMap { la in shot.lon.map { GeoPoint(latitude: la, longitude: $0) } } },
+                                                          set: { shot.lat = $0?.latitude; shot.lon = $0?.longitude }))
+                    }
+                    .navigationTitle("장소").navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("완료") { placeSheet = false } } }
+                }
+            }
+            .confirmationDialog("이 칸 기록을 지울까요?", isPresented: $askDelete, titleVisibility: .visible) {
+                Button("지우기", role: .destructive) { onDelete?(); dismiss() }
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("저장") { onSave(shot); dismiss() }.bold() }

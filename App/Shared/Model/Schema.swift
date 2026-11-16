@@ -546,6 +546,10 @@ struct MeterShot: Codable, Hashable, Sendable {
     /// 메모 템플릿 태그 (예: "인물", "야간")
     var tags: [String]?
     var memo: String?
+    /// 찍은 장소 (상세 기록: 기본은 그때 현재 위치, 고칠 수 있음)
+    var place: String?
+    var lat: Double?
+    var lon: Double?
 }
 
 extension MeterShot {
