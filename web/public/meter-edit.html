@@ -46,8 +46,8 @@ const $ = (id) => document.getElementById(id)
 // 노출계(meter.html)가 읽는 CSS 값들
 const ITEMS = [
   { key: '--ctl-gap', name: '셔터 줄 ↔ 위 링 간격', min: -10, max: 40, step: 1, unit: 'px', def: 10 },
-  { key: '--strip-gap', name: '필름 ↔ 셔터 줄 간격 (음수면 겹침)', min: -40, max: 40, step: 1, unit: 'px', def: 2 },
-  { key: '--spread', name: '되감기·셔터를 카운터에서 벌리기', min: 0, max: 40, step: 1, unit: '', def: 18 },
+  { key: '--strip-gap', name: '필름 ↔ 셔터 줄 간격 (음수면 겹침)', min: -40, max: 40, step: 1, unit: 'px', def: 8 },
+  { key: '--spread', name: '되감기·셔터를 카운터에서 벌리기', min: 0, max: 40, step: 1, unit: '', def: 30 },
   { key: '--lcd-bottom', name: '초록 숫자 높이 (파인더 아래에서)', min: 0, max: 12, step: .2, unit: '%', def: 4.5 },
   { key: '--lcd-font', name: '초록 숫자 크기', min: 10, max: 20, step: .5, unit: 'px', def: 0 },
 ]
