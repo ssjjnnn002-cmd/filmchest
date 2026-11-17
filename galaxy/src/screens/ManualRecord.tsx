@@ -341,10 +341,10 @@ function RecordDials({ dial, onChange, onLocked, iso }: { dial: Dial; onChange: 
   const program = dialOf.program(dial), flash = dialOf.flash(dial)
   const sh = dialOf.shutter(dial), ap = dialOf.aperture(dial)
   const accentS = new Set(dial.stops.map((v, i) => (v <= 0 ? i : -1)).filter((i) => i >= 0))
-  // 보정하면: 실제로 맞춘 감도와 더 밝게/더 어둡게
   const comp = dialOf.comp(dial)
   const zero = Math.max(0, dial.comps.indexOf(0))
-  const compNote = comp ? `ISO ${ISOS[nearest(ISOS, iso / Math.pow(2, comp))]}\n${comp > 0 ? '더 밝게' : '더 어둡게'}` : undefined
+  // 보정하면: 다이얼 숫자 그대로 몇 스톱 더 밝게/더 어둡게 (보정은 셔터·조리개를 옮기는 것, 필름 감도는 그대로)
+  const compNote = comp ? `${formatComp(Math.abs(comp)).replace('+', '')}스톱\n${comp > 0 ? '더 밝게' : '더 어둡게'}` : undefined
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
       <TopDial low title="셔터" labels={dial.stops.map(dialS)} index={dial.s} onChange={(s) => onChange({ ...dial, s })} size={132}

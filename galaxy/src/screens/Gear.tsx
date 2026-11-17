@@ -13,6 +13,8 @@ import { lensesFor } from '../core/lenses'
 import { filmFits, filterDiameters, filterKinds, groupPrice, lensSpec, parseLens } from '../core/optics'
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
 import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
+import { groupSections, lotKey, type GearGroup } from '../core/gearGroup'
+import { FilmPickGrid } from '../FilmPickGrid'
 import { deleteCameraPhoto, readBytes, saveCameraPhoto, useCameraPhoto, usePhotoIsCutout } from '../files'
 import { Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Footnote, Group, LensPicture, Row, Section, Segmented, Select, Sub } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
@@ -21,7 +23,7 @@ import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
 import { useTheme } from '../theme'
 import { Icon } from '../icons'
 import { CustomFilmEdit } from './CustomFilmEdit'
-import { PhotoRows, GroupTitle, OptionalDate, TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../gearExtras'
+import { FilmPickSortBar, PhotoRows, GroupTitle, OptionalDate, TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../gearExtras'
 
 export type GearKind = 'lens' | 'filter' | 'film'
 const storageName: Record<FilmStorage, string> = { fridge: '냉장고', freezer: '냉동고', drawer: '서랍', room: '상온' }
@@ -134,7 +136,7 @@ async function storePhoto(id: string, uri?: string, cleared?: boolean) {
   else if (cleared) await deleteCameraPhoto(id)
 }
 
-export function GearBoard({ kind, layout, tag, search = '', grouped = false }: { kind: GearKind; layout: string; tag?: string; search?: string; grouped?: boolean }) {
+export function GearBoard({ kind, layout, tag, search = '', grouped = false, filmGroup = 'none' }: { kind: GearKind; layout: string; tag?: string; search?: string; grouped?: boolean; filmGroup?: GearGroup }) {
   const c = useTheme()
   const allLenses = useLiveQuery(() => db.lenses.orderBy('createdAt').toArray(), [])
   const allFilters = useLiveQuery(() => db.filters.orderBy('createdAt').toArray(), [])
@@ -199,7 +201,10 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false }: {
       {kind === 'lens' && lenses.length > 0 && sections(lenses, lensCell)}
       {kind === 'filter' && filters.length > 0 && sections(filters, filterCell, grouped ? undefined
         : [...new Set(filters.map(kindOf))].sort((a, b) => kindOrder(a) - kindOrder(b)).map((k) => ({ title: k, items: filters.filter((f) => kindOf(f) === k) })))}
-      {kind === 'film' && lots.length > 0 && box(lots.map((lot) => {
+      {/* 필름 재고: 브랜드·ISO·흑백/컬러·35mm/120으로 묶어 볼 수 있다 (묶음 안은 이름순, 웹과 같음) */}
+      {kind === 'film' && lots.length > 0 && (filmGroup === 'none' ? [{ title: undefined as string | undefined, items: lots }]
+        : groupSections([...lots].sort((a, b) => filmDisplayName(filmById(a.filmId)).localeCompare(filmDisplayName(filmById(b.filmId)))), (l) => lotKey(l, filmGroup)))
+        .map((sec, n) => <View key={sec.title ?? n} style={{ gap: 8 }}>{sec.title ? <GroupTitle>{`${sec.title} · ${sec.items.length}`}</GroupTitle> : null}{box(sec.items.map((lot) => {
         const film = filmById(lot.filmId)
         const late = !!lot.expiresAt && lot.expiresAt < Date.now()
         return (
@@ -212,7 +217,7 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false }: {
             </View>
           </Pressable>
         )
-      }))}
+      }))}</View>)}
       {edit && kind === 'lens' && <LensEdit lens={(allLenses ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
       {edit && kind === 'filter' && <FilterEdit filter={(allFilters ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
       {edit && kind === 'film' && <FilmEdit lot={(allLots ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
@@ -454,15 +459,19 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
   const [date, setDate] = useState(lot?.purchasedAt)
   const [price, setPrice] = useState(groupPrice(lot?.price ?? ''))
   const [seller, setSeller] = useState(lot?.seller ?? '')
+  const c = useTheme()
+  const [search, setSearch] = useState('')
   const [showAll, setShowAll] = useState(false)
+  const [pickSort, setPickSort] = useState<GearGroup>(() => getPref('filmPickSort', 'none' as string) as GearGroup)
   const [customEdit, setCustomEdit] = useState<CustomFilmRow | 'new' | null>(null)
   const [confirm, setConfirm] = useState(false)
   const stocks = useMemo(() => {
     const recent = rolls.map((roll) => roll.filmId)
     const list = allFilms().filter((stock) => filmFits(stock.formats, format))
+      .filter((stock) => !search || filmDisplayName(stock).toLowerCase().includes(search.toLowerCase()))
     const rank = (stock: { id: string }) => [(recent.indexOf(stock.id) < 0 ? 999 : recent.indexOf(stock.id)), (popularFilms.indexOf(stock.id) < 0 ? 999 : popularFilms.indexOf(stock.id))] as const
     return list.sort((a, b) => rank(a)[0] - rank(b)[0] || rank(a)[1] - rank(b)[1])
-  }, [rolls, format, custom])
+  }, [rolls, format, search, custom])
   // 고른 필름은 접혀 있어도 늘 보이게 (수정할 때 다시 찾지 않도록)
   const visible = useMemo(() => {
     // 고른 필름은 포맷·검색·순서와 상관없이 늘 보이게 (수정할 때 저장된 필름이 안 보여 못 고치던 것)
@@ -492,24 +501,17 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
       right={<SheetBtn label="저장" accent disabled={!filmId} onPress={save} />}>
       <Section title={showAll ? '필름' : '필름 · 최근 사용'}>
         <Group>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 10 }}>
-            {visible.map((stock) => (
-              <Pressable key={stock.id} onPress={() => setFilmId(stock.id)} style={{ width: 96, alignItems: 'center', borderWidth: 2, borderColor: filmId === stock.id ? '#ff6b1f' : 'transparent', borderRadius: 16, padding: 4 }}>
-                <Canister film={stock} format={format} size={84} />
-                <Text style={{ fontSize: 11, textAlign: 'center' }} numberOfLines={2}>{filmDisplayName(stock)}</Text>
-              </Pressable>
-            ))}
-            <Pressable onPress={() => setCustomEdit('new')} style={{ width: 96, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 28, color: '#ff6b1f' }}>+</Text>
-              <Text style={{ color: '#ff6b1f', fontWeight: '600' }}>직접 추가</Text>
-            </Pressable>
-          </View>
+          {showAll ? <Field label="필름 검색" value={search} onChangeText={setSearch} /> : null}
+          {showAll ? <FilmPickSortBar value={pickSort} onChange={setPickSort} /> : null}
+          <FilmPickGrid films={visible} value={filmId} onPick={setFilmId} format={format} sort={showAll ? pickSort : 'none'} onCustom={() => setCustomEdit('new')} />
           {pickedCustom ? (
             <Row onPress={() => setCustomEdit(pickedCustom)} style={{ justifyContent: 'center' }}>
-              <Text style={{ fontSize: 17, color: '#ff6b1f' }}>{pickedCustom.name} 수정</Text>
+              <Text style={{ fontSize: 17, color: c.safelight }}>{pickedCustom.name} 수정</Text>
             </Row>
           ) : null}
-          <Row onPress={() => setShowAll(!showAll)}><Text style={{ color: '#ff6b1f' }}>{showAll ? '접기' : `더보기 (${stocks.length}종)`}</Text></Row>
+          <Row onPress={() => { setShowAll(!showAll); setSearch('') }} style={{ justifyContent: 'center' }}>
+            <Text style={{ fontSize: 17, color: c.safelight }}>{showAll ? '접기' : `더보기 (${stocks.length}종)`}</Text>
+          </Row>
         </Group>
         {lot && filmId && !filmById(filmId) ? <Footnote>목록에서 찾을 수 없는 필름이에요. 그대로 저장해도 되고, 다시 고를 수 있어요.</Footnote> : null}
       </Section>

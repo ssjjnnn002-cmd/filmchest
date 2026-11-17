@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import { Text } from '../text'
 import { db, kept } from '../data'
-import { useLiveQuery } from '../store'
+import { getPref, useLiveQuery } from '../store'
+import { filmSections, type GearGroup } from '../core/gearGroup'
+import { FilmPickSortBar, GroupTitle } from '../gearExtras'
 import type { Roll } from '../core/types'
 import { formatInfo, uid } from '../core/types'
 import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films'
@@ -24,6 +26,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const [cameraId, setCameraId] = useState(initialCameraId)
   const [filmId, setFilmId] = useState<string>()
   const [showAll, setShowAll] = useState(false)
+  const [pickSort, setPickSort] = useState<GearGroup>(() => getPref('filmPickSort', 'none' as string) as GearGroup)
   const [search, setSearch] = useState('')
   const [lensId, setLensId] = useState('')
   const [newLens, setNewLens] = useState('')
@@ -182,8 +185,13 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
       <Section title={showAll ? '필름' : '필름 · 추천'}>
         <Group>
           {showAll ? <Field label="필름 검색" value={search} onChangeText={setSearch} /> : null}
+          {showAll ? <FilmPickSortBar value={pickSort} onChange={setPickSort} /> : null}
+          {/* 더보기에서 브랜드·ISO·흑백/컬러로 묶으면 묶음마다 제목을 단다 (웹과 같음) */}
+          {filmSections(visible, showAll ? pickSort : 'none').map((sec, i, all) => (
+          <View key={sec.title ?? i}>
+          {sec.title ? <View style={{ marginTop: 10, marginHorizontal: 12 }}><GroupTitle>{`${sec.title} · ${sec.items.length}`}</GroupTitle></View> : null}
           <View onLayout={(e) => setGridW(e.nativeEvent.layout.width)} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, padding: 10 }}>
-            {visible.map((f) => {
+            {sec.items.map((f) => {
               const on = f.id === filmId
               return (
                 <Pressable key={f.id} onPress={() => setFilmId(f.id)} style={({ pressed }) => ({
@@ -198,13 +206,15 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
                 </Pressable>
               )
             })}
-            <Pressable onPress={() => setCustomEdit('new')} style={{ width: cellW, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 4, alignItems: 'center', gap: 2 }}>
+            {i === all.length - 1 ? <Pressable onPress={() => setCustomEdit('new')} style={{ width: cellW, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 4, alignItems: 'center', gap: 2 }}>
               <View style={{ width: 84, height: 84, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', borderColor: `${c.safelight}8C`, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ fontSize: 34, fontWeight: '300', color: c.safelight }}>+</Text>
               </View>
               <Text style={{ fontSize: 12, fontWeight: '600', color: c.safelight }}>직접 추가</Text>
-            </Pressable>
+            </Pressable> : null}
           </View>
+          </View>
+          ))}
           {film?.id.startsWith('custom-') ? (
             <Row onPress={() => setCustomEdit(film.id)} style={{ justifyContent: 'center' }}>
               <Text style={{ fontSize: 17, color: c.safelight }}>{filmDisplayName(film)} 수정</Text>

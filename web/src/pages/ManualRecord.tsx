@@ -326,13 +326,12 @@ function Recorder({ roll, camera, allLenses, onClose }: {
 // ───────── 다이얼
 
 /** 셔터 · (가운데 작게) 노출 보정 · 조리개(⚡). 그 카메라에서 의미 없는 다이얼은 흐리게 막는다 */
-function RecordDials({ dial, onChange, onLocked, iso }: { dial: Dial; onChange: (d: Dial) => void; onLocked: (t: string) => void; iso: number }) {
+function RecordDials({ dial, onChange, onLocked }: { dial: Dial; onChange: (d: Dial) => void; onLocked: (t: string) => void; iso?: number }) {
   const program = dialOf.program(dial), flash = dialOf.flash(dial)
-  // 보정하면: 실제로 맞춘 감도와 밝게/어둡게 (보정은 감도를 바꿔 다는 것과 같다)
-  const ISOS = [25, 32, 40, 50, 64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400]
   const comp = dialOf.comp(dial)
   const zero = Math.max(0, dial.comps.indexOf(0))
-  const compNote = comp ? `ISO ${ISOS[nearest(ISOS, iso / Math.pow(2, comp))]}\n${comp > 0 ? '더 밝게' : '더 어둡게'}` : undefined
+  // 보정하면: 다이얼 숫자 그대로 몇 스톱 더 밝게/더 어둡게 (보정은 셔터·조리개를 옮기는 것, 필름 감도는 그대로)
+  const compNote = comp ? `${formatComp(Math.abs(comp)).replace('+', '')}스톱\n${comp > 0 ? '더 밝게' : '더 어둡게'}` : undefined
   const sh = dialOf.shutter(dial), ap = dialOf.aperture(dial)
   const accentS = new Set(dial.stops.map((v, i) => (v <= 0 ? i : -1)).filter((i) => i >= 0))
   return (

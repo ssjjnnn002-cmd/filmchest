@@ -438,9 +438,9 @@ struct CompDial: View {
     /// 보정하면: 실제로 맞춘 감도와 밝게/어둡게 (보정은 감도를 바꿔 다는 것과 같다)
     private var note: String? {
         guard !disabled, comps.indices.contains(index), comps[index] != 0 else { return nil }
+        // 다이얼 숫자 그대로 몇 스톱 더 밝게/더 어둡게 (보정은 셔터·조리개를 옮기는 것, 필름 감도는 그대로)
         let c = comps[index]
-        let eff = MeterMath.isoList[MeterMath.nearest(MeterMath.isoList, iso / pow(2, c))]
-        return "ISO \(MeterMath.trim(eff))\n\(c > 0 ? "더 밝게" : "더 어둡게")"
+        return "\(MeterMath.fmtC(abs(c)).replacingOccurrences(of: "+", with: ""))스톱\n\(c > 0 ? "더 밝게" : "더 어둡게")"
     }
     var body: some View {
         let zero = comps.firstIndex(of: 0) ?? 0

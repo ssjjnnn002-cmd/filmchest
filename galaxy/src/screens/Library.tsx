@@ -18,7 +18,8 @@ import { seedExample } from '../seed'
 import { CameraEdit } from './CameraEdit'
 import { GearAdd, GearBoard, type GearKind } from './Gear'
 import { usePhotoIsCutout } from '../files'
-import { GroupTitle, TagFilter, TagLine, migrateAccessories, tagSections } from '../gearExtras'
+import { GroupMenu, GroupTitle, TagFilter, TagLine, migrateAccessories, tagSections } from '../gearExtras'
+import { cameraGroups, cameraKey, filmStockGroups, groupSections, type GearGroup } from '../core/gearGroup'
 import { Settings } from './Settings'
 
 export const batteryDue = (c: Camera) =>
@@ -36,6 +37,9 @@ export function Library() {
   const [tag, setTag] = useState<string>()
   const [search, setSearch] = useState('')
   const [grouped, setGrouped] = useState(getPref('gearGrouped', '' as string) === '1')
+  // 묶어 보기 (웹과 같음): 카메라는 태그·브랜드·유형, 필름 재고는 브랜드·ISO·흑백/컬러·35mm/120
+  const [cameraGroup, setCameraGroup] = useState<GearGroup>(() => (getPref('gearGroupCamera', '' as string) as GearGroup) || (grouped ? 'tag' : 'none'))
+  const [filmGroup, setFilmGroup] = useState<GearGroup>(() => (getPref('gearGroupFilm', 'none' as string) as GearGroup))
   const query = search.trim().toLowerCase()
   useEffect(() => { void migrateAccessories() }, [])
   const lensTags = useLiveQuery(async () => (await db.lenses.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
@@ -167,7 +171,9 @@ export function Library() {
       {!editing ? (
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
           <View style={{ flex: 1 }}><SearchBox value={search} onChange={setSearch} placeholder={`${({ camera: '카메라', lens: '렌즈', filter: '액세서리', film: '필름' } as const)[gear]} 검색`} /></View>
-          {gear !== 'film' ? (
+          {gear === 'camera' ? <GroupMenu value={cameraGroup} options={cameraGroups} onChange={(g) => { setCameraGroup(g); setPref('gearGroupCamera', g) }} /> : null}
+          {gear === 'film' ? <GroupMenu value={filmGroup} options={filmStockGroups} onChange={(g) => { setFilmGroup(g); setPref('gearGroupFilm', g) }} /> : null}
+          {gear === 'lens' || gear === 'filter' ? (
             <Pressable accessibilityRole="button" accessibilityLabel="태그별로 묶기" accessibilityState={{ selected: grouped }}
               onPress={() => { setGrouped(!grouped); setPref('gearGrouped', grouped ? '' : '1') }}
               style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: grouped ? c.safelight : c.card }}>
@@ -182,7 +188,7 @@ export function Library() {
         </View>
       ) : null}
 
-      {gear !== 'camera' && !editing ? <GearBoard kind={gear} layout={layout} tag={tag} search={search} grouped={grouped} /> : null}
+      {gear !== 'camera' && !editing ? <GearBoard kind={gear} layout={layout} tag={tag} search={search} grouped={grouped} filmGroup={filmGroup} /> : null}
 
       {gear === 'camera' && cameras && cameras.length === 0 ? (
         <Empty icon="camera" title="카메라가 없어요">
@@ -209,7 +215,7 @@ export function Library() {
           </Pressable>
 
           {shown.length === 0 ? <Empty icon="search" title="맞는 카메라가 없어요" /> : null}
-          {grouped && !editing ? tagSections(shown, true).map((sec) => (
+          {cameraGroup !== 'none' && !editing ? (cameraGroup === 'tag' ? tagSections(shown, true) : groupSections(shown, (x) => cameraKey(x, cameraGroup))).map((sec) => (
             <View key={sec.title} style={{ gap: 8 }}>
               <GroupTitle>{`${sec.title} · ${sec.items.length}`}</GroupTitle>
               <View style={grid ? { flexDirection: 'row', flexWrap: 'wrap', gap: 14 } : { backgroundColor: c.cell, borderRadius: 22 }}>
@@ -220,7 +226,7 @@ export function Library() {
             </View>
           )) : null}
           <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-            style={grouped && !editing ? { height: 0, overflow: 'hidden' } : grid
+            style={cameraGroup !== 'none' && !editing ? { height: 0, overflow: 'hidden' } : grid
               ? { flexDirection: 'row', flexWrap: 'wrap', gap: 14 }
               : { backgroundColor: c.cell, borderRadius: 22 }}>
             {shown.map(item)}

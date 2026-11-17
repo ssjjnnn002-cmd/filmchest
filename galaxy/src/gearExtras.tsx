@@ -1,12 +1,13 @@
 // 웹 ui/gearExtras.tsx와 같은 구성: 태그, 태그 거르기, 악세서리, 비워 둘 수 있는 날짜
-import { useMemo, useState } from 'react'
-import { Pressable, View } from 'react-native'
+import { useMemo, useRef, useState } from 'react'
+import { Dimensions, Modal, Pressable, View } from 'react-native'
 import { Text } from './text'
 import { TextInput } from './textInput'
 import { DateTimePickerAndroid as Picker } from '@react-native-community/datetimepicker'
 import { db } from './data'
 import { defaultAccessoryKinds, uid } from './core/types'
-import { Chip, Chips, Group, Row, Section } from './kit'
+import { Chip, Chips, Group, Row, Section, Segmented } from './kit'
+import { filmPickGroups, groupTitle, type GearGroup } from './core/gearGroup'
 import { getPref, setPref, useLiveQuery } from './store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from './suggest'
 import { useTheme } from './theme'
@@ -192,6 +193,50 @@ export function PhotoRows({ onCamera, onAlbum, onClear, inset = 12 }: { onCamera
       {row('camera', '사진 찍기', c.safelight, onCamera)}
       {row('photos', '앨범에서 사진 고르기', c.safelight, onAlbum)}
       {onClear ? row('trash', '사진 지우기', c.danger, onClear) : null}
+    </View>
+  )
+}
+
+/** 검색 칸 옆 '묶어 보기' 버튼 (고른 기준이 있으면 주황으로 채움). 웹 GroupMenu와 같다: 버튼 바로 아래 오른쪽에 메뉴 */
+export function GroupMenu({ value, options, onChange }: { value: GearGroup; options: GearGroup[]; onChange: (g: GearGroup) => void }) {
+  const c = useTheme()
+  const ref = useRef<View>(null)
+  const [at, setAt] = useState<{ x: number; y: number }>()
+  const open = () => ref.current?.measureInWindow((x, y, w, h) => setAt({ x: x + w, y: y + h + 6 }))
+  const on = value !== 'none'
+  return (
+    <>
+      <Pressable ref={ref} accessibilityRole="button" accessibilityLabel="묶어 보기" onPress={open}
+        style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.safelight : c.card }}>
+        <Icon name="group" size={20} color={on ? '#fff' : c.safelight} />
+      </Pressable>
+      {at ? (
+        <Modal transparent visible animationType="fade" onRequestClose={() => setAt(undefined)} statusBarTranslucent>
+          <Pressable style={{ flex: 1 }} onPress={() => setAt(undefined)}>
+            <View style={{ position: 'absolute', right: Dimensions.get('window').width - at.x, top: at.y, minWidth: 200, borderRadius: 18, overflow: 'hidden',
+              backgroundColor: c.glass, boxShadow: '0px 12px 40px rgba(0,0,0,0.2)' }}>
+              {options.map((g, i) => (
+                <Pressable key={g} accessibilityRole="menuitem" accessibilityState={{ checked: g === value }} onPress={() => { onChange(g); setAt(undefined) }}
+                  style={({ pressed }) => ({ minHeight: 46, paddingVertical: 10, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center',
+                    backgroundColor: pressed ? c.fill : 'transparent', borderTopWidth: i ? 0.5 : 0, borderTopColor: c.sep })}>
+                  <Text style={{ width: 22, color: c.safelight, fontSize: 17 }}>{g === value ? '✓' : ''}</Text>
+                  <Text style={{ fontSize: 17, color: c.ink }}>{groupTitle[g]}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Modal>
+      ) : null}
+    </>
+  )
+}
+
+/** 필름 고르기 '더보기'에서 쓰는 기준 줄 (추천 · 브랜드 · ISO · 흑백·컬러). 고른 값은 기억한다 (웹 FilmPickSortBar와 같음) */
+export function FilmPickSortBar({ value, onChange }: { value: GearGroup; onChange: (g: GearGroup) => void }) {
+  return (
+    <View style={{ marginVertical: 8, marginHorizontal: 12 }}>
+      <Segmented value={value} options={filmPickGroups.map((g) => [g, g === 'none' ? '추천' : groupTitle[g]] as [GearGroup, string])}
+        onChange={(g) => { onChange(g); setPref('filmPickSort', g) }} />
     </View>
   )
 }

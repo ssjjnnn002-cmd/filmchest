@@ -64,6 +64,8 @@ export function Page({ title, onBack, left, actions, large = true, children, foo
   useScrollFocusedField(ref)
   const y = useRef(new Animated.Value(0)).current
   const [scrolled, setScrolled] = useState(!large)
+  // 불러오는 동안 large={false}로 그린 뒤 큰 제목으로 바뀌면 작은 제목을 다시 숨긴다 (웹처럼 스크롤해야 보이게)
+  useEffect(() => { setScrolled(!large) }, [large])
   const titleBottom = 50
   useEffect(() => {
     const start = scroll?.saved.get(scroll.key) ?? 0

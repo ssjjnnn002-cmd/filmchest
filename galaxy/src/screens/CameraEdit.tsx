@@ -6,6 +6,8 @@ import * as ImagePicker from 'expo-image-picker'
 import { db, rememberCamera } from '../data'
 import type { BodyStyle, Camera, FilmFormat } from '../core/types'
 import { formatInfo, styleName, uid } from '../core/types'
+import { getPref, setPref } from '../store'
+import { groupSections, styleKey } from '../core/gearGroup'
 import { brandsMatching, catalog, catalogMatch, catalogName, inferStyle, kindText, modelsMatching, type CatalogCamera } from '../core/cameras'
 import { profileFor } from '../core/profiles'
 import { Model3D } from '../Model3D'
@@ -300,20 +302,30 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
 function CatalogPicker({ onPick, onClose }: { onPick: (k: CatalogCamera) => void; onClose: () => void }) {
   const c = useTheme()
   const [q, setQ] = useState('')
+  // 브랜드별 또는 유형별(SLR·RF·P&S·중형)로 묶어 보기 (웹·아이폰과 같음)
+  const [byType, setByType] = useState(getPref('cameraPickGroup', '' as string) === 'type')
   const groups = useMemo(() => {
     const n = (x: string) => x.toLowerCase().replace(/\s+/g, '')
     const list = catalog.filter((k) => !q || n(catalogName(k)).includes(n(q)) || (k.aka ?? []).some((a) => n(a).includes(n(q))))
+    if (byType) {
+      return groupSections([...list].sort((a, b) => catalogName(a).localeCompare(catalogName(b))), (k) => styleKey(k.style))
+        .map((sec) => [sec.title ?? '', sec.items] as [string, CatalogCamera[]])
+    }
     const m = new Map<string, CatalogCamera[]>()
     for (const k of list) m.set(k.brand, [...(m.get(k.brand) ?? []), k])
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-  }, [q])
+  }, [q, byType])
   return (
     <Sheet title="카메라 목록" onClose={onClose}>
       <Group style={{ marginBottom: 12 }}>
         <Field label="검색" value={q} onChangeText={setQ} placeholder="제조사나 모델" autoFocus />
       </Group>
+      <View style={{ marginBottom: 12 }}>
+        <Segmented value={byType ? 'type' : 'brand'} options={[['brand', '브랜드'], ['type', '유형']]}
+          onChange={(k) => { setByType(k === 'type'); setPref('cameraPickGroup', k) }} />
+      </View>
       {groups.map(([brand, list]) => (
-        <Section key={brand} title={brand}>
+        <Section key={brand} title={`${brand} · ${list.length}`}>
           <Group>
             {list.map((k) => (
               <Row key={k.model} onPress={() => onPick(k)}>
