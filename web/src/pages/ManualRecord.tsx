@@ -271,6 +271,8 @@ function Recorder({ roll, camera, allLenses, onClose }: {
           onShutter={() => { audio(); fire() }} />
         <div className="mr-stripwrap">
           <div className="mr-strip" ref={stripRef}>
+            {/* 필름통까지 이어지는 필름 (칸·번호 없이). 맨 끝에서 마지막 컷이 딱 가운데에 오는 길이 (아이폰과 같음) */}
+            <span className="mr-strip-lead" aria-hidden="true" />
             {cells.map((p) => {
               const s = shots.find((x) => x.pos === p)
               return (
@@ -289,7 +291,13 @@ function Recorder({ roll, camera, allLenses, onClose }: {
                 </button>
               )
             })}
-            {/* 1번 칸(맨 오른쪽)도 가운데로 올 수 있게 끝에 필름 여백 */}
+            {/* 필름 앞쪽 (잘린 혀 모양) — 1번 칸이 가운데일 때 오른쪽에 보인다 (아이폰과 같음) */}
+            <svg className="mr-tongue" viewBox="0 0 232 112" aria-hidden="true">
+              <path d="M0 0 L206 0 Q226 0 227 18 L227 42 Q227 60 207 60 L122 60 C94 60 76 67 60 84 C46 100 28 112 0 112 Z" fill="#2a1a0f" />
+              {Array.from({ length: 12 }, (_, i) => <rect key={i} x={6 + i * 17.33} y={4} width={7} height={8} rx={1.5} fill="#0b0b0c" />)}
+              <rect x={6} y={100} width={7} height={8} rx={1.5} fill="#0b0b0c" />
+            </svg>
+            {/* 아주 넓은 화면에서도 1번 칸이 가운데로 올 수 있게 */}
             <span className="mr-strip-end" aria-hidden="true" />
           </div>
           <Canister iso={iso} frames={frames} colors={film ? boxPalette(film) : undefined} />

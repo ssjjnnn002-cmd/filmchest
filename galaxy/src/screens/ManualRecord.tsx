@@ -204,7 +204,8 @@ function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: C
   // 다음 칸이 가운데 오게 (칸 104, 왼쪽 끝은 필름통 자리)
   const first = useRef(true)
   useEffect(() => {
-    const x = cells.indexOf(frame) * 104 - (width - 104) / 2
+    // 앞쪽 필름(LeadFilm) 길이만큼 밀린다
+    const x = Math.max(60, width / 2 - 52) + cells.indexOf(frame) * 104 - (width - 104) / 2
     stripRef.current?.scrollTo({ x: Math.max(0, x), animated: !first.current })
     first.current = false
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -283,12 +284,19 @@ function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: C
           onShutter={fire} />
         <View style={{ marginHorizontal: -16, marginTop: 8 }}>
           <ScrollView ref={stripRef} horizontal showsHorizontalScrollIndicator={false} style={{ opacity: 0.86 }}>
+            {/* 필름통까지 이어지는 필름 (칸·번호 없이). 맨 끝에서 마지막 컷이 딱 가운데에 오는 길이 (웹·아이폰과 같음) */}
+            <LeadFilm width={Math.max(60, width / 2 - 52)} />
             {cells.map((p) => {
               const s = shots.find((x) => x.pos === p)
               return <Cell key={p} p={p} shot={s} next={p === frame && !s} onPress={() => (s ? setEditing(p) : setFrame(p))} />
             })}
-            {/* 1번 칸(맨 오른쪽)도 가운데로 올 수 있게 끝에 필름 여백 (웹과 같음) */}
-            <View style={{ width: Math.max(0, (width - 104) / 2), height: 112, backgroundColor: '#2a1a0f' }} />
+            {/* 필름 앞쪽 (잘린 혀 모양) — 1번 칸이 가운데일 때 오른쪽에 보인다 (웹·아이폰과 같음) */}
+            <Svg width={232} height={112}>
+              <Path d="M0 0 L206 0 Q226 0 227 18 L227 42 Q227 60 207 60 L122 60 C94 60 76 67 60 84 C46 100 28 112 0 112 Z" fill="#2a1a0f" />
+              {Array.from({ length: 12 }, (_, i) => <Rect key={i} x={6 + i * 17.33} y={4} width={7} height={8} rx={1.5} fill="#0b0b0c" />)}
+              <Rect x={6} y={100} width={7} height={8} rx={1.5} fill="#0b0b0c" />
+            </Svg>
+            <View style={{ width: Math.max(0, width / 2 - 52 - 232) }} />
           </ScrollView>
           <Canister iso={iso} frames={frames} colors={film ? filmBoxColors[film.id] ?? [film.style.body, film.style.band] : undefined} />
         </View>
@@ -566,6 +574,19 @@ function Controls({ counter, flash, leverOut, rewind, down, onFlash, onShutter }
 }
 
 /** 필름 한 칸 (위아래 구멍, 칸 번호, 찍은 값) */
+/** 구멍만 있는 필름 (칸·번호 없이) */
+function LeadFilm({ width }: { width: number }) {
+  const holes = Array.from({ length: Math.ceil(width / 17.33) }, (_, i) => 6 + i * 17.33).filter((x) => x < width)
+  return (
+    <View style={{ width, height: 112, backgroundColor: '#2a1a0f' }}>
+      <Svg width={width} height={112} style={{ position: 'absolute' }}>
+        {holes.map((x) => <Rect key={`t${x}`} x={x} y={4} width={7} height={8} fill="#000" />)}
+        {holes.map((x) => <Rect key={`b${x}`} x={x} y={100} width={7} height={8} fill="#000" />)}
+      </Svg>
+    </View>
+  )
+}
+
 function Cell({ p, shot, next, onPress }: { p: number; shot?: MeterShot; next: boolean; onPress: () => void }) {
   const holes = useMemo(() => Array.from({ length: 6 }, (_, i) => 6 + i * 17.33).filter((x) => x < 104), [])
   const extra = shot ? [shot.focal ? `${shot.focal}mm` : '', shot.comp ? formatComp(shot.comp) : ''].filter(Boolean).join(' · ') : ''
