@@ -14,6 +14,13 @@ struct WelcomeView: View {
     @State private var result: String?
     @State private var error: String?
     @State private var showImport = false
+    /// 로그아웃한 뒤: 기록은 기기에 남아 있다. 같은 계정이면 그대로 이어지고, 다른 계정·로그인 없이 쓰기는 지울지 묻는다 (웹·갤럭시와 같음)
+    private var kept: String? { loginOnly ? nil : DriveSync.keptAccount }
+    @State private var ask: Ask?
+    struct Ask: Identifiable { let id = UUID(); let message: String; let resolve: (Bool) -> Void }
+    private func askOnce(_ message: String) async -> Bool {
+        await withCheckedContinuation { cont in ask = Ask(message: message) { cont.resume(returning: $0) } }
+    }
 
     var body: some View {
         NavigationStack {
@@ -48,17 +55,26 @@ struct WelcomeView: View {
                             .tint(Theme.safelight)
                         }
                         if !loginOnly {
-                            Button("로그인 없이 쓰기") { finish() }.disabled(step != nil)
+                            Button("로그인 없이 쓰기") {
+                                guard let kept else { finish(); return }
+                                Task {
+                                    if await askOnce("이 기기에 남은 \(kept) 계정 기록을 지우고 로그인 없이 새로 시작할까요? 기록은 그 계정 드라이브에 있어요.") {
+                                        try? DriveSync.wipeDevice(context)
+                                        finish()
+                                    }
+                                }
+                            }.disabled(step != nil)
                         }
                     }
                 } footer: {
                     VStack(alignment: .leading, spacing: 6) {
                         if let error { Text(error).foregroundStyle(.red) }
+                        if let kept, result == nil { Text("로그아웃했어요. \(kept) 계정으로 다시 로그인하면 바뀐 것만 받아서 바로 이어져요.") }
                         Text(loginOnly ? "필름함 서버에는 아무것도 올라가지 않아요." : "필름함 서버에는 아무것도 올라가지 않아요. 나중에 설정에서도 로그인할 수 있어요.")
                     }
                 }
 
-                if result == nil && !loginOnly {
+                if result == nil && !loginOnly && kept == nil {
                     Section("기록 불러오기") {
                         Button("백업 파일 불러오기") { showImport = true }
                             .tint(Theme.safelight)
@@ -91,7 +107,11 @@ struct WelcomeView: View {
                 step = nil
             }
         }
-        .interactiveDismissDisabled(step != nil)
+        .interactiveDismissDisabled(step != nil || (kept != nil && result == nil))
+        .alert(ask?.message ?? "", isPresented: Binding(get: { ask != nil }, set: { if !$0 { ask?.resolve(false); ask = nil } })) {
+            Button("취소", role: .cancel) { ask?.resolve(false); ask = nil }
+            Button("지우고 시작", role: .destructive) { ask?.resolve(true); ask = nil }
+        }
         .onDisappear {
             welcomeSeen = true
             moveAsked = true
@@ -110,6 +130,17 @@ struct WelcomeView: View {
             do {
                 step = "로그인 중…"
                 try await GoogleAuth.signIn()
+                if let kept {
+                    if let now = GoogleAuth.account, now != kept {
+                        guard await askOnce("이 기기에는 \(kept) 계정 기록이 남아 있어요. 지우고 \(now)(으)로 시작할까요? \(kept) 기록은 그 계정 드라이브에 있어요.") else {
+                            GoogleAuth.signOut()
+                            throw DriveError.message("로그인을 취소했어요. 기록은 그대로 있어요.")
+                        }
+                        step = "이 기기 기록 지우는 중…"
+                        try DriveSync.wipeForNewAccount(context)
+                    }
+                    UserDefaults.standard.removeObject(forKey: DriveSync.keptKey)
+                }
                 step = "기록 받는 중…"
                 let counts = try await DriveSync.pull(context, force: true)
                 step = "올리는 중…"

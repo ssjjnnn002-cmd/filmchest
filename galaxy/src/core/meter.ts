@@ -40,6 +40,8 @@ export function formatShutter(seconds: number): string {
 
 /** 1/3 스톱 단위. 예: 0.333 → +⅓, 1 → +1, -0.666 → −⅔ */
 export function formatComp(stops: number): string {
+  // 반 스톱(역광 보정 +1.5 같은 것)은 소수로
+  if (Math.abs(stops * 2 - Math.round(stops * 2)) < 0.01 && !Number.isInteger(stops)) return (stops > 0 ? '+' : '−') + Math.abs(stops).toFixed(1)
   const k = Math.round(stops * 3)
   if (!k) return '0'
   const w = Math.floor(Math.abs(k) / 3)

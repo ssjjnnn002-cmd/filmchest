@@ -15,6 +15,8 @@ export interface CatalogCamera {
   aka?: string[] // 다른 이름 (예: AF600 → Lite Touch)
   /** 셔터 범위: [] = 자동(고를 수 없음), [x, 초] = 1/x ~ 초. 없으면 모름 (catalog/shutters.mjs) */
   shutter?: number[]
+  /** 고를 수 있는 노출 보정 값(EV). 없으면 기본 (catalog/comps.mjs) */
+  comp?: number[]
   /** P(프로그램) 모드가 있음 */
   program?: boolean
 }

@@ -42,6 +42,8 @@ struct MeterGear {
     var shutterAuto = false
     /// P(프로그램) 모드가 있음 (셔터 자동이면서 P면 완전 자동 카메라)
     var program = false
+    /// 고를 수 있는 노출 보정 값 (catalog/comps.mjs). nil = 기본 (완전 자동은 없음, 그 밖은 ±2 ⅓ 단계)
+    var comps: [Double]?
     var lens: MeterLens = .generic
     /// 바꿔 낄 수 있는 렌즈 (장비 탭, 같은 마운트)
     var lenses: [MeterLens] = []
@@ -88,6 +90,8 @@ enum MeterMath {
     static func fmtS(_ t: Double) -> String { t < 0 ? "B" : t >= 1 ? "\(trim(t))\"" : "1/\(Int((1 / t).rounded()))" }
     static func lcdS(_ t: Double) -> String { t < 0 ? "B" : t >= 1 ? "\(trim(t))\"" : "\(Int((1 / t).rounded()))" }
     static func fmtC(_ c: Double) -> String {
+        // 반 스톱(역광 보정 +1.5 같은 것)은 소수로
+        if abs(c * 2 - (c * 2).rounded()) < 0.01, c != c.rounded() { return (c > 0 ? "+" : "−") + String(format: "%.1f", abs(c)) }
         let k = Int((c * 3).rounded())
         if k == 0 { return "0" }
         let w = abs(k) / 3, r = abs(k) % 3

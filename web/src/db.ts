@@ -1,3 +1,5 @@
+import { addTomb, type Tombs } from './core/syncMerge'
+import { getPref, setPref } from './platform'
 import Dexie, { type Table } from 'dexie'
 import type { Camera, FilmLot, Frame, GearFilter, Lens, Original, Project, Roll } from './core/types'
 import type { CustomFilmRow } from './core/films'
@@ -95,6 +97,25 @@ export interface ZipQueueRow {
 }
 
 export const db = new FilmchestDB()
+
+// ───── 기기 사이 맞추기 (core/syncMerge): 고친 시각을 붙이고, 지우면 지움 표시를 남긴다.
+// 드라이브에서 받은 것을 넣는 동안(applyingRemote)은 받은 시각 그대로 두고 표시도 남기지 않는다
+export const SYNC_TABLES = ['cameras', 'lenses', 'filters', 'filmLots', 'customFilms', 'rolls', 'projects'] as const
+let remote = 0
+export async function applyingRemote<T>(fn: () => Promise<T>): Promise<T> {
+  remote += 1
+  try { return await fn() } finally { remote -= 1 }
+}
+export function readTombs(): Tombs {
+  try { return JSON.parse(getPref('syncTombs', '{}')) as Tombs } catch { return {} }
+}
+export const writeTombs = (t: Tombs) => setPref('syncTombs', JSON.stringify(t))
+for (const name of SYNC_TABLES) {
+  const t = db.table(name)
+  t.hook('creating', (_pk, obj) => { if (!remote) (obj as { updatedAt?: number }).updatedAt = Date.now() })
+  t.hook('updating', () => (remote ? undefined : { updatedAt: Date.now() }))
+  t.hook('deleting', (pk) => { if (!remote) writeTombs(addTomb(readTombs(), name, pk)) })
+}
 
 export const kept = (r: { deletedAt?: number }) => !r.deletedAt
 export const cameraKept = (c: { deletedAt?: number }) => !c.deletedAt
@@ -204,4 +225,5 @@ export async function storageEstimate() {
 /** 이 기기의 기록·사진을 모두 지운다 (로그아웃, 모든 기록 지우기) */
 export async function wipeLocal() {
   await Promise.all(db.tables.map((t) => t.clear()))
+  writeTombs({})
 }

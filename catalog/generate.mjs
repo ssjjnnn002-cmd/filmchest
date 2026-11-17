@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cameras } from './cameras.mjs'
 import { shutters } from './shutters.mjs'
+import { comps } from './comps.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const header = '// 자동 생성 파일 — 직접 고치지 말고 catalog/cameras.mjs를 고친 뒤 `node catalog/generate.mjs` 실행\n'
@@ -26,8 +27,13 @@ for (const c of cameras) {
 for (const k of Object.keys(shutters)) {
   if (!cameras.some((c) => `${c.brand} ${c.model}` === k)) throw new Error(`셔터 목록에 없는 기종: ${k}`)
 }
+for (const k of Object.keys(comps)) {
+  if (!cameras.some((c) => `${c.brand} ${c.model}` === k)) throw new Error(`노출 보정 목록에 없는 기종: ${k}`)
+}
 // shutter: [] = 셔터 자동(조리개 우선, 다이얼 A만), [x, 초] = 1/x ~ 초. program: P 모드가 있음 (완전 자동이면 [] + program)
 const shutterOf = (c) => { const v = shutters[`${c.brand} ${c.model}`]; return v === undefined ? undefined : typeof v === 'string' ? [] : v.filter((x) => typeof x === 'number') }
+// comp: 고를 수 있는 노출 보정 값 (EV). 없으면 기본 (완전 자동은 없음, 그 밖은 ±2 ⅓ 단계)
+const compOf = (c) => comps[`${c.brand} ${c.model}`]
 const programOf = (c) => { const v = shutters[`${c.brand} ${c.model}`]; return v === 'P' || (Array.isArray(v) && v.includes('P')) }
 
 // --- Swift
@@ -36,7 +42,7 @@ const s = (v) => (v === undefined ? 'nil' : JSON.stringify(v))
 const swiftRows = cameras.map((c) =>
   `        CatalogCamera(brand: ${s(c.brand)}, model: ${s(c.model)}, style: .${c.style}, format: ${swiftFormat[c.f ?? '135']}, ` +
   `mount: ${s(c.m)}, lens: ${s(c.l)}, battery: ${s(c.b)}, aka: ${JSON.stringify(c.aka ?? [])}` +
-  (shutterOf(c) ? `, shutter: [${shutterOf(c).join(', ')}]` : '') + (programOf(c) ? ', program: true' : '') + '),')
+  (shutterOf(c) ? `, shutter: [${shutterOf(c).join(', ')}]` : '') + (programOf(c) ? ', program: true' : '') + (compOf(c) ? `, comp: [${compOf(c).join(', ')}]` : '') + '),')
 const swift = `${header}import FilmScanCore
 
 extension CameraCatalog {
@@ -57,6 +63,7 @@ const tsRows = cameras.map((c) => {
   if (c.aka?.length) o.aka = c.aka
   if (shutterOf(c)) o.shutter = shutterOf(c)
   if (programOf(c)) o.program = true
+  if (compOf(c)) o.comp = compOf(c)
   return `  ${JSON.stringify(o)},`
 })
 const ts = `${header}import type { CatalogCamera } from './cameras'

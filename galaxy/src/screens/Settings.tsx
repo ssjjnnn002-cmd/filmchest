@@ -1,7 +1,7 @@
 // 웹 pages/Settings.tsx
 import { useEffect, useState } from 'react'
 import { Welcome } from '../Welcome'
-import { disconnectDrive, driveAccount, driveConnected, signOutAndClear } from '../drive'
+import { disconnectDrive, driveAccount, driveConnected, signOutKeep } from '../drive'
 import { notifyBackup } from '../core/backupNudge'
 import { View } from 'react-native'
 import { Text } from '../text'
@@ -91,16 +91,16 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           }} />
       ) : null}
       {login ? <Welcome loginOnly onDone={() => setLogin(false)} /> : null}
-      {logout ? <Confirm message="로그아웃할까요? 기록과 사진을 드라이브에 올린 뒤 이 기기에서 지워요. 다시 로그인하면 받아 와요." action="로그아웃"
+      {logout ? <Confirm message="로그아웃할까요? 이 기기의 기록은 그대로 남고, 같은 계정으로 다시 로그인하면 바로 이어져요." action="로그아웃"
         onCancel={() => setLogout(false)} onConfirm={async () => {
           setLogout(false)
           setLogoutStep('준비 중…')
           try {
-            await signOutAndClear(setLogoutStep)
+            await signOutKeep(setLogoutStep)
             notifyBackup()
             onClose()
           } catch (e) {
-            setNote(`드라이브에 다 올리지 못해서 로그아웃하지 않았어요. 기록은 이 기기에 그대로 있어요. (${e instanceof Error ? e.message : String(e)})`)
+            setNote(`로그아웃하지 못했어요. (${e instanceof Error ? e.message : String(e)})`)
           } finally {
             setLogoutStep(undefined)
           }

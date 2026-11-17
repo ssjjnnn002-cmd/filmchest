@@ -136,15 +136,12 @@ struct SettingsView: View {
             .filmKeyboard()
             .sheet(isPresented: $showPaywall) { PaywallView() }
             .sheet(isPresented: $showLogin, onDismiss: { accountRevision += 1 }) { WelcomeView(loginOnly: true) }
-            .confirmationDialog("로그아웃할까요? 기록과 사진을 드라이브에 올린 뒤 이 기기에서 지워요. 다시 로그인하면 받아 와요. 사진 앱의 사진은 그대로예요.", isPresented: $confirmLogout, titleVisibility: .visible) {
+            .confirmationDialog("로그아웃할까요? 이 기기의 기록은 그대로 남고, 같은 계정으로 다시 로그인하면 바로 이어져요.", isPresented: $confirmLogout, titleVisibility: .visible) {
                 Button("로그아웃", role: .destructive) {
                     logoutStep = "준비 중…"
                     Task {
-                        do {
-                            try await DriveSync.signOutAndClear(context) { logoutStep = $0 }
-                        } catch {
-                            note = "드라이브에 다 올리지 못해서 로그아웃하지 않았어요. 기록은 이 기기에 그대로 있어요. (\(error.localizedDescription))"
-                        }
+                        logoutStep = "기록 올리는 중…"
+                        await DriveSync.signOutKeep(context)
                         logoutStep = nil
                         accountRevision += 1
                     }

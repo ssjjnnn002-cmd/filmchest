@@ -2,7 +2,7 @@
 import { importAll, restoredBackupUri, startLocalAutoBackup } from './backup'
 import { Welcome } from './Welcome'
 import { getPref } from './store'
-import { driveConnected } from './drive'
+import { driveConnected, keptAccount, onSignedOut } from './drive'
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Animated, BackHandler, Easing, Pressable, View } from 'react-native'
 import { Text } from './text'
@@ -129,7 +129,9 @@ export function App() {
   }, [])
   const [intro, setIntro] = useState(true)
   // 처음 켤 때 한 번: 구글로 시작하기 (이미 연결했으면 묻지 않는다)
-  const [welcome, setWelcome] = useState(() => !driveConnected() && getPref('welcomeSeen', '' as string) !== '1')
+  const [welcome, setWelcome] = useState(() => !driveConnected() && (getPref('welcomeSeen', '' as string) !== '1' || !!keptAccount()))
+  // 로그아웃하면 시작 화면으로 (기록은 기기에 남아 있다)
+  useEffect(() => onSignedOut(() => setWelcome(true)), [])
 
   const setQueue = (next: ZipJob[], active: string | null) => {
     zipQueueRef.current = next

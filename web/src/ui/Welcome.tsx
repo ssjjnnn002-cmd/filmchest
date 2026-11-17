@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { signInWithGoogle } from '../core/drive'
+import { clearKept, keptAccount, signInWithGoogle } from '../core/drive'
 import { importAll } from '../core/backup'
 import { isOldSite } from '../core/move'
 import { setPref } from '../platform'
-import { Sheet } from './common'
+import { Confirm, Sheet } from './common'
 import { MoveGuide, MoveInfo } from './MoveNotice'
 
 /** 처음 켤 때 한 번: 구글로 시작하기 · 로그인 없이 쓰기 · 기록 불러오기.
@@ -13,6 +13,10 @@ export function Welcome({ onDone, loginOnly = false }: { onDone: () => void; log
   const [result, setResult] = useState<string>()
   const [error, setError] = useState<string>()
   const [guide, setGuide] = useState(false)
+  // 로그아웃한 뒤: 기록은 기기에 남아 있다. 같은 계정이면 그대로 이어지고, 다른 계정·로그인 없이 쓰기는 지울지 묻는다
+  const kept = loginOnly ? undefined : keptAccount()
+  const [ask, setAsk] = useState<{ message: string; action: string; resolve: (ok: boolean) => void }>()
+  const askOnce = (message: string, action: string) => new Promise<boolean>((resolve) => setAsk({ message, action, resolve }))
   const finish = () => {
     setPref('welcomeSeen', '1')
     setPref('moveAsked', '1')
@@ -27,7 +31,8 @@ export function Welcome({ onDone, loginOnly = false }: { onDone: () => void; log
   }
   // 둘 다 같은 구글 로그인 (드라이브에 기록이 있으면 받아 오고, 없으면 새로 시작)
   const start = () => run(async () => {
-    const r = await signInWithGoogle(setStep)
+    const r = await signInWithGoogle(setStep, (old, next) =>
+      askOnce(`이 기기에는 ${old} 계정 기록이 남아 있어요. 지우고 ${next}(으)로 시작할까요? ${old} 기록은 그 계정 드라이브에 있어요.`, '지우고 시작'))
     return r.rolls || r.cameras
       ? `카메라 ${r.cameras}대, 롤 ${r.rolls}개${r.photos ? `, 사진 ${r.photos}장` : ''}을 받았어요.`
       : '연결했어요. 이제 기록과 사진이 내 구글 드라이브에 저장돼요.'
@@ -40,7 +45,7 @@ export function Welcome({ onDone, loginOnly = false }: { onDone: () => void; log
 
   return (
     <>
-      <Sheet title={loginOnly ? '구글로 로그인' : '필름함 시작하기'} onClose={finish} left={loginOnly ? undefined : <span />}>
+      <Sheet title={loginOnly ? '구글로 로그인' : '필름함 시작하기'} onClose={kept && !result ? () => {} : finish} left={loginOnly ? undefined : <span />} page={!!kept}>
         <div className="welcome">
           <img src="./icon-192.png?v=2" alt="" width={84} height={84} />
           <p>구글 계정으로 시작하면 기록과 사진이 <b>내 구글 드라이브</b>에 저장돼요.<br />다른 기기에서 같은 계정으로 들어오면 그대로 이어져요.</p>
@@ -54,12 +59,17 @@ export function Welcome({ onDone, loginOnly = false }: { onDone: () => void; log
                 <button className="row accent" onClick={start}><span className="grow sub">처음이에요</span><b>구글로 시작하기</b></button>
                 <button className="row accent" onClick={start}><span className="grow sub">계정이 있어요</span><b>구글로 로그인하기</b></button>
               </>}
-          {!result && !loginOnly && <button className="row" disabled={!!step} onClick={finish}>로그인 없이 쓰기</button>}
+          {!result && !loginOnly && <button className="row" disabled={!!step} onClick={() => {
+            if (!kept) { finish(); return }
+            void askOnce(`이 기기에 남은 ${kept} 계정 기록을 지우고 로그인 없이 새로 시작할까요? 기록은 그 계정 드라이브에 있어요.`, '지우고 시작')
+              .then(async (ok) => { if (ok) { await clearKept(); finish() } })
+          }}>로그인 없이 쓰기</button>}
         </div>
         {error && <p className="footnote" style={{ color: 'var(--danger)' }}>{error}</p>}
+        {kept && !result && <p className="footnote">로그아웃했어요. {kept} 계정으로 다시 로그인하면 바뀐 것만 받아서 바로 이어져요.</p>}
         <p className="footnote">필름함 서버에는 아무것도 올라가지 않아요.{loginOnly ? '' : ' 나중에 설정에서도 로그인할 수 있어요.'}</p>
 
-        {!result && !loginOnly && (
+        {!result && !loginOnly && !kept && (
           <div className="section">
             <h2>기록 불러오기</h2>
             <div className="group">
@@ -78,6 +88,7 @@ export function Welcome({ onDone, loginOnly = false }: { onDone: () => void; log
         )}
       </Sheet>
       {guide && <MoveGuide onClose={() => setGuide(false)} />}
+      {ask && <Confirm message={ask.message} action={ask.action} onCancel={() => { ask.resolve(false); setAsk(undefined) }} onConfirm={() => { ask.resolve(true); setAsk(undefined) }} />}
     </>
   )
 }

@@ -7,6 +7,8 @@ import FilmScanCore
 
 @Model
 final class CameraItem {
+    /// 기기 사이 맞추기: 이 기기에서 마지막으로 고친 시각 (DriveSync가 저장할 때 붙인다)
+    var updatedAt: Date?
     var id: UUID = UUID()
     var brand: String = ""
     var model: String = ""
@@ -84,6 +86,8 @@ final class CameraItem {
 
 @Model
 final class LensItem {
+    /// 기기 사이 맞추기: 이 기기에서 마지막으로 고친 시각 (DriveSync가 저장할 때 붙인다)
+    var updatedAt: Date?
     var id: UUID = UUID()
     var brand: String = ""
     var model: String = ""
@@ -205,6 +209,8 @@ struct LensOptics {
 
 @Model
 final class RollItem {
+    /// 기기 사이 맞추기: 이 기기에서 마지막으로 고친 시각 (DriveSync가 저장할 때 붙인다)
+    var updatedAt: Date?
     var id: UUID = UUID()
     var camera: CameraItem?
     var lens: LensItem?
@@ -636,6 +642,7 @@ extension MeterShot {
     }
 
     static func formatComp(_ stops: Double) -> String {
+        if abs(stops * 2 - (stops * 2).rounded()) < 0.01, stops != stops.rounded() { return (stops > 0 ? "+" : "−") + String(format: "%.1f", abs(stops)) }
         let k = Int((stops * 3).rounded())
         if k == 0 { return "0" }
         let w = abs(k) / 3
@@ -662,6 +669,8 @@ extension FilmFormat {
 /// 롤 보관함 프로젝트(폴더). 한 롤을 여러 프로젝트에 넣을 수 있어서 롤 id 목록으로 묶는다.
 @Model
 final class ProjectItem {
+    /// 기기 사이 맞추기: 이 기기에서 마지막으로 고친 시각 (DriveSync가 저장할 때 붙인다)
+    var updatedAt: Date?
     var id: UUID = UUID()
     var name: String = ""
     var memo: String?
@@ -737,6 +746,8 @@ enum FilmStorage: String, CaseIterable, Identifiable {
 
 @Model
 final class FilterItem {
+    /// 기기 사이 맞추기: 이 기기에서 마지막으로 고친 시각 (DriveSync가 저장할 때 붙인다)
+    var updatedAt: Date?
     var id: UUID = UUID()
     var name: String = ""
     /// 액세서리 유형 (필터, 그립, 스트랩 … 사용자가 추가 가능). 예전 필터는 비어 있음 = 필터
@@ -767,6 +778,8 @@ final class FilterItem {
 
 @Model
 final class FilmLotItem {
+    /// 기기 사이 맞추기: 이 기기에서 마지막으로 고친 시각 (DriveSync가 저장할 때 붙인다)
+    var updatedAt: Date?
     var id: UUID = UUID()
     var filmStockID: String = ""
     var customName: String = ""

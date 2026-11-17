@@ -19,7 +19,7 @@ import { uid } from './core/types'
 import { Intro } from './ui/Intro'
 import { MoveNotice } from './ui/MoveNotice'
 import { Welcome } from './ui/Welcome'
-import { driveAvailable, driveConnected } from './core/drive'
+import { driveAvailable, driveConnected, keptAccount } from './core/drive'
 import { isOldSite } from './core/move'
 import { getPref, inClaudeHost } from './platform'
 import { goBack, noteNavigation, replaceUrl, reuseNextOverlay, startBackStack, type BackSnap } from './backStack'
@@ -112,7 +112,13 @@ export function App() {
   // 처음 켤 때 한 번: 구글로 시작하기 (이미 연결했거나, 예전 주소·Claude 화면에서는 묻지 않는다)
   // 예전 주소가 기록을 건네려고 연 창(?move)이면 시작 화면 대신 받는 화면(MoveNotice)을 먼저 띄운다
   const [welcome, setWelcome] = useState(() => driveAvailable && !driveConnected() && !isOldSite && !inClaudeHost()
-    && !new URLSearchParams(location.search).has('move') && getPref('welcomeSeen', '' as string) !== '1')
+    && !new URLSearchParams(location.search).has('move') && (getPref('welcomeSeen', '' as string) !== '1' || !!keptAccount()))
+  // 로그아웃하면 시작 화면으로 (기록은 기기에 남아 있다)
+  useEffect(() => {
+    const show = () => setWelcome(true)
+    window.addEventListener('filmchest-signedout', show)
+    return () => window.removeEventListener('filmchest-signedout', show)
+  }, [])
 
   const setQueue = (next: ZipJob[], active: string | null) => {
     zipQueueRef.current = next

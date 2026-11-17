@@ -15,6 +15,7 @@ struct FilmScanApp: App {
         #endif
         CanisterCache.prewarm()
         DriveUploader.shared.resume()
+        SyncStamp.start()
     }
 
     @State private var router = Router()

@@ -16,6 +16,8 @@ struct CatalogCamera: Identifiable, Hashable {
     var shutter: [Double]? = nil
     /// P(프로그램) 모드가 있음
     var program = false
+    /// 고를 수 있는 노출 보정 값(EV). nil = 기본 (catalog/comps.mjs)
+    var comp: [Double]? = nil
 
     var id: String { "\(brand) \(model)" }
     var displayName: String { "\(brand) \(model)" }

@@ -3,7 +3,7 @@ import { AppState, Linking } from 'react-native'
 import * as Sharing from 'expo-sharing'
 import { File } from 'expo-file-system'
 import JSZip from 'jszip'
-import { db } from './data'
+import { db, deleteRoll, purgeCamera } from './data'
 import type { Frame } from './core/types'
 import { rollFolderName } from './core/driveApi'
 import { rollTitle } from './core/display'
@@ -13,52 +13,75 @@ import type { PickedFile } from './pick'
 import { b64ToBytes, bytesToB64, cameraPhotoBytes, folder, readBytes, saveCameraPhoto, writeBytes } from './files'
 import { importGear } from './gear'
 import { dedupeCaseIds, idCanon, remapRow } from './core/backupMerge'
-import { getPref, setPref, subscribe } from './store'
+import { applyingRemote, getPref, readTombs, setPref, subscribe, writeTombs } from './store'
+import { mergeTombs, pruneTombs, remoteWins, replaceRow, tombKills, type Tombs } from './core/syncMerge'
 
 const tables = ['cameras', 'lenses', 'filters', 'filmLots', 'customFilms', 'rolls', 'projects'] as const
 export const backupFileName = '필름함 백업.json'
-type Table = { toArray(): Promise<Record<string, unknown>[]>; get(id: string): Promise<Record<string, unknown> | undefined>; put(row: unknown): Promise<unknown> }
+type Table = { toArray(): Promise<Record<string, unknown>[]>; get(id: string): Promise<Record<string, unknown> | undefined>; put(row: unknown): Promise<unknown>; delete(id: string): Promise<unknown> }
 const table = (t: typeof tables[number]) => (db as unknown as Record<string, Table>)[t]
 
 export async function exportAll(): Promise<Uint8Array> {
   const data: Record<string, unknown[]> = {}
   for (const t of tables) {
-    data[t] = (await table(t).toArray()).filter((r) => !r.deletedAt)
+    // 휴지통 줄도 함께 보낸다 (다른 기기에서도 휴지통에 들어가게)
+    data[t] = await table(t).toArray()
   }
   const photos: Record<string, string> = {}
   for (const t of ['cameras', 'lenses', 'filters'] as const) {
-    for (const row of data[t] as { id: string; hasPhoto?: boolean }[]) {
-      if (!row.hasPhoto) continue
+    for (const row of data[t] as { id: string; hasPhoto?: boolean; deletedAt?: number }[]) {
+      if (!row.hasPhoto || row.deletedAt) continue
       const bytes = await cameraPhotoBytes(row.id).catch(() => undefined)
       if (bytes) photos[row.id] = bytesToB64(bytes)
     }
   }
-  const file = { kind: 'filmchest-backup-web', version: 1, savedAt: new Date().toISOString(), data, photos }
+  const deleted = pruneTombs(readTombs())
+  const file = { kind: 'filmchest-backup-web', version: 2, savedAt: new Date().toISOString(), data, photos, deleted }
   return new TextEncoder().encode(JSON.stringify(file))
 }
 
-export async function importAll(uri: string): Promise<{ cameras: number; rolls: number }> {
+/** 받은 기록을 합친다 (core/syncMerge 규칙, 웹과 같음): 더 최근에 고친 줄이 이기고, 지움 표시가 있으면 지운다.
+ *  sync가 아니면(백업 파일 불러오기) 지움 표시는 쓰지 않는다 */
+export async function importAll(uri: string, opts: { sync?: boolean } = {}): Promise<{ cameras: number; rolls: number }> {
   const json = JSON.parse(new TextDecoder().decode(await readBytes(uri)))
   if (json?.kind !== 'filmchest-backup-web') {
     const gear = await importGear(uri)
     return { cameras: gear.cameras, rolls: 0 }
   }
-  // 대소문자만 다른 id(아이폰은 대문자)는 같은 장비·롤로 본다
-  const canon = idCanon(await Promise.all(tables.map((t) => table(t).toArray())))
-  for (const t of tables) {
-    const rows = json.data?.[t]
-    if (!Array.isArray(rows)) continue
-    for (const raw of rows) {
-      const row = remapRow(raw, canon) as Record<string, unknown> & { id: string }
-      const old = await table(t).get(row.id)
-      await table(t).put({ ...(old ?? {}), ...row })
+  return applyingRemote(async () => {
+    // 대소문자만 다른 id(아이폰은 대문자)는 같은 장비·롤로 본다
+    const canon = idCanon(await Promise.all(tables.map((t) => table(t).toArray())))
+    const tombs: Tombs = opts.sync ? mergeTombs(readTombs(), (json.deleted ?? {}) as Tombs) : {}
+    for (const t of tables) {
+      const rows = json.data?.[t]
+      if (!Array.isArray(rows)) continue
+      for (const raw of rows) {
+        const row = remapRow(raw, canon) as Record<string, unknown> & { id: string }
+        if (tombKills(tombs, t, row)) continue
+        const old = await table(t).get(row.id)
+        if (!remoteWins(old, row)) continue
+        await table(t).put(replaceRow(old, row, () => false))
+      }
     }
-  }
-  for (const [id, b64] of Object.entries((json.photos ?? {}) as Record<string, string>)) {
-    await saveCameraPhoto(String(canon(id)), b64ToBytes(b64)).catch(() => {})
-  }
-  await dedupeCaseIds(db as unknown as Parameters<typeof dedupeCaseIds>[0])
-  return { cameras: json.data?.cameras?.length ?? 0, rolls: json.data?.rolls?.length ?? 0 }
+    for (const [id, b64] of Object.entries((json.photos ?? {}) as Record<string, string>)) {
+      await saveCameraPhoto(String(canon(id)), b64ToBytes(b64)).catch(() => {})
+    }
+    if (opts.sync) {
+      // 다른 기기에서 지운 것: 지운 뒤로 이 기기에서 고치지 않았으면 여기서도 지운다
+      for (const t of tables) {
+        for (const row of await table(t).toArray()) {
+          if (!tombKills(tombs, t, row)) continue
+          const id = String(row.id)
+          if (t === 'rolls') await deleteRoll(id, true)
+          else if (t === 'cameras') await purgeCamera(id)
+          else await table(t).delete(id)
+        }
+      }
+      writeTombs(pruneTombs(tombs))
+    }
+    await dedupeCaseIds(db as unknown as Parameters<typeof dedupeCaseIds>[0])
+    return { cameras: json.data?.cameras?.length ?? 0, rolls: json.data?.rolls?.length ?? 0 }
+  })
 }
 
 // 안드로이드 자동 백업(구글 드라이브)은 backup 폴더만 올린다 (android/backup_rules). 앱이 뒤로 갈 때 하루 한 번 새로 쓴다.

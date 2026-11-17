@@ -125,13 +125,15 @@ struct RootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in syncNow(delay: 4) }
         .sheet(isPresented: $showWelcome) { WelcomeView() }
+        // 로그아웃하면 시작 화면으로 (기록은 기기에 남아 있다)
+        .onReceive(NotificationCenter.default.publisher(for: DriveSync.signedOut)) { _ in showWelcome = true }
         .onReceive(pullTimer) { _ in if scenePhase == .active { DriveSync.onActive(context) } }
         .overlay {
             if showIntro {
                 IntroView {
                     showIntro = false
                     // 처음 켤 때 한 번: 구글로 시작하기 (이미 연결했으면 묻지 않는다)
-                    if !welcomeSeen && !GoogleAuth.isConnected { showWelcome = true }
+                    if !GoogleAuth.isConnected && (!welcomeSeen || DriveSync.keptAccount != nil) { showWelcome = true }
                 }
                     .transition(.opacity)
             }

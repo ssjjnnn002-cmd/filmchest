@@ -6,6 +6,8 @@ import FilmScanCore
 /// 목록에 없는 필름을 직접 만든 것 (이름, 감도, 필름통 색)
 @Model
 final class CustomFilmItem {
+    /// 기기 사이 맞추기: 이 기기에서 마지막으로 고친 시각 (DriveSync가 저장할 때 붙인다)
+    var updatedAt: Date?
     var id: String = "custom-\(UUID().uuidString)"
     var name: String = ""
     var iso: Int = 400

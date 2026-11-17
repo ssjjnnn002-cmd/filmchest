@@ -51,6 +51,7 @@ extension MeterGear {
         } else {
             gear.fastest = 1000; gear.slowest = 1
         }
+        gear.comps = known?.comp
         gear.iso = roll.shotISO.map(Double.init)
         return gear
     }

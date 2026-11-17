@@ -7,7 +7,7 @@ import { lastBackupAt, markFileBackup } from '../core/backupNudge'
 import { useBackupRefresh } from '../ui/BackupNudge'
 import { MoveGuide } from '../ui/MoveNotice'
 import { Welcome } from '../ui/Welcome'
-import { disconnectDrive, driveAccount, driveAvailable, driveConnected, signOutAndClear } from '../core/drive'
+import { disconnectDrive, driveAccount, driveAvailable, driveConnected, signOutKeep } from '../core/drive'
 import { CloudBackup, cloudStatus } from './CloudBackup'
 import { Stats } from './Stats'
 import { restorePhotos } from '../core/restore'
@@ -224,15 +224,16 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
       {purge && <Confirm message='완전히 지울까요? 이 작업은 되돌릴 수 없습니다.' action="지우기" onCancel={() => setPurge(null)} onConfirm={async () => { const run = purge; setPurge(null); await run() }} />}
       {moveGuide && <MoveGuide onClose={() => setMoveGuide(false)} />}
       {login && <Welcome loginOnly onDone={() => setLogin(false)} />}
-      {logout && <Confirm message="로그아웃할까요? 기록과 사진을 드라이브에 올린 뒤 이 기기에서 지워요. 다시 로그인하면 받아 와요." action="로그아웃"
+      {logout && <Confirm message="로그아웃할까요? 이 기기의 기록은 그대로 남고, 같은 계정으로 다시 로그인하면 바로 이어져요." action="로그아웃"
         onCancel={() => setLogout(false)} onConfirm={async () => {
           setLogout(false)
           setLogoutStep('준비 중…')
           try {
-            await signOutAndClear(setLogoutStep)
+            await signOutKeep(setLogoutStep)
             onClose()
+            window.dispatchEvent(new Event('filmchest-signedout'))
           } catch (e) {
-            setLogoutError(`드라이브에 다 올리지 못해서 로그아웃하지 않았어요. 기록은 이 기기에 그대로 있어요. (${e instanceof Error ? e.message : e})`)
+            setLogoutError(`로그아웃하지 못했어요. (${e instanceof Error ? e.message : e})`)
           } finally {
             setLogoutStep(undefined)
           }

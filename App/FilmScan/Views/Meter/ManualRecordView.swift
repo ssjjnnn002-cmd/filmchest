@@ -45,8 +45,10 @@ struct ManualRecordView: View {
         let fullAuto = gear.shutterAuto && gear.program
         let stops = DialState.stops(speeds: model.shutters, manual: manual, program: gear.program)
         let start = manual ? (stops.indices.filter { stops[$0] > 0 }.min { abs(log2(stops[$0] * 125)) < abs(log2(stops[$1] * 125)) } ?? 0) : 0
+        // 노출 보정: 이 카메라에 있는 값만 (XA는 역광 +1.5 하나, 기계식은 없음)
+        let comps = gear.comps.map { $0.isEmpty ? [0] : $0 } ?? (fullAuto ? [0] : MeterMath.comps)
         var first = DialState(shutterStops: stops, apertures: model.apertures, s: start,
-                              a: fullAuto ? 0 : 1 + MeterMath.nearest(model.apertures, 8), c: 6, fullAuto: fullAuto)
+                              a: fullAuto ? 0 : 1 + MeterMath.nearest(model.apertures, 8), c: comps.firstIndex(of: 0) ?? 0, fullAuto: fullAuto, comps: comps)
         // 이어서: 마지막에 찍은 컷의 렌즈·필터·다이얼 값에서 다시 시작
         if let last = shots.max(by: { $0.order < $1.order }) {
             if let id = last.lensId, let l = gear.lenses.first(where: { $0.id == id }) { model.setLens(l) }
@@ -308,7 +310,9 @@ struct DialState {
     /// 조작해도 의미 없는 다이얼은 흐리게 막는다
     var shutterEnabled: Bool { shutterStops.count > 1 }
     var apertureEnabled: Bool { !program }
-    var compEnabled: Bool { !fullAuto }
+    /// 이 카메라에서 고를 수 있는 노출 보정 값
+    var comps: [Double] = MeterMath.comps
+    var compEnabled: Bool { comps.count > 1 }
 
     var apertureLabels: [String] { fullAuto ? ["A", "⚡"] : ["A"] + apertures.map(MeterMath.trim) + ["⚡"] }
     var flashIndex: Int { fullAuto ? 1 : apertures.count + 1 }
@@ -319,20 +323,20 @@ struct DialState {
         return v == Self.P || v == Self.A ? nil : v
     }
     var aperture: Double? { program || fullAuto || a == 0 || flash || a > apertures.count ? nil : apertures[a - 1] }
-    var comp: Double { compEnabled ? MeterMath.comps[c] : 0 }
+    var comp: Double { compEnabled && comps.indices.contains(c) ? comps[c] : 0 }
     var mode: String { program ? "P" : aperture != nil && shutter != nil ? "M" : aperture != nil ? "A" : shutter != nil ? "S" : "P" }
 
     mutating func toggleFlash() {
         if flash { a = lastAperture } else { lastAperture = a; a = flashIndex }
     }
 
-    init(shutterStops: [Double], apertures: [Double], s: Int, a: Int, c: Int, fullAuto: Bool) {
-        self.shutterStops = shutterStops; self.apertures = apertures; self.s = s; self.a = a; self.c = c; self.fullAuto = fullAuto
+    init(shutterStops: [Double], apertures: [Double], s: Int, a: Int, c: Int, fullAuto: Bool, comps: [Double] = MeterMath.comps) {
+        self.shutterStops = shutterStops; self.apertures = apertures; self.s = s; self.a = a; self.c = c; self.fullAuto = fullAuto; self.comps = comps
     }
 
     /// 기록된 컷 값으로 다이얼을 맞춘다 (컷 고치기). 카메라 자리(셔터·자동 여부)는 like에서, 조리개는 그 컷 렌즈에서
     init(shot: MeterShot, like t: DialState, apertures: [Double]) {
-        shutterStops = t.shutterStops; self.apertures = apertures; fullAuto = t.fullAuto
+        shutterStops = t.shutterStops; self.apertures = apertures; fullAuto = t.fullAuto; comps = t.comps
         let stops = t.shutterStops
         let speeds = stops.indices.filter { stops[$0] > 0 }
         if let v = shot.shutter, v < 0, let b = stops.firstIndex(of: MeterMath.bulb) { s = b }
@@ -341,7 +345,8 @@ struct DialState {
         else { s = stops.firstIndex(of: Self.A) ?? 0 }
         let ap = fullAuto ? 0 : shot.aperture.map { 1 + MeterMath.nearest(apertures, $0) } ?? 0
         a = shot.flash ? (fullAuto ? 1 : apertures.count + 1) : ap
-        c = MeterMath.comps.indices.min { abs(MeterMath.comps[$0] - shot.comp) < abs(MeterMath.comps[$1] - shot.comp) } ?? 6
+        let cs = t.comps
+        c = cs.indices.min { abs(cs[$0] - shot.comp) < abs(cs[$1] - shot.comp) } ?? 0
         lastAperture = ap
     }
 }
@@ -364,7 +369,7 @@ struct RecordDials: View {
                     onDisabledTap: { onLocked(dial.fullAuto ? "이 카메라는 셔터·조리개를 자동으로 정해요" : "이 카메라는 셔터를 자동으로 정해요") })
                 .padding(.top, 56)
             // 노출 보정은 자주 안 쓰니 위쪽에 작게
-            CompDial(index: $dial.c, iso: iso, disabled: !dial.compEnabled) { onLocked("이 카메라는 노출 보정이 없어요") }
+            CompDial(index: $dial.c, comps: dial.comps, iso: iso, disabled: !dial.compEnabled) { onLocked("이 카메라는 노출 보정이 없어요") }
             TopDial(title: "조리개", labels: dial.apertureLabels, index: $dial.a, size: 132,
                     big: dial.flash ? "플래시" : dial.program ? "P 자동" : dial.aperture.map(MeterMath.fmtA) ?? "자동",
                     accent: [0, dial.flashIndex], snaps: [0, dial.flashIndex], bigSize: 24,
@@ -411,19 +416,22 @@ struct PlaceTimeCard: View {
 /// 노출 보정 작은 다이얼 (가운데 0)
 struct CompDial: View {
     @Binding var index: Int
+    var comps: [Double] = MeterMath.comps
     var iso: Double = 400
     var disabled = false
     var onLocked: () -> Void = {}
     /// 보정하면: 실제로 맞춘 감도와 밝게/어둡게 (보정은 감도를 바꿔 다는 것과 같다)
     private var note: String? {
-        let c = MeterMath.comps[index]
-        guard !disabled, c != 0 else { return nil }
+        guard !disabled, comps.indices.contains(index), comps[index] != 0 else { return nil }
+        let c = comps[index]
         let eff = MeterMath.isoList[MeterMath.nearest(MeterMath.isoList, iso / pow(2, c))]
         return "ISO \(MeterMath.trim(eff))\n\(c > 0 ? "더 밝게" : "더 어둡게")"
     }
     var body: some View {
-        TopDial(title: note ?? "노출 보정", labels: MeterMath.comps.map { $0 == 0 ? "0" : $0 == $0.rounded() ? MeterMath.fmtC($0) : "·" }, index: $index, size: 88,
-                big: disabled || MeterMath.comps[index] == 0 ? "±0" : MeterMath.fmtC(MeterMath.comps[index]), accent: [6], snaps: [6], bigSize: 18, titleColor: note == nil ? .meterSub : Color(white: 0.86),
+        let zero = comps.firstIndex(of: 0) ?? 0
+        // ⅓ 칸은 점, 정수·반 스톱(역광 +1.5)은 숫자
+        return TopDial(title: note ?? "노출 보정", labels: comps.map { $0 == 0 ? "0" : ($0 * 2) == ($0 * 2).rounded() ? MeterMath.fmtC($0) : "·" }, index: $index, size: 88,
+                big: disabled || !comps.indices.contains(index) || comps[index] == 0 ? "±0" : MeterMath.fmtC(comps[index]), accent: [zero], snaps: [zero], bigSize: 18, titleColor: note == nil ? .meterSub : Color(white: 0.86),
                 disabled: disabled, onDisabledTap: onLocked)
             .frame(width: 96)
     }

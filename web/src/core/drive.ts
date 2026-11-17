@@ -117,11 +117,11 @@ export const driveConnected = () => getPref('driveConnected', '' as string) === 
 export const driveAccount = () => getPref('driveAccount', '' as string) || undefined
 export const driveLastBackup = () => Number(getPref('driveLast', '0')) || undefined
 export const driveIntervalDays = () => Number(getPref('driveDays', '1'))
-export function disconnectDrive() {
-  for (const k of ['driveConnected', 'driveAccount', 'driveFileId', 'driveRoot', 'driveKey']) setPref(k, '')
-  setPref('drivePulledPhotos', '{}')
+/** 연결 끊기. keep이면 드라이브 파일·올린 사진 표시는 남긴다 (같은 계정으로 다시 들어오면 바뀐 것만 맞추게) */
+export function disconnectDrive(keep = false) {
+  for (const k of keep ? ['driveConnected', 'driveAccount'] : ['driveConnected', 'driveAccount', 'driveFileId', 'driveRoot', 'driveKey', 'drivePulledAt', 'keptAccount']) setPref(k, '')
+  if (!keep) { setPref('drivePulledPhotos', '{}'); setPref('driveRollFolders', '{}'); setPref('driveFrames', '{}') }
   notifyBackup()
-  setPref('driveRollFolders', '{}'); setPref('driveFrames', '{}')
   token = undefined
   try { sessionStorage.removeItem('driveToken') } catch { /* 없음 */ }
   // 오래 쓰는 허가도 구글에서 취소하고 지운다
@@ -241,7 +241,7 @@ export async function pullFromDrive(force = false) {
   const blob = await res.blob()
   const saved = Date.parse(JSON.parse(await blob.text())?.savedAt ?? '') || 0
   if (!force && saved <= Number(getPref('drivePulledAt', '0'))) return undefined
-  const counts = await importAll(blob)
+  const counts = await importAll(blob, { sync: true })
   setPref('drivePulledAt', String(saved))
   setPref('driveKey', await backupKey(await exportAll()))
   return counts
@@ -320,9 +320,35 @@ export function startDriveAutoBackup() {
   })
 }
 
-/** 구글로 시작하기: 연결 → 드라이브의 기록 받기 → (이 기기에 사진이 없으면) 사진 받기 → 이 기기 기록 올리기 */
-export async function signInWithGoogle(onStep?: (text: string) => void) {
-  await driveToken('consent')
+/** 로그아웃한 뒤에도 이 기기에 남겨 둔 기록의 계정 (같은 계정으로 다시 들어오면 그대로 이어진다) */
+export const keptAccount = () => getPref('keptAccount', '' as string) || undefined
+
+async function accountOf(t: string): Promise<string | undefined> {
+  try {
+    const j = await (await fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', { headers: { Authorization: `Bearer ${t}` } })).json()
+    const email = j?.user?.emailAddress as string | undefined
+    if (email) setPref('driveAccount', email)
+    return email
+  } catch { return undefined }
+}
+
+/** 구글로 시작하기: 연결 → (다른 계정 기록이 남아 있으면 지울지 묻기) → 드라이브의 기록 받기(바뀐 것만 합침)
+ *  → (이 기기에 사진이 없으면) 사진 받기 → 이 기기 기록 올리기 */
+export async function signInWithGoogle(onStep?: (text: string) => void, confirmSwitch?: (old: string, next: string) => Promise<boolean>) {
+  const t = await driveToken('consent')
+  const kept = keptAccount()
+  if (kept) {
+    const now = await accountOf(t)
+    if (now && kept !== now) {
+      if (!(await (confirmSwitch?.(kept, now) ?? Promise.resolve(false)))) { disconnectDrive(true); setPref('keptAccount', kept); throw new Error('로그인을 취소했어요. 기록은 그대로 있어요.') }
+      onStep?.('이 기기 기록 지우는 중…')
+      await wipeLocal()
+      for (const k of ['driveFileId', 'driveRoot', 'driveKey', 'drivePulledAt']) setPref(k, '')
+      setPref('drivePulledPhotos', '{}'); setPref('driveRollFolders', '{}'); setPref('driveFrames', '{}')
+      await driveToken()
+    }
+    setPref('keptAccount', '')
+  }
   onStep?.('기록 받는 중…')
   const counts = await pullFromDrive(true)
   let photos = 0
@@ -387,13 +413,17 @@ export function pullPhotosFromDrive(onProgress?: Progress): Promise<number> {
   return pullingPhotos
 }
 
-/** 로그아웃: 이 기기의 기록과 사진을 드라이브에 다 올린 뒤 이 기기에서 지운다. 올리지 못하면 지우지 않는다 */
-export async function signOutAndClear(onStep?: (text: string) => void) {
+/** 로그아웃: 기록만 짧게 올리고(못 올려도 기기에 남아 있으니 괜찮다) 연결을 끊는다.
+ *  기록·사진은 이 기기에 그대로 두고 시작 화면만 보인다. 같은 계정으로 다시 들어오면 바뀐 것만 맞춘다 */
+export async function signOutKeep(onStep?: (text: string) => void) {
   onStep?.('기록 올리는 중…')
-  await backupToDrive(true)
-  onStep?.('사진 올리는 중…')
-  await syncPhotosToDrive((done, total) => onStep?.(total ? `사진 올리는 중 ${done}/${total}` : '사진 올리는 중…'))
-  onStep?.('이 기기에서 지우는 중…')
+  await Promise.race([backupToDrive(true).catch(() => {}), new Promise((r) => setTimeout(r, 8000))])
+  setPref('keptAccount', driveAccount() ?? '이전 계정')
+  disconnectDrive(true)
+}
+
+/** 남겨 둔 다른 계정 기록을 지우고 로그인 없이 새로 시작 */
+export async function clearKept() {
   await wipeLocal()
   disconnectDrive()
 }

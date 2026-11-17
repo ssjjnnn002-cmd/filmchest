@@ -58,7 +58,8 @@ function speeds(fastest: number, slowest: number) {
 }
 
 // ───────── 다이얼 상태 (메인과 컷 고치기가 같이 쓴다)
-interface Dial { stops: number[]; aps: number[]; s: number; a: number; c: number; fullAuto: boolean; lastA: number }
+/** comps: 이 카메라에서 고를 수 있는 노출 보정 값 (catalog/comps.mjs) */
+interface Dial { stops: number[]; aps: number[]; s: number; a: number; c: number; fullAuto: boolean; lastA: number; comps: number[] }
 const dialOf = {
   stops: (sp: number[], manual: boolean, program: boolean) => (!manual ? [program ? P : A] : [...(program ? [P] : []), A, ...sp, B]),
   program: (d: Dial) => d.stops[d.s] === P,
@@ -66,7 +67,7 @@ const dialOf = {
   flash: (d: Dial) => d.a === dialOf.flashIndex(d),
   shutter: (d: Dial) => { const v = d.stops[d.s]; return v === P || v === A || v === undefined ? null : v },
   aperture: (d: Dial) => (dialOf.program(d) || d.fullAuto || d.a === 0 || dialOf.flash(d) || d.a > d.aps.length ? null : d.aps[d.a - 1]),
-  comp: (d: Dial) => (d.fullAuto ? 0 : COMPS[d.c]),
+  comp: (d: Dial) => (d.comps.length > 1 ? d.comps[d.c] ?? 0 : 0),
   mode: (d: Dial): MeterShot['mode'] => {
     if (dialOf.program(d)) return 'P'
     const a = dialOf.aperture(d), s = dialOf.shutter(d)
@@ -80,8 +81,9 @@ const dialOf = {
     else if (shot.shutter != null && shot.shutter > 0 && sp.length) s = sp[nearest(sp.map(([v]) => v), shot.shutter)][1]
     else if (shot.mode === 'P' && st.includes(P)) s = st.indexOf(P)
     const ap = like.fullAuto || shot.aperture == null ? 0 : 1 + nearest(aps, shot.aperture)
-    const c = COMPS.reduce((b, x, i) => (Math.abs(x - shot.comp) < Math.abs(COMPS[b] - shot.comp) ? i : b), 6)
-    return { stops: st, aps, s, a: shot.flash ? (like.fullAuto ? 1 : aps.length + 1) : ap, c, fullAuto: like.fullAuto, lastA: ap }
+    const cs = like.comps
+    const c = cs.reduce((b, x, i) => (Math.abs(x - shot.comp) < Math.abs(cs[b] - shot.comp) ? i : b), 0)
+    return { stops: st, aps, s, a: shot.flash ? (like.fullAuto ? 1 : aps.length + 1) : ap, c, fullAuto: like.fullAuto, lastA: ap, comps: cs }
   },
 }
 
@@ -142,8 +144,10 @@ function setupOf(roll: Roll, camera: Camera | undefined, allLenses: GearLens[]) 
     const fullAuto = !manual && program
     const stops = dialOf.stops(manual ? speeds(range[0], range[1]) : [], manual, program)
     const sp = stops.map((v, i) => [v, i]).filter(([v]) => v > 0)
+    // 노출 보정: 이 카메라에 있는 값만 (XA는 역광 +1.5 하나, 기계식은 없음)
+    const comps = known?.comp ? (known.comp.length ? known.comp : [0]) : fullAuto ? [0] : COMPS
     return { stops, aps, s: manual && sp.length ? sp[nearest(sp.map(([v]) => v), 1 / 125)][1] : 0,
-      a: fullAuto ? 0 : 1 + nearest(aps, 8), c: 6, fullAuto, lastA: 0 }
+      a: fullAuto ? 0 : 1 + nearest(aps, 8), c: Math.max(0, comps.indexOf(0)), fullAuto, lastA: 0, comps }
   }
   return { film, frames, iso, lensList, lensById, baseDial }
 }
@@ -331,16 +335,17 @@ function RecordDials({ dial, onChange, onLocked, iso }: { dial: Dial; onChange: 
   const sh = dialOf.shutter(dial), ap = dialOf.aperture(dial)
   const accentS = new Set(dial.stops.map((v, i) => (v <= 0 ? i : -1)).filter((i) => i >= 0))
   // 보정하면: 실제로 맞춘 감도와 더 밝게/더 어둡게
-  const comp = dial.fullAuto ? 0 : COMPS[dial.c]
+  const comp = dialOf.comp(dial)
+  const zero = Math.max(0, dial.comps.indexOf(0))
   const compNote = comp ? `ISO ${ISOS[nearest(ISOS, iso / Math.pow(2, comp))]}\n${comp > 0 ? '더 밝게' : '더 어둡게'}` : undefined
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
       <TopDial low title="셔터" labels={dial.stops.map(dialS)} index={dial.s} onChange={(s) => onChange({ ...dial, s })} size={132}
         big={program ? 'P 자동' : sh != null ? formatShutter(sh) : '자동'} accent={accentS} bigSize={24}
         disabled={dial.stops.length < 2} onLocked={() => onLocked(dial.fullAuto ? '이 카메라는 셔터·조리개를 자동으로 정해요' : '이 카메라는 셔터를 자동으로 정해요')} />
-      <TopDial title={compNote ?? '노출 보정'} titleOn={!!compNote} labels={COMPS.map((c) => (c === 0 ? '0' : Number.isInteger(c) ? formatComp(c) : '·'))} index={dial.c}
-        onChange={(c) => onChange({ ...dial, c })} size={88} big={dial.fullAuto || COMPS[dial.c] === 0 ? '±0' : formatComp(COMPS[dial.c])}
-        accent={new Set([6])} bigSize={18} disabled={dial.fullAuto} onLocked={() => onLocked('이 카메라는 노출 보정이 없어요')} />
+      <TopDial title={compNote ?? '노출 보정'} titleOn={!!compNote} labels={dial.comps.map((c) => (c === 0 ? '0' : Number.isInteger(c * 2) ? formatComp(c) : '·'))} index={dial.c}
+        onChange={(c) => onChange({ ...dial, c })} size={88} big={comp === 0 ? '±0' : formatComp(comp)}
+        accent={new Set([zero])} bigSize={18} disabled={dial.comps.length < 2} onLocked={() => onLocked('이 카메라는 노출 보정이 없어요')} />
       <TopDial low title="조리개" labels={dialOf.apLabels(dial)} index={dial.a} onChange={(a) => onChange({ ...dial, a })} size={132}
         big={flash ? '플래시' : program ? 'P 자동' : ap != null ? formatAperture(ap) : '자동'}
         accent={new Set([0, dialOf.flashIndex(dial)])} bigSize={24}

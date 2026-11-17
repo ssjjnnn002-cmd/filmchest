@@ -3,6 +3,7 @@
 // 실제 저장은 SQLite 한 테이블(docs)에 JSON으로. 바뀌면 useLiveQuery를 쓰는 화면이 다시 읽는다.
 import { openDatabaseSync } from 'expo-sqlite'
 import { useEffect, useRef, useState } from 'react'
+import { addTomb, type Tombs } from './core/syncMerge'
 
 const sql = openDatabaseSync('filmchest.db')
 sql.execSync(`
@@ -31,6 +32,19 @@ export function subscribe(fn: () => void) {
 }
 
 type Doc = Record<string, any>
+
+// ───── 기기 사이 맞추기 (core/syncMerge, 웹 db.ts와 같음): 고친 시각을 붙이고, 지우면 지움 표시를 남긴다.
+// 드라이브에서 받은 것을 넣는 동안(applyingRemote)은 받은 시각 그대로 두고 표시도 남기지 않는다
+export const SYNC_TABLES = ['cameras', 'lenses', 'filters', 'filmLots', 'customFilms', 'rolls', 'projects']
+let remote = 0
+export async function applyingRemote<T>(fn: () => Promise<T>): Promise<T> {
+  remote += 1
+  try { return await fn() } finally { remote -= 1 }
+}
+export function readTombs(): Tombs {
+  try { return JSON.parse(getPref('syncTombs', '{}')) as Tombs } catch { return {} }
+}
+export const writeTombs = (t: Tombs) => setPref('syncTombs', JSON.stringify(t))
 const get = (o: Doc, path: string) => path.split('.').reduce((v, k) => v?.[k], o)
 const cmp = (a: any, b: any) => (a === b ? 0 : a === undefined ? 1 : b === undefined ? -1 : a < b ? -1 : 1)
 const clone = <T,>(o: T): T => (o === undefined ? o : JSON.parse(JSON.stringify(o)))
@@ -98,6 +112,7 @@ export class Table<T extends Doc, K extends string = string> {
   }
   write(row: T) {
     this.all()
+    if (!remote && SYNC_TABLES.includes(this.name)) row = { ...row, updatedAt: Date.now() }
     const id = this.keyOf(row)
     // undefined 필드는 지운다 (웹 Dexie와 같게)
     const clean = JSON.parse(JSON.stringify(row))
@@ -106,6 +121,7 @@ export class Table<T extends Doc, K extends string = string> {
   }
   remove(id: string) {
     this.all()
+    if (!remote && SYNC_TABLES.includes(this.name) && this.cache!.has(id)) writeTombs(addTomb(readTombs(), this.name, id))
     this.cache!.delete(id)
     sql.runSync('DELETE FROM docs WHERE coll = ? AND id = ?', this.name, id)
   }

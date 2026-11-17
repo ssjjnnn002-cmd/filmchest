@@ -1,7 +1,7 @@
 // 웹 db.ts와 같은 표와 도우미. (저장 방식만 갤럭시용 store.ts)
 import type { Camera, FilmLot, Frame, GearFilter, Lens, Original, Project, Roll } from './core/types'
 import type { CustomFilmRow } from './core/films'
-import { rawSql, Table, transaction } from './store'
+import { rawSql, Table, transaction, writeTombs } from './store'
 import { deleteCameraPhoto, removeFile } from './files'
 
 export interface ZipQueueRow {
@@ -177,4 +177,5 @@ export async function wipeLocal() {
   for (const o of await db.originals.toArray()) removeFile(o.blob)
   for (const c of await db.cameras.toArray()) await deleteCameraPhoto(c.id).catch(() => {})
   await Promise.all([db.cameras, db.lenses, db.rolls, db.frames, db.originals, db.zipQueue, db.customFilms, db.projects, db.filters, db.filmLots].map((t) => t.clear()))
+  writeTombs({})
 }

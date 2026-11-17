@@ -185,3 +185,32 @@ describe('lens body', () => {
     expect(new THREE.Box3().setFromObject(wide).getSize(new THREE.Vector3()).z).toBeLessThan(size.z)
   })
 })
+
+// ───── 기기 사이 맞추기 규칙
+import { addTomb, mergeTombs, pruneTombs, remoteWins, replaceRow, tombKills } from './syncMerge'
+
+describe('syncMerge', () => {
+  it('더 최근에 고친 줄이 이긴다', () => {
+    expect(remoteWins(undefined, { id: 'a' })).toBe(true)
+    expect(remoteWins({ id: 'a', updatedAt: 200 }, { id: 'a', updatedAt: 100 })).toBe(false)
+    expect(remoteWins({ id: 'a', updatedAt: 100 }, { id: 'a', updatedAt: 200 })).toBe(true)
+    expect(remoteWins({ id: 'a' }, { id: 'a' })).toBe(true)
+  })
+  it('지운 뒤 고치지 않은 줄만 지운다 (대소문자 무시)', () => {
+    const t = addTomb({}, 'rolls', 'ABC', 500)
+    expect(tombKills(t, 'rolls', { id: 'abc', updatedAt: 400 })).toBe(true)
+    expect(tombKills(t, 'rolls', { id: 'abc', updatedAt: 600 })).toBe(false)
+    expect(tombKills(t, 'cameras', { id: 'abc' })).toBe(false)
+  })
+  it('지움 표시를 합치고 오래된 것은 버린다', () => {
+    const now = Date.now()
+    const t = mergeTombs(addTomb({}, 'rolls', 'a', now - 1000), addTomb({}, 'rolls', 'a', now))
+    expect(t.rolls.a).toBe(now)
+    expect(pruneTombs(addTomb({}, 'rolls', 'b', now - 100 * 86_400_000), now)).toEqual({})
+  })
+  it('받은 줄에서 빠진 칸은 빠지고, 이 기기 사진 값만 남는다', () => {
+    const local = { id: 'a', note: '옛 메모', deletedAt: 5, thumb: 'blob' }
+    const out = replaceRow(local, { id: 'a', title: '새' }, (v) => v === 'blob')
+    expect(out).toEqual({ id: 'a', title: '새', thumb: 'blob' })
+  })
+})

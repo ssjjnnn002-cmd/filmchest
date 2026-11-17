@@ -282,8 +282,9 @@ enum WebFormat {
     static func export(from context: ModelContext) throws -> Data {
         func all<T: PersistentModel>(_ t: T.Type) -> [T] { (try? context.fetch(FetchDescriptor<T>())) ?? [] }
         var photos: [String: String] = [:]
-        let cameras: [[String: Any]] = all(CameraItem.self).filter { $0.deletedAt == nil }.map { c in
-            if let p = c.photo { photos[id(c.id)] = p.base64EncodedString() }
+        // 휴지통 줄도 함께 보낸다 (다른 기기에서도 휴지통에 들어가게). 고친 시각도 함께
+        let cameras: [[String: Any]] = all(CameraItem.self).map { c in
+            if c.deletedAt == nil, let p = c.photo { photos[id(c.id)] = p.base64EncodedString() }
             return clean([
                 "id": id(c.id), "brand": c.brand, "model": c.model, "nickname": c.nickname, "format": c.formatRaw,
                 "mount": c.mount, "fixedLens": c.fixedLensName, "style": c.bodyStyleRaw, "styleManual": c.bodyStyleManual,
@@ -291,7 +292,7 @@ enum WebFormat {
                 "photoOffsetY": c.photoOffsetY, "tags": c.tags, "accessoryIds": c.accessoryIDs.map(id), "battery": c.batteryType,
                 "batteryAt": ms(c.batteryReplacedAt), "prewind": c.prewind, "purchasedAt": ms(c.purchasedAt), "price": c.price,
                 "seller": c.seller, "createdAt": ms(c.createdAt), "sortOrder": c.sortOrder, "lensesChosen": c.lensesChosen,
-                "lensIds": c.linkedLensIDs.map(id),
+                "lensIds": c.linkedLensIDs.map(id), "deletedAt": ms(c.deletedAt), "updatedAt": ms(c.updatedAt),
             ])
         }
         let lenses: [[String: Any]] = all(LensItem.self).map { l in
@@ -299,24 +300,24 @@ enum WebFormat {
             return clean([
                 "id": id(l.id), "brand": l.brand, "model": l.model, "mount": l.mount, "zoom": l.zoomLens, "focalMin": l.focalMin,
                 "focalMax": l.focalMax, "apertureOpen": l.apertureOpen, "apertureClose": l.apertureClose, "hasPhoto": l.photo != nil,
-                "purchasedAt": ms(l.purchasedAt), "price": l.price, "seller": l.seller, "tags": l.tags, "createdAt": ms(l.createdAt),
+                "purchasedAt": ms(l.purchasedAt), "price": l.price, "seller": l.seller, "tags": l.tags, "createdAt": ms(l.createdAt), "updatedAt": ms(l.updatedAt),
             ])
         }
         let filters: [[String: Any]] = all(FilterItem.self).map { f in
             if let p = f.photo { photos[id(f.id)] = p.base64EncodedString() }
             return clean([
                 "id": id(f.id), "kind": f.kind.nilIfBlank, "name": f.name, "diameter": f.diameter.nilIfBlank, "glass": f.glass, "hasPhoto": f.photo != nil,
-                "purchasedAt": ms(f.purchasedAt), "price": f.price, "seller": f.seller, "tags": f.tags, "createdAt": ms(f.createdAt),
+                "purchasedAt": ms(f.purchasedAt), "price": f.price, "seller": f.seller, "tags": f.tags, "createdAt": ms(f.createdAt), "updatedAt": ms(f.updatedAt),
             ])
         }
         let lots: [[String: Any]] = all(FilmLotItem.self).map { x in clean([
             "id": id(x.id), "filmId": x.filmStockID, "format": x.formatRaw, "count": x.count, "lowAt": x.lowAt, "storage": x.storageRaw,
-            "expiresAt": ms(x.expiresAt), "purchasedAt": ms(x.purchasedAt), "price": x.price, "seller": x.seller, "createdAt": ms(x.createdAt),
+            "expiresAt": ms(x.expiresAt), "purchasedAt": ms(x.purchasedAt), "price": x.price, "seller": x.seller, "createdAt": ms(x.createdAt), "updatedAt": ms(x.updatedAt),
         ]) }
         let films: [[String: Any]] = all(CustomFilmItem.self).map { x in clean([
-            "id": x.id, "name": x.name, "iso": x.iso, "color": x.colorHex, "bw": x.isBlackAndWhite, "createdAt": ms(x.createdAt),
+            "id": x.id, "name": x.name, "iso": x.iso, "color": x.colorHex, "bw": x.isBlackAndWhite, "createdAt": ms(x.createdAt), "updatedAt": ms(x.updatedAt),
         ]) }
-        let rolls: [[String: Any]] = all(RollItem.self).filter { $0.deletedAt == nil }.map { r in clean([
+        let rolls: [[String: Any]] = all(RollItem.self).map { r in clean([
             "id": id(r.id), "cameraId": r.camera.map { id($0.id) }, "cameraBrand": r.recordedCameraBrand.nilIfBlank,
             "cameraModel": r.recordedCameraModel.nilIfBlank, "cameraFormat": r.recordedCameraFormatRaw.nilIfBlank,
             "cameraFixedLens": r.recordedFixedLensName.nilIfBlank, "lensId": r.lens.map { id($0.id) },
@@ -329,23 +330,24 @@ enum WebFormat {
             "lab": r.labName, "droppedAt": ms(r.droppedOffAt), "scanner": r.scannerName, "importedAt": ms(r.importedAt),
             "frameCount": r.frameCount, "note": r.note, "title": r.customTitle, "noteInList": r.noteInList ? true : nil, "tags": r.tags, "favorite": r.isFavorite, "isArchive": r.isArchive,
             "coverIndex": r.coverFrameIndex, "scanW": r.scanPixelWidth, "scanH": r.scanPixelHeight, "scanFormat": r.scanFormat,
-            "scanBytes": r.scanBytes,
+            "scanBytes": r.scanBytes, "deletedAt": ms(r.deletedAt), "updatedAt": ms(r.updatedAt),
         ]) }
         let projects: [[String: Any]] = all(ProjectItem.self).map { p in clean([
             "id": id(p.id), "name": p.name, "memo": p.memo, "color": p.colorIndex, "archived": p.isArchived,
-            "createdAt": ms(p.createdAt), "rollIds": p.rollIDs.map(id),
+            "createdAt": ms(p.createdAt), "rollIds": p.rollIDs.map(id), "updatedAt": ms(p.updatedAt),
         ]) }
         let file: [String: Any] = [
-            "kind": "filmchest-backup-web", "version": 1, "savedAt": ISO8601DateFormatter().string(from: Date()), "from": "ios",
+            "kind": "filmchest-backup-web", "version": 2, "savedAt": ISO8601DateFormatter().string(from: Date()), "from": "ios",
             "data": ["cameras": cameras, "lenses": lenses, "filters": filters, "filmLots": lots, "customFilms": films, "rolls": rolls, "projects": projects],
-            "photos": photos,
+            "photos": photos, "deleted": SyncStamp.pruned(SyncStamp.tombs),
         ]
         return try JSONSerialization.data(withJSONObject: file, options: [.sortedKeys])
     }
 
-    /// 같은 id는 파일 내용으로 덮고, 없는 것은 만든다. 지금 있는 것은 지우지 않는다. 스캔 사진은 건드리지 않는다.
+    /// 받은 기록을 합친다 (웹·갤럭시 core/syncMerge와 같은 규칙): 더 최근에 고친 줄만 덮고, 없는 것은 만든다.
+    /// sync(드라이브 맞추기)면 다른 기기의 지움 표시도 따라 지운다. 스캔 사진은 건드리지 않는다.
     @MainActor
-    static func merge(_ data: Data, into context: ModelContext) throws -> (cameras: Int, rolls: Int) {
+    static func merge(_ data: Data, into context: ModelContext, sync: Bool = false) throws -> (cameras: Int, rolls: Int) {
         guard let file = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               file["kind"] as? String == "filmchest-backup-web",
               let d = file["data"] as? [String: Any] else { throw DriveError.message("백업 파일 형식이 달라요") }
@@ -355,11 +357,38 @@ enum WebFormat {
         func str(_ r: [String: Any], _ k: String) -> String? { r[k] as? String }
         func int(_ r: [String: Any], _ k: String) -> Int? { (r[k] as? NSNumber)?.intValue }
         func photo(_ key: String) -> Data? { photos[key].flatMap { Data(base64Encoded: $0) } }
+        SyncStamp.applyingRemote += 1
+        defer { SyncStamp.applyingRemote -= 1 }
+        var remoteTombs: SyncStamp.Tombs = [:]
+        for (table, ids) in file["deleted"] as? [String: [String: Any]] ?? [:] {
+            for (rid, at) in ids { remoteTombs[table, default: [:]][rid] = (at as? NSNumber)?.doubleValue ?? 0 }
+        }
+        let tombs = sync ? SyncStamp.merged(SyncStamp.tombs, remoteTombs) : [:]
+        func rt(_ r: [String: Any]) -> Double { (r["updatedAt"] as? NSNumber)?.doubleValue ?? 0 }
+        func updatedOf(_ m: (any PersistentModel)?) -> Date? {
+            switch m {
+            case let x as CameraItem: x.updatedAt
+            case let x as LensItem: x.updatedAt
+            case let x as FilterItem: x.updatedAt
+            case let x as FilmLotItem: x.updatedAt
+            case let x as CustomFilmItem: x.updatedAt
+            case let x as RollItem: x.updatedAt
+            case let x as ProjectItem: x.updatedAt
+            default: nil
+            }
+        }
+        /// 이 줄을 받아 쓸지: 지움 표시에 걸리지 않고, 이 기기 줄보다 최근이거나 같을 때
+        func take(_ table: String, _ rid: String, _ r: [String: Any], _ local: (any PersistentModel)?) -> Bool {
+            if SyncStamp.kills(tombs, table, rid, updatedAt: rt(r)) { return false }
+            guard let local else { return true }
+            return SyncStamp.remoteWins(local: updatedOf(local).map(SyncStamp.ms) ?? 0, remote: rt(r))
+        }
 
         let cams = all(CameraItem.self)
         for r in rows("cameras") {
-            guard let uid = uuid(r["id"]) else { continue }
+            guard let uid = uuid(r["id"]), take("cameras", uid.uuidString, r, cams.first { $0.id == uid }) else { continue }
             let c = cams.first { $0.id == uid } ?? { let x = CameraItem(brand: "", model: ""); x.id = uid; context.insert(x); return x }()
+            c.updatedAt = date(r["updatedAt"])
             c.brand = str(r, "brand") ?? ""; c.model = str(r, "model") ?? ""; c.nickname = str(r, "nickname")
             c.formatRaw = str(r, "format") ?? c.formatRaw; c.mount = str(r, "mount"); c.fixedLensName = str(r, "fixedLens")
             c.bodyStyleRaw = str(r, "style") ?? c.bodyStyleRaw; c.bodyStyleManual = r["styleManual"] as? Bool ?? false
@@ -371,12 +400,13 @@ enum WebFormat {
             c.purchasedAt = date(r["purchasedAt"]); c.price = str(r, "price"); c.seller = str(r, "seller")
             c.createdAt = date(r["createdAt"]) ?? c.createdAt; c.sortOrder = int(r, "sortOrder") ?? c.sortOrder
             c.lensesChosen = r["lensesChosen"] as? Bool ?? false; c.linkedLensIDs = (r["lensIds"] as? [String] ?? []).compactMap(uuid)
-            c.deletedAt = nil
+            c.deletedAt = date(r["deletedAt"])
         }
         let lenses = all(LensItem.self)
         for r in rows("lenses") {
-            guard let uid = uuid(r["id"]) else { continue }
+            guard let uid = uuid(r["id"]), take("lenses", uid.uuidString, r, lenses.first { $0.id == uid }) else { continue }
             let l = lenses.first { $0.id == uid } ?? { let x = LensItem(brand: "", model: "", mount: ""); x.id = uid; context.insert(x); return x }()
+            l.updatedAt = date(r["updatedAt"])
             l.brand = str(r, "brand") ?? ""; l.model = str(r, "model") ?? ""; l.mount = str(r, "mount") ?? ""
             l.zoomLens = r["zoom"] as? Bool ?? false; l.focalMin = int(r, "focalMin") ?? 0; l.focalMax = int(r, "focalMax") ?? 0
             l.apertureOpen = str(r, "apertureOpen") ?? ""; l.apertureClose = str(r, "apertureClose") ?? ""
@@ -386,8 +416,9 @@ enum WebFormat {
         }
         let filters = all(FilterItem.self)
         for r in rows("filters") {
-            guard let uid = uuid(r["id"]) else { continue }
+            guard let uid = uuid(r["id"]), take("filters", uid.uuidString, r, filters.first { $0.id == uid }) else { continue }
             let f = filters.first { $0.id == uid } ?? { let x = FilterItem(name: ""); x.id = uid; context.insert(x); return x }()
+            f.updatedAt = date(r["updatedAt"])
             f.kind = str(r, "kind") ?? ""; f.name = str(r, "name") ?? ""; f.diameter = str(r, "diameter") ?? ""; f.glass = str(r, "glass")
             if let p = photo(r["id"] as? String ?? "") { f.photo = p }
             f.purchasedAt = date(r["purchasedAt"]); f.price = str(r, "price"); f.seller = str(r, "seller")
@@ -395,8 +426,9 @@ enum WebFormat {
         }
         let lots = all(FilmLotItem.self)
         for r in rows("filmLots") {
-            guard let uid = uuid(r["id"]) else { continue }
+            guard let uid = uuid(r["id"]), take("filmLots", uid.uuidString, r, lots.first { $0.id == uid }) else { continue }
             let x = lots.first { $0.id == uid } ?? { let n = FilmLotItem(filmStockID: ""); n.id = uid; context.insert(n); return n }()
+            x.updatedAt = date(r["updatedAt"])
             x.filmStockID = str(r, "filmId") ?? ""; x.formatRaw = str(r, "format") ?? x.formatRaw; x.count = int(r, "count") ?? 0
             x.lowAt = int(r, "lowAt") ?? 1; x.storageRaw = str(r, "storage") ?? x.storageRaw; x.expiresAt = date(r["expiresAt"])
             x.purchasedAt = date(r["purchasedAt"]); x.price = str(r, "price"); x.seller = str(r, "seller")
@@ -404,18 +436,20 @@ enum WebFormat {
         }
         let films = all(CustomFilmItem.self)
         for r in rows("customFilms") {
-            guard let fid = str(r, "id") else { continue }
+            guard let fid = str(r, "id"), take("customFilms", fid, r, films.first { $0.id == fid }) else { continue }
             let x = films.first { $0.id == fid } ?? { let n = CustomFilmItem(name: "", iso: 400, colorHex: "#FDB913", isBlackAndWhite: false); n.id = fid; context.insert(n); return n }()
+            x.updatedAt = date(r["updatedAt"])
             x.name = str(r, "name") ?? ""; x.iso = int(r, "iso") ?? 400; x.colorHex = str(r, "color") ?? x.colorHex
             x.isBlackAndWhite = r["bw"] as? Bool ?? false; x.createdAt = date(r["createdAt"]) ?? x.createdAt
         }
         let camsNow = all(CameraItem.self), lensesNow = all(LensItem.self), rolls = all(RollItem.self)
         for r in rows("rolls") {
-            guard let uid = uuid(r["id"]) else { continue }
+            guard let uid = uuid(r["id"]), take("rolls", uid.uuidString, r, rolls.first { $0.id == uid }) else { continue }
             let cam = uuid(r["cameraId"]).flatMap { cid in camsNow.first { $0.id == cid } }
             let lens = uuid(r["lensId"]).flatMap { lid in lensesNow.first { $0.id == lid } }
             let x = rolls.first { $0.id == uid } ?? { let n = RollItem(camera: cam, lens: lens, filmStockID: ""); n.id = uid; context.insert(n); return n }()
             x.camera = cam; x.lens = lens
+            x.updatedAt = date(r["updatedAt"])
             x.recordedCameraBrand = str(r, "cameraBrand") ?? x.recordedCameraBrand
             x.recordedCameraModel = str(r, "cameraModel") ?? x.recordedCameraModel
             x.recordedCameraFormatRaw = str(r, "cameraFormat") ?? x.recordedCameraFormatRaw
@@ -444,15 +478,28 @@ enum WebFormat {
             x.coverFrameIndex = int(r, "coverIndex"); x.scanPixelWidth = int(r, "scanW") ?? x.scanPixelWidth
             x.scanPixelHeight = int(r, "scanH") ?? x.scanPixelHeight; x.scanFormat = str(r, "scanFormat") ?? x.scanFormat
             if let b = (r["scanBytes"] as? NSNumber)?.int64Value { x.scanBytes = b }
-            x.deletedAt = nil
+            x.deletedAt = date(r["deletedAt"])
         }
         let projects = all(ProjectItem.self)
         for r in rows("projects") {
-            guard let uid = uuid(r["id"]) else { continue }
+            guard let uid = uuid(r["id"]), take("projects", uid.uuidString, r, projects.first { $0.id == uid }) else { continue }
             let p = projects.first { $0.id == uid } ?? { let n = ProjectItem(name: ""); n.id = uid; context.insert(n); return n }()
+            p.updatedAt = date(r["updatedAt"])
             p.name = str(r, "name") ?? ""; p.memo = str(r, "memo"); p.colorIndex = int(r, "color") ?? 0
             p.isArchived = r["archived"] as? Bool ?? false; p.createdAt = date(r["createdAt"]) ?? p.createdAt
             p.rollIDs = (r["rollIds"] as? [String] ?? []).compactMap(uuid)
+        }
+        if sync {
+            // 다른 기기에서 지운 것: 지운 뒤로 이 기기에서 고치지 않았으면 여기서도 지운다
+            func sweep<T: PersistentModel>(_ t: T.Type) {
+                for m in all(t) {
+                    guard let k = SyncStamp.key(m) else { continue }
+                    if SyncStamp.kills(tombs, k.table, k.id, updatedAt: updatedOf(m).map(SyncStamp.ms) ?? 0) { context.delete(m) }
+                }
+            }
+            sweep(RollItem.self); sweep(CameraItem.self); sweep(LensItem.self); sweep(FilterItem.self)
+            sweep(FilmLotItem.self); sweep(CustomFilmItem.self); sweep(ProjectItem.self)
+            SyncStamp.tombs = SyncStamp.pruned(tombs)
         }
         try context.save()
         return (rows("cameras").count, rows("rolls").count)
@@ -518,7 +565,7 @@ enum DriveSync {
         let saved = (json["savedAt"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantPast
         let pulled = UserDefaults.standard.object(forKey: pulledKey) as? Date ?? .distantPast
         if !force, saved <= pulled { return nil }
-        let counts = try WebFormat.merge(data, into: context)
+        let counts = try WebFormat.merge(data, into: context, sync: true)
         UserDefaults.standard.set(saved, forKey: pulledKey)
         UserDefaults.standard.set(contentKey(try WebFormat.export(from: context)), forKey: pushedKey)
         return counts
@@ -528,29 +575,46 @@ enum DriveSync {
         for k in [fileKey, pushedKey, pulledKey, "filmscan.driveLast", "filmscan.driveRoot"] { UserDefaults.standard.removeObject(forKey: k) }
     }
 
-    /// 로그아웃: 기록과 사진을 드라이브에 다 올린 뒤 이 기기의 기록을 지운다 (웹·갤럭시와 같음).
-    /// 올리지 못하면 지우지 않고 오류를 던진다. 사진 앱의 사진은 그대로 둔다
+    // ───── 로그아웃: 기록은 기기에 남기고 시작 화면만 (웹·갤럭시와 같음)
+
+    static let keptKey = "filmscan.keptAccount"
+    /// 로그아웃한 뒤에도 이 기기에 남겨 둔 기록의 계정 (같은 계정으로 다시 들어오면 그대로 이어진다)
+    static var keptAccount: String? { UserDefaults.standard.string(forKey: keptKey) }
+    static let signedOut = Notification.Name("filmscan.signedOut")
+
+    /// 로그아웃: 기록만 짧게 올리고(못 올려도 기기에 남아 있으니 괜찮다) 연결을 끊는다.
+    /// 드라이브 파일·올린 사진 표시는 남겨서, 같은 계정으로 다시 들어오면 바뀐 것만 맞춘다
     @MainActor
-    static func signOutAndClear(_ context: ModelContext, onStep: @escaping (String) -> Void) async throws {
-        onStep("기록 올리는 중…")
-        try await push(context, force: true)
-        onStep("사진 올리는 중…")
-        if let error = await DrivePhotos.sync(context, progress: { done, total, _ in onStep("사진 확인 중 \(done)/\(total)") }) {
-            throw DriveError.message(error)
-        }
-        while case let n = await DriveUploader.shared.pendingCount(), n > 0 {
-            onStep("사진 올리는 중 · \(n)장 남음")
-            try await Task.sleep(for: .seconds(1))
-        }
-        onStep("이 기기에서 지우는 중…")
-        try wipeDevice(context)
+    static func signOutKeep(_ context: ModelContext) async {
+        let upload = Task { @MainActor in try? await push(context, force: true) }
+        let timeout = Task { try? await Task.sleep(for: .seconds(8)); upload.cancel() }
+        _ = await upload.value
+        timeout.cancel()
+        UserDefaults.standard.set(GoogleAuth.account ?? "이전 계정", forKey: keptKey)
+        GoogleAuth.signOut()
+        NotificationCenter.default.post(name: signedOut, object: nil)
     }
 
-    /// 이 기기의 기록을 모두 지운다 (로그아웃, 모든 기록 지우기). 웹·갤럭시 wipeLocal과 같음.
+    /// 다른 계정으로 바꿀 때: 남은 기록만 지운다 (방금 로그인한 계정은 그대로)
+    @MainActor
+    static func wipeForNewAccount(_ context: ModelContext) throws {
+        try wipeData(context)
+        UserDefaults.standard.removeObject(forKey: keptKey)
+    }
+
+    /// 이 기기의 기록을 모두 지운다 (모든 기록 지우기, 남은 기록 지우고 로그인 없이 쓰기). 웹·갤럭시 wipeLocal과 같음.
     /// 먼저 연결을 끊는다: 지운 빈 기록이 드라이브·파일 앱 폴더 백업을 덮어쓰지 않게. 사진 앱의 사진은 그대로
     @MainActor
     static func wipeDevice(_ context: ModelContext) throws {
         GoogleAuth.signOut()
+        UserDefaults.standard.removeObject(forKey: keptKey)
+        try wipeData(context)
+    }
+
+    @MainActor
+    private static func wipeData(_ context: ModelContext) throws {
+        SyncStamp.applyingRemote += 1
+        defer { SyncStamp.applyingRemote -= 1; SyncStamp.tombs = [:] }
         DrivePhotos.forget()
         forget()
         AutoBackup.clearFolder()
