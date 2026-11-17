@@ -903,5 +903,5 @@ body:has(.mr-overlay) .sheet-root, body:has(.mr-overlay) .alert-backdrop { z-ind
 .menu .menu-title { padding: 10px 16px 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .lot-count { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; margin-top: 2px; }
 .lot-tag { font-style: normal; font-size: 12px; font-weight: 700; line-height: 1; padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
-.lot-tag.low { background: #ffd23f; color: #3a2a00; }
+.lot-tag.low { background: #fce08a; color: #7a5a00; }
 .lot-tag.late { background: #ff453a; color: #fff; }

@@ -218,13 +218,13 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
               {/* 바둑판: 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게, 웹·아이폰과 같음) */}
               {grid ? <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: c.muted, lineHeight: 15 }}>{film?.brand || ' '}</Text> : null}
               {title(grid && film?.brand ? film.name : filmDisplayName(film))}
-              {sub(`${formatInfo[lot.format].name} · ${storageText(lot)}`, grid ? 2 : 1)}
+              {sub(`${formatInfo[lot.format].name} · ${storageText(lot)}`, 1)}
               {/* 재고 수량은 크게, 부족·기한 지남은 옆에 둥근 표시 (웹·아이폰과 같음) */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                 <Text style={{ fontSize: 16, fontWeight: '700', color: c.ink, fontVariant: ['tabular-nums'] }}>{lot.count}롤</Text>
                 {late || lot.count <= lot.lowAt ? (
                   <Text style={{ fontSize: 12, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, overflow: 'hidden',
-                    backgroundColor: late ? '#ff453a' : '#ffd23f', color: late ? '#fff' : '#3a2a00' }}>{late ? '기한 지남' : '부족'}</Text>
+                    backgroundColor: late ? '#ff453a' : '#fce08a', color: late ? '#fff' : '#7a5a00' }} numberOfLines={1}>{late ? '기한 지남' : '재고 부족'}</Text>
                 ) : null}
               </View>
             </View>

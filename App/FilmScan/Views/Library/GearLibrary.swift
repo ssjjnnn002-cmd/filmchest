@@ -404,9 +404,9 @@ private struct FilterGearRow: View {
 private struct FilmGearCard: View {
     let lot: FilmLotItem
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             FilmCanisterView(stock: FilmStockCatalog.stock(id: lot.filmStockID), format: lot.format)
-                .frame(height: 110)
+                .frame(height: 96)
                 .frame(maxWidth: .infinity)
             // 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게)
             VStack(alignment: .leading, spacing: 1) {
@@ -414,10 +414,10 @@ private struct FilmGearCard: View {
                 Text(stock?.brand.nilIfBlank ?? " ").font(.caption.weight(.medium)).foregroundStyle(.secondary).lineLimit(1)
                 Text(stock.map { $0.brand.isEmpty ? $0.name : $0.name } ?? lot.title).font(.headline).lineLimit(2)
             }
-            .frame(maxWidth: .infinity, minHeight: 58, alignment: .topLeading)
-            Text(lot.metaLine).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                .frame(maxWidth: .infinity, minHeight: 32, alignment: .topLeading)
-            lot.lotBadge.frame(minHeight: 16, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 62, maxHeight: 62, alignment: .topLeading)
+            // 칸 높이를 모두 같게: 이름 두 줄 자리, 정보 한 줄, 수량 한 줄
+            Text(lot.metaLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            lot.lotBadge.frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
         }
         .modifier(GearCardChrome())
     }
@@ -483,11 +483,12 @@ private extension FilmLotItem {
         HStack(spacing: 6) {
             Text("\(count)롤").font(.callout.weight(.bold)).monospacedDigit()
             if expired {
-                Text("기한 지남").font(.caption.weight(.bold)).foregroundStyle(.white)
+                Text("기한 지남").font(.caption.weight(.bold)).foregroundStyle(.white).lineLimit(1).fixedSize()
                     .padding(.horizontal, 8).padding(.vertical, 3).background(Color.red, in: Capsule())
             } else if low {
-                Text("부족").font(.caption.weight(.bold)).foregroundStyle(Color(red: 0.23, green: 0.16, blue: 0))
-                    .padding(.horizontal, 8).padding(.vertical, 3).background(Color(red: 1, green: 0.82, blue: 0.25), in: Capsule())
+                // 부드러운 버터색 바탕 + 진한 갈색 글씨 (웹·갤럭시와 같음)
+                Text("재고 부족").font(.caption.weight(.bold)).foregroundStyle(Color(red: 0.48, green: 0.35, blue: 0)).lineLimit(1).fixedSize()
+                    .padding(.horizontal, 8).padding(.vertical, 3).background(Color(red: 0.99, green: 0.88, blue: 0.54), in: Capsule())
             }
         }
     }
