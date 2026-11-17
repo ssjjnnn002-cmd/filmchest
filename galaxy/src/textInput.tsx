@@ -13,7 +13,7 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextIn
   const changedByApp = value !== undefined && value !== typed.current
   if (changedByApp) { base.current = value; typed.current = value }
   return (
-    <RNTextInput ref={ref} {...rest} style={[{ fontFamily: FONT }, style]} defaultValue={base.current} value={changedByApp ? value : undefined}
+    <RNTextInput ref={ref} allowFontScaling={false} {...rest} style={[{ fontFamily: FONT }, style]} defaultValue={base.current} value={changedByApp ? value : undefined}
       onChangeText={(t) => { typed.current = t; onChangeText?.(t) }} />
   )
 })

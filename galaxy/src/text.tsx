@@ -7,5 +7,6 @@ export const FONT = 'Pretendard'
 const base = { fontFamily: FONT }
 
 export const Text = forwardRef<RNText, TextProps>(function Text({ style, ...rest }, ref) {
-  return <RNText ref={ref} {...rest} style={[base, style]} />
+  // 갤럭시 '글자 크기' 설정이 커도 웹·아이폰과 같은 크기로 (키우면 줄이 넘치고 버튼 글자가 두 줄이 된다)
+  return <RNText ref={ref} allowFontScaling={false} {...rest} style={[base, style]} />
 })

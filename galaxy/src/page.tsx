@@ -93,7 +93,7 @@ export function Page({ title, onBack, left, actions, large = true, children, foo
       </Animated.ScrollView>
       <View pointerEvents="box-none" style={{ position: 'absolute', top: 0, left: 0, right: 0, paddingTop: insets.top + 10, paddingBottom: 8, paddingHorizontal: 16, overflow: 'hidden' }}>
         {scrolled ? (
-          <Glass intensity={30} tint={c.dark ? 'dark' : 'light'} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: c.dark ? 'rgba(19,18,17,0.78)' : 'rgba(242,240,234,0.78)' }} />
+          <Glass intensity={30} tint={c.dark ? 'dark' : 'light'} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: c.dark ? 'rgba(19,18,17,0.95)' : 'rgba(242,240,234,0.95)' }} />
         ) : null}
         <View pointerEvents="box-none" style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={{ flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'flex-start' }}>

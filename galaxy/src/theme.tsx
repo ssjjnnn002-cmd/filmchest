@@ -44,7 +44,8 @@ export function palette(dark: boolean): Palette {
         soft: '#3B241C',
         danger: '#FF453A',
         warn: '#FF9F0A',
-        glass: 'rgba(40,38,36,0.72)',
+        // 안드로이드는 흐림(블러)을 못 써서 웹처럼 뒤 글자가 비치지 않게 거의 불투명으로
+        glass: 'rgba(40,38,36,0.95)',
         glassLine: 'rgba(255,255,255,0.08)',
         good: '#30D158',
         blue: '#0A84FF',
@@ -67,7 +68,7 @@ export function palette(dark: boolean): Palette {
         soft: '#F8E3DB',
         danger: '#FF3B30',
         warn: '#F08A00',
-        glass: 'rgba(252,251,248,0.72)',
+        glass: 'rgba(252,251,248,0.95)',
         glassLine: 'rgba(255,255,255,0.7)',
         good: '#34A853',
         blue: '#0A7AFF',

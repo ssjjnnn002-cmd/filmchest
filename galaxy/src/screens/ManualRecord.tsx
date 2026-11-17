@@ -477,7 +477,7 @@ const isoStops = (v: number, box: number) => { const s = Math.log2(box / v); ret
 function IsoSheet({ value, box, onChange, onClose }: { value: number; box: number; onChange: (v: number) => void; onClose: () => void }) {
   const list = ISOS.filter((v) => v >= box / 8 && v <= box * 8)
   return (
-    <Sheet title="카메라 ISO" onClose={onClose} scroll={false} right={<SheetBtn label="완료" accent onPress={onClose} />}>
+    <Sheet title="카메라 ISO" onClose={onClose} right={<SheetBtn label="완료" accent onPress={onClose} />}>
       <View style={{ alignItems: 'center', paddingVertical: 18, borderRadius: 18, backgroundColor: '#000', marginHorizontal: 16, marginTop: 4, marginBottom: 8 }}>
         <TopDial title={value === box ? '필름 그대로' : isoStops(value, box)} titleOn={value !== box} labels={list.map(String)}
           index={Math.max(0, list.indexOf(value))} onChange={(i) => onChange(list[i])} size={220} big={`ISO ${value}`}
@@ -659,7 +659,7 @@ function ShotEdit({ shot, like, lenses, current, box, onClose, onSave, onDelete 
             <View style={{ height: 1, backgroundColor: LINE }} />
             <DarkLine k="필터" v={filters.length ? filters.join('+') : '없음'} onPress={() => setSheet('filter')} />
           </View>
-          <TextInput value={memo} onChangeText={setMemo} placeholder="메모" placeholderTextColor={SUB} multiline
+          <TextInput allowFontScaling={false} value={memo} onChangeText={setMemo} placeholder="메모" placeholderTextColor={SUB} multiline
             style={{ minHeight: 60, borderRadius: 16, borderWidth: 1, borderColor: LINE, backgroundColor: PANEL, color: '#fff', padding: 14, fontSize: 15, textAlignVertical: 'top' }} />
           <Pressable onPress={() => setAsk(true)} style={{ padding: 10, alignItems: 'center' }}><Text style={{ color: '#ff453a', fontSize: 16 }}>이 칸 기록 지우기</Text></Pressable>
         </ScrollView>
