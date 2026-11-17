@@ -6,6 +6,10 @@ public struct FrameInfo: Sendable, Hashable {
     public let date: Date
     public let timeZone: TimeZone
     public let location: LocationSegment?
+
+    public init(frame: Int, date: Date, timeZone: TimeZone, location: LocationSegment?) {
+        self.frame = frame; self.date = date; self.timeZone = timeZone; self.location = location
+    }
 }
 
 /// 촬영일·장소 기록을 컷 번호별 날짜/장소로 펼친다.

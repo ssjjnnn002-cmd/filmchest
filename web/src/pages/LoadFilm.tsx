@@ -33,11 +33,11 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const customRows = useLiveQuery(() => db.customFilms.toArray(), []) ?? []
   const [customEdit, setCustomEdit] = useState<string | 'new' | null>(null)
 
-  // 필름이 없는 카메라를 앞에, 처음 고른 카메라는 맨 앞에
-  const isLoaded = (id: string) => rolls.some((r) => r.cameraId === id && r.status === 'loaded')
+  // 최근에 쓴 카메라 순서 (쓴 적 없으면 장비 순서), 지금 필름이 들어 있는 카메라는 맨 오른쪽 (아이폰·갤럭시와 같음)
+  const isLoaded = (id: string) => rolls.some((r) => r.cameraId === id && r.status === 'loaded' && !r.deletedAt)
   const pickOrder = useMemo(() => {
-    const list = cameras ?? []
-    if (initialCameraId) return [...list.filter((c) => c.id === initialCameraId), ...list.filter((c) => c.id !== initialCameraId)]
+    const recent = (id: string) => { const i = rolls.findIndex((r) => r.cameraId === id && !r.deletedAt); return i < 0 ? Infinity : i }
+    const list = (cameras ?? []).map((c, i) => ({ c, i })).sort((a, b) => recent(a.c.id) - recent(b.c.id) || a.i - b.i).map((x) => x.c)
     return [...list.filter((c) => !isLoaded(c.id)), ...list.filter((c) => isLoaded(c.id))]
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cameras, rollsLoaded, initialCameraId])
@@ -134,12 +134,10 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
         {cameras?.length === 0 && <p className="footnote">먼저 내 장비에서 카메라를 추가해 주세요.</p>}
         <div className="chips">
           {pickOrder.map((c) => {
-            const inUse = rolls.find((r) => r.cameraId === c.id && r.status === 'loaded')
             return (
               <button key={c.id} className={`camera-pick ${c.id === cameraId ? 'on' : ''}`} onClick={() => { setCameraId(c.id); setLensId('') }}>
                 <CameraCover camera={c} height={56} />
                 <span className="truncate" style={{ maxWidth: '100%' }}>{c.brand} {c.model}</span>
-                {inUse && <span className="truncate" style={{ color: 'var(--safelight)', maxWidth: '100%' }}>{filmDisplayName(filmById(inUse.filmId))}</span>}
               </button>
             )
           })}
@@ -191,7 +189,8 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
           {filmSections(visible, showAll ? pickSort : 'none').map((sec, i, all) => (
             <div key={sec.title ?? i}>
               {sec.title && <h3 className="group-title" style={{ margin: '10px 16px 0' }}>{sec.title} · {sec.items.length}</h3>}
-              <div className="film-grid">
+              {/* 추천 6개는 가로로 넘겨 본다 (아래 감도·촬영일 칸이 바로 보이게) */}
+              <div className={`film-grid ${showAll ? '' : 'scroll'}`}>
                 {sec.items.map((f) => (
                   <button key={f.id} className={`film-pick ${f.id === filmId ? 'on' : ''}`} onClick={() => setFilmId(f.id)}>
                     <Canister film={f} format={camera?.format} size={84} />
@@ -221,17 +220,18 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
         {stock > 0 && <p className="footnote">재고 {stock}롤 · 장착하면 1롤 빼요</p>}
       </div>
 
-      {film && (
+      {/* 필름을 고르기 전에도 보인다 (감도는 '선택 안 됨') */}
+      {(
         <div className="section">
           <div className="group">
             <div className="toggle">
               <span>감도</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button className="btn small" onClick={() => setPush(Math.max(-2, push - 1))} aria-label="감도 낮추기">−</button>
-                <b style={{ minWidth: 110, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
-                  ISO {shotISO ?? film.iso}{push !== 0 && ` (${push > 0 ? '+' : ''}${push})`}
+                <button className="btn small" disabled={!film} onClick={() => setPush(Math.max(-2, push - 1))} aria-label="감도 낮추기">−</button>
+                <b style={{ minWidth: 110, textAlign: 'center', fontVariantNumeric: 'tabular-nums', color: film ? undefined : 'var(--muted)', fontWeight: film ? undefined : 500 }}>
+                  {film ? <>ISO {shotISO ?? film.iso}{push !== 0 && ` (${push > 0 ? '+' : ''}${push})`}</> : '선택 안 됨'}
                 </b>
-                <button className="btn small" onClick={() => setPush(Math.min(3, push + 1))} aria-label="감도 높이기">+</button>
+                <button className="btn small" disabled={!film} onClick={() => setPush(Math.min(3, push + 1))} aria-label="감도 높이기">+</button>
               </span>
             </div>
             <label className="toggle">

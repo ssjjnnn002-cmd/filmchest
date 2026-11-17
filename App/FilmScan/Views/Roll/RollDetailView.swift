@@ -76,8 +76,9 @@ struct RollDetailView: View {
             if roll.status == .loaded {
                 Section {
                     Button { recording = true } label: {
-                        Label("상세 기록", systemImage: "dial.medium").font(.headline)
-                            .frame(maxWidth: .infinity).padding(.vertical, 8)
+                        // 아이콘 없이 글자만 가운데 (웹·갤럭시 버튼과 같음)
+                        Text("상세 기록").font(.headline)
+                            .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 8)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.safelight)
@@ -113,10 +114,12 @@ struct RollDetailView: View {
                             Label("밀착 인화지로 보기", systemImage: "square.grid.3x3").frame(maxWidth: .infinity)
                         }
                         .tint(Theme.safelight)
-                        Button { showFramePrint = true } label: {
-                            Label("프레임 만들기", systemImage: "rectangle.inset.filled").frame(maxWidth: .infinity)
+                        if Features.framePrint {
+                            Button { showFramePrint = true } label: {
+                                Label("프레임 만들기", systemImage: "rectangle.inset.filled").frame(maxWidth: .infinity)
+                            }
+                            .tint(Theme.safelight)
                         }
-                        .tint(Theme.safelight)
                         Button { openPhotos() } label: {
                             Label("사진 앱에서 보기", systemImage: "photo.on.rectangle").frame(maxWidth: .infinity)
                         }
@@ -141,6 +144,8 @@ struct RollDetailView: View {
 
             if showShots { shotsSection }
 
+            // 상세 기록이 있으면 컷마다 시간·장소가 있어 촬영일·장소 칸은 따로 두지 않는다
+            if roll.meterShots.isEmpty {
             Section {
                 ForEach(roll.sortedDays) { day in
                     Button { editingDay = day } label: {
@@ -161,6 +166,7 @@ struct RollDetailView: View {
                 Text("촬영일")
             } footer: {
                 if !roll.shootingDays.isEmpty { Text("눌러서 수정하거나 삭제할 수 있어요.") }
+            }
             }
 
             if let camera = roll.camera, camera.isInterchangeable {
@@ -188,6 +194,7 @@ struct RollDetailView: View {
                 }
             }
 
+            if roll.meterShots.isEmpty {
             Section {
                 ForEach(placeRanges, id: \.segment.id) { item in
                     Button { editingPlace = item.segment } label: { placeRow(item.segment, range: item.range) }
@@ -207,6 +214,7 @@ struct RollDetailView: View {
                 if roll.locations.contains(where: { $0.point == nil }) {
                     Text("주황색 장소는 좌표가 없어 사진에 위치가 기록되지 않아요. 눌러서 장소를 검색해 주세요.")
                 }
+            }
             }
 
             if showsScanSection {
@@ -326,15 +334,26 @@ struct RollDetailView: View {
                             isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("삭제", role: .destructive) {
                 roll.deletedAt = Date()
-                dismiss()
+                // 확인 창이 닫힌 뒤 그 탭 첫 목록으로 (롤 보관함 안쪽에서 열었어도 맨 앞으로)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    router.rollsPath = NavigationPath()
+                    dismiss()
+                }
             }
         }
     }
 
-    /// 롤 화면의 컷 기록: 최근 5컷, 넘으면 전체 보기
+    /// 컷 번호 순서 (역순 감기여도 1번부터)
+    private func byNumber(_ list: [MeterShot]) -> [MeterShot] {
+        let prewind = roll.meterPrewind == true
+        func n(_ s: MeterShot) -> Int { Int(MeterShot.frameTitle(s.pos, prewind: prewind).filter(\.isNumber)) ?? s.pos }
+        return list.sorted { n($0) < n($1) }
+    }
+
+    /// 롤 화면의 컷 기록: 촬영 중이면 최근 5컷(넘으면 전체 보기), 다 찍은 롤은 1번부터 전부
     private var shotsSection: some View {
-        let shots = roll.meterShots.sorted { $0.pos < $1.pos }
-        let recent = shots.count > 6 ? Array(roll.meterShots.sorted { $0.order > $1.order }.prefix(5)).sorted { $0.pos < $1.pos } : shots
+        let shots = byNumber(roll.meterShots)
+        let recent = roll.status == .loaded && shots.count > 6 ? byNumber(Array(roll.meterShots.sorted { $0.order > $1.order }.prefix(5))) : shots
         return Section {
             if shots.isEmpty {
                 Text("상세 기록에서 찍으면 여기에 쌓여요.").foregroundStyle(.secondary)
@@ -422,7 +441,9 @@ struct RollDetailView: View {
     private var photoInfoKey: String {
         let days = roll.shootingDays.map { "\($0.startedAt.timeIntervalSince1970)/\($0.startFrame ?? 0)/\($0.timeZoneID)" }
         let places = roll.locations.map { "\($0.startFrame)/\($0.name)/\($0.point?.latitude ?? 0),\($0.point?.longitude ?? 0)" }
-        return (days + ["|"] + places).joined(separator: ";")
+        // 상세 기록 컷의 시간·장소·렌즈·ISO를 고쳐도 사진 정보를 다시 쓴다
+        let shots = roll.meterShots.map { "\($0.pos)/\($0.at ?? "")/\($0.place ?? "")/\($0.lat ?? 0),\($0.lon ?? 0)/\($0.lensId ?? "")/\($0.iso ?? 0)" }
+        return (days + ["|"] + places + ["|"] + shots).joined(separator: ";")
     }
 
     private func refreshPhotoInfo(manual: Bool) {
@@ -448,13 +469,9 @@ struct RollDetailView: View {
             || roll.importedAt != nil
     }
 
-    /// 현상 맡기기를 저장하지 않고 닫으면 촬영만 끝난 상태로 남긴다.
+    /// 현상 맡기기를 저장하지 않고 닫으면 아무것도 바꾸지 않는다 (촬영 중이던 롤은 그대로).
     /// 촬영 중이던 롤을 맡겼으면 현상 스캔으로 넘어간다.
     private func endShootingIfNeeded() {
-        if roll.status == .loaded {
-            roll.status = .finished
-            roll.finishedAt = Date()
-        }
         if dropOffWasLoaded, roll.status == .atLab {
             router.tab = .pending
             dismiss()

@@ -6,4 +6,6 @@ export const features = {
   nearbyLabs: false,
   /** 스캔 가져올 때 노출계 기록을 앞뒤로 몇 칸 미루는 '번호 맞추기' */
   frameShift: false,
+  /** 프레임 만들기 (다듬는 동안 잠시 숨김) */
+  framePrint: false,
 }

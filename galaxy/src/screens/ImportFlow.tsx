@@ -11,7 +11,7 @@ import { allFilms, filmDisplayName } from '../core/films'
 import type { ScanResult } from '../core/zip'
 import { readScanner } from '../core/exif'
 import { buildTimeline, type FrameInfo } from '../core/timeline'
-import { exposureText, meterAlignLimit, meterAlignText, meterFrameTitle, meterShotsInScan } from '../core/meter'
+import { exposureText, meterAlignLimit, meterAlignText, meterFrameTitle, meterShotsInScan, meterShotAt } from '../core/meter'
 import { bytesText, cameraName, fmtDay, rollCameraFormat, rollFilm, rollFilmName, rollTitle } from '../core/display'
 import { Btn, Canister, DateInput, Empty, EmptyText, Field, Footnote, Group, Progress, Row, RowText, Section, Select, Spinner, Sub } from '../kit'
 import { Sheet, SheetBtn } from '../overlay'
@@ -66,7 +66,8 @@ export function ImportFlow({ files, rollId, onClose }: { files: PickedFile[]; ro
     try {
       const camera = roll.cameraId ? await db.cameras.get(roll.cameraId) : undefined
       const lensMap = new Map((await db.lenses.toArray()).map((l) => [l.id, l]))
-      const lensAt = (frame: number) => { const id = lensIdAt(roll, frame); return id ? lensMap.get(id) : undefined }
+      // 상세 기록한 컷은 그 컷에 끼운 렌즈
+      const lensAt = (frame: number) => { const id = meterShotAt(roll.meterShots, frame, meterOffset)?.lensId ?? lensIdAt(roll, frame); return id ? lensMap.get(id) : undefined }
       const updated = await importScans(set, roll, camera, lensAt, setProgress, meterOffset)
       setRoll(updated)
       nav.toast('롤 보관함에 기록했어요')

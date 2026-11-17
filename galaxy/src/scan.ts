@@ -51,7 +51,8 @@ export async function importScans(
   meterOffset = 0,
 ): Promise<Roll> {
   const files = set.files
-  const timeline = buildTimeline(roll, files.length)
+  // 상세 기록한 컷은 그 컷의 시간·장소로 (번호 맞추기 값은 지금 고른 값)
+  const timeline = buildTimeline({ ...roll, meterOffset }, files.length)
   const dateUnknown = roll.isArchive && roll.days.length === 0
   const scanner = roll.scanner ?? readScanner(files[0].data).name
   const film = filmById(roll.filmId)
@@ -74,7 +75,7 @@ export async function importScans(
       cameraModel: camera?.model ?? roll.cameraModel,
       lens: ((l) => (l ? `${l.brand} ${l.model}`.trim() : camera?.fixedLens ?? roll.cameraFixedLens))(lensAt(f.index)),
       film,
-      iso: roll.shotISO ?? film?.iso,
+      iso: meterShotAt(roll.meterShots, f.index, meterOffset)?.iso ?? roll.shotISO ?? film?.iso,
       lab: roll.lab,
       scanner,
       rollId: roll.id,
@@ -179,7 +180,7 @@ export async function refreshRollPhotoMeta(rollId: string): Promise<number> {
     const original = await db.originals.get(fr.id)
     const info = timeline[fr.index - 1]
     if (!original || !info) continue
-    const lensId = lensIdAt(roll, fr.index)
+    const lensId = meterShotAt(roll.meterShots, fr.index, roll.meterOffset ?? 0)?.lensId ?? lensIdAt(roll, fr.index)
     const lens = lensId ? lenses.get(lensId) : undefined
     const data = writeMeta(await readBytes(original.blob), {
       frame: fr.index,
@@ -192,7 +193,7 @@ export async function refreshRollPhotoMeta(rollId: string): Promise<number> {
       cameraModel: camera?.model ?? roll.cameraModel,
       lens: lens ? `${lens.brand} ${lens.model}`.trim() : camera?.fixedLens ?? roll.cameraFixedLens,
       film,
-      iso: roll.shotISO ?? film?.iso,
+      iso: meterShotAt(roll.meterShots, fr.index, roll.meterOffset ?? 0)?.iso ?? roll.shotISO ?? film?.iso,
       lab: roll.lab,
       scanner: roll.scanner,
       rollId: roll.id,

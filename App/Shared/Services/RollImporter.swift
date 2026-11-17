@@ -26,6 +26,26 @@ struct RollSnapshot: Sendable {
     let existingAlbumID: String?
     /// 필름 칸 번호 → 그 칸의 노출 기록
     var exposures: [Int: ExposureNote] = [:]
+    /// 필름 칸 번호 → 상세 기록한 그 컷의 시간·장소·렌즈·카메라 ISO (있으면 촬영일·장소 기록보다 먼저)
+    var shots: [Int: ShotInfo] = [:]
+
+    struct ShotInfo: Sendable {
+        let date: Date?
+        let place: LocationSegment?
+        let lens: Lens?
+        let iso: Int?
+    }
+
+    /// 사진마다 날짜·장소: 촬영일·장소 기록으로 펼친 뒤, 상세 기록한 컷은 그 컷 값으로
+    func frameTimeline(count: Int, offset: Int) -> [FrameInfo] {
+        FrameTimeline.build(roll: roll, frameCount: count).map { info in
+            guard let s = shots[info.frame - offset] else { return info }
+            return FrameInfo(frame: info.frame, date: s.date ?? info.date, timeZone: info.timeZone, location: s.place ?? info.location)
+        }
+    }
+
+    func lens(at frame: Int, offset: Int) -> Lens? { shots[frame - offset]?.lens ?? lens(at: frame) }
+    func iso(at frame: Int, offset: Int) -> Int? { shots[frame - offset]?.iso ?? roll.shotISO }
 }
 
 struct LensStep: Sendable {
@@ -104,7 +124,7 @@ enum RollImporter {
         try await PhotoLibrary.requestAccess()
         let frames = (set ?? preview.result.primary).frames
         let album = try await targetAlbum(for: snapshot)
-        let timeline = FrameTimeline.build(roll: snapshot.roll, frameCount: frames.count)
+        let timeline = snapshot.frameTimeline(count: frames.count, offset: meterOffset)
         let outDir = preview.result.workingDirectory.appendingPathComponent("out", isDirectory: true)
         try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
         let scannerName = snapshot.roll.scannerName ?? preview.scanner?.name
@@ -114,8 +134,8 @@ enum RollImporter {
             try Task.checkCancellation()
             let date: Date? = snapshot.dateUnknown ? nil : info.date
             let meta = FrameMetadata(frame: frame.index, frameCount: frames.count, date: date, timeZone: info.timeZone,
-                                     location: info.location, camera: snapshot.camera, lens: snapshot.lens(at: frame.index),
-                                     film: snapshot.film, shotISO: snapshot.roll.shotISO,
+                                     location: info.location, camera: snapshot.camera, lens: snapshot.lens(at: frame.index, offset: meterOffset),
+                                     film: snapshot.film, shotISO: snapshot.iso(at: frame.index, offset: meterOffset),
                                      labName: snapshot.roll.labName, scannerName: scannerName,
                                      rollID: snapshot.roll.id, exposure: snapshot.exposures[frame.index - meterOffset])
             let ext = frame.fileURL.pathExtension
@@ -147,7 +167,7 @@ enum RollImporter {
                      progress: @escaping @Sendable (Int, Int) -> Void) async throws -> ImportOutcome {
         try await PhotoLibrary.requestAccess()
         let album = try await targetAlbum(for: snapshot)
-        let timeline = FrameTimeline.build(roll: snapshot.roll, frameCount: assetIDs.count)
+        let timeline = snapshot.frameTimeline(count: assetIDs.count, offset: 0)
         var imported: [ImportedFrame] = []
         for (i, (id, info)) in zip(assetIDs, timeline).enumerated() {
             try Task.checkCancellation()
@@ -185,9 +205,19 @@ extension RollItem {
         let all = (try? modelContext?.fetch(FetchDescriptor<LensItem>())) ?? []
         let steps = lensChanges.compactMap { c in all.first { $0.id == c.lensID }.map { LensStep(startFrame: c.startFrame, lens: $0.core) } }
         let notes = Dictionary(meterShots.map { ($0.pos, $0.exposureNote) }, uniquingKeysWith: { _, last in last })
-        return RollSnapshot(roll: coreRoll(), camera: camera?.core, lens: lens?.core, lensSteps: steps, film: film, dateUnknown: dateUnknown,
-                            albumTitle: albumTitle, cameraAlbumTitle: cameraName,
-                            existingAlbumID: albumIdentifier, exposures: notes)
+        // 상세 기록: 컷마다 시간·장소·렌즈·카메라 ISO
+        let shotInfo = Dictionary(meterShots.map { s -> (Int, RollSnapshot.ShotInfo) in
+            let place = s.place.map { name in
+                LocationSegment(startFrame: s.pos, name: name, point: s.lat.flatMap { la in s.lon.map { GeoPoint(latitude: la, longitude: $0) } })
+            }
+            let lens = s.lensId.flatMap { id in all.first { $0.id.uuidString.caseInsensitiveCompare(id) == .orderedSame }?.core }
+            return (s.pos, .init(date: s.at.flatMap(MeterShot.parseAt), place: place, lens: lens, iso: s.iso.map { Int($0) }))
+        }, uniquingKeysWith: { _, last in last })
+        var snap = RollSnapshot(roll: coreRoll(), camera: camera?.core, lens: lens?.core, lensSteps: steps, film: film, dateUnknown: dateUnknown,
+                                albumTitle: albumTitle, cameraAlbumTitle: cameraName,
+                                existingAlbumID: albumIdentifier, exposures: notes)
+        snap.shots = shotInfo
+        return snap
     }
 
     @MainActor
@@ -227,7 +257,7 @@ extension RollImporter {
         guard !frames.isEmpty, (try? await PhotoLibrary.requestAccess()) != nil else { return 0 }
         let snapshot = roll.snapshot()
         let count = max(roll.frameCount ?? 0, frames.map(\.index).max() ?? 0)
-        let timeline = FrameTimeline.build(roll: snapshot.roll, frameCount: count)
+        let timeline = snapshot.frameTimeline(count: count, offset: roll.meterOffset)
         var changed = 0
         for frame in frames.sorted(by: { $0.index < $1.index }) {
             guard frame.index <= timeline.count, let id = frame.assetIdentifier else { continue }
@@ -252,12 +282,12 @@ extension RollImporter {
     static func withCurrentInfo(_ data: Data, frame: FrameItem, roll: RollItem) -> Data? {
         let snapshot = roll.snapshot()
         let count = max(roll.frameCount ?? 0, frame.index)
-        let timeline = FrameTimeline.build(roll: snapshot.roll, frameCount: count)
+        let timeline = snapshot.frameTimeline(count: count, offset: roll.meterOffset)
         guard frame.index >= 1, frame.index <= timeline.count else { return nil }
         let info = timeline[frame.index - 1]
         let meta = FrameMetadata(frame: frame.index, frameCount: count, date: snapshot.dateUnknown ? nil : info.date, timeZone: info.timeZone,
-                                 location: info.location, camera: snapshot.camera, lens: snapshot.lens(at: frame.index),
-                                 film: snapshot.film, shotISO: snapshot.roll.shotISO,
+                                 location: info.location, camera: snapshot.camera, lens: snapshot.lens(at: frame.index, offset: roll.meterOffset),
+                                 film: snapshot.film, shotISO: snapshot.iso(at: frame.index, offset: roll.meterOffset),
                                  labName: snapshot.roll.labName, scannerName: roll.scannerName,
                                  rollID: snapshot.roll.id, exposure: snapshot.exposures[frame.index - roll.meterOffset])
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("drive-\(UUID().uuidString)", isDirectory: true)

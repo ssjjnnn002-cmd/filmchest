@@ -278,13 +278,8 @@ export function LabDropOff({ roll, onClose }: { roll: Roll; onClose: (ended?: bo
   const [nearby, setNearby] = useState(false)
   const wasLoaded = useRef(roll.status === 'loaded').current
 
-  const close = async () => {
-    const current = await db.rolls.get(roll.id)
-    if (current?.status === 'loaded') {
-      await db.rolls.update(roll.id, { status: 'finished', finishedAt: current.finishedAt ?? Date.now() })
-    }
-    onClose(false)
-  }
+  // 취소: 아무것도 바꾸지 않는다 (촬영 중이던 롤은 그대로 촬영 중). 저장해야만 현상 맡김으로 넘어간다
+  const close = () => onClose(false)
 
   const save = async () => {
     rememberLab(lab)

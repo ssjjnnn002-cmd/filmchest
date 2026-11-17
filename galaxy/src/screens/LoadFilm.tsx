@@ -5,7 +5,8 @@ import { Text } from '../text'
 import { db, kept } from '../data'
 import { getPref, useLiveQuery } from '../store'
 import { filmSections, type GearGroup } from '../core/gearGroup'
-import { FilmPickSortBar, GroupTitle } from '../gearExtras'
+import { FilmPickSortBar } from '../gearExtras'
+import { FilmPickGrid } from '../FilmPickGrid'
 import type { Roll } from '../core/types'
 import { formatInfo, uid } from '../core/types'
 import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films'
@@ -38,11 +39,11 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const customRows = useLiveQuery(() => db.customFilms.toArray(), []) ?? []
   const [customEdit, setCustomEdit] = useState<string | 'new' | null>(null)
 
-  // 필름이 없는 카메라를 앞에, 처음 고른 카메라는 맨 앞에
-  const isLoaded = (id: string) => rolls.some((r) => r.cameraId === id && r.status === 'loaded')
+  // 최근에 쓴 카메라 순서 (쓴 적 없으면 장비 순서), 지금 필름이 들어 있는 카메라는 맨 오른쪽 (웹·아이폰과 같음)
+  const isLoaded = (id: string) => rolls.some((r) => r.cameraId === id && r.status === 'loaded' && !r.deletedAt)
   const pickOrder = useMemo(() => {
-    const list = cameras ?? []
-    if (initialCameraId) return [...list.filter((x) => x.id === initialCameraId), ...list.filter((x) => x.id !== initialCameraId)]
+    const recent = (id: string) => { const i = rolls.findIndex((r) => r.cameraId === id && !r.deletedAt); return i < 0 ? Infinity : i }
+    const list = (cameras ?? []).map((x, i) => ({ x, i })).sort((a, b) => recent(a.x.id) - recent(b.x.id) || a.i - b.i).map((v) => v.x)
     return [...list.filter((x) => !isLoaded(x.id)), ...list.filter((x) => isLoaded(x.id))]
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cameras, rollsLoaded, initialCameraId])
@@ -144,7 +145,6 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
         {cameras?.length === 0 ? <Footnote>먼저 내 장비에서 카메라를 추가해 주세요.</Footnote> : null}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2, paddingTop: 2, paddingBottom: 4 }}>
           {pickOrder.map((x) => {
-            const inUse = rolls.find((r) => r.cameraId === x.id && r.status === 'loaded')
             const on = x.id === cameraId
             return (
               <Pressable key={x.id} onPress={() => { setCameraId(x.id); setLensId('') }} style={({ pressed }) => ({
@@ -153,7 +153,6 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
               })}>
                 <CameraCover camera={x} height={56} />
                 <Text numberOfLines={1} style={{ fontSize: 12, color: c.ink, maxWidth: '100%' }}>{x.brand} {x.model}</Text>
-                {inUse ? <Text numberOfLines={1} style={{ fontSize: 12, color: c.safelight, maxWidth: '100%' }}>{filmDisplayName(filmById(inUse.filmId))}</Text> : null}
               </Pressable>
             )
           })}
@@ -186,35 +185,9 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
         <Group>
           {showAll ? <Field label="필름 검색" value={search} onChangeText={setSearch} /> : null}
           {showAll ? <FilmPickSortBar value={pickSort} onChange={setPickSort} /> : null}
-          {/* 더보기에서 브랜드·ISO·흑백/컬러로 묶으면 묶음마다 제목을 단다 (웹과 같음) */}
-          {filmSections(visible, showAll ? pickSort : 'none').map((sec, i, all) => (
-          <View key={sec.title ?? i}>
-          {sec.title ? <View style={{ marginTop: 10, marginHorizontal: 12 }}><GroupTitle>{`${sec.title} · ${sec.items.length}`}</GroupTitle></View> : null}
-          <View onLayout={(e) => setGridW(e.nativeEvent.layout.width)} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, padding: 10 }}>
-            {sec.items.map((f) => {
-              const on = f.id === filmId
-              return (
-                <Pressable key={f.id} onPress={() => setFilmId(f.id)} style={({ pressed }) => ({
-                  width: cellW, borderWidth: 2, borderColor: on ? c.safelight : 'transparent', backgroundColor: on ? c.soft : 'transparent',
-                  borderRadius: 16, paddingVertical: 6, paddingHorizontal: 4, alignItems: 'center', gap: 2, transform: [{ scale: pressed ? 0.975 : 1 }],
-                })}>
-                  <Canister film={f} format={camera?.format} size={84} />
-                  <Text style={{ fontSize: 12, lineHeight: 15, textAlign: 'center', color: c.ink }}>{filmDisplayName(f)}</Text>
-                  <Text style={{ fontSize: 11, lineHeight: 14, minHeight: 14, color: c.muted, fontVariant: ['tabular-nums'] }}>
-                    {stockCount(lots, f.id) > 0 ? `재고 ${stockCount(lots, f.id)}롤` : ''}
-                  </Text>
-                </Pressable>
-              )
-            })}
-            {i === all.length - 1 ? <Pressable onPress={() => setCustomEdit('new')} style={{ width: cellW, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 4, alignItems: 'center', gap: 2 }}>
-              <View style={{ width: 84, height: 84, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', borderColor: `${c.safelight}8C`, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 34, fontWeight: '300', color: c.safelight }}>+</Text>
-              </View>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: c.safelight }}>직접 추가</Text>
-            </Pressable> : null}
-          </View>
-          </View>
-          ))}
+          {/* 추천 6개는 가로로 넘겨 보고, 더보기는 바둑판(브랜드·ISO·흑백/컬러로 묶으면 묶음마다 제목) (웹과 같음) */}
+          <FilmPickGrid films={visible} value={filmId} onPick={setFilmId} format={camera?.format} sort={showAll ? pickSort : 'none'} scroll={!showAll}
+            note={(f) => (stockCount(lots, f.id) > 0 ? `재고 ${stockCount(lots, f.id)}롤` : '')} onCustom={() => setCustomEdit('new')} />
           {film?.id.startsWith('custom-') ? (
             <Row onPress={() => setCustomEdit(film.id)} style={{ justifyContent: 'center' }}>
               <Text style={{ fontSize: 17, color: c.safelight }}>{filmDisplayName(film)} 수정</Text>
@@ -227,17 +200,18 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
         {stock > 0 ? <Footnote>재고 {stock}롤 · 장착하면 1롤 빼요</Footnote> : null}
       </Section>
 
-      {film ? (
+      {/* 필름을 고르기 전에도 보인다 (감도는 '선택 안 됨') */}
+      {true ? (
         <Section foot={today && isToday ? (locationAvailable() ? '지금 시각과 현재 위치를 첫 촬영일로 기록해요.' : '지금 시각을 첫 촬영일로 기록해요. 장소는 롤 화면에서 넣을 수 있어요.') : undefined}>
           <Group>
             <View style={{ minHeight: 52, paddingVertical: 10, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <Text style={{ fontSize: 17, color: c.ink }}>감도</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Btn label="−" size="small" onPress={() => setPush(Math.max(-2, push - 1))} />
-                <Text style={{ minWidth: 110, textAlign: 'center', fontSize: 17, fontWeight: '700', color: c.ink, fontVariant: ['tabular-nums'] }}>
-                  ISO {shotISO ?? film.iso}{push !== 0 ? ` (${push > 0 ? '+' : ''}${push})` : ''}
+                <Btn label="−" size="small" disabled={!film} onPress={() => setPush(Math.max(-2, push - 1))} />
+                <Text style={{ minWidth: 110, textAlign: 'center', fontSize: 17, fontWeight: film ? '700' : '500', color: film ? c.ink : c.muted, fontVariant: ['tabular-nums'] }}>
+                  {film ? `ISO ${shotISO ?? film.iso}${push !== 0 ? ` (${push > 0 ? '+' : ''}${push})` : ''}` : '선택 안 됨'}
                 </Text>
-                <Btn label="+" size="small" onPress={() => setPush(Math.min(3, push + 1))} />
+                <Btn label="+" size="small" disabled={!film} onPress={() => setPush(Math.min(3, push + 1))} />
               </View>
             </View>
             <Toggle label="오늘을 촬영일로 설정하기" value={today} onChange={setToday} />

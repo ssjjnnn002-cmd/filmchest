@@ -186,14 +186,18 @@ function Recorder({ roll, camera, allLenses, onClose }: {
     return () => { html.overflow = prev[0]; body.overflow = prev[1] }
   }, [])
   // 다음 칸이 가운데 오게
-  const firstScroll = useRef(true)
+  const openedAt = useRef(Date.now())
   useEffect(() => {
-    const id = requestAnimationFrame(() => {
+    const go = (smooth: boolean) => {
       const strip = stripRef.current, el = strip?.querySelector<HTMLElement>(`[data-p="${frame}"]`)
-      if (strip && el) strip.scrollTo({ left: el.offsetLeft - (strip.clientWidth - el.clientWidth) / 2, behavior: firstScroll.current ? 'auto' : 'smooth' })
-      firstScroll.current = false
-    })
-    return () => cancelAnimationFrame(id)
+      if (strip && el) strip.scrollTo({ left: el.offsetLeft - (strip.clientWidth - el.clientWidth) / 2, behavior: smooth ? 'smooth' : 'auto' })
+    }
+    // 처음 열 때는 화면이 다 그려지기 전이라 몇 번 더 맞춘다 (한 번만 하면 맨 왼쪽에 남던 것)
+    // 연 직후(0.8초 안)는 처음으로 본다 (개발 모드에서 효과가 두 번 돌아도)
+    const first = Date.now() - openedAt.current < 800
+    const id = requestAnimationFrame(() => go(!first))
+    const later = first ? [150, 450].map((ms) => setTimeout(() => go(false), ms)) : []
+    return () => { cancelAnimationFrame(id); later.forEach(clearTimeout) }
   }, [frame, shots.length])
 
   /** 셔터: 지금 다이얼 값으로 이 칸을 기록하고, 셔터가 닫힌 뒤 레버가 감기며 다음 칸으로 */
@@ -284,6 +288,8 @@ function Recorder({ roll, camera, allLenses, onClose }: {
                 </button>
               )
             })}
+            {/* 1번 칸(맨 오른쪽)도 가운데로 올 수 있게 끝에 필름 여백 */}
+            <span className="mr-strip-end" aria-hidden="true" />
           </div>
           <Canister iso={iso} frames={frames} body={film?.style.body} band={film?.style.band} />
         </div>

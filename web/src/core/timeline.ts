@@ -39,7 +39,24 @@ function timestamp(base: number, offset: number, count: number) {
 }
 
 /** 촬영일·장소 기록을 컷 번호별 날짜/장소로 펼친다 */
-export function buildTimeline(roll: Pick<Roll, 'days' | 'locations' | 'loadedAt'>, frameCount: number): FrameInfo[] {
+/** 사진마다 날짜·장소: 촬영일·장소 기록으로 펼친 뒤, 상세 기록한 컷(meterShots)은 그 컷의 시간·장소로 (아이폰 RollSnapshot.frameTimeline과 같음) */
+export function buildTimeline(roll: Pick<Roll, 'days' | 'locations' | 'loadedAt'> & Partial<Pick<Roll, 'meterShots' | 'meterOffset'>>, frameCount: number): FrameInfo[] {
+  const base = spreadTimeline(roll, frameCount)
+  const shots = roll.meterShots ?? []
+  if (!shots.length) return base
+  const offset = roll.meterOffset ?? 0
+  return base.map((info) => {
+    const s = shots.find((x) => x.pos + offset === info.frame)
+    if (!s) return info
+    const at = s.at ? Date.parse(s.at) : NaN
+    const location: LocationSegment | undefined = s.place
+      ? { id: `shot-${s.pos}`, startFrame: info.frame, name: s.place, point: s.lat != null && s.lon != null ? { latitude: s.lat, longitude: s.lon } : undefined }
+      : info.location
+    return { frame: info.frame, date: Number.isNaN(at) ? info.date : at, location }
+  })
+}
+
+function spreadTimeline(roll: Pick<Roll, 'days' | 'locations' | 'loadedAt'>, frameCount: number): FrameInfo[] {
   if (frameCount <= 0) return []
   const days = [...roll.days].sort((a, b) => a.startedAt - b.startedAt)
   const starts = startFrames(days, frameCount)

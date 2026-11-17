@@ -71,13 +71,9 @@ struct ShootingView: View {
         dropOff = roll
     }
 
-    /// 저장하지 않고 닫으면 촬영만 끝난 상태로 남긴다. 맡기면 상태가 이미 바뀌어 있다.
+    /// 저장해야만 현상 맡김으로 넘어간다. 취소하면 아무것도 바꾸지 않는다 (촬영 중이던 롤은 그대로).
     /// 촬영 중이던 롤을 현상소에 맡겼으면 현상 스캔으로 넘어간다.
     private func endDropOffIfNeeded() {
-        if let roll = dropOffHeld, roll.status == .loaded {
-            roll.status = .finished
-            roll.finishedAt = Date()
-        }
         if dropOffWasLoaded, dropOffHeld?.status == .atLab {
             router.tab = .pending
         }

@@ -5,6 +5,7 @@ import { useNav } from '../App'
 import { weatherText, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
 import { exposureText, meterFrameTitle, meterProgress, meterShotsByOrder, shotRowMeta } from '../core/meter'
 import { ManualRecord, RollShotEdit } from './ManualRecord'
+import { features } from '../core/features'
 import { RollGalleryButton } from '../ui/GallerySave'
 import { Canister, cameraName, Confirm, Sheet, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedDays, sortedLocations } from '../ui/common'
 import { DayEdit, LabDropOff, LensChangeEdit, PlaceEdit } from './Editors'
@@ -41,6 +42,8 @@ export function RollDetail({ id }: { id: string }) {
   if (!roll) return null
   // 컷 기록: 촬영 중이거나 상세 기록을 남긴 롤
   const showShots = roll.status === 'loaded' || (roll.meterShots?.length ?? 0) > 0
+  // 상세 기록이 있으면 컷마다 시간·장소가 있어 촬영일·장소 칸은 따로 두지 않는다
+  const noShots = !(roll.meterShots?.length)
   const locs = sortedLocations(roll)
   const rangeOf = (i: number) => {
     const s = locs[i].startFrame
@@ -94,7 +97,7 @@ export function RollDetail({ id }: { id: string }) {
           <div className="bleed"><FilmStrip roll={roll} frames={frames} onSelect={setViewing} /></div>
           <div style={{ display: 'grid', gap: 10 }}>
             <button className="btn soft" onClick={() => setSheet(true)}><Icon name="sheet" size={18} /> 밀착 인화지로 보기</button>
-            <button className="btn soft" onClick={() => setFramePrint(true)}><Icon name="photos" size={18} /> 프레임 만들기</button>
+            {features.framePrint && <button className="btn soft" onClick={() => setFramePrint(true)}><Icon name="photos" size={18} /> 프레임 만들기</button>}
             <RollGalleryButton rollId={roll.id} title={rollTitle(roll, camera)} onToast={nav.toast} className="btn primary block" />
           </div>
           <p className="footnote">공유 창에서 이미지 저장을 고르면 사진 앱 최근 항목에 들어가요.</p>
@@ -103,7 +106,7 @@ export function RollDetail({ id }: { id: string }) {
 
       {showShots && <ShotsSection roll={roll} format={rollCameraFormat(camera, roll)} onEdit={setShotEdit} onAll={() => setAllShots(true)} />}
 
-      <div className="section">
+      {noShots && <div className="section">
         <h2>촬영일</h2>
         <div className="group">
           {sortedDays(roll).map((d) => (
@@ -116,7 +119,7 @@ export function RollDetail({ id }: { id: string }) {
           <button className="row accent" onClick={() => setDay('new')}><Icon name="plus" /> 촬영일 추가</button>
         </div>
         {roll.days.length > 0 && <p className="footnote">눌러서 수정하거나 삭제할 수 있어요.</p>}
-      </div>
+      </div>}
 
       {camera?.mount && (
         <div className="section">
@@ -138,7 +141,7 @@ export function RollDetail({ id }: { id: string }) {
         </div>
       )}
 
-      <div className="section">
+      {noShots && <div className="section">
         <h2>장소</h2>
         <div className="group">
           {locs.map((l, i) => (
@@ -156,7 +159,7 @@ export function RollDetail({ id }: { id: string }) {
           <button className="row accent" onClick={() => setPlace('new')}><Icon name="plus" /> 장소 추가</button>
         </div>
         {locs.some((l) => !l.point) && <p className="footnote warn">주황색 장소는 좌표가 없어 사진에 위치가 기록되지 않아요. 눌러서 좌표를 넣어 주세요.</p>}
-      </div>
+      </div>}
 
       {(roll.lab || roll.droppedAt || roll.scanner || resolutionText(roll.scanW, roll.scanH) || roll.frameCount || roll.importedAt) && (
         <div className="section">
@@ -227,7 +230,7 @@ export function RollDetail({ id }: { id: string }) {
       {sheet && <ContactSheetView roll={roll} frames={frames} onClose={() => setSheet(false)} />}
       {confirm && (
         <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. 사진 앱에 저장한 사진은 그대로 남아요." onCancel={() => setConfirm(false)}
-          onConfirm={async () => { await deleteRoll(id); nav.pop() }} />
+          onConfirm={async () => { await deleteRoll(id); nav.setTab(nav.tab) }} />
       )}
       {lensEdit && camera?.mount && (
         <LensChangeEdit roll={roll} mount={camera.mount} brand={camera.brand}
@@ -243,8 +246,11 @@ function Info({ label, value }: { label: string; value: string }) {
 
 /** 롤 화면의 컷 기록: 최근 5컷, 넘으면 전체 보기 (아이폰과 같음) */
 function ShotsSection({ roll, format, onEdit, onAll }: { roll: Roll; format: FilmFormat; onEdit: (pos: number) => void; onAll: () => void }) {
-  const shots = [...(roll.meterShots ?? [])].sort((a, b) => a.pos - b.pos)
-  const recent = shots.length > 6 ? [...shots].sort((a, b) => b.order - a.order).slice(0, 5).sort((a, b) => a.pos - b.pos) : shots
+  // 컷 번호 순서 (역순 감기여도 1번부터). 촬영 중이면 최근 5컷, 다 찍은 롤은 전부 (아이폰과 같음)
+  const num = (x: MeterShot) => Number(meterFrameTitle(x.pos, !!roll.meterPrewind).replace(/\D/g, '')) || x.pos
+  const byNumber = (list: MeterShot[]) => [...list].sort((a, b) => num(a) - num(b))
+  const shots = byNumber(roll.meterShots ?? [])
+  const recent = roll.status === 'loaded' && shots.length > 6 ? byNumber([...shots].sort((a, b) => b.order - a.order).slice(0, 5)) : shots
   const { capacity } = meterProgress(shots.length, format)
   return (
     <div className="section">
@@ -302,7 +308,8 @@ function AllShots({ roll, format, onEdit }: { roll: Roll; format: FilmFormat; on
 /** 촬영일·장소를 고치면 저장한 사진 속 날짜·위치도 새로 쓴다. 드라이브에 연결돼 있으면 새 정보의 사진으로 다시 올린다 */
 function usePhotoMetaSync(roll: Roll | undefined, toast: (m: string) => void) {
   const key = roll?.status === 'imported'
-    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive])
+    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive,
+      (roll.meterShots ?? []).map((x) => [x.pos, x.at, x.place, x.lat, x.lon, x.lensId, x.iso])])
     : ''
   const last = useRef<string | undefined>(undefined)
   useEffect(() => {

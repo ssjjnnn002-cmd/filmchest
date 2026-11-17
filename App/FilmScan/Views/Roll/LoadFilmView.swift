@@ -41,12 +41,13 @@ struct LoadFilmView: View {
     private var available: [CameraItem] { cameras.filter { $0.deletedAt == nil } }
     private var camera: CameraItem? { available.first { $0.id == cameraID } }
 
-    /// 필름이 없는 카메라를 앞에 (처음 고른 카메라가 맨 앞에 보이게)
+    /// 최근에 쓴 카메라 순서 (쓴 적 없으면 장비 순서), 지금 필름이 들어 있는 카메라는 맨 오른쪽 (웹·갤럭시와 같음)
     private var pickOrder: [CameraItem] {
-        if let initialCamera, available.contains(where: { $0.id == initialCamera.id }) {
-            return [initialCamera] + available.filter { $0.id != initialCamera.id }
-        }
-        return available.filter { $0.loadedRoll == nil } + available.filter { $0.loadedRoll != nil }
+        func recent(_ c: CameraItem) -> Int { rolls.firstIndex { $0.camera?.id == c.id && $0.deletedAt == nil } ?? .max }
+        let sorted = available.enumerated().sorted { a, b in
+            (recent(a.element), a.offset) < (recent(b.element), b.offset)
+        }.map(\.element)
+        return sorted.filter { $0.loadedRoll == nil } + sorted.filter { $0.loadedRoll != nil }
     }
     private var film: FilmStock? { filmID.flatMap(FilmStockCatalog.stock) }
 
@@ -135,54 +136,30 @@ struct LoadFilmView: View {
                         TextField("필름 검색", text: $search)
                         FilmPickSortBar(value: $pickSort)
                     }
+                    if showAllFilms {
                     // 더보기에서 브랜드·ISO·흑백/컬러로 묶으면 묶음마다 제목을 달고 따로 늘어놓는다 (묶음마다 한 줄씩)
-                    let secs = filmSections(visibleStocks, by: showAllFilms ? GearGroup(rawValue: pickSort) ?? .none : .none)
+                    let secs = filmSections(visibleStocks, by: GearGroup(rawValue: pickSort) ?? .none)
                     ForEach(Array(secs.enumerated()), id: \.offset) { i, sec in
                         VStack(alignment: .leading, spacing: 6) {
                             if let t = sec.title {
                                 Text("\(t) · \(sec.items.count)").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                             }
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 6)], spacing: 10) {
-                                ForEach(sec.items) { stock in
-                            Button { filmID = stock.id } label: {
-                                VStack(spacing: 2) {
-                                    FilmCanisterView(stock: stock, format: camera?.format ?? .f135)
-                                        .frame(height: 84)
-                                    VStack(spacing: 1) {
-                                        Text(stock.displayName).font(.caption2).lineLimit(2).multilineTextAlignment(.center)
-                                        if stockCount(stock.id) > 0 {
-                                            Text("재고 \(stockCount(stock.id))롤")
-                                                .font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
-                                        }
-                                    }
-                                    .frame(height: 42, alignment: .top)
-                                }
-                                .padding(4)
-                                .background(RoundedRectangle(cornerRadius: 10)
-                                    .fill(filmID == stock.id ? Theme.safelight.opacity(0.15) : .clear))
-                                .overlay(RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(filmID == stock.id ? Theme.safelight : .clear, lineWidth: 2))
-                            }
-                            .buttonStyle(.plain)
-                                }
-                                if i == secs.count - 1 {
-                                    Button { customEdit = .new } label: {
-                            VStack(spacing: 2) {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .strokeBorder(Theme.safelight.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                                    .overlay(Image(systemName: "plus").font(.title2.weight(.light)).foregroundStyle(Theme.safelight))
-                                    .frame(width: 76, height: 76)
-                                    .frame(height: 84)
-                                Text("직접 추가").font(.caption2.weight(.semibold)).foregroundStyle(Theme.safelight)
-                                    .frame(height: 42, alignment: .top)
-                            }
-                            .padding(4)
-                        }
-                        .buttonStyle(.plain)
-                                }
+                                ForEach(sec.items) { filmCell($0) }
+                                if i == secs.count - 1 { customCell }
                             }
                         }
                         .padding(.vertical, 4)
+                    }
+                    } else {
+                        // 추천 6개는 가로로 넘겨 본다 (아래 감도·촬영일 칸이 바로 보이게)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(alignment: .top, spacing: 6) {
+                                ForEach(visibleStocks) { filmCell($0).frame(width: 96) }
+                                customCell.frame(width: 96)
+                            }
+                            .padding(.vertical, 4)
+                        }
                     }
                     if let film, film.isCustom, let item = customFilms.first(where: { $0.id == film.id }) {
                         Button("\(film.displayName) 수정", systemImage: "pencil") { customEdit = .edit(item) }
@@ -202,12 +179,14 @@ struct LoadFilmView: View {
                     if let film, stockCount(film.id) > 0 { Text("재고 \(stockCount(film.id))롤 · 장착하면 1롤 빼요") }
                 }
 
-                if let film {
+                // 필름을 고르기 전에도 보인다 (감도는 '선택 안 됨')
+                do {
                     Section {
                         Stepper(value: $pushPull, in: -2...3) {
-                            LabeledContent("감도", value: pushPull == 0 ? "ISO \(film.iso)"
-                                           : "ISO \(shotISO ?? film.iso) (\(pushPull > 0 ? "+" : "")\(pushPull) 스톱)")
+                            LabeledContent("감도", value: film.map { film in pushPull == 0 ? "ISO \(film.iso)"
+                                           : "ISO \(shotISO ?? film.iso) (\(pushPull > 0 ? "+" : "")\(pushPull) 스톱)" } ?? "선택 안 됨")
                         }
+                        .disabled(film == nil)
                         Toggle("오늘을 촬영일로 설정하기", isOn: $startToday)
                         if startToday {
                             DatePicker("날짜", selection: $startDate, in: ...Date(), displayedComponents: .date)
@@ -274,14 +253,50 @@ struct LoadFilmView: View {
         lensID = mountLenses.contains { $0.id == last } ? last : nil
     }
 
+    private func filmCell(_ stock: FilmStock) -> some View {
+        Button { filmID = stock.id } label: {
+            VStack(spacing: 2) {
+                FilmCanisterView(stock: stock, format: camera?.format ?? .f135)
+                    .frame(height: 84)
+                VStack(spacing: 1) {
+                    Text(stock.displayName).font(.caption2).lineLimit(2).multilineTextAlignment(.center)
+                    if stockCount(stock.id) > 0 {
+                        Text("재고 \(stockCount(stock.id))롤")
+                            .font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
+                    }
+                }
+                .frame(height: 42, alignment: .top)
+            }
+            .padding(4)
+            .background(RoundedRectangle(cornerRadius: 10)
+                .fill(filmID == stock.id ? Theme.safelight.opacity(0.15) : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(filmID == stock.id ? Theme.safelight : .clear, lineWidth: 2))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var customCell: some View {
+        Button { customEdit = .new } label: {
+            VStack(spacing: 2) {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Theme.safelight.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                    .overlay(Image(systemName: "plus").font(.title2.weight(.light)).foregroundStyle(Theme.safelight))
+                    .frame(width: 76, height: 76)
+                    .frame(height: 84)
+                Text("직접 추가").font(.caption2.weight(.semibold)).foregroundStyle(Theme.safelight)
+                    .frame(height: 42, alignment: .top)
+            }
+            .padding(4)
+        }
+        .buttonStyle(.plain)
+    }
+
     private func cameraChip(_ c: CameraItem) -> some View {
         Button { cameraID = c.id } label: {
             VStack(spacing: 4) {
                 CameraCoverView(camera: c).frame(width: 84, height: 56)
                 Text(c.displayName).font(.caption2).lineLimit(1)
-                if let roll = c.loadedRoll {
-                    Text(roll.filmName).font(.caption2).foregroundStyle(Theme.safelight).lineLimit(1)
-                }
             }
             .frame(width: 104)
             .padding(6)

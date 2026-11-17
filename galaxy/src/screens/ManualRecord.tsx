@@ -286,6 +286,8 @@ function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: C
               const s = shots.find((x) => x.pos === p)
               return <Cell key={p} p={p} shot={s} next={p === frame && !s} onPress={() => (s ? setEditing(p) : setFrame(p))} />
             })}
+            {/* 1번 칸(맨 오른쪽)도 가운데로 올 수 있게 끝에 필름 여백 (웹과 같음) */}
+            <View style={{ width: Math.max(0, (width - 104) / 2), height: 112, backgroundColor: '#2a1a0f' }} />
           </ScrollView>
           <Canister iso={iso} frames={frames} body={film?.style.body} band={film?.style.band} />
         </View>

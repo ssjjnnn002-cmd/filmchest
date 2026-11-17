@@ -894,3 +894,8 @@ a.row.accent { color: var(--safelight); }
 .mr-iso-dial { display: grid; justify-items: center; padding: 18px 0 14px; border-radius: 18px; background: #000; color: #fff; margin: 4px 0 8px; }
 /* 상세 기록(.mr-overlay, z 1000) 위에서 여는 시트·확인 창은 그 위로 */
 body:has(.mr-overlay) .sheet-root, body:has(.mr-overlay) .alert-backdrop { z-index: 1100; }
+/* 필름 장착·필름 추가의 추천 6개: 가로로 넘겨 보기 (아이폰·갤럭시와 같음) */
+.film-grid.scroll { display: flex; overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+.film-grid.scroll::-webkit-scrollbar { display: none; }
+.film-grid.scroll > * { flex: 0 0 96px; }
+.mr-strip-end { flex: 0 0 calc(50% - 52px); background: #2a1a0f; }
