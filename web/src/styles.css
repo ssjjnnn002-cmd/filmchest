@@ -886,3 +886,7 @@ a.row.accent { color: var(--safelight); }
 .mr-dials { padding-top: 0; }
 .mr-comp-dial { padding-top: 0; }
 .mr-bottom { margin-top: 0; padding-bottom: calc(env(safe-area-inset-bottom) + 70px); }
+.mr-dial-title { white-space: pre-line; text-align: center; line-height: 1.25; }
+.mr-dial-title.on { color: #ff6b1f; }
+/* 셔터 줄만 위로 (필름 띠는 그대로) */
+.mr-controls { margin-bottom: calc(min(100%, 318px) * -58 / 360 + 30px); }

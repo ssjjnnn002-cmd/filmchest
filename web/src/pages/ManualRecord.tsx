@@ -226,7 +226,7 @@ function Recorder({ roll, camera, allLenses, onClose }: {
       </div>
 
       <div className="mr-space" />
-      <RecordDials dial={dial} onChange={setDial} onLocked={show} />
+      <RecordDials dial={dial} onChange={setDial} onLocked={show} iso={iso} />
 
       <PlaceTimeCard place={locating && !placeName ? '현재 위치 찾는 중…' : placeName || '없음'}
         time={useNow ? '기록하는 순간' : time.toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -285,7 +285,7 @@ function Recorder({ roll, camera, allLenses, onClose }: {
         }} />
       )}
       {editShot && (
-        <ShotEdit shot={editShot} like={dial} lenses={lensList.length ? lensList : [lens]} current={lens}
+        <ShotEdit shot={editShot} like={dial} lenses={lensList.length ? lensList : [lens]} current={lens} iso={iso}
           onClose={() => setEditing(undefined)}
           onSave={(s) => { save(shots.map((x) => (x.pos === s.pos ? { ...s, edited: true } : x))); setEditing(undefined); show(`${s.pos}번을 고쳤어요`) }}
           onDelete={() => { save(shots.filter((x) => x.pos !== editShot.pos)); setEditing(undefined); show(`${editShot.pos}번 기록을 지웠어요`) }} />
@@ -298,8 +298,12 @@ function Recorder({ roll, camera, allLenses, onClose }: {
 // ───────── 다이얼
 
 /** 셔터 · (가운데 작게) 노출 보정 · 조리개(⚡). 그 카메라에서 의미 없는 다이얼은 흐리게 막는다 */
-function RecordDials({ dial, onChange, onLocked }: { dial: Dial; onChange: (d: Dial) => void; onLocked: (t: string) => void }) {
+function RecordDials({ dial, onChange, onLocked, iso }: { dial: Dial; onChange: (d: Dial) => void; onLocked: (t: string) => void; iso: number }) {
   const program = dialOf.program(dial), flash = dialOf.flash(dial)
+  // 보정하면: 실제로 맞춘 감도와 밝게/어둡게 (보정은 감도를 바꿔 다는 것과 같다)
+  const ISOS = [25, 32, 40, 50, 64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400]
+  const comp = dial.fullAuto ? 0 : COMPS[dial.c]
+  const compNote = comp ? `ISO ${ISOS[nearest(ISOS, iso / Math.pow(2, comp))]}\n${comp > 0 ? '밝게' : '어둡게'}` : undefined
   const sh = dialOf.shutter(dial), ap = dialOf.aperture(dial)
   const accentS = new Set(dial.stops.map((v, i) => (v <= 0 ? i : -1)).filter((i) => i >= 0))
   return (
@@ -308,7 +312,7 @@ function RecordDials({ dial, onChange, onLocked }: { dial: Dial; onChange: (d: D
         big={program ? 'P 자동' : sh != null ? formatShutter(sh) : '자동'} accent={accentS} bigSize={24}
         disabled={dial.stops.length < 2} onLocked={() => onLocked(dial.fullAuto ? '이 카메라는 셔터·조리개를 자동으로 정해요' : '이 카메라는 셔터를 자동으로 정해요')} />
       <div className="mr-comp-dial">
-        <TopDial title="노출 보정" labels={COMPS.map((c) => (c === 0 ? '0' : Number.isInteger(c) ? formatComp(c) : '·'))} index={dial.c}
+        <TopDial title={compNote ?? '노출 보정'} titleOn={!!compNote} labels={COMPS.map((c) => (c === 0 ? '0' : Number.isInteger(c) ? formatComp(c) : '·'))} index={dial.c}
           onChange={(c) => onChange({ ...dial, c })} size={88} big={dial.fullAuto || COMPS[dial.c] === 0 ? '±0' : formatComp(COMPS[dial.c])}
           accent={new Set([6])} bigSize={18} disabled={dial.fullAuto} onLocked={() => onLocked('이 카메라는 노출 보정이 없어요')} />
       </div>
@@ -322,8 +326,10 @@ function RecordDials({ dial, onChange, onLocked }: { dial: Dial; onChange: (d: D
 
 /** 카메라 윗면에서 본 다이얼: 값이 방사형(바깥쪽으로)으로 적혀 겹치지 않고, 오른쪽 표시에 맞춘 값이 고른 값.
  *  위아래(또는 좌우)로 끌어서 돌린다. A·P·B·⚡·0 자리에서는 '딱' 하고 걸린다 */
-function TopDial({ title, labels, index, onChange, size, big, accent, bigSize, disabled, onLocked, low }: {
+function TopDial({ title, labels, index, onChange, size, big, accent, bigSize, disabled, onLocked, low, titleOn }: {
   title: string; labels: string[]; index: number; onChange: (i: number) => void; size: number; big: string
+  /** 제목 자리에 안내(보정 감도)를 주황으로 */
+  titleOn?: boolean
   accent: Set<number>; bigSize: number; disabled?: boolean; onLocked?: () => void
   /** 셔터·조리개는 노출 보정보다 아래에 */
   low?: boolean
@@ -381,7 +387,7 @@ function TopDial({ title, labels, index, onChange, size, big, accent, bigSize, d
         <i className="mr-index" aria-hidden="true" />
       </div>
       <b className={`mr-big ${disabled || (index === 0 && accent.has(0)) ? 'dim' : ''}`} style={{ fontSize: bigSize }}>{big}</b>
-      <span className="mr-dial-title">{title}</span>
+      <span className={`mr-dial-title ${titleOn ? 'on' : ''}`}>{title}</span>
     </div>
   )
 }
@@ -517,8 +523,8 @@ function Canister({ iso, frames, body, band }: { iso: number; frames: number; bo
 }
 
 // ───────── 컷 고치기 (메인과 같은 다이얼 배치, 그 컷 값으로 맞춰서 연다)
-function ShotEdit({ shot, like, lenses, current, onClose, onSave, onDelete }: {
-  shot: MeterShot; like: Dial; lenses: Lens[]; current: Lens; onClose: () => void; onSave: (s: MeterShot) => void; onDelete: () => void
+function ShotEdit({ shot, like, lenses, current, iso, onClose, onSave, onDelete }: {
+  shot: MeterShot; like: Dial; lenses: Lens[]; current: Lens; iso: number; onClose: () => void; onSave: (s: MeterShot) => void; onDelete: () => void
 }) {
   const [lens, setLens] = useState<Lens>(() => lenses.find((l) => l.id === shot.lensId) ?? current)
   const [dial, setDial] = useState<Dial>(() => dialOf.fromShot(shot, like, apertures(lens.open, lens.close)))
@@ -547,7 +553,7 @@ function ShotEdit({ shot, like, lenses, current, onClose, onSave, onDelete }: {
         <button className="mr-text strong" onClick={save}>저장</button>
       </div>
       <div className="mr-edit-body">
-        <RecordDials dial={dial} onChange={setDial} onLocked={setNote} />
+        <RecordDials dial={dial} onChange={setDial} onLocked={setNote} iso={iso} />
         {note && <p className="mr-note">{note}</p>}
         <PlaceTimeCard place={placeName || '없음'} time={time.toLocaleString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
           onPlace={() => setSheet('place')} onTime={() => setSheet('time')} />

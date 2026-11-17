@@ -55,7 +55,7 @@ struct ManualRecordView: View {
         VStack(spacing: 12) {
             header
             Spacer(minLength: 6)
-            RecordDials(dial: $dial, onLocked: show)
+            RecordDials(dial: $dial, iso: m.iso, onLocked: show)
             placeTimeCard.padding(.top, 6)
             Spacer(minLength: 6)
             rollPart.padding(.bottom, 70)
@@ -88,7 +88,7 @@ struct ManualRecordView: View {
         }
         .sheet(item: $editing) { t in
             if let shot = m.shots.first(where: { $0.pos == t.pos }) {
-                ShotDialEditor(shot: shot, like: dial, lenses: m.gear.lenses.isEmpty ? [m.lens] : m.gear.lenses, current: m.lens) { edited in
+                ShotDialEditor(shot: shot, like: dial, lenses: m.gear.lenses.isEmpty ? [m.lens] : m.gear.lenses, current: m.lens, iso: m.iso) { edited in
                     m.update(edited); onSave(m.shots, m.prewind); show("\(t.pos)번을 고쳤어요")
                 } onDelete: {
                     m.shots.removeAll { $0.pos == t.pos }; onSave(m.shots, m.prewind); show("\(t.pos)번 기록을 지웠어요")
@@ -194,7 +194,7 @@ struct ManualRecordView: View {
                           onFlash: { dial.toggleFlash(); UIImpactFeedbackGenerator(style: .heavy).impactOccurred() },
                           onShutter: fire)
                 .frame(width: w)
-                .padding(.bottom, -w * 58 / 360)
+                .padding(.bottom, -w * 58 / 360 + 30)
                 .zIndex(1)
             MeterFilmStrip(shots: m.shots, frames: m.gear.frames, prewind: false, ended: false, nextPos: frame,
                            showFocal: m.showFocal, effISO: m.effISO, film: m.gear.film) { p in
@@ -342,6 +342,8 @@ struct DialState {
 /// 셔터 · (가운데 작게) 노출 보정 · 조리개(⚡) 다이얼. 그 카메라에서 의미 없는 다이얼은 흐리게 막는다
 struct RecordDials: View {
     @Binding var dial: DialState
+    /// 필름 감도 (보정하면 실제로 맞춘 감도를 보여 준다)
+    var iso: Double = 400
     /// 막힌 다이얼을 눌렀을 때 알림
     var onLocked: (String) -> Void = { _ in }
 
@@ -355,7 +357,7 @@ struct RecordDials: View {
                     onDisabledTap: { onLocked(dial.fullAuto ? "이 카메라는 셔터·조리개를 자동으로 정해요" : "이 카메라는 셔터를 자동으로 정해요") })
                 .padding(.top, 56)
             // 노출 보정은 자주 안 쓰니 위쪽에 작게
-            CompDial(index: $dial.c, disabled: !dial.compEnabled) { onLocked("이 카메라는 노출 보정이 없어요") }
+            CompDial(index: $dial.c, iso: iso, disabled: !dial.compEnabled) { onLocked("이 카메라는 노출 보정이 없어요") }
             TopDial(title: "조리개", labels: dial.apertureLabels, index: $dial.a, size: 132,
                     big: dial.flash ? "플래시" : dial.program ? "P 자동" : dial.aperture.map(MeterMath.fmtA) ?? "자동",
                     accent: [0, dial.flashIndex], snaps: [0, dial.flashIndex], bigSize: 24,
@@ -402,11 +404,19 @@ struct PlaceTimeCard: View {
 /// 노출 보정 작은 다이얼 (가운데 0)
 struct CompDial: View {
     @Binding var index: Int
+    var iso: Double = 400
     var disabled = false
     var onLocked: () -> Void = {}
+    /// 보정하면: 실제로 맞춘 감도와 밝게/어둡게 (보정은 감도를 바꿔 다는 것과 같다)
+    private var note: String? {
+        let c = MeterMath.comps[index]
+        guard !disabled, c != 0 else { return nil }
+        let eff = MeterMath.isoList[MeterMath.nearest(MeterMath.isoList, iso / pow(2, c))]
+        return "ISO \(MeterMath.trim(eff))\n\(c > 0 ? "밝게" : "어둡게")"
+    }
     var body: some View {
-        TopDial(title: "노출 보정", labels: MeterMath.comps.map { $0 == 0 ? "0" : $0 == $0.rounded() ? MeterMath.fmtC($0) : "·" }, index: $index, size: 88,
-                big: disabled || MeterMath.comps[index] == 0 ? "±0" : MeterMath.fmtC(MeterMath.comps[index]), accent: [6], snaps: [6], bigSize: 18,
+        TopDial(title: note ?? "노출 보정", labels: MeterMath.comps.map { $0 == 0 ? "0" : $0 == $0.rounded() ? MeterMath.fmtC($0) : "·" }, index: $index, size: 88,
+                big: disabled || MeterMath.comps[index] == 0 ? "±0" : MeterMath.fmtC(MeterMath.comps[index]), accent: [6], snaps: [6], bigSize: 18, titleColor: note == nil ? .meterSub : .meterOrange,
                 disabled: disabled, onDisabledTap: onLocked)
             .frame(width: 96)
     }
@@ -425,6 +435,7 @@ struct TopDial: View {
     /// 걸리는 느낌을 세게 줄 칸
     var snaps: Set<Int> = []
     var bigSize: CGFloat = 26
+    var titleColor: Color = .meterSub
     /// 이 카메라에서 의미 없는 다이얼: 흐리게, 돌아가지 않음
     var disabled = false
     var onDisabledTap: (() -> Void)? = nil
@@ -494,7 +505,7 @@ struct TopDial: View {
             Text(big).font(.system(size: bigSize, weight: .semibold, design: .rounded)).monospacedDigit()
                 .foregroundStyle(disabled || (index == 0 && accent.contains(0)) ? Color.meterSub : .white)
                 .lineLimit(1).minimumScaleFactor(0.6)
-            Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.meterSub)
+            Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(titleColor).lineLimit(2).multilineTextAlignment(.center).fixedSize()
         }
         .frame(maxWidth: .infinity)
     }
@@ -578,9 +589,10 @@ struct ShotDialEditor: View {
     @State private var toast: String?
     let lenses: [MeterLens]
     @State private var lens: MeterLens
+    var iso: Double = 400
 
-    init(shot: MeterShot, like: DialState, lenses: [MeterLens], current: MeterLens, onSave: @escaping (MeterShot) -> Void, onDelete: @escaping () -> Void) {
-        self.shot = shot; self.onSave = onSave; self.onDelete = onDelete; self.lenses = lenses
+    init(shot: MeterShot, like: DialState, lenses: [MeterLens], current: MeterLens, iso: Double, onSave: @escaping (MeterShot) -> Void, onDelete: @escaping () -> Void) {
+        self.shot = shot; self.onSave = onSave; self.onDelete = onDelete; self.lenses = lenses; self.iso = iso
         // 그 컷에 끼웠던 렌즈 (모르면 지금 렌즈)
         let l = lenses.first { $0.id == shot.lensId } ?? current
         _lens = State(initialValue: l)
@@ -596,7 +608,7 @@ struct ShotDialEditor: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    RecordDials(dial: $dial, onLocked: { toast = $0 }).padding(.top, 8)
+                    RecordDials(dial: $dial, iso: iso, onLocked: { toast = $0 }).padding(.top, 8)
                     if let toast { Text(toast).font(.footnote).foregroundStyle(Color.meterSub) }
                     PlaceTimeCard(place: placeName.isEmpty ? "없음" : placeName,
                                   time: time.formatted(date: .abbreviated, time: .shortened),
