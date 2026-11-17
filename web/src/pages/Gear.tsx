@@ -213,8 +213,9 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
               {/* 바둑판: 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게, 아이폰과 같음) */}
               {grid && <small className="lot-brand">{film?.brand || '\u00a0'}</small>}
               <b className={grid ? 'clamp-2 reserve-2' : 'truncate'}>{grid && film ? (film.brand ? film.name : filmDisplayName(film)) : filmDisplayName(film)}</b>
-              <span className={grid ? 'sub clamp-2' : 'sub truncate'}>{formatInfo[lot.format].name} · {storageText(lot)} · {lot.count}롤</span>
-              <span className="sub" style={{ color: late ? 'var(--warn, #ff453a)' : '#ff9f0a', visibility: late || lot.count <= lot.lowAt ? 'visible' : 'hidden' }}>{late ? '기한 지남' : '부족'}</span>
+              <span className={grid ? 'sub clamp-2' : 'sub truncate'}>{formatInfo[lot.format].name} · {storageText(lot)}</span>
+              {/* 재고 수량은 크게, 부족·기한 지남은 옆에 둥근 표시 (아이폰·갤럭시와 같음) */}
+              <span className="lot-count">{lot.count}롤{late ? <i className="lot-tag late">기한 지남</i> : lot.count <= lot.lowAt ? <i className="lot-tag low">부족</i> : null}</span>
             </span>
           </button>
         )

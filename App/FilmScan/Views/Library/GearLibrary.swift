@@ -477,14 +477,18 @@ private extension FilterItem {
 }
 
 private extension FilmLotItem {
-    var metaLine: String { "\(format.displayName) · \(storageText) · \(count)롤" }
+    var metaLine: String { "\(format.displayName) · \(storageText)" }
+    /// 재고 수량은 크게, 부족·기한 지남은 옆에 둥근 표시 (웹·갤럭시와 같음)
     @ViewBuilder var lotBadge: some View {
-        if expired {
-            Text("기한 지남").font(.caption.weight(.semibold)).foregroundStyle(.red)
-        } else if low {
-            Text("부족").font(.caption.weight(.semibold)).foregroundStyle(.orange)
-        } else {
-            Text(" ").font(.caption)
+        HStack(spacing: 6) {
+            Text("\(count)롤").font(.callout.weight(.bold)).monospacedDigit()
+            if expired {
+                Text("기한 지남").font(.caption.weight(.bold)).foregroundStyle(.white)
+                    .padding(.horizontal, 8).padding(.vertical, 3).background(Color.red, in: Capsule())
+            } else if low {
+                Text("부족").font(.caption.weight(.bold)).foregroundStyle(Color(red: 0.23, green: 0.16, blue: 0))
+                    .padding(.horizontal, 8).padding(.vertical, 3).background(Color(red: 1, green: 0.82, blue: 0.25), in: Capsule())
+            }
         }
     }
 }
