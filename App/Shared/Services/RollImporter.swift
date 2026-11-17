@@ -277,19 +277,36 @@ extension RollImporter {
 }
 
 extension RollImporter {
-    /// 사진 파일 속 날짜·위치·카메라 정보를 지금 롤 기록으로 다시 쓴 사본 (드라이브에 올릴 때). 못 쓰면 nil
+    /// 이 컷의 촬영 정보 (지금 롤 기록 기준: 카메라·렌즈·날짜·장소·노출)
     @MainActor
-    static func withCurrentInfo(_ data: Data, frame: FrameItem, roll: RollItem) -> Data? {
+    static func metadata(for frame: FrameItem, roll: RollItem) -> FrameMetadata? {
         let snapshot = roll.snapshot()
         let count = max(roll.frameCount ?? 0, frame.index)
         let timeline = snapshot.frameTimeline(count: count, offset: roll.meterOffset)
         guard frame.index >= 1, frame.index <= timeline.count else { return nil }
         let info = timeline[frame.index - 1]
-        let meta = FrameMetadata(frame: frame.index, frameCount: count, date: snapshot.dateUnknown ? nil : info.date, timeZone: info.timeZone,
-                                 location: info.location, camera: snapshot.camera, lens: snapshot.lens(at: frame.index, offset: roll.meterOffset),
-                                 film: snapshot.film, shotISO: snapshot.iso(at: frame.index, offset: roll.meterOffset),
-                                 labName: snapshot.roll.labName, scannerName: roll.scannerName,
-                                 rollID: snapshot.roll.id, exposure: snapshot.exposures[frame.index - roll.meterOffset])
+        return FrameMetadata(frame: frame.index, frameCount: count, date: snapshot.dateUnknown ? nil : info.date, timeZone: info.timeZone,
+                             location: info.location, camera: snapshot.camera, lens: snapshot.lens(at: frame.index, offset: roll.meterOffset),
+                             film: snapshot.film, shotISO: snapshot.iso(at: frame.index, offset: roll.meterOffset),
+                             labName: snapshot.roll.labName, scannerName: roll.scannerName,
+                             rollID: snapshot.roll.id, exposure: snapshot.exposures[frame.index - roll.meterOffset])
+    }
+
+    /// 롤 카메라를 바꾼 뒤: 사진 앱에 저장한 사진의 촬영 정보를 새 기록으로 다시 쓴다 (돌린 것은 그대로). 바꾼 장 수
+    @MainActor
+    static func rewritePhotos(for roll: RollItem) async -> Int {
+        let frames = (roll.frames ?? []).filter { $0.assetIdentifier != nil }
+        guard !frames.isEmpty, (try? await PhotoLibrary.requestAccess()) != nil else { return 0 }
+        let items = frames.map { (assetID: $0.assetIdentifier!, turns: $0.turns, metadata: metadata(for: $0, roll: roll)) }
+        let done = Set(await PhotoLibrary.setRotation(items))
+        for f in frames where done.contains(f.assetIdentifier!) { f.photoRotation = f.turns }
+        return done.count
+    }
+
+    /// 사진 파일 속 날짜·위치·카메라 정보를 지금 롤 기록으로 다시 쓴 사본 (드라이브에 올릴 때). 못 쓰면 nil
+    @MainActor
+    static func withCurrentInfo(_ data: Data, frame: FrameItem, roll: RollItem) -> Data? {
+        guard let meta = metadata(for: frame, roll: roll) else { return nil }
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("drive-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }

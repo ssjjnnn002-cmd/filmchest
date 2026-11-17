@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll } from '../db'
 import { useNav } from '../App'
-import { weatherText, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
+import { weatherText, type Camera, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
 import { exposureText, meterFrameTitle, meterProgress, meterShotsByOrder, shotRowMeta } from '../core/meter'
 import { ManualRecord, RollShotEdit } from './ManualRecord'
 import { features } from '../core/features'
 import { RollGalleryButton } from '../ui/GallerySave'
-import { Canister, cameraName, Confirm, Sheet, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedDays, sortedLocations } from '../ui/common'
+import { CameraCover, Canister, cameraName, Confirm, Sheet, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedDays, sortedLocations } from '../ui/common'
 import { DayEdit, LabDropOff, LensChangeEdit, PlaceEdit } from './Editors'
 import { RollProjects } from './Projects'
 import { TagField } from '../ui/gearExtras'
@@ -36,6 +36,8 @@ export function RollDetail({ id }: { id: string }) {
   const [framePrint, setFramePrint] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const [recording, setRecording] = useState(false)
+  const [moreMenu, setMoreMenu] = useState(false)
+  const [pickCamera, setPickCamera] = useState(false)
   const [shotEdit, setShotEdit] = useState<number>()
   const [allShots, setAllShots] = useState(false)
 
@@ -64,7 +66,15 @@ export function RollDetail({ id }: { id: string }) {
                 <path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" />
               </svg>
             </button>
-            <button aria-label="롤 삭제" onClick={() => setConfirm(true)}><Icon name="trash" /></button>
+            <div style={{ position: 'relative' }}>
+              <button aria-label="더 보기" onClick={() => setMoreMenu(!moreMenu)}><Icon name="more" /></button>
+              {moreMenu && (
+                <div className="menu">
+                  <button className="row" onClick={() => { setMoreMenu(false); setPickCamera(true) }}>카메라 바꾸기</button>
+                  <button className="row danger" onClick={() => { setMoreMenu(false); setConfirm(true) }}>롤 삭제</button>
+                </div>
+              )}
+            </div>
           </GlassGroup>
         } />
 
@@ -202,6 +212,7 @@ export function RollDetail({ id }: { id: string }) {
       </div>
       )}
 
+      {pickCamera && <RollCameraPick roll={roll} onClose={() => setPickCamera(false)} />}
       {recording && <ManualRecord roll={roll} onClose={() => setRecording(false)} />}
       {shotEdit !== undefined && <RollShotEdit roll={roll} pos={shotEdit} onClose={() => setShotEdit(undefined)} onToast={nav.toast} />}
       {allShots && (
@@ -242,6 +253,43 @@ export function RollDetail({ id }: { id: string }) {
 
 function Info({ label, value }: { label: string; value: string }) {
   return <div className="row static"><span className="grow">{label}</span><span className="value">{value}</span></div>
+}
+
+/** 롤 카메라 바꾸기: 내 장비 카메라 중에서 (아이폰 RollCameraPicker와 같음). 촬영 중인 롤은 다른 필름이 든 카메라로는 못 옮긴다.
+ *  마운트가 다르거나 렌즈 고정형으로 바꾸면 롤 렌즈 기록은 비운다. 바꾸면 저장한 사진 속 카메라 정보도 다시 쓴다 */
+function RollCameraPick({ roll, onClose }: { roll: Roll; onClose: () => void }) {
+  const cameras = useLiveQuery(() => db.cameras.orderBy('sortOrder').filter((c) => !c.deletedAt).toArray(), []) ?? []
+  const busyIds = useLiveQuery(async () => new Set((await db.rolls.where('status').equals('loaded').toArray()).filter((r) => !r.deletedAt && r.id !== roll.id).map((r) => r.cameraId)), [roll.id]) ?? new Set()
+  const lens = useLiveQuery(() => (roll.lensId ? db.lenses.get(roll.lensId) : undefined), [roll.lensId])
+  const pick = async (c: Camera) => {
+    if (c.id !== roll.cameraId) {
+      const keepLens = !c.fixedLens && !!lens && (lens.mount ?? '').toLowerCase() === (c.mount ?? '').toLowerCase()
+      await db.rolls.update(roll.id, {
+        cameraId: c.id, cameraBrand: c.brand, cameraModel: c.model, cameraFormat: c.format, cameraFixedLens: c.fixedLens,
+        ...(keepLens ? {} : { lensId: undefined, lensChanges: [] }),
+      })
+    }
+    onClose()
+  }
+  return (
+    <Sheet title="카메라 바꾸기" onClose={onClose}>
+      <div className="section">
+        <div className="group">
+          {cameras.map((c) => {
+            const busy = roll.status === 'loaded' && busyIds.has(c.id)
+            return (
+              <button key={c.id} className="row" disabled={busy} style={{ opacity: busy ? 0.45 : 1 }} onClick={() => { void pick(c) }}>
+                <span style={{ width: 56, flex: 'none' }}><CameraCover camera={c} height={40} /></span>
+                <span className="grow">{c.brand} {c.model}{busy && <span className="sub">다른 필름이 들어 있어요</span>}</span>
+                {c.id === roll.cameraId && <span style={{ color: 'var(--safelight)' }}>✓</span>}
+              </button>
+            )
+          })}
+        </div>
+        <p className="footnote">저장한 사진의 카메라 정보도 함께 바꿔요. 휴대폰 갤러리에 이미 저장한 사진은 '갤러리에 저장'을 다시 눌러 주세요.</p>
+      </div>
+    </Sheet>
+  )
 }
 
 /** 롤 화면의 컷 기록: 최근 5컷, 넘으면 전체 보기 (아이폰과 같음) */
@@ -308,7 +356,7 @@ function AllShots({ roll, format, onEdit }: { roll: Roll; format: FilmFormat; on
 /** 촬영일·장소를 고치면 저장한 사진 속 날짜·위치도 새로 쓴다. 드라이브에 연결돼 있으면 새 정보의 사진으로 다시 올린다 */
 function usePhotoMetaSync(roll: Roll | undefined, toast: (m: string) => void) {
   const key = roll?.status === 'imported'
-    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive,
+    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive, roll.cameraId, roll.cameraBrand, roll.cameraModel, roll.lensId,
       (roll.meterShots ?? []).map((x) => [x.pos, x.at, x.place, x.lat, x.lon, x.lensId, x.iso])])
     : ''
   const last = useRef<string | undefined>(undefined)

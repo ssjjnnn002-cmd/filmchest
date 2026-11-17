@@ -151,8 +151,9 @@ enum PhotoLibrary {
     }
 
     /// 사진 앱 사진을 원본에서 시계 방향 90°×turns로 돌려 둔다 (여러 장을 한 번에: 허락 창이 한 번만 뜬다).
-    /// 0이면 원본으로 되돌린다. 반영한 사진의 id 목록을 돌려준다.
-    static func setRotation(_ items: [(assetID: String, turns: Int)]) async -> [String] {
+    /// metadata가 있으면 사진 속 촬영 정보(카메라·렌즈·날짜 등)도 그 값으로 다시 쓴다 (롤 카메라를 바꿨을 때).
+    /// 0이고 metadata도 없으면 원본으로 되돌린다. 반영한 사진의 id 목록을 돌려준다.
+    static func setRotation(_ items: [(assetID: String, turns: Int, metadata: FrameMetadata?)]) async -> [String] {
         let ids = items.map(\.assetID)
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
         var byID: [String: PHAsset] = [:]
@@ -161,7 +162,7 @@ enum PhotoLibrary {
         for item in items {
             guard let asset = byID[item.assetID] else { continue }
             let t = ((item.turns % 4) + 4) % 4
-            if t == 0 { outputs.append((asset, nil)); continue }
+            if t == 0 && item.metadata == nil { outputs.append((asset, nil)); continue }
             let options = PHContentEditingInputRequestOptions()
             options.isNetworkAccessAllowed = true
             // 우리 회전 기록이면 원본을 받아 다시 돌린다 (돌린 위에 또 돌리지 않게)
@@ -176,12 +177,19 @@ enum PhotoLibrary {
             let oriented = image.applyingOrientation(Int(input.fullSizeImageOrientation))
             let output = PHContentEditingOutput(contentEditingInput: input)
             output.adjustmentData = PHAdjustmentData(formatIdentifier: rotateFormat, formatVersion: "1", data: Data("\(t)".utf8))
-            guard let dest = CGImageDestinationCreateWithURL(output.renderedContentURL as CFURL, "public.jpeg" as CFString, 1, nil) else { continue }
+            // 돌린 사진을 먼저 임시 파일로, 촬영 정보를 다시 써야 하면 그 위에 써서 결과로 낸다
+            let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("edit-\(UUID().uuidString).jpg")
+            defer { try? FileManager.default.removeItem(at: tmp) }
+            let target = item.metadata == nil ? output.renderedContentURL : tmp
+            guard let dest = CGImageDestinationCreateWithURL(target as CFURL, "public.jpeg" as CFString, 1, nil) else { continue }
             var meta = props
             meta[kCGImagePropertyOrientation] = 1
             meta[kCGImageDestinationLossyCompressionQuality] = 0.95
             CGImageDestinationAddImage(dest, oriented.rotated(quarterTurns: t), meta as CFDictionary)
             guard CGImageDestinationFinalize(dest) else { continue }
+            if let m = item.metadata {
+                guard (try? MetadataWriter.write(source: tmp, destination: output.renderedContentURL, metadata: m)) != nil else { continue }
+            }
             outputs.append((asset, output))
         }
         guard !outputs.isEmpty else { return [] }

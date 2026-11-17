@@ -44,6 +44,7 @@ struct RollDetailView: View {
     @State private var viewing: ViewerTarget?
     @State private var confirmDelete = false
     @State private var recording = false
+    @State private var pickingCamera = false
     /// 목록 가장자리 여백 (필름을 화면 끝까지 늘이려고 잰다)
     @State private var stripInset: CGFloat = 16
 
@@ -290,7 +291,21 @@ struct RollDetailView: View {
             }
             ToolbarItem {
                 Menu("더 보기", systemImage: "ellipsis.circle") {
+                    Button("카메라 바꾸기", systemImage: "camera") { pickingCamera = true }
                     Button("롤 삭제", systemImage: "trash", role: .destructive) { confirmDelete = true }
+                }
+            }
+        }
+        .sheet(isPresented: $pickingCamera) {
+            RollCameraPicker(roll: roll) { changed in
+                // 사진 앱에 저장한 사진도 새 카메라 정보로 다시 쓴다
+                guard changed, (roll.frames ?? []).contains(where: { $0.assetIdentifier != nil }) else { return }
+                photoTask?.cancel()
+                photoTask = Task {
+                    let n = await RollImporter.rewritePhotos(for: roll)
+                    withAnimation { photoNote = n > 0 ? "사진 앱 사진도 바꿨어요 (\(n)장)" : "사진 앱 사진은 바꾸지 못했어요" }
+                    try? await Task.sleep(for: .seconds(2.5))
+                    withAnimation { photoNote = nil }
                 }
             }
         }
@@ -583,3 +598,61 @@ struct RollShotsView: View {
         }
     }
 }
+
+/// 롤 카메라 바꾸기: 내 장비 카메라 중에서. 촬영 중인 롤은 다른 필름이 든 카메라로는 못 옮긴다.
+/// 마운트가 다르거나 렌즈 고정형으로 바꾸면 롤 렌즈 기록은 비운다
+struct RollCameraPicker: View {
+    @Bindable var roll: RollItem
+    var onDone: (Bool) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @Query(sort: \CameraItem.sortOrder) private var cameras: [CameraItem]
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(cameras.filter { $0.deletedAt == nil }) { c in
+                        let busy = roll.status == .loaded && c.id != roll.camera?.id && c.loadedRoll != nil
+                        Button { pick(c) } label: {
+                            HStack(spacing: 12) {
+                                CameraCoverView(camera: c).frame(width: 56, height: 40)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(c.displayName)
+                                    if busy { Text("다른 필름이 들어 있어요").font(.caption).foregroundStyle(.secondary) }
+                                }
+                                Spacer()
+                                if c.id == roll.camera?.id { Image(systemName: "checkmark").foregroundStyle(Theme.safelight) }
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(busy)
+                        .opacity(busy ? 0.45 : 1)
+                    }
+                } footer: {
+                    Text("사진 앱에 저장한 사진의 카메라 정보도 함께 바꿔요.")
+                }
+            }
+            .navigationTitle("카메라 바꾸기")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } } }
+        }
+    }
+
+    private func pick(_ c: CameraItem) {
+        let changed = c.id != roll.camera?.id
+        if changed {
+            if c.fixedLensName != nil || (roll.lens.map { $0.mount.caseInsensitiveCompare(c.mount ?? "") != .orderedSame } ?? false) {
+                roll.lens = nil
+                roll.lensChanges = []
+            }
+            roll.camera = c
+            roll.rememberCamera()
+        }
+        dismiss()
+        onDone(changed)
+    }
+}
+

@@ -147,7 +147,8 @@ struct FrameViewer: View {
     private func syncRotationsToPhotos() {
         let changed = frames.filter { $0.assetIdentifier != nil && $0.turns != (($0.photoRotation ?? 0) % 4 + 4) % 4 }
         guard !changed.isEmpty else { return }
-        let items = changed.map { (assetID: $0.assetIdentifier!, turns: $0.turns) }
+        // 돌릴 때도 지금 롤 기록으로 촬영 정보를 다시 쓴다 (카메라를 바꾼 뒤 돌려도 예전 카메라로 돌아가지 않게)
+        let items = changed.map { (assetID: $0.assetIdentifier!, turns: $0.turns, metadata: RollImporter.metadata(for: $0, roll: roll)) }
         Task { @MainActor in
             let done = Set(await PhotoLibrary.setRotation(items))
             for f in changed where done.contains(f.assetIdentifier!) { f.photoRotation = f.turns }

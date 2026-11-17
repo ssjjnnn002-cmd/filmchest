@@ -11,7 +11,7 @@ export function RollGalleryButton({ rollId, title, onToast, block }: {
   onToast: (message: string) => void
   block?: boolean
 }) {
-  const [files, setFiles] = useState<{ uri: string; name: string }[] | null>(null)
+  const [files, setFiles] = useState<{ uri: string; name: string; key: string }[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [wantFile, setWantFile] = useState(false)
 

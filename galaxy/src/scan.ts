@@ -121,14 +121,14 @@ export async function importScans(
 }
 
 /** 갤러리에 넣을 사진 파일. 촬영 순서대로 01, 02 … */
-export async function rollImageFiles(rollId: string): Promise<{ uri: string; name: string }[]> {
+export async function rollImageFiles(rollId: string): Promise<{ uri: string; name: string; key: string }[]> {
   const frames = await db.frames.where('rollId').equals(rollId).sortBy('index')
-  const out: { uri: string; name: string }[] = []
+  const out: { uri: string; name: string; key: string }[] = []
   for (const frame of frames) {
     const original = await db.originals.get(frame.id)
     if (!original) continue
     const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase().replace('jpeg', 'jpg')
-    out.push({ uri: await rotatedFile(original.blob, frame.rotation, frame.id), name: `${String(frame.index).padStart(2, '0')}.${ext}`.replace(/[/\\:]/g, '-') })
+    out.push({ uri: await rotatedFile(original.blob, frame.rotation, frame.id), name: `${String(frame.index).padStart(2, '0')}.${ext}`.replace(/[/\\:]/g, '-'), key: frame.id })
   }
   return out
 }

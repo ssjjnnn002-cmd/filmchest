@@ -7,14 +7,14 @@ import Svg, { Path } from 'react-native-svg'
 import { db, deleteRoll } from '../data'
 import { useLiveQuery } from '../store'
 import { useNav } from '../App'
-import { weatherText, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
+import { weatherText, type Camera, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
 import { exposureText, meterFrameTitle, meterProgress, meterShotsByOrder, shotRowMeta } from '../core/meter'
 import { ManualRecord, RollShotEdit } from './ManualRecord'
 import { bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedDays, sortedLocations } from '../core/display'
-import { Btn, Canister, Field, Group, Progress, Row, RowText, Section, Segmented, StatusBadge, Sub } from '../kit'
+import { Btn, CameraCover, Canister, Field, Group, Progress, Row, RowText, Section, Segmented, StatusBadge, Sub } from '../kit'
 import { Icon } from '../icons'
 import { Page } from '../page'
-import { Confirm, Sheet, SheetBtn } from '../overlay'
+import { Confirm, Menu, Sheet, SheetBtn } from '../overlay'
 import { features } from '../core/features'
 import { RollGalleryButton } from '../GallerySave'
 import { useTheme } from '../theme'
@@ -25,7 +25,8 @@ import { FramePrint } from './FramePrint'
 import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
 import { ScanButton } from './Pending'
 import { driveConnected, syncPhotosToDrive } from '../drive'
-import { refreshRollPhotoMeta } from '../scan'
+import { refreshRollPhotoMeta, rollImageFiles } from '../scan'
+import { replaceInGallery } from '../gallery'
 
 export function RollDetail({ id }: { id: string }) {
   const c = useTheme()
@@ -47,6 +48,8 @@ export function RollDetail({ id }: { id: string }) {
   const [framePrint, setFramePrint] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const [recording, setRecording] = useState(false)
+  const [moreMenu, setMoreMenu] = useState(false)
+  const [pickCamera, setPickCamera] = useState(false)
   const [shotEdit, setShotEdit] = useState<number>()
   const [allShots, setAllShots] = useState(false)
 
@@ -79,9 +82,9 @@ export function RollDetail({ id }: { id: string }) {
                 stroke={roll.favorite ? '#f5b700' : c.ink} strokeWidth={1.8} strokeLinejoin="round" />
             </Svg>
           </Pressable>
-          <Pressable accessibilityLabel="롤 삭제" onPress={() => setConfirm(true)}
+          <Pressable accessibilityLabel="더 보기" onPress={() => setMoreMenu(true)}
             style={({ pressed }) => ({ width: 48, height: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
-            <Icon name="trash" size={23} color={c.safelight} />
+            <Icon name="more" size={23} color={c.safelight} />
           </Pressable>
         </View>
       }>
@@ -210,6 +213,11 @@ export function RollDetail({ id }: { id: string }) {
       </Section>
       ) : null}
 
+      {moreMenu ? <Menu onClose={() => setMoreMenu(false)} items={[
+        { label: '카메라 바꾸기', onPress: () => setPickCamera(true) },
+        { label: '롤 삭제', danger: true, onPress: () => setConfirm(true) },
+      ]} /> : null}
+      {pickCamera ? <RollCameraPick roll={roll} onClose={() => setPickCamera(false)} /> : null}
       {recording ? <ManualRecord roll={roll} onClose={() => setRecording(false)} /> : null}
       {shotEdit !== undefined ? <RollShotEdit roll={roll} pos={shotEdit} onClose={() => setShotEdit(undefined)} onToast={nav.toast} /> : null}
       {allShots ? (
@@ -242,6 +250,47 @@ export function RollDetail({ id }: { id: string }) {
           change={lensEdit === 'new' ? undefined : lensEdit} onClose={() => setLensEdit(null)} />
       ) : null}
     </Page>
+  )
+}
+
+/** 롤 카메라 바꾸기: 내 장비 카메라 중에서 (웹·아이폰과 같음). 촬영 중인 롤은 다른 필름이 든 카메라로는 못 옮긴다.
+ *  마운트가 다르거나 렌즈 고정형으로 바꾸면 롤 렌즈 기록은 비운다. 바꾸면 저장한 사진·갤러리 사진의 카메라 정보도 바꾼다 */
+function RollCameraPick({ roll, onClose }: { roll: Roll; onClose: () => void }) {
+  const c = useTheme()
+  const cameras = useLiveQuery(() => db.cameras.orderBy('sortOrder').filter((x) => !x.deletedAt).toArray(), []) ?? []
+  const busyIds = useLiveQuery(async () => new Set((await db.rolls.where('status').equals('loaded').toArray()).filter((r) => !r.deletedAt && r.id !== roll.id).map((r) => r.cameraId)), [roll.id]) ?? new Set<string | undefined>()
+  const lens = useLiveQuery(() => (roll.lensId ? db.lenses.get(roll.lensId) : undefined), [roll.lensId])
+  const pick = async (x: Camera) => {
+    if (x.id !== roll.cameraId) {
+      const keepLens = !x.fixedLens && !!lens && (lens.mount ?? '').toLowerCase() === (x.mount ?? '').toLowerCase()
+      await db.rolls.update(roll.id, {
+        cameraId: x.id, cameraBrand: x.brand, cameraModel: x.model, cameraFormat: x.format, cameraFixedLens: x.fixedLens,
+        ...(keepLens ? {} : { lensId: undefined, lensChanges: [] }),
+      })
+    }
+    onClose()
+  }
+  return (
+    <Sheet title="카메라 바꾸기" onClose={onClose}>
+      <Section foot="저장한 사진과 갤러리에 저장한 사진의 카메라 정보도 함께 바꿔요.">
+        <Group>
+          {cameras.map((x) => {
+            const busy = roll.status === 'loaded' && busyIds.has(x.id)
+            return (
+              <Pressable key={x.id} disabled={busy} onPress={() => { void pick(x) }}
+                style={({ pressed }) => ({ minHeight: 60, paddingHorizontal: 18, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 12, opacity: busy ? 0.45 : pressed ? 0.6 : 1 })}>
+                <View style={{ width: 56 }}><CameraCover camera={x} height={40} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 17, color: c.ink }}>{x.brand} {x.model}</Text>
+                  {busy ? <Sub>다른 필름이 들어 있어요</Sub> : null}
+                </View>
+                {x.id === roll.cameraId ? <Text style={{ fontSize: 17, color: c.safelight }}>✓</Text> : null}
+              </Pressable>
+            )
+          })}
+        </Group>
+      </Section>
+    </Sheet>
   )
 }
 
@@ -304,7 +353,7 @@ function AllShots({ roll, format, onEdit }: { roll: Roll; format: FilmFormat; on
 /** 촬영일·장소를 고치면 저장한 사진 속 날짜·위치도 새로 쓴다. 드라이브에 연결돼 있으면 새 정보의 사진으로 다시 올린다 */
 function usePhotoMetaSync(roll: Roll | undefined, toast: (m: string) => void) {
   const key = roll?.status === 'imported'
-    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive,
+    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive, roll.cameraId, roll.cameraBrand, roll.cameraModel, roll.lensId,
       (roll.meterShots ?? []).map((x) => [x.pos, x.at, x.place, x.lat, x.lon, x.lensId, x.iso])])
     : ''
   const last = useRef<string | undefined>(undefined)
@@ -322,6 +371,8 @@ async function syncPhotoMeta(rollId: string, toast: (m: string) => void) {
   const n = await refreshRollPhotoMeta(rollId)
   if (!n) return
   const drive = driveConnected()
-  toast(drive ? `사진 정보도 바꿨어요 (${n}장). 드라이브에도 새로 올려요` : `사진 정보도 바꿨어요 (${n}장)`)
+  // 갤러리에 저장해 둔 사진도 새 정보의 사진으로 바꿔 넣는다
+  const g = await replaceInGallery(await rollImageFiles(rollId)).catch(() => 0)
+  toast(`사진 정보도 바꿨어요 (${n}장)${g ? ` · 갤러리 ${g}장도 바꿨어요` : ''}${drive ? '. 드라이브에도 새로 올려요' : ''}`)
   if (drive) void syncPhotosToDrive(undefined, false).catch(() => {})
 }

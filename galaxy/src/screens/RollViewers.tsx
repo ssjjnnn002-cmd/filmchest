@@ -197,7 +197,7 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
               <RoundBtn icon="download" label="이 사진 갤러리에 저장" onPress={async () => {
                 const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase()
                 const name = `${String(frame.index).padStart(2, '0')}.${ext}`
-                const r = await saveImagesToGallery([{ uri: await rotatedFile(original.blob, frame.rotation, frame.id), name }])
+                const r = await saveImagesToGallery([{ uri: await rotatedFile(original.blob, frame.rotation, frame.id), name, key: frame.id }])
                 nav.toast(r.saved ? '갤러리에 저장했어요' : r.denied ? '사진 저장을 허용해 주세요' : '갤러리에 저장하지 못했어요')
               }} />
             ) : null}
