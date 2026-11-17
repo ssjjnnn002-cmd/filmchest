@@ -303,7 +303,7 @@ function RecordDials({ dial, onChange, onLocked, iso }: { dial: Dial; onChange: 
   // 보정하면: 실제로 맞춘 감도와 밝게/어둡게 (보정은 감도를 바꿔 다는 것과 같다)
   const ISOS = [25, 32, 40, 50, 64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400]
   const comp = dial.fullAuto ? 0 : COMPS[dial.c]
-  const compNote = comp ? `ISO ${ISOS[nearest(ISOS, iso / Math.pow(2, comp))]}\n${comp > 0 ? '밝게' : '어둡게'}` : undefined
+  const compNote = comp ? `ISO ${ISOS[nearest(ISOS, iso / Math.pow(2, comp))]}\n${comp > 0 ? '더 밝게' : '더 어둡게'}` : undefined
   const sh = dialOf.shutter(dial), ap = dialOf.aperture(dial)
   const accentS = new Set(dial.stops.map((v, i) => (v <= 0 ? i : -1)).filter((i) => i >= 0))
   return (

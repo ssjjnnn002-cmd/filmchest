@@ -412,7 +412,7 @@ struct CompDial: View {
         let c = MeterMath.comps[index]
         guard !disabled, c != 0 else { return nil }
         let eff = MeterMath.isoList[MeterMath.nearest(MeterMath.isoList, iso / pow(2, c))]
-        return "ISO \(MeterMath.trim(eff))\n\(c > 0 ? "밝게" : "어둡게")"
+        return "ISO \(MeterMath.trim(eff))\n\(c > 0 ? "더 밝게" : "더 어둡게")"
     }
     var body: some View {
         TopDial(title: note ?? "노출 보정", labels: MeterMath.comps.map { $0 == 0 ? "0" : $0 == $0.rounded() ? MeterMath.fmtC($0) : "·" }, index: $index, size: 88,
