@@ -405,9 +405,12 @@ private struct FilmGearCard: View {
     let lot: FilmLotItem
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            FilmCanisterView(stock: FilmStockCatalog.stock(id: lot.filmStockID), format: lot.format)
-                .frame(height: 96)
+            // 상자 그림을 썸네일처럼 칸 너비에 꽉 채운다 (상자 비율 1.6 : 1, 모든 칸 같은 높이)
+            Color.clear
+                .aspectRatio(1.6, contentMode: .fit)
                 .frame(maxWidth: .infinity)
+                .overlay { FilmCanisterView(stock: FilmStockCatalog.stock(id: lot.filmStockID), format: lot.format, fill: true) }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             // 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게)
             VStack(alignment: .leading, spacing: 1) {
                 let stock = FilmStockCatalog.stock(id: lot.filmStockID)

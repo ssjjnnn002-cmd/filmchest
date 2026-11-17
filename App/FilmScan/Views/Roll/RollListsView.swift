@@ -704,7 +704,8 @@ struct RollGridCard: View {
                 if let cover {
                     Image(cgImage: cover).resizable().scaledToFill()
                 } else {
-                    FilmCanisterView(stock: roll.film, format: roll.format).padding(14)
+                    // 사진이 없으면 상자 그림을 썸네일처럼 꽉 채운다
+                    FilmCanisterView(stock: roll.film, format: roll.format, fill: true)
                 }
             }
             .frame(height: 104)

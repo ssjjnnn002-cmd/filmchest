@@ -413,7 +413,7 @@ select.input { appearance: none; -webkit-appearance: none; color: var(--muted); 
 .roll-card:active { transform: scale(0.98); }
 .roll-card .thumb { height: 110px; border-radius: 12px; background: var(--film-base); overflow: hidden; display: grid; place-items: center; position: relative; }
 .roll-card .thumb img { width: 100%; height: 100%; object-fit: cover; }
-.roll-card .thumb img.can { width: auto; height: 80%; object-fit: contain; }
+.roll-card .thumb img.can { width: 100%; height: 100%; object-fit: cover; } /* 사진이 없으면 상자 그림을 꽉 채운다 */
 
 .film-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; padding: 10px; }
 .film-pick { border: 2px solid transparent; border-radius: 16px; background: none; padding: 6px 4px; display: grid; gap: 2px; justify-items: center; cursor: pointer; font-size: 12px; line-height: 1.25; text-align: center; min-width: 0; }

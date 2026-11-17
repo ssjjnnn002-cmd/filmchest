@@ -293,13 +293,14 @@ export function Card({ children, style }: { children: ReactNode; style?: ViewSty
 }
 
 /** 필름 통 그림 (웹 canister.ts를 미리 그려 둔 것). 목록에 없는 필름은 색 상자. */
-export function Canister({ film, format = '135', size = 48 }: { film?: FilmStock; format?: FilmFormat; size?: number }) {
+export function Canister({ film, format = '135', size = 48, cover }: { film?: FilmStock; format?: FilmFormat; size?: number; /** 썸네일처럼 칸 너비에 꽉 채운다 (웹과 같음) */ cover?: boolean }) {
   const c = useTheme()
   if (!film) return <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}><Icon name="film" size={size * 0.6} color={c.muted} /></View>
   // 목록에 있는 필름은 미리 그려 둔 상자 그림 (웹과 같은 그림), 직접 만든 필름은 웹 그림을 그 자리에서 그린다
   const pack = filmPack(format)
   const k = pack === 'roll' ? '120' : format === '110' ? '110' : format === 'sheet-45' ? '45' : format === 'sheet-810' ? '810' : pack === 'instant' ? 'inst' : '135'
   const src = canisterShots[`${film.id}-${k}`]
+  if (src && cover) return <Image source={src} resizeMode="cover" style={{ width: '100%', aspectRatio: 1.6, borderRadius: 8 }} accessibilityLabel={film.name} />
   if (src) return <Image source={src} resizeMode="contain" style={{ width: size, height: size }} accessibilityLabel={film.name} />
   return <DrawnCanister film={film} format={format} size={size} />
 }

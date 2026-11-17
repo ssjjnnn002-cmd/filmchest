@@ -213,7 +213,7 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
         const late = !!lot.expiresAt && lot.expiresAt < Date.now()
         return (
           <Pressable key={lot.id} onPress={() => setEdit(lot.id)} style={grid ? { ...card, alignItems: 'flex-start' } : row}>
-            <Canister film={film} format={lot.format} size={grid ? 96 : 52} />
+            {grid ? <Canister film={film} format={lot.format} cover /> : <Canister film={film} format={lot.format} size={52} />}
             <View style={{ flex: grid ? undefined : 1, gap: 2, alignSelf: 'stretch' }}>
               {/* 바둑판: 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게, 웹·아이폰과 같음) */}
               {grid ? <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: c.muted, lineHeight: 15 }}>{film?.brand || ' '}</Text> : null}

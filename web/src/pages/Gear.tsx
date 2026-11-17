@@ -209,7 +209,7 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
         const late = !!lot.expiresAt && lot.expiresAt < Date.now()
         return (
           <button key={lot.id} className={grid ? 'card' : 'row'} onClick={() => setEdit(lot.id)} style={{ textAlign: 'left' }}>
-            <Canister film={film} format={lot.format} size={grid ? 96 : 52} />
+            {grid ? <Canister film={film} format={lot.format} cover /> : <Canister film={film} format={lot.format} size={52} />}
             <span className="grow">
               {/* 바둑판: 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게, 아이폰과 같음) */}
               {grid && <small className="lot-brand">{film?.brand || '\u00a0'}</small>}

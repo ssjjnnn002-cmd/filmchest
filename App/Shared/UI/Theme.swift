@@ -38,13 +38,15 @@ extension Image {
 struct FilmCanisterView: View {
     let stock: FilmStock?
     var format: FilmFormat = .f135
+    /// 칸을 꽉 채운다 (썸네일처럼, 넘치는 가장자리는 잘림)
+    var fill = false
 
     @State private var image: CGImage?
 
     var body: some View {
         Group {
             if let image {
-                Image(cgImage: image).resizable().scaledToFit()
+                Image(cgImage: image).resizable().aspectRatio(contentMode: fill ? .fill : .fit)
             } else if stock != nil {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
