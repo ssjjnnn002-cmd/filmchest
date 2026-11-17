@@ -3,6 +3,8 @@ import SwiftData
 import FilmScanCore
 
 struct RollDetailView: View {
+    /// 노출 탭: 상세 기록을 남긴 롤이면 보인다 (노출계는 보류)
+    private var showExposure: Bool { Features.meter || !roll.meterShots.isEmpty }
     @Bindable var roll: RollItem
     @Environment(Router.self) private var router
     @Environment(\.modelContext) private var context
@@ -104,7 +106,7 @@ struct RollDetailView: View {
             TagField(tags: Binding(get: { roll.tags }, set: { roll.tags = $0 }))
                 .disabled(showDropOff)
 
-            if Features.meter {
+            if showExposure {
             Section {
                 Picker("보기", selection: $detailTab) {
                     ForEach(DetailTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -115,7 +117,7 @@ struct RollDetailView: View {
             }
             }
 
-            if Features.meter && detailTab == .meter {
+            if showExposure && detailTab == .meter {
                 meterSummary
                 meterShots
             } else if roll.status == .imported, !(roll.frames ?? []).isEmpty {
@@ -151,7 +153,7 @@ struct RollDetailView: View {
                 }
             }
 
-            if !Features.meter || detailTab == .log {
+            if !showExposure || detailTab == .log {
             Section {
                 ForEach(roll.sortedDays) { day in
                     Button { editingDay = day } label: {

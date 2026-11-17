@@ -6,7 +6,6 @@ import type { Roll } from '../core/types'
 import { CameraCover, cameraName, Canister, Icon, PageHeader, fmtDay, rollCameraFormat, rollFilm, rollFilmName, sortedLocations } from '../ui/common'
 import { LabDropOff, PlaceEdit } from './Editors'
 import { ManualRecord } from './ManualRecord'
-import { useMeterOn } from '../core/devMode'
 import { SettingsButton } from './Settings'
 
 export function Shooting() {
@@ -39,7 +38,6 @@ function LoadedCard({ roll }: { roll: Roll }) {
   const [placing, setPlacing] = useState(false)
   const [dropOff, setDropOff] = useState(false)
   const [meter, setMeter] = useState(false)
-  const meterOn = useMeterOn()
   const places = sortedLocations(roll).map((l) => l.name).filter(Boolean).join(' → ')
   return (
     <div className="card shooting-card">
@@ -58,7 +56,7 @@ function LoadedCard({ roll }: { roll: Roll }) {
       </button>
       <div className="shooting-actions">
         {roll.locations.length === 0 && <button className="btn soft" onClick={() => setPlacing(true)}><Icon name="pin" size={18} /> 장소 추가</button>}
-        {meterOn && <button className="btn soft" onClick={() => setMeter(true)}>상세 기록</button>}
+        <button className="btn soft" onClick={() => setMeter(true)}>상세 기록</button>
         <button className="btn primary" onClick={() => setDropOff(true)}>촬영 끝내기</button>
       </div>
       {placing && <PlaceEdit roll={roll} onClose={() => setPlacing(false)} />}

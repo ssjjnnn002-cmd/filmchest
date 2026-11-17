@@ -38,7 +38,9 @@ export function RollDetail({ id }: { id: string }) {
   const [tab, setTab] = useState<'log' | 'meter' | null>(null)
 
   if (!roll) return null
-  const view = meterOn ? tab ?? 'log' : 'log'
+  // 노출 탭: 상세 기록을 남긴 롤이면 (노출계는 보류)
+  const showExposure = meterOn || (roll.meterShots?.length ?? 0) > 0
+  const view = showExposure ? tab ?? 'log' : 'log'
   const locs = sortedLocations(roll)
   const rangeOf = (i: number) => {
     const s = locs[i].startFrame
@@ -84,7 +86,7 @@ export function RollDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      {meterOn && <div className="segmented" role="tablist" aria-label="롤 내용" style={{ margin: '8px 0 4px' }}>
+      {showExposure && <div className="segmented" role="tablist" aria-label="롤 내용" style={{ margin: '8px 0 4px' }}>
         <button role="tab" aria-selected={view === 'log'} className={view === 'log' ? 'on' : ''} onClick={() => setTab('log')}>기록</button>
         <button role="tab" aria-selected={view === 'meter'} className={view === 'meter' ? 'on' : ''} onClick={() => setTab('meter')}>노출</button>
       </div>}

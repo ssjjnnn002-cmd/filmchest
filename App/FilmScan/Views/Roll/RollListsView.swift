@@ -126,7 +126,6 @@ struct RollQuickActions: View {
     var onMeter: () -> Void = {}
     var onDropOff: () -> Void
     @State private var showPlace = false
-    @AppStorage("devMode") private var devMode = false
 
     /// 촬영일 추가는 롤 화면에서. 장소가 이미 있으면 촬영 끝내기만.
     /// 촬영 끝내기는 현상 맡기기 창으로 이어진다. 닫으면 촬영 완료로 남긴다.
@@ -140,15 +139,13 @@ struct RollQuickActions: View {
                     .fixedSize(horizontal: true, vertical: false)
             }
             #if os(iOS)
-            // 장소 추가 · 상세 기록(노출계로 컷마다 기록) · 촬영 끝내기
-            if devMode {
-                Button {
-                    onMeter()
-                } label: {
-                    Text("상세 기록").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
+            // 장소 추가 · 상세 기록(다이얼로 컷마다 기록) · 촬영 끝내기
+            Button {
+                onMeter()
+            } label: {
+                Text("상세 기록").frame(maxWidth: .infinity)
             }
+            .buttonStyle(.bordered)
             Button {
                 onDropOff()
             } label: {

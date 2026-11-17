@@ -416,7 +416,7 @@ struct CompDial: View {
     }
     var body: some View {
         TopDial(title: note ?? "노출 보정", labels: MeterMath.comps.map { $0 == 0 ? "0" : $0 == $0.rounded() ? MeterMath.fmtC($0) : "·" }, index: $index, size: 88,
-                big: disabled || MeterMath.comps[index] == 0 ? "±0" : MeterMath.fmtC(MeterMath.comps[index]), accent: [6], snaps: [6], bigSize: 18, titleColor: note == nil ? .meterSub : .meterOrange,
+                big: disabled || MeterMath.comps[index] == 0 ? "±0" : MeterMath.fmtC(MeterMath.comps[index]), accent: [6], snaps: [6], bigSize: 18, titleColor: note == nil ? .meterSub : Color(white: 0.86),
                 disabled: disabled, onDisabledTap: onLocked)
             .frame(width: 96)
     }
