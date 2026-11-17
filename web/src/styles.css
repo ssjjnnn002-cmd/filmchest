@@ -911,3 +911,7 @@ body:has(.mr-overlay) .sheet-root, body:has(.mr-overlay) .alert-backdrop { z-ind
 .chip.small { height: 32px; padding: 0 12px; font-size: 14px; }
 .film-pick-bar .chip:not(.active) { box-shadow: none; background: var(--fill); }
 .chip-gap { flex: 0 0 1px; align-self: stretch; margin: 4px 4px; background: var(--line, rgba(128,128,128,.3)); }
+
+/* 필름 상자 그림 글꼴 (Archivo, OFL — public/fonts/Archivo-OFL.txt). 폭 62~125 · 굵기 100~900 */
+@font-face { font-family: 'FilmBox Archivo'; src: url('/fonts/Archivo.ttf') format('truetype'); font-weight: 100 900; font-stretch: 62% 125%; font-style: normal; font-display: block; }
+@font-face { font-family: 'FilmBox Archivo'; src: url('/fonts/Archivo-Italic.ttf') format('truetype'); font-weight: 100 900; font-stretch: 62% 125%; font-style: italic; font-display: block; }

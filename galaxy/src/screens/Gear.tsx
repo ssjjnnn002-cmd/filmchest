@@ -509,7 +509,8 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
         </Section>
       ) : null}
       {!fixedFilm ? (
-        <FilmPicker format={format} filmId={filmId || undefined} onPick={setFilmId}
+        <FilmPicker format={format} anyFormat filmId={filmId || undefined}
+          onPick={(id, f) => { setFilmId(id); if (f) setFormat(f) }}
           onAddCustom={() => setCustomEdit('new')} onEditCustom={(id) => setCustomEdit(custom.find((r) => r.id === id) ?? null)}
           footer={lot && filmId && !filmById(filmId) ? <Footnote>목록에서 찾을 수 없는 필름이에요. 그대로 저장해도 되고, 다시 고를 수 있어요.</Footnote> : null} />
       ) : null}

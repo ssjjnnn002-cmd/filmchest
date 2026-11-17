@@ -51,7 +51,7 @@ struct FilmCanisterView: View {
                 Image(systemName: "film").resizable().scaledToFit().padding(20).foregroundStyle(.secondary)
             }
         }
-        .task(id: stock.map { "\($0.id)|\($0.name)|\($0.iso)|\($0.style.body)" }) {
+        .task(id: stock.map { "\($0.id)|\($0.name)|\($0.iso)|\($0.style.body)|\(format.rawValue)" }) {
             guard let stock else { return }
             if let hit = CanisterCache.cached(stock, format: format) { image = hit; return }
             image = await CanisterCache.render(stock, format: format)
@@ -67,7 +67,28 @@ enum CanisterCache {
         "\(stock.id)|\(stock.name)|\(stock.iso)|\(stock.style.body)|\(format.rawValue)" as NSString
     }
 
-    static func cached(_ stock: FilmStock, format: FilmFormat) -> CGImage? { cache.object(forKey: key(stock, format)) }
+    static func cached(_ stock: FilmStock, format: FilmFormat) -> CGImage? {
+        cache.object(forKey: key(stock, format)) ?? bundledBox(stock, format: format)
+    }
+
+    /// 목록에 있는 필름은 웹과 같은 상자 그림(PNG, scripts/render-film-boxes.mjs)을 쓴다. 직접 만든 필름은 없어서 그린다
+    private static func bundledBox(_ stock: FilmStock, format: FilmFormat) -> CGImage? {
+        #if canImport(UIKit)
+        let k: String
+        switch format {
+        case .f110: k = "110"
+        case .sheet45: k = "45"
+        case .sheet810: k = "810"
+        case .instaxMini, .instaxSquare, .instaxWide, .polaroid: k = "inst"
+        default: k = format.is120 ? "120" : "135"
+        }
+        guard let image = UIImage(named: "filmbox-\(stock.id)-\(k)")?.cgImage else { return nil }
+        cache.setObject(image, forKey: key(stock, format))
+        return image
+        #else
+        return nil
+        #endif
+    }
 
     static func render(_ stock: FilmStock, format: FilmFormat) async -> CGImage? {
         if let hit = cached(stock, format: format) { return hit }

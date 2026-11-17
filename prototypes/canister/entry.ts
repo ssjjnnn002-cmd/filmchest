@@ -1,6 +1,6 @@
 import { films } from '../../web/src/core/films'
 import { canisterURL } from '../../web/src/core/canister'
-import { drawBox, tplOf } from './box'
+import { drawBox } from './box'
 
 type St = (typeof films)[number]
 const pick = ['kodak-portra-400', 'kodak-gold-200', 'kodak-ektar-100', 'kodak-trix-400', 'fuji-c200', 'ilford-hp5-plus',
@@ -27,7 +27,7 @@ function render() {
     el.className = 'card'
     el.innerHTML = `<div class="pair"><figure><img src="${canisterURL(st, f as never, 360)}"><figcaption>지금</figcaption></figure>
       <figure class="new"><img src="${png(st, 360, f)}"><figcaption>새 시안</figcaption></figure></div>
-      <div class="small"><img src="${canisterURL(st, f as never, 360)}"><img src="${png(st, 252, f)}"></div><b>${st.brand} ${st.name}</b><small>${tplOf(st)}</small>`
+      <div class="small"><img src="${canisterURL(st, f as never, 360)}"><img src="${png(st, 252, f)}"></div><b>${st.brand} ${st.name}</b>`
     grid.appendChild(el)
   }
   const all = document.getElementById('all')!

@@ -1,5 +1,5 @@
 // 묶어 보기 (내 장비 카메라·필름 재고, 필름 고르기 '더보기', 카메라 목록). 아이폰 GearGrouping.swift와 같은 이름·순서
-import type { BodyStyle, Camera, FilmLot } from './types'
+import type { BodyStyle, Camera, FilmFormat, FilmLot } from './types'
 import { formatFamily, styleName } from './types'
 import type { FilmStock } from './films'
 import { filmById, filmDisplayName } from './films'
@@ -57,14 +57,29 @@ export function filmKey(f: FilmStock, g: GearGroup): Key {
   return { sort: '', title: '' }
 }
 
-/** 필름 고르기(장착·재고 추가 '더보기'): 필름 재고 탭과 같은 정렬(알파벳·재고량·자주 사용, 오름/내림)과 묶기.
- *  stock = 필름 id → 재고 롤 수, used = 필름 id → 쓴 롤 수 */
+/** 필름 고르기 한 칸. format이 있으면 그 규격으로 보여 주고 고른다 (규격으로 묶을 때) */
+export interface FilmPickItem { film: FilmStock; format?: FilmFormat }
+
+/** 필름 고르기(장착·재고 추가 '더보기'): 묶기(브랜드·ISO·종류·규격)가 1순위, 그 안에서 정렬(알파벳·재고량·자주 사용, 오름/내림).
+ *  규격으로 묶으면 35mm·120처럼 여러 규격으로 나오는 필름은 규격마다 한 칸씩. stock = 필름 id → 재고 롤 수, used = 필름 id → 쓴 롤 수 */
 export function filmPickSections(list: FilmStock[], g: GearGroup, by: FilmLotSort, desc: boolean,
-  stock: Record<string, number>, used: Record<string, number>): { title?: string; items: FilmStock[] }[] {
+  stock: Record<string, number>, used: Record<string, number>): { title?: string; items: FilmPickItem[] }[] {
   const name = (f: FilmStock) => filmDisplayName(f).toLowerCase()
   const key = (f: FilmStock) => (by === 'count' ? stock[f.id] ?? 0 : by === 'usage' ? used[f.id] ?? 0 : 0)
   const asc = [...list].sort((a, b) => key(a) - key(b) || name(a).localeCompare(name(b)) || a.iso - b.iso)
-  return groupSections(desc ? asc.reverse() : asc, (f) => filmKey(f, g))
+  const sorted = desc ? asc.reverse() : asc
+  if (g === 'format') {
+    const items: FilmPickItem[] = []
+    for (const film of sorted) {
+      const seen = new Set<string>()
+      for (const f of film.formats) {
+        const t = formatFamily(f).title
+        if (!seen.has(t)) { seen.add(t); items.push({ film, format: f }) }
+      }
+    }
+    return groupSections(items, (x) => formatFamily(x.format!))
+  }
+  return groupSections(sorted.map((film) => ({ film })), (x) => filmKey(x.film, g))
 }
 
 export function lotKey(l: FilmLot, g: GearGroup): Key {

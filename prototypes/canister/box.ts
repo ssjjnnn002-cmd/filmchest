@@ -1,8 +1,10 @@
-// 필름 상자 정면 시안 (평면, 가로 1.6 : 1 — 35mm 상자 정면 약 60×38mm).
+// 필름 상자 정면 그림 (평면, 가로 1.6 : 1 — 35mm 상자 정면 약 60×38mm). 아이폰·갤럭시는 이 그림을 미리 PNG로 뽑아 쓴다 (scripts/render-film-boxes.mjs).
 // 종류마다 실제 상자 정면의 글씨 배치·색 배치·분위기를 따르되, 로고·글꼴은 쓰지 않고 무료 글꼴(Archivo, 폭 62~125)로 새로 쓴다.
 import type { FilmStock } from '../../web/src/core/films'
 
-const F = '"Archivo", "Helvetica Neue", Arial, sans-serif'
+/** 무료 글꼴 Archivo (public/fonts, OFL). 폭 62~125 · 굵기 100~900 */
+export const FILM_BOX_FONT = 'FilmBox Archivo'
+const F = `"${FILM_BOX_FONT}", "Archivo", "Helvetica Neue", Arial, sans-serif`
 type Ctx = CanvasRenderingContext2D
 type Opt = { size: number; weight?: number; wdth?: number; color: string; maxW?: number; align?: CanvasTextAlign; italic?: boolean; track?: number; base?: CanvasTextBaseline; stroke?: string }
 
@@ -82,9 +84,24 @@ function consumerStripe(ctx: Ctx, b: Box, bg: string, stripe: string, nameInk: s
   rect(ctx, stripe, b.x, b.y + b.h * 0.3, b.w, b.h * 0.4)
   const [lx] = P(b, 0.06, 0)
   t(ctx, b.st.brand, lx, b.y + b.h * 0.2, { size: b.h * 0.13, weight: 900, color: accent })
-  t(ctx, nameOnly(b.st).toUpperCase(), lx, b.y + b.h * 0.62, { size: b.h * 0.3, weight: 900, wdth: 100, color: nameInk, stroke: accent, maxW: b.w * 0.62 })
-  t(ctx, String(b.st.iso), b.x + b.w * 0.94, b.y + b.h * 0.63, { size: b.h * 0.28, weight: 900, wdth: 80, color: nameInk, align: 'right' })
+  const isoW = t(ctx, String(b.st.iso), b.x + b.w * 0.94, b.y + b.h * 0.63, { size: b.h * 0.28, weight: 900, wdth: 80, color: nameInk, align: 'right' })
+  t(ctx, nameOnly(b.st).toUpperCase(), lx, b.y + b.h * 0.62, { size: b.h * 0.3, weight: 900, wdth: 100, color: nameInk, stroke: accent, maxW: b.w * 0.88 - isoW - b.h * 0.1 })
   t(ctx, `${b.fmt}  ·  ${b.st.process}`, lx, b.y + b.h * 0.9, { size: b.h * 0.08, weight: 700, color: ink })
+}
+
+/** 코닥 일상용 상자 (위 노랑에 빨간 브랜드·감도, 아래 색 면에 흰 이름, 경계는 살짝 휘게) */
+function kodakConsumer(ctx: Ctx, b: Box, bottom: string, tagline: string[]) {
+  rect(ctx, '#F7C600', b.x, b.y, b.w, b.h)
+  rect(ctx, bottom, b.x, b.y + b.h * 0.46, b.w, b.h * 0.54)
+  const lx = b.x + b.w * 0.06, rx = b.x + b.w * 0.94
+  t(ctx, b.st.brand, lx, b.y + b.h * 0.3, { size: b.h * 0.22, weight: 900, wdth: 100, color: '#D21F1B' })
+  t(ctx, 'EXP.', rx, b.y + b.h * 0.17, { size: b.h * 0.055, weight: 700, color: '#1a1a1a', align: 'right' })
+  t(ctx, '36', rx - b.h * 0.15, b.y + b.h * 0.17, { size: b.h * 0.11, weight: 700, wdth: 85, color: '#1a1a1a', align: 'right' })
+  t(ctx, String(b.st.iso), rx, b.y + b.h * 0.3, { size: b.h * 0.12, weight: 700, wdth: 85, color: '#1a1a1a', align: 'right' })
+  t(ctx, nameOnly(b.st), lx, b.y + b.h * 0.76, { size: b.h * 0.3, weight: 500, wdth: 82, color: '#ffffff', maxW: b.w * 0.86 })
+  tagline.forEach((line, i) => t(ctx, line, lx, b.y + b.h * (tagline.length === 1 ? 0.9 : 0.85 + i * 0.075), { size: b.h * 0.055, weight: 700, color: '#ffffff', maxW: b.w * 0.62 }))
+  t(ctx, 'CONT.', rx, b.y + b.h * 0.85, { size: b.h * 0.05, weight: 600, color: '#F7C600', align: 'right' })
+  t(ctx, `1 ${b.fmt}`, rx, b.y + b.h * 0.92, { size: b.h * 0.05, weight: 600, color: '#F7C600', align: 'right' })
 }
 
 /** 흰 바탕 + 초록 아래 + 빨간 이름 딱지 (일상용 Fuji 느낌) */
@@ -198,7 +215,7 @@ function instantBox(ctx: Ctx, b: Box, bg: string, band: string, ink: string) {
 
 const KY = '#F6C000', KP = '#9B6CB6'
 function paint(ctx: Ctx, b: Box) {
-  const st = b.st, s = st.style, id = st.id, n = st.name
+  const st = b.st, s = st.style, id = st.id
   if (/portra/.test(id)) return proWide(ctx, b, id.includes('800') ? '#B8732E' : id.includes('160') ? '#C9A3D8' : KP, KY, '#ffffff', '#1a1a1a')
   if (/ektacolor|kodak-proimage/.test(id)) return proWide(ctx, b, s.band, KY, '#ffffff', '#1a1a1a')
   if (/ektar/.test(id)) return darkCenter(ctx, b, '#5A1A1E', KY, '#f3e6d8', '#B0161E')
@@ -207,6 +224,14 @@ function paint(ctx: Ctx, b: Box) {
   if (/tmax|plus-x/.test(id)) return bwCode(ctx, b, KY, s.band, '#C8102E', id.includes('plus-x') ? 'PX' : id.includes('p3200') ? 'TMZ' : st.iso === 100 ? 'TMX' : 'TMY')
   if (id === 'kodak-bw400cn') return bwCode(ctx, b, '#f4efe4', '#1a1a1a', '#C8102E', 'CN')
   if (/vision3|double-x|cinestill/.test(id)) return cineBig(ctx, b, st.brand === 'CineStill' ? (s.band === '#D7262E' ? '#D7262E' : s.band) : '#232323', '#ffffff', '#111111')
+  // 코닥 일상용: 모두 같은 틀 (위 노랑 + 아래 색 면에 흰 이름), 색과 문구만 다르다
+  const kc: Record<string, [string, string[]]> = {
+    'kodak-gold-200': ['#B4389F', ['FILM FOR COLOR PRINTS']], 'kodak-gold-100': ['#B4389F', ['FILM FOR COLOR PRINTS']],
+    'kodak-colorplus-200': ['#E0241B', ['FILM • FILME', 'PELÍCULA PARA FOTOS A COLOR']],
+    'kodak-ultramax-400': ['#1F5FB5', ['FILM FOR COLOR PRINTS']], 'kodak-max-800': ['#1B1B1B', ['FILM FOR COLOR PRINTS']],
+    'kodak-kodacolor-100': ['#E87722', ['FILM FOR COLOR PRINTS']], 'kodak-kodacolor-200': ['#2E8B57', ['FILM FOR COLOR PRINTS']],
+  }
+  if (kc[id]) return kodakConsumer(ctx, b, kc[id][0], kc[id][1])
   if (st.brand === 'Kodak') return consumerStripe(ctx, b, KY, s.band, KY, '#1a1a1a', '#C8102E')
   if (st.brand === 'Fujifilm') {
     if (st.process === 'E-6') return slidePanel(ctx, b, s.body, s.band === '#F5F5F2' ? s.body : s.band, '#ffffff', '#1a1a1a')
@@ -225,14 +250,13 @@ function paint(ctx: Ctx, b: Box) {
   // 그 밖의 컬러: 꽉 찬 바탕 + 넓은 이름
   const bg = /F5F5F2|F4EFE4|EDEDED/i.test(s.body) ? s.band : s.body
   return boldWide(ctx, b, bg, '#ffffff', /F5F5F2|FFFFFF/i.test(s.bandText) && bg === s.band ? '#ffffff' : s.bandText === bg ? '#ffffff' : s.bandText)
-  void n
 }
 
 /** 정사각 칸 가운데 가로 1.6 : 1 상자 정면 */
 export function drawBox(ctx: Ctx, st: FilmStock, S: number, format = '135') {
   const w = S * 0.94, h = w / 1.6
   const x = (S - w) / 2, y = (S - h) / 2
-  const fmt = format.startsWith('120') ? '120' : format === '110' ? '110' : format.startsWith('sheet') ? '4×5' : format.startsWith('instax') || format === 'polaroid' ? '' : '135-36'
+  const fmt = boxFormatText(format)
   ctx.fillStyle = 'rgba(0,0,0,0.14)'
   ctx.beginPath(); ctx.roundRect(x + S * 0.01, y + S * 0.012, w, h, S * 0.008); ctx.fill()
   ctx.save()
@@ -243,4 +267,5 @@ export function drawBox(ctx: Ctx, st: FilmStock, S: number, format = '135') {
   ctx.beginPath(); ctx.roundRect(x, y, w, h, S * 0.008); ctx.stroke()
 }
 
-export const tplOf = (st: FilmStock) => st.id
+/** 상자에 적는 규격 글씨 (같은 글씨면 같은 그림) */
+export const boxFormatText = (format: string) => format.startsWith('120') ? '120' : format === '110' ? '110' : format === 'sheet-810' ? '8×10' : format.startsWith('sheet') ? '4×5' : format.startsWith('instax') || format === 'polaroid' ? '' : '135-36'

@@ -82,8 +82,15 @@ startFolderAutoBackup()
 // 예전 불러오기로 둘이 된 장비·롤(대소문자만 다른 id)을 하나로 합친다
 void import('./core/backupMerge').then(async (m) => m.dedupeCaseIds((await import('./db')).db as unknown as Parameters<typeof m.dedupeCaseIds>[0])).catch(() => {})
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// 필름 상자 그림은 글꼴이 있어야 바르게 그려진다 (그림을 한 번 만들면 다시 쓰므로 먼저 불러 둔다, 오래 걸리면 그냥 시작)
+const filmFont = Promise.all([
+  document.fonts.load("900 20px 'FilmBox Archivo'"),
+  document.fonts.load("italic 900 20px 'FilmBox Archivo'"),
+]).catch(() => undefined)
+void Promise.race([filmFont, new Promise((r) => setTimeout(r, 2000))]).then(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+})
