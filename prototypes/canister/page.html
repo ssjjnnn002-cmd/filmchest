@@ -1,0 +1,28 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>필름 상자 시안</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F2F0EA;--card:#FBFAF7;--ink:#1d1b18;--muted:#8a857c;--accent:#E0552F}
+@media (prefers-color-scheme:dark){:root{--bg:#131211;--card:#1f1d1b;--ink:#f2efe9;--muted:#9a948a}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,"Pretendard",sans-serif;padding:20px 16px 60px}
+h1{font-size:26px;margin:0 0 4px}p{color:var(--muted);margin:0 0 14px}
+.seg{display:inline-flex;background:rgba(128,120,110,.15);border-radius:999px;padding:3px;margin-bottom:16px}
+.seg label{padding:6px 16px;border-radius:999px;cursor:pointer}.seg input{display:none}.seg input:checked+span{color:#fff}
+.seg label:has(input:checked){background:var(--accent);color:#fff}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{background:var(--card);border-radius:18px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.pair{display:flex;gap:6px}figure{margin:0;flex:1;text-align:center}figure img{width:100%;max-width:170px}
+figcaption{font-size:12px;color:var(--muted)}figure.new figcaption{color:var(--accent);font-weight:600}
+.small{display:flex;gap:10px;align-items:center;justify-content:center;margin:6px 0}.small img{width:84px;height:84px}
+.card small{display:block;text-align:center;color:var(--muted);font-size:11px}
+#all{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}#all figure img{width:96px;height:96px}#all figcaption{font-size:11px;line-height:1.25}
+.card b{display:block;text-align:center;font-size:14px}
+</style></head><body>
+<h1>필름 상자 시안 (평면)</h1>
+<p>왼쪽은 지금 앱 그림, 오른쪽이 새 시안(상자 앞면)이에요. 작은 두 개는 실제 목록 크기(84)예요. 실제 상자를 베끼지 않고 종류마다 색 배치·글씨 느낌만 살렸어요. 아직 앱에는 넣지 않았어요.</p>
+<div class="seg"><label><input type="radio" name="fmt" value="135" checked><span>35mm</span></label><label><input type="radio" name="fmt" value="120"><span>120</span></label></div>
+<div id="grid"></div>
+<h2 style="margin:28px 0 8px;font-size:20px">전체 목록 (실제 크기)</h2>
+<div id="all"></div>
+<script>/*BUNDLE*/</script>
+</body></html>

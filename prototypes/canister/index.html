@@ -1,0 +1,819 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>필름 상자 시안</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F2F0EA;--card:#FBFAF7;--ink:#1d1b18;--muted:#8a857c;--accent:#E0552F}
+@media (prefers-color-scheme:dark){:root{--bg:#131211;--card:#1f1d1b;--ink:#f2efe9;--muted:#9a948a}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,"Pretendard",sans-serif;padding:20px 16px 60px}
+h1{font-size:26px;margin:0 0 4px}p{color:var(--muted);margin:0 0 14px}
+.seg{display:inline-flex;background:rgba(128,120,110,.15);border-radius:999px;padding:3px;margin-bottom:16px}
+.seg label{padding:6px 16px;border-radius:999px;cursor:pointer}.seg input{display:none}.seg input:checked+span{color:#fff}
+.seg label:has(input:checked){background:var(--accent);color:#fff}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{background:var(--card);border-radius:18px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.pair{display:flex;gap:6px}figure{margin:0;flex:1;text-align:center}figure img{width:100%;max-width:170px}
+figcaption{font-size:12px;color:var(--muted)}figure.new figcaption{color:var(--accent);font-weight:600}
+.small{display:flex;gap:10px;align-items:center;justify-content:center;margin:6px 0}.small img{width:84px;height:84px}
+.card small{display:block;text-align:center;color:var(--muted);font-size:11px}
+#all{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}#all figure img{width:96px;height:96px}#all figcaption{font-size:11px;line-height:1.25}
+.card b{display:block;text-align:center;font-size:14px}
+</style></head><body>
+<h1>필름 상자 시안 (평면)</h1>
+<p>왼쪽은 지금 앱 그림, 오른쪽이 새 시안(상자 앞면)이에요. 작은 두 개는 실제 목록 크기(84)예요. 실제 상자를 베끼지 않고 종류마다 색 배치·글씨 느낌만 살렸어요. 아직 앱에는 넣지 않았어요.</p>
+<div class="seg"><label><input type="radio" name="fmt" value="135" checked><span>35mm</span></label><label><input type="radio" name="fmt" value="120"><span>120</span></label></div>
+<div id="grid"></div>
+<h2 style="margin:28px 0 8px;font-size:20px">전체 목록 (실제 크기)</h2>
+<div id="all"></div>
+<script>(() => {
+  // src/core/filmData.ts
+  var moreFilmRows = [
+    ["kodak-proimage-100", "Kodak", "Pro Image 100", 100, "C-41", ["135"], ["#FDB913", "#D2232A", "#1B1B1B", "#FFFFFF"]],
+    ["kodak-kodacolor-100", "Kodak", "Kodacolor 100", 100, "C-41", ["135"], ["#FDB913", "#E87722", "#1B1B1B", "#FFFFFF"]],
+    ["kodak-kodacolor-200", "Kodak", "Kodacolor 200", 200, "C-41", ["135"], ["#FDB913", "#2E8B57", "#1B1B1B", "#FFFFFF"]],
+    ["kodak-tmax-p3200", "Kodak", "T-Max P3200", 3200, "B&W", ["135"], ["#FDB913", "#5A2D82", "#1B1B1B", "#FFFFFF"]],
+    ["kodak-double-x", "Kodak", "Double-X 5222", 250, "B&W", ["135"], ["#2A2A2A", "#9A9A9A", "#F2F2F2", "#1B1B1B"]],
+    ["kodak-vision3-50d", "Kodak", "Vision3 50D", 50, "ECN-2", ["135"], ["#2A2A2A", "#F2C94C", "#F2F2F2", "#1B1B1B"]],
+    ["kodak-vision3-200t", "Kodak", "Vision3 200T", 200, "ECN-2", ["135"], ["#2A2A2A", "#5BA3E0", "#F2F2F2", "#1B1B1B"]],
+    ["kodak-portra-160nc", "Kodak", "Portra 160NC", 160, "C-41", ["135", "120-66"], ["#F4EFE4", "#C98B3A", "#3A2E22", "#FFFFFF"]],
+    ["kodak-portra-160vc", "Kodak", "Portra 160VC", 160, "C-41", ["135", "120-66"], ["#F4EFE4", "#C8102E", "#3A2E22", "#FFFFFF"]],
+    ["kodak-portra-400nc", "Kodak", "Portra 400NC", 400, "C-41", ["135", "120-66"], ["#F4EFE4", "#B8860B", "#3A2E22", "#FFFFFF"]],
+    ["kodak-portra-400vc", "Kodak", "Portra 400VC", 400, "C-41", ["135", "120-66"], ["#F4EFE4", "#A31F34", "#3A2E22", "#FFFFFF"]],
+    ["kodak-portra-400uc", "Kodak", "Portra 400UC", 400, "C-41", ["135", "120-66"], ["#F4EFE4", "#7B2D8E", "#3A2E22", "#FFFFFF"]],
+    ["kodak-ektar-25", "Kodak", "Ektar 25", 25, "C-41", ["135"], ["#FDB913", "#8B1A1A", "#1B1B1B", "#FFFFFF"]],
+    ["kodak-gold-100", "Kodak", "Gold 100", 100, "C-41", ["135"], ["#FDB913", "#E2231A", "#1B1B1B", "#FFFFFF"]],
+    ["kodak-max-800", "Kodak", "Max 800", 800, "C-41", ["135"], ["#FDB913", "#1B1B1B", "#1B1B1B", "#FDB913"]],
+    ["kodak-ektacolor-pro-160", "Kodak", "Ektacolor Pro 160", 160, "C-41", ["120-66"], ["#F4EFE4", "#6B8E23", "#3A2E22", "#FFFFFF"]],
+    ["kodak-bw400cn", "Kodak", "BW400CN", 400, "C-41", ["135"], ["#F4EFE4", "#1B1B1B", "#1B1B1B", "#FFFFFF"]],
+    ["kodak-plus-x-125", "Kodak", "Plus-X 125", 125, "B&W", ["135", "120-66"], ["#FDB913", "#2E5AA8", "#1B1B1B", "#FFFFFF"]],
+    ["kodak-ektachrome-e100vs", "Kodak", "Ektachrome E100VS", 100, "E-6", ["135", "120-66"], ["#1B1B1B", "#C8102E", "#FFFFFF", "#FFFFFF"]],
+    ["kodak-ektachrome-e100g", "Kodak", "Ektachrome E100G", 100, "E-6", ["135", "120-66"], ["#1B1B1B", "#2E8B57", "#FFFFFF", "#FFFFFF"]],
+    ["kodak-elite-chrome-100", "Kodak", "Elite Chrome 100", 100, "E-6", ["135"], ["#1B1B1B", "#1F4E9C", "#FFFFFF", "#FFFFFF"]],
+    ["fuji-superia-200", "Fujifilm", "Superia 200", 200, "C-41", ["135"], ["#0C8A4B", "#E2231A", "#FFFFFF", "#FFFFFF"]],
+    ["fuji-superia-800", "Fujifilm", "Superia 800", 800, "C-41", ["135"], ["#0C8A4B", "#5A2D82", "#FFFFFF", "#FFFFFF"]],
+    ["fuji-superia-1600", "Fujifilm", "Superia 1600", 1600, "C-41", ["135"], ["#0C8A4B", "#1B1B1B", "#FFFFFF", "#FFFFFF"]],
+    ["fuji-superia-venus-800", "Fujifilm", "Superia Venus 800", 800, "C-41", ["135"], ["#C2185B", "#F5F5F2", "#FFFFFF", "#C2185B"]],
+    ["fuji-superia-reala-100", "Fujifilm", "Superia Reala 100", 100, "C-41", ["135", "120-66"], ["#0C8A4B", "#1F4E9C", "#FFFFFF", "#FFFFFF"]],
+    ["fuji-natura-1600", "Fujifilm", "Natura 1600", 1600, "C-41", ["135"], ["#1B1B1B", "#C9A227", "#F5F5F2", "#1B1B1B", "#111111"]],
+    ["fuji-pro-160ns", "Fujifilm", "Pro 160NS", 160, "C-41", ["135", "120-66"], ["#EDEDED", "#3C9DD9", "#1B1B1B", "#FFFFFF"]],
+    ["fuji-industrial-100", "Fujifilm", "Fujicolor 100 Industrial", 100, "C-41", ["135"], ["#F5F5F2", "#E2231A", "#1B1B1B", "#FFFFFF"]],
+    ["fuji-superia-premium-400", "Fujifilm", "Superia Premium 400", 400, "C-41", ["135"], ["#0C8A4B", "#C9A227", "#FFFFFF", "#1B1B1B"]],
+    ["fuji-neopan-acros-100", "Fujifilm", "Neopan Acros 100", 100, "B&W", ["135", "120-66", "sheet-45", "sheet-810"], ["#1B1B1B", "#C8102E", "#FFFFFF", "#FFFFFF", "#111111"]],
+    ["fuji-neopan-400", "Fujifilm", "Neopan 400", 400, "B&W", ["135", "120-66"], ["#1B1B1B", "#1F4E9C", "#FFFFFF", "#FFFFFF", "#111111"]],
+    ["fuji-neopan-1600", "Fujifilm", "Neopan 1600", 1600, "B&W", ["135"], ["#1B1B1B", "#5A2D82", "#FFFFFF", "#FFFFFF", "#111111"]],
+    ["fuji-velvia-100f", "Fujifilm", "Velvia 100F", 100, "E-6", ["135", "120-66"], ["#7A2A82", "#C9A227", "#FFFFFF", "#1B1B1B"]],
+    ["fuji-astia-100f", "Fujifilm", "Astia 100F", 100, "E-6", ["135", "120-66"], ["#C2185B", "#F5F5F2", "#FFFFFF", "#C2185B"]],
+    ["fuji-sensia-100", "Fujifilm", "Sensia 100", 100, "E-6", ["135"], ["#1E4FA0", "#F2A71B", "#FFFFFF", "#1B1B1B"]],
+    ["fuji-provia-400x", "Fujifilm", "Provia 400X", 400, "E-6", ["135", "120-66"], ["#1E4FA0", "#E2231A", "#FFFFFF", "#FFFFFF"]],
+    ["ilford-sfx-200", "Ilford", "SFX 200", 200, "B&W", ["135", "120-66"], ["#1B1B1B", "#B22222", "#F5F5F2", "#FFFFFF", "#111111"]],
+    ["ilford-ortho-plus", "Ilford", "Ortho Plus 80", 80, "B&W", ["135", "120-66", "sheet-45", "sheet-810"], ["#1B1B1B", "#2E8B57", "#F5F5F2", "#FFFFFF", "#111111"]],
+    ["kentmere-pan-100", "Kentmere", "Pan 100", 100, "B&W", ["135"], ["#F5F5F2", "#1F7A8C", "#1B1B1B", "#FFFFFF"]],
+    ["harman-phoenix-ii-200", "Harman", "Phoenix II 200", 200, "C-41", ["135"], ["#F15A22", "#F5F5F2", "#FFFFFF", "#F15A22"]],
+    ["cinestill-bwxx", "CineStill", "BwXX", 250, "B&W", ["135", "120-66"], ["#1B1B1B", "#9A9A9A", "#FFFFFF", "#1B1B1B", "#111111"]],
+    ["lomo-color-92", "Lomography", "Color '92 400", 400, "C-41", ["135", "120-66"], ["#F4C430", "#E2231A", "#1B1B1B", "#FFFFFF"]],
+    ["lomo-metropolis", "Lomography", "LomoChrome Metropolis", 200, "C-41", ["135", "120-66"], ["#3A3A3A", "#9A9A9A", "#F5F5F2", "#1B1B1B"]],
+    ["lomo-turquoise", "Lomography", "LomoChrome Turquoise", 200, "C-41", ["135", "120-66"], ["#1E9AA0", "#F2A71B", "#FFFFFF", "#1B1B1B"]],
+    ["lomo-redscale-xr", "Lomography", "Redscale XR 50-200", 100, "C-41", ["135", "120-66"], ["#B22222", "#F2A71B", "#FFFFFF", "#1B1B1B"]],
+    ["lomo-earl-grey-100", "Lomography", "Earl Grey 100", 100, "B&W", ["135", "120-66"], ["#8C8C8C", "#1B1B1B", "#FFFFFF", "#FFFFFF"]],
+    ["lomo-lady-grey-400", "Lomography", "Lady Grey 400", 400, "B&W", ["135", "120-66"], ["#B5B5B5", "#E85D9C", "#1B1B1B", "#FFFFFF"]],
+    ["lomo-berlin-kino-400", "Lomography", "Berlin Kino 400", 400, "B&W", ["135", "120-66"], ["#1B1B1B", "#F4C430", "#F5F5F2", "#1B1B1B", "#111111"]],
+    ["lomo-potsdam-kino-100", "Lomography", "Potsdam Kino 100", 100, "B&W", ["135", "120-66"], ["#1B1B1B", "#3C9DD9", "#F5F5F2", "#FFFFFF", "#111111"]],
+    ["lomo-babylon-kino-13", "Lomography", "Babylon Kino 13", 13, "B&W", ["135"], ["#1B1B1B", "#C9A227", "#F5F5F2", "#1B1B1B", "#111111"]],
+    ["rollei-retro-80s", "Rollei", "Retro 80S", 80, "B&W", ["135", "120-66"], ["#C8102E", "#1B1B1B", "#FFFFFF", "#FFFFFF"]],
+    ["rollei-retro-400s", "Rollei", "Retro 400S", 400, "B&W", ["135", "120-66"], ["#C8102E", "#9A9A9A", "#FFFFFF", "#1B1B1B"]],
+    ["rollei-rpx-25", "Rollei", "RPX 25", 25, "B&W", ["135", "120-66"], ["#F5F5F2", "#2E8B57", "#1B1B1B", "#FFFFFF"]],
+    ["rollei-rpx-100", "Rollei", "RPX 100", 100, "B&W", ["135", "120-66"], ["#F5F5F2", "#1F4E9C", "#1B1B1B", "#FFFFFF"]],
+    ["rollei-rpx-400", "Rollei", "RPX 400", 400, "B&W", ["135", "120-66"], ["#F5F5F2", "#C8102E", "#1B1B1B", "#FFFFFF"]],
+    ["rollei-superpan-200", "Rollei", "Superpan 200", 200, "B&W", ["135", "120-66"], ["#1B1B1B", "#C8102E", "#FFFFFF", "#FFFFFF", "#111111"]],
+    ["rollei-infrared-400", "Rollei", "Infrared 400", 400, "B&W", ["135", "120-66"], ["#1B1B1B", "#8B1A1A", "#FFFFFF", "#FFFFFF", "#111111"]],
+    ["adox-chs-100-ii", "Adox", "CHS 100 II", 100, "B&W", ["135", "120-66", "sheet-45", "sheet-810"], ["#F2A71B", "#1B1B1B", "#1B1B1B", "#F2A71B"]],
+    ["adox-silvermax-100", "Adox", "Silvermax 100", 100, "B&W", ["135"], ["#9A9A9A", "#1B1B1B", "#1B1B1B", "#FFFFFF"]],
+    ["adox-scala-50", "Adox", "Scala 50", 50, "B&W", ["135", "120-66"], ["#1B1B1B", "#E2231A", "#FFFFFF", "#FFFFFF", "#111111"]],
+    ["adox-color-mission-200", "Adox", "Color Mission 200", 200, "C-41", ["135", "120-66"], ["#F2A71B", "#1F4E9C", "#1B1B1B", "#FFFFFF"]],
+    ["agfa-apx-100", "AgfaPhoto", "APX 100", 100, "B&W", ["135", "120-66"], ["#F5F5F2", "#E2231A", "#1B1B1B", "#FFFFFF"]],
+    ["agfa-apx-400", "AgfaPhoto", "APX 400", 400, "B&W", ["135"], ["#F5F5F2", "#1F4E9C", "#1B1B1B", "#FFFFFF"]],
+    ["agfa-ct-precisa-100", "AgfaPhoto", "CT Precisa 100", 100, "E-6", ["135"], ["#1F4E9C", "#E2231A", "#FFFFFF", "#FFFFFF"]],
+    ["agfa-vista-plus-200", "AgfaPhoto", "Vista Plus 200", 200, "C-41", ["135"], ["#E2231A", "#F2A71B", "#FFFFFF", "#1B1B1B"]],
+    ["agfa-vista-plus-400", "AgfaPhoto", "Vista Plus 400", 400, "C-41", ["135"], ["#E2231A", "#1F4E9C", "#FFFFFF", "#FFFFFF"]],
+    ["agfa-ultra-100", "Agfa", "Ultra 100", 100, "C-41", ["135"], ["#E2231A", "#1B1B1B", "#FFFFFF", "#FFFFFF"]],
+    ["agfa-rsx-ii-100", "Agfa", "RSX II 100", 100, "E-6", ["135", "120-66"], ["#1F4E9C", "#F2A71B", "#FFFFFF", "#1B1B1B"]],
+    ["foma-fomapan-200", "Foma", "Fomapan 200 Creative", 200, "B&W", ["135", "120-66", "sheet-45", "sheet-810"], ["#F5F5F2", "#1F4E9C", "#1B1B1B", "#FFFFFF"]],
+    ["foma-retropan-320", "Foma", "Retropan 320 Soft", 320, "B&W", ["135", "120-66"], ["#8B5A2B", "#F5F5F2", "#FFFFFF", "#8B5A2B"]],
+    ["ferrania-p30", "Ferrania", "P30 80", 80, "B&W", ["135"], ["#1B1B1B", "#E2231A", "#F5F5F2", "#FFFFFF", "#111111"]],
+    ["ferrania-p33", "Ferrania", "P33 160", 160, "B&W", ["135"], ["#1B1B1B", "#1F7A8C", "#F5F5F2", "#FFFFFF", "#111111"]],
+    ["ferrania-orto-50", "Ferrania", "Orto 50", 50, "B&W", ["135"], ["#1B1B1B", "#F4C430", "#F5F5F2", "#1B1B1B", "#111111"]],
+    ["kosmo-foto-mono-100", "Kosmo Foto", "Mono 100", 100, "B&W", ["135", "120-66"], ["#C8102E", "#F5F5F2", "#FFFFFF", "#C8102E"]],
+    ["kosmo-agent-shadow-400", "Kosmo Foto", "Agent Shadow 400", 400, "B&W", ["135"], ["#1B1B1B", "#C9A227", "#F5F5F2", "#1B1B1B", "#111111"]],
+    ["jch-streetpan-400", "JCH", "StreetPan 400", 400, "B&W", ["135", "120-66"], ["#F4C430", "#1B1B1B", "#1B1B1B", "#F4C430"]],
+    ["shanghai-gp3-100", "Shanghai", "GP3 100", 100, "B&W", ["120-66"], ["#1F4E9C", "#F5F5F2", "#FFFFFF", "#1F4E9C"]],
+    ["konica-centuria-200", "Konica", "Centuria 200", 200, "C-41", ["135"], ["#1F4E9C", "#F2A71B", "#FFFFFF", "#1B1B1B"]],
+    ["konica-centuria-400", "Konica", "Centuria 400", 400, "C-41", ["135"], ["#1F4E9C", "#E2231A", "#FFFFFF", "#FFFFFF"]]
+  ];
+
+  // src/core/films.ts
+  var s = (body, band, text, bandText, cap2 = "#2B2B2B") => ({
+    body,
+    band,
+    text,
+    bandText,
+    cap: cap2
+  });
+  var both = ["135", "120-66"];
+  var only135 = ["135"];
+  var withSheets = ["135", "120-66", "sheet-45", "sheet-810"];
+  var only = (...f2) => f2;
+  var f = (id, brand, name, iso, process, style, formats = both) => ({ id, brand, name, iso, process, formats, style });
+  var films = [
+    f("kodak-portra-160", "Kodak", "Portra 160", 160, "C-41", s("#F4EFE4", "#E39B2D", "#3A2E22", "#FFFFFF"), withSheets),
+    f("kodak-portra-400", "Kodak", "Portra 400", 400, "C-41", s("#F4EFE4", "#F2A71B", "#3A2E22", "#FFFFFF"), withSheets),
+    f("kodak-portra-800", "Kodak", "Portra 800", 800, "C-41", s("#F4EFE4", "#D9771E", "#3A2E22", "#FFFFFF")),
+    f("kodak-ektar-100", "Kodak", "Ektar 100", 100, "C-41", s("#FFC20E", "#E2231A", "#1A1A1A", "#FFFFFF"), withSheets),
+    f("kodak-gold-200", "Kodak", "Gold 200", 200, "C-41", s("#FDB913", "#C8102E", "#1A1A1A", "#FFFFFF")),
+    f("kodak-ultramax-400", "Kodak", "UltraMax 400", 400, "C-41", s("#FDB913", "#1F4E9C", "#1A1A1A", "#FFFFFF"), only135),
+    f("kodak-colorplus-200", "Kodak", "ColorPlus 200", 200, "C-41", s("#FDB913", "#5B3A8C", "#1A1A1A", "#FFFFFF"), only135),
+    f("kodak-ektachrome-e100", "Kodak", "Ektachrome E100", 100, "E-6", s("#1B1B1B", "#FDB913", "#FFFFFF", "#1B1B1B")),
+    f("kodak-trix-400", "Kodak", "Tri-X 400", 400, "B&W", s("#FDB913", "#1B1B1B", "#1B1B1B", "#FDB913")),
+    f("kodak-tmax-100", "Kodak", "T-Max 100", 100, "B&W", s("#FDB913", "#2E5AA8", "#1B1B1B", "#FFFFFF"), withSheets),
+    f("kodak-tmax-400", "Kodak", "T-Max 400", 400, "B&W", s("#FDB913", "#C8102E", "#1B1B1B", "#FFFFFF"), withSheets),
+    f("kodak-vision3-250d", "Kodak", "Vision3 250D", 250, "ECN-2", s("#2A2A2A", "#E8B02E", "#F2F2F2", "#1B1B1B"), only135),
+    f("kodak-vision3-500t", "Kodak", "Vision3 500T", 500, "ECN-2", s("#2A2A2A", "#3C7DD9", "#F2F2F2", "#FFFFFF"), only135),
+    f("fuji-200", "Fujifilm", "200", 200, "C-41", s("#F5F5F2", "#00A15F", "#1B1B1B", "#FFFFFF"), only135),
+    f("fuji-400", "Fujifilm", "400", 400, "C-41", s("#F5F5F2", "#2B6CB0", "#1B1B1B", "#FFFFFF"), only135),
+    f("fuji-superia-xtra-400", "Fujifilm", "Superia X-TRA 400", 400, "C-41", s("#0C8A4B", "#E2231A", "#FFFFFF", "#FFFFFF"), only135),
+    f("fuji-c200", "Fujifilm", "Fujicolor C200", 200, "C-41", s("#00A15F", "#F5F5F2", "#FFFFFF", "#00A15F"), only135),
+    f("fuji-pro-400h", "Fujifilm", "Pro 400H", 400, "C-41", s("#EDEDED", "#6CB33F", "#1B1B1B", "#FFFFFF")),
+    f("fuji-velvia-50", "Fujifilm", "Velvia 50", 50, "E-6", s("#5A2D82", "#E2231A", "#FFFFFF", "#FFFFFF"), withSheets),
+    f("fuji-velvia-100", "Fujifilm", "Velvia 100", 100, "E-6", s("#7A2A82", "#F5F5F2", "#FFFFFF", "#7A2A82")),
+    f("fuji-provia-100f", "Fujifilm", "Provia 100F", 100, "E-6", s("#1E4FA0", "#F5F5F2", "#FFFFFF", "#1E4FA0"), withSheets),
+    f("fuji-acros-100-ii", "Fujifilm", "Acros II 100", 100, "B&W", s("#1B1B1B", "#9A9A9A", "#FFFFFF", "#1B1B1B")),
+    f("ilford-hp5-plus", "Ilford", "HP5 Plus", 400, "B&W", s("#1B1B1B", "#F5F5F2", "#F5F5F2", "#1B1B1B", "#111111"), withSheets),
+    f("ilford-fp4-plus", "Ilford", "FP4 Plus", 125, "B&W", s("#1B1B1B", "#2F6DB5", "#F5F5F2", "#FFFFFF", "#111111"), withSheets),
+    f("ilford-delta-100", "Ilford", "Delta 100", 100, "B&W", s("#F5F5F2", "#1B1B1B", "#1B1B1B", "#F5F5F2"), withSheets),
+    f("ilford-delta-400", "Ilford", "Delta 400", 400, "B&W", s("#F5F5F2", "#E2231A", "#1B1B1B", "#FFFFFF")),
+    f("ilford-delta-3200", "Ilford", "Delta 3200", 3200, "B&W", s("#F5F5F2", "#5A2D82", "#1B1B1B", "#FFFFFF")),
+    f("ilford-panf-plus-50", "Ilford", "Pan F Plus 50", 50, "B&W", s("#1B1B1B", "#E85D9C", "#F5F5F2", "#FFFFFF", "#111111")),
+    f("ilford-xp2-super", "Ilford", "XP2 Super", 400, "C-41", s("#1B1B1B", "#F28C28", "#F5F5F2", "#1B1B1B", "#111111")),
+    f("kentmere-pan-400", "Kentmere", "Pan 400", 400, "B&W", s("#F5F5F2", "#E87722", "#1B1B1B", "#FFFFFF"), only135),
+    f("harman-phoenix-200", "Harman", "Phoenix 200", 200, "C-41", s("#F15A22", "#1B1B1B", "#FFFFFF", "#F15A22")),
+    f("cinestill-800t", "CineStill", "800T", 800, "C-41", s("#1B1B1B", "#D7262E", "#FFFFFF", "#FFFFFF", "#111111")),
+    f("cinestill-400d", "CineStill", "400D", 400, "C-41", s("#1B1B1B", "#F2A71B", "#FFFFFF", "#1B1B1B", "#111111")),
+    f("cinestill-50d", "CineStill", "50D", 50, "C-41", s("#1B1B1B", "#3C9DD9", "#FFFFFF", "#FFFFFF", "#111111")),
+    f("lomo-cn-100", "Lomography", "Color Negative 100", 100, "C-41", s("#F5F5F2", "#F4C430", "#1B1B1B", "#1B1B1B")),
+    f("lomo-cn-400", "Lomography", "Color Negative 400", 400, "C-41", s("#F5F5F2", "#E2231A", "#1B1B1B", "#FFFFFF")),
+    f("lomo-cn-800", "Lomography", "Color Negative 800", 800, "C-41", s("#F5F5F2", "#1F4E9C", "#1B1B1B", "#FFFFFF")),
+    f("lomo-lomochrome-purple", "Lomography", "LomoChrome Purple", 400, "C-41", s("#6B2C91", "#E85D9C", "#FFFFFF", "#FFFFFF")),
+    f("foma-fomapan-100", "Foma", "Fomapan 100", 100, "B&W", s("#F5F5F2", "#2E8B57", "#1B1B1B", "#FFFFFF"), withSheets),
+    f("foma-fomapan-400", "Foma", "Fomapan 400", 400, "B&W", s("#F5F5F2", "#C8102E", "#1B1B1B", "#FFFFFF")),
+    // 110 카트리지 (로모그래피)
+    f("lomo-tiger-110", "Lomography", "Tiger 200", 200, "C-41", s("#F28C28", "#1B1B1B", "#1B1B1B", "#F28C28"), only("110")),
+    f("lomo-peacock-110", "Lomography", "Peacock 200", 200, "C-41", s("#1E7F8C", "#F4C430", "#FFFFFF", "#1B1B1B"), only("110")),
+    f("lomo-orca-110", "Lomography", "Orca 100", 100, "B&W", s("#1B1B1B", "#F5F5F2", "#F5F5F2", "#1B1B1B"), only("110")),
+    // 인스턴트 필름
+    f("fuji-instax-mini", "Fujifilm", "Instax Mini", 800, "instant", s("#F5F5F2", "#E2231A", "#1B1B1B", "#FFFFFF"), only("instax-mini")),
+    f("fuji-instax-mini-mono", "Fujifilm", "Instax Mini Monochrome", 800, "instant", s("#1B1B1B", "#9A9A9A", "#F5F5F2", "#1B1B1B"), only("instax-mini")),
+    f("fuji-instax-square", "Fujifilm", "Instax Square", 800, "instant", s("#F5F5F2", "#1F4E9C", "#1B1B1B", "#FFFFFF"), only("instax-square")),
+    f("fuji-instax-wide", "Fujifilm", "Instax Wide", 800, "instant", s("#F5F5F2", "#00A15F", "#1B1B1B", "#FFFFFF"), only("instax-wide")),
+    f("polaroid-600-color", "Polaroid", "600 Color", 640, "instant", s("#F5F5F2", "#E2231A", "#1B1B1B", "#FFFFFF"), only("polaroid")),
+    f("polaroid-itype-color", "Polaroid", "i-Type Color", 640, "instant", s("#F5F5F2", "#2B6CB0", "#1B1B1B", "#FFFFFF"), only("polaroid")),
+    f("polaroid-sx70-color", "Polaroid", "SX-70 Color", 160, "instant", s("#F5F5F2", "#F2A71B", "#1B1B1B", "#1B1B1B"), only("polaroid")),
+    f("polaroid-600-bw", "Polaroid", "600 B&W", 640, "instant", s("#1B1B1B", "#F5F5F2", "#F5F5F2", "#1B1B1B"), only("polaroid")),
+    // 지금 판매 + 단종됐지만 구할 수 있는 필름 (catalog/films.mjs에서 생성)
+    ...moreFilmRows.map(([id, brand, name, iso, process, formats, st]) => f(id, brand, name, iso, process, s(st[0], st[1], st[2], st[3], st[4]), formats))
+  ];
+
+  // src/core/types.ts
+  var formatInfo = {
+    "135": { name: "35mm", aspect: 36 / 24, perStrip: 6, count: 36, is120: false },
+    "135-half": { name: "35mm \uD558\uD504", aspect: 18 / 24, perStrip: 12, count: 72, is120: false },
+    "120-645": { name: "120 6\xD74.5", aspect: 41.5 / 56, perStrip: 4, count: 15, is120: true },
+    "120-66": { name: "120 6\xD76", aspect: 1, perStrip: 3, count: 12, is120: true },
+    "120-67": { name: "120 6\xD77", aspect: 70 / 56, perStrip: 3, count: 10, is120: true },
+    "120-69": { name: "120 6\xD79", aspect: 84 / 56, perStrip: 2, count: 8, is120: true },
+    "110": { name: "110", aspect: 17 / 13, perStrip: 4, count: 24, is120: false },
+    "sheet-45": { name: "4\xD75 \uC2DC\uD2B8", aspect: 5 / 4, perStrip: 1, count: 1, is120: false },
+    "sheet-810": { name: "8\xD710 \uC2DC\uD2B8", aspect: 10 / 8, perStrip: 1, count: 1, is120: false },
+    "instax-mini": { name: "\uC778\uC2A4\uD0C1\uC2A4 \uBBF8\uB2C8", aspect: 46 / 62, perStrip: 1, count: 10, is120: false },
+    "instax-square": { name: "\uC778\uC2A4\uD0C1\uC2A4 \uC2A4\uD018\uC5B4", aspect: 1, perStrip: 1, count: 10, is120: false },
+    "instax-wide": { name: "\uC778\uC2A4\uD0C1\uC2A4 \uC640\uC774\uB4DC", aspect: 99 / 62, perStrip: 1, count: 10, is120: false },
+    "polaroid": { name: "\uD3F4\uB77C\uB85C\uC774\uB4DC", aspect: 79 / 77, perStrip: 1, count: 8, is120: false }
+  };
+  function filmPack(f2) {
+    if (formatInfo[f2]?.is120) return "roll";
+    if (f2 === "110") return "cartridge";
+    if (f2.startsWith("sheet")) return "sheet";
+    if (f2.startsWith("instax") || f2 === "polaroid") return "instant";
+    return "canister";
+  }
+
+  // src/core/canister.ts
+  var cache = /* @__PURE__ */ new Map();
+  function paintCanister(ctx, stock, format, size) {
+    const pack = filmPack(format);
+    if (pack === "roll") drawRoll120(ctx, stock, size);
+    else if (pack === "cartridge") drawCartridge110(ctx, stock, size);
+    else if (pack === "sheet") drawSheetBox(ctx, stock, size, formatInfo[format].name.replace(" \uC2DC\uD2B8", ""));
+    else if (pack === "instant") drawInstantPack(ctx, stock, size, format);
+    else draw135(ctx, stock, size);
+  }
+  function canisterURL(stock, format = "135", size = 360) {
+    const key = `${stock.id}|${stock.name}|${stock.iso}|${stock.style.body}|${filmPack(format)}|${format}|${size}`;
+    const hit = cache.get(key);
+    if (hit) return hit;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    paintCanister(ctx, stock, format, size);
+    const url = canvas.toDataURL("image/png");
+    cache.set(key, url);
+    return url;
+  }
+  var FONT = '"Helvetica Neue", "Pretendard", "Apple SD Gothic Neo", Arial, sans-serif';
+  function nameWithoutISO(s2) {
+    const suffix = ` ${s2.iso}`;
+    const n = s2.name.endsWith(suffix) ? s2.name.slice(0, -suffix.length) : s2.name;
+    return (n || s2.name).toUpperCase();
+  }
+  function fitText(ctx, text, weight, maxWidth, maxSize, condensed = false) {
+    let size = maxSize;
+    const family = condensed ? `"Helvetica Neue Condensed", ${FONT}` : FONT;
+    ctx.font = `${weight} ${size}px ${family}`;
+    const w = ctx.measureText(text).width;
+    if (w > maxWidth) size = maxSize * maxWidth / w;
+    ctx.font = `${weight} ${size}px ${family}`;
+    return size;
+  }
+  function centerText(ctx, text, x, y, color) {
+    ctx.fillStyle = color;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x, y);
+  }
+  function cylinderShade(ctx, x, y, w, h, stops) {
+    const g = ctx.createLinearGradient(x, 0, x + w, 0);
+    for (const [o, c] of stops) g.addColorStop(o, c);
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+  }
+  var shade = (a) => `rgba(0,0,0,${a})`;
+  var light = (a) => `rgba(255,255,255,${a})`;
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+  }
+  function cap(ctx, x, y, w, h, color) {
+    roundRect(ctx, x, y, w, h, h * 0.25);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    cylinderShade(ctx, x, y, w, h, [[0, shade(0.45)], [0.25, light(0.35)], [0.4, light(0.08)], [0.85, shade(0.2)], [1, shade(0.55)]]);
+    ctx.restore();
+  }
+  function draw135(ctx, st, S) {
+    const u = (v) => v * S;
+    const sty = st.style;
+    const bx = u(0.12), bw = u(0.4), top = u(0.17), bottom = u(0.85);
+    ctx.save();
+    ctx.filter = `blur(${u(0.015)}px)`;
+    ctx.fillStyle = shade(0.25);
+    ctx.beginPath();
+    ctx.ellipse(bx + u(0.42), u(0.91), u(0.42), u(0.02), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    const leaderColor = st.process === "C-41" ? "#8A4A1E" : st.process === "ECN-2" ? "#5E3218" : st.process === "E-6" ? "#2C2A2B" : "#3C3C40";
+    const fromX = bx + bw - u(0.01), lt = u(0.215), lb = u(0.805), mid = (lt + lb) / 2;
+    const fullEnd = u(0.7), tongueEnd = u(0.93);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(fromX, lt);
+    ctx.lineTo(fullEnd, lt);
+    ctx.bezierCurveTo(fullEnd + u(0.04), lt, fullEnd + u(0.02), mid, fullEnd + u(0.06), mid);
+    ctx.lineTo(tongueEnd - u(0.03), mid);
+    ctx.quadraticCurveTo(tongueEnd, mid, tongueEnd, mid + u(0.04));
+    ctx.lineTo(tongueEnd, lb);
+    ctx.lineTo(fromX, lb);
+    ctx.closePath();
+    ctx.fillStyle = leaderColor;
+    ctx.fill();
+    ctx.clip();
+    ctx.globalCompositeOperation = "destination-out";
+    for (let x = fromX + u(0.02); x < tongueEnd; x += u(0.034)) {
+      for (const y of [lt + u(0.018), lb - u(0.018) - u(0.022)]) {
+        roundRect(ctx, x, y, u(0.016), u(0.022), u(3e-3));
+        ctx.fill();
+      }
+    }
+    ctx.globalCompositeOperation = "source-over";
+    const gloss = ctx.createLinearGradient(0, lt, 0, lb);
+    gloss.addColorStop(0, light(0));
+    gloss.addColorStop(0.35, light(0.16));
+    gloss.addColorStop(0.5, light(0));
+    gloss.addColorStop(1, shade(0.2));
+    ctx.fillStyle = gloss;
+    ctx.fillRect(fromX, lt, tongueEnd - fromX, lb - lt);
+    ctx.restore();
+    ctx.fillStyle = "#141210";
+    ctx.fillRect(bx + bw - u(0.015), top + u(0.02), u(0.03), bottom - top - u(0.04));
+    ctx.fillStyle = sty.body;
+    ctx.fillRect(bx, top, bw, bottom - top);
+    ctx.fillStyle = sty.band;
+    ctx.fillRect(bx, u(0.45), bw, u(0.14));
+    const cell = bw / 12;
+    for (let i = 0; i < 12; i++) for (let row = 0; row < 2; row++) {
+      const on = ((st.iso >> i % 8 ^ row * 166 >> i) & 1) === 0 || i === 0;
+      ctx.fillStyle = on ? "#C9CCCF" : "#1A1A1A";
+      ctx.fillRect(bx + i * cell, u(0.7) + row * cell * 0.9, cell, cell * 0.9);
+    }
+    const cx = bx + bw / 2;
+    fitText(ctx, st.brand.toUpperCase(), "bold", bw * 0.8, u(0.05));
+    centerText(ctx, st.brand.toUpperCase(), cx, u(0.235), sty.text);
+    const name = nameWithoutISO(st);
+    fitText(ctx, name, "900", bw * 0.86, u(0.085), true);
+    centerText(ctx, name, cx, u(0.35), sty.text);
+    fitText(ctx, String(st.iso), "900", bw * 0.7, u(0.11), true);
+    centerText(ctx, String(st.iso), cx, u(0.52), sty.bandText);
+    ctx.font = `500 ${u(0.026)}px ${FONT}`;
+    ctx.globalAlpha = 0.8;
+    centerText(ctx, `${st.process} \xB7 135-36`, cx, u(0.65), sty.text);
+    ctx.globalAlpha = 1;
+    cylinderShade(ctx, bx, top, bw, bottom - top, [[0, shade(0.42)], [0.1, shade(0.12)], [0.3, light(0.22)], [0.45, light(0)], [0.8, shade(0.18)], [1, shade(0.5)]]);
+    cap(ctx, bx - u(0.012), top - u(0.06), bw + u(0.024), u(0.065), sty.cap);
+    cap(ctx, bx - u(0.012), bottom - u(5e-3), bw + u(0.024), u(0.06), sty.cap);
+    ctx.fillStyle = "#1E1E1E";
+    ctx.fillRect(cx - u(0.07), top - u(0.115), u(0.14), u(0.06));
+    cylinderShade(ctx, cx - u(0.07), top - u(0.115), u(0.14), u(0.06), [[0, shade(0.5)], [0.35, light(0.18)], [1, shade(0.55)]]);
+  }
+  function drawRoll120(ctx, st, S) {
+    const u = (v) => v * S;
+    const sty = st.style;
+    const x = u(0.27), w = u(0.46), top = u(0.17), bottom = u(0.83);
+    ctx.save();
+    ctx.filter = `blur(${u(0.015)}px)`;
+    ctx.fillStyle = shade(0.25);
+    ctx.beginPath();
+    ctx.ellipse(x + w / 2, u(0.885), w / 2 + u(0.05), u(0.025), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    for (const y of [top - u(0.045), bottom - u(5e-3)]) {
+      ctx.fillStyle = "#151515";
+      ctx.fillRect(x - u(0.035), y, w + u(0.07), u(0.05));
+      cylinderShade(ctx, x - u(0.035), y, w + u(0.07), u(0.05), [[0, shade(0.4)], [0.3, light(0.2)], [1, shade(0.5)]]);
+    }
+    ctx.fillStyle = sty.body;
+    ctx.fillRect(x, top, w, bottom - top);
+    ctx.fillStyle = sty.band;
+    ctx.fillRect(x, u(0.46), w, u(0.12));
+    const cx = x + w / 2;
+    fitText(ctx, st.brand.toUpperCase(), "bold", w * 0.7, u(0.05));
+    centerText(ctx, st.brand.toUpperCase(), cx, u(0.24), sty.text);
+    const name = nameWithoutISO(st);
+    fitText(ctx, name, "900", w * 0.86, u(0.09), true);
+    centerText(ctx, name, cx, u(0.35), sty.text);
+    ctx.font = `900 ${u(0.09)}px ${FONT}`;
+    centerText(ctx, String(st.iso), cx, u(0.52), sty.bandText);
+    ctx.font = `500 ${u(0.028)}px ${FONT}`;
+    ctx.globalAlpha = 0.8;
+    centerText(ctx, `${st.process} \xB7 120`, cx, u(0.7), sty.text);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = sty.body;
+    ctx.beginPath();
+    ctx.moveTo(x + w, top + u(0.02));
+    ctx.lineTo(x + w + u(0.05), top + u(0.05));
+    ctx.lineTo(x + w + u(0.05), bottom - u(0.05));
+    ctx.lineTo(x + w, bottom - u(0.02));
+    ctx.closePath();
+    ctx.fill();
+    cylinderShade(ctx, x, top, w, bottom - top, [[0, shade(0.4)], [0.12, shade(0.1)], [0.32, light(0.22)], [0.48, light(0)], [0.82, shade(0.18)], [1, shade(0.48)]]);
+  }
+  function dropShadow(ctx, cx, cy, rx, ry, blur) {
+    ctx.save();
+    ctx.filter = `blur(${blur}px)`;
+    ctx.fillStyle = shade(0.25);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  function drawCartridge110(ctx, st, S) {
+    const u = (v) => v * S;
+    const sty = st.style;
+    dropShadow(ctx, u(0.5), u(0.76), u(0.42), u(0.025), u(0.015));
+    const plastic = "#232325";
+    const top = u(0.3), h = u(0.42);
+    for (const [x, w] of [[u(0.08), u(0.38)], [u(0.64), u(0.28)]]) {
+      roundRect(ctx, x, top, w, h, u(0.035));
+      ctx.fillStyle = plastic;
+      ctx.fill();
+    }
+    ctx.fillStyle = plastic;
+    ctx.fillRect(u(0.44), u(0.4), u(0.22), u(0.2));
+    const leader = st.process === "B&W" ? "#3C3C40" : "#8A4A1E";
+    ctx.fillStyle = leader;
+    ctx.fillRect(u(0.47), u(0.43), u(0.16), u(0.14));
+    const lx = u(0.11), ly = u(0.33), lw = u(0.32), lh = u(0.36);
+    roundRect(ctx, lx, ly, lw, lh, u(0.02));
+    ctx.fillStyle = sty.body;
+    ctx.fill();
+    ctx.fillStyle = sty.band;
+    ctx.fillRect(lx, ly + lh * 0.52, lw, lh * 0.24);
+    const cx = lx + lw / 2;
+    fitText(ctx, st.brand.toUpperCase(), "bold", lw * 0.8, u(0.035));
+    centerText(ctx, st.brand.toUpperCase(), cx, ly + lh * 0.13, sty.text);
+    const name = nameWithoutISO(st);
+    fitText(ctx, name, "900", lw * 0.86, u(0.06), true);
+    centerText(ctx, name, cx, ly + lh * 0.34, sty.text);
+    fitText(ctx, String(st.iso), "900", lw * 0.6, u(0.07), true);
+    centerText(ctx, String(st.iso), cx, ly + lh * 0.64, sty.bandText);
+    ctx.font = `600 ${u(0.026)}px ${FONT}`;
+    centerText(ctx, "110", cx, ly + lh * 0.88, sty.text);
+    ctx.fillStyle = shade(0.35);
+    ctx.fillRect(u(0.7), u(0.36), u(0.16), u(0.03));
+    ctx.fillRect(u(0.7), u(0.61), u(0.16), u(0.03));
+    const g = ctx.createLinearGradient(0, top, 0, top + h);
+    g.addColorStop(0, light(0.18));
+    g.addColorStop(0.3, light(0));
+    g.addColorStop(1, shade(0.25));
+    ctx.fillStyle = g;
+    for (const [x, w] of [[u(0.08), u(0.38)], [u(0.64), u(0.28)]]) {
+      roundRect(ctx, x, top, w, h, u(0.035));
+      ctx.fill();
+    }
+  }
+  function drawSheetBox(ctx, st, S, sizeLabel) {
+    const u = (v) => v * S;
+    const sty = st.style;
+    dropShadow(ctx, u(0.5), u(0.8), u(0.44), u(0.025), u(0.015));
+    const x = u(0.08), y = u(0.36), w = u(0.84), h = u(0.42), d = u(0.12);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + d * 0.6, y - d);
+    ctx.lineTo(x + w + d * 0.6 - u(0.05), y - d);
+    ctx.lineTo(x + w - u(0.05), y);
+    ctx.closePath();
+    ctx.fillStyle = sty.body;
+    ctx.fill();
+    ctx.fillStyle = light(0.25);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + w - u(0.05), y);
+    ctx.lineTo(x + w + d * 0.6 - u(0.05), y - d);
+    ctx.lineTo(x + w + d * 0.6 - u(0.05), y + h - d);
+    ctx.lineTo(x + w - u(0.05), y + h);
+    ctx.closePath();
+    ctx.fillStyle = sty.body;
+    ctx.fill();
+    ctx.fillStyle = shade(0.3);
+    ctx.fill();
+    const fw = w - u(0.05);
+    ctx.fillStyle = sty.body;
+    ctx.fillRect(x, y, fw, h);
+    ctx.fillStyle = sty.band;
+    ctx.fillRect(x, y + h * 0.56, fw, h * 0.22);
+    const cx = x + fw / 2;
+    fitText(ctx, st.brand.toUpperCase(), "bold", fw * 0.5, u(0.045));
+    centerText(ctx, st.brand.toUpperCase(), cx, y + h * 0.16, sty.text);
+    const name = nameWithoutISO(st);
+    fitText(ctx, name, "900", fw * 0.8, u(0.085), true);
+    centerText(ctx, name, cx, y + h * 0.38, sty.text);
+    fitText(ctx, String(st.iso), "900", fw * 0.4, u(0.07), true);
+    centerText(ctx, String(st.iso), cx, y + h * 0.67, sty.bandText);
+    ctx.font = `700 ${u(0.032)}px ${FONT}`;
+    centerText(ctx, `${sizeLabel} \xB7 SHEET FILM`, cx, y + h * 0.9, sty.text);
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, light(0.12));
+    g.addColorStop(0.5, light(0));
+    g.addColorStop(1, shade(0.18));
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, fw, h);
+  }
+  function drawInstantPack(ctx, st, S, format) {
+    const u = (v) => v * S;
+    const sty = st.style;
+    dropShadow(ctx, u(0.5), u(0.86), u(0.4), u(0.025), u(0.015));
+    const bx = u(0.1), by = u(0.14), bw = u(0.6), bh = u(0.66);
+    roundRect(ctx, bx, by, bw, bh, u(0.03));
+    ctx.fillStyle = sty.body;
+    ctx.fill();
+    ctx.fillStyle = sty.band;
+    ctx.fillRect(bx, by + bh * 0.5, bw, bh * 0.16);
+    const cx = bx + bw / 2;
+    fitText(ctx, st.brand.toUpperCase(), "bold", bw * 0.7, u(0.045));
+    centerText(ctx, st.brand.toUpperCase(), cx, by + bh * 0.12, sty.text);
+    const name = nameWithoutISO(st);
+    fitText(ctx, name, "900", bw * 0.86, u(0.075), true);
+    centerText(ctx, name, cx, by + bh * 0.3, sty.text);
+    fitText(ctx, String(st.iso), "900", bw * 0.5, u(0.06), true);
+    centerText(ctx, String(st.iso), cx, by + bh * 0.58, sty.bandText);
+    ctx.font = `700 ${u(0.03)}px ${FONT}`;
+    centerText(ctx, "INSTANT FILM", cx, by + bh * 0.76, sty.text);
+    const g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    g.addColorStop(0, shade(0.15));
+    g.addColorStop(0.3, light(0.12));
+    g.addColorStop(1, shade(0.2));
+    roundRect(ctx, bx, by, bw, bh, u(0.03));
+    ctx.fillStyle = g;
+    ctx.fill();
+    const ratio = format === "instax-mini" ? [0.3, 0.46] : format === "instax-wide" ? [0.46, 0.34] : [0.36, 0.42];
+    const [pw, ph] = [u(ratio[0]), u(ratio[1])];
+    ctx.save();
+    ctx.translate(u(0.68), u(0.6));
+    ctx.rotate(0.12);
+    ctx.shadowColor = shade(0.3);
+    ctx.shadowBlur = u(0.02);
+    ctx.shadowOffsetY = u(8e-3);
+    ctx.fillStyle = "#FBFAF7";
+    ctx.fillRect(-pw / 2, -ph / 2, pw, ph);
+    ctx.shadowColor = "transparent";
+    const m = pw * 0.08, bottom = format === "instax-wide" ? ph * 0.2 : ph * 0.24;
+    const iw = pw - m * 2, ih = ph - m - bottom;
+    const pic = ctx.createLinearGradient(0, -ph / 2 + m, 0, -ph / 2 + m + ih);
+    pic.addColorStop(0, st.process === "instant" && sty.body === "#1B1B1B" ? "#9A9A9A" : "#7FB2D9");
+    pic.addColorStop(0.6, sty.body === "#1B1B1B" ? "#4A4A4A" : "#E8C27A");
+    pic.addColorStop(1, sty.body === "#1B1B1B" ? "#2A2A2A" : "#7A5A3A");
+    ctx.fillStyle = pic;
+    ctx.fillRect(-pw / 2 + m, -ph / 2 + m, iw, ih);
+    ctx.restore();
+  }
+
+  // ../prototypes/canister/box.ts
+  var F = '"Archivo", "Helvetica Neue", Arial, sans-serif';
+  var stretch = (w) => w == null ? "normal" : w <= 66 ? "extra-condensed" : w <= 80 ? "condensed" : w <= 94 ? "semi-condensed" : w >= 122 ? "expanded" : w >= 108 ? "semi-expanded" : "normal";
+  function t(ctx, text, x, y, o) {
+    const set = (sz) => {
+      ctx.font = `${o.italic ? "italic " : ""}${o.weight ?? 700} ${sz}px ${F}`;
+      ctx.fontStretch = stretch(o.wdth);
+      ctx.letterSpacing = `${(o.track ?? 0) * sz}px`;
+    };
+    let size = o.size;
+    set(size);
+    if (o.maxW) {
+      const w = ctx.measureText(text).width;
+      if (w > o.maxW) {
+        size *= o.maxW / w;
+        set(size);
+      }
+    }
+    ctx.textAlign = o.align ?? "left";
+    ctx.textBaseline = o.base ?? "alphabetic";
+    if (o.stroke) {
+      ctx.strokeStyle = o.stroke;
+      ctx.lineWidth = size * 0.09;
+      ctx.lineJoin = "round";
+      ctx.strokeText(text, x, y);
+    }
+    ctx.fillStyle = o.color;
+    ctx.fillText(text, x, y);
+    ctx.letterSpacing = "0px";
+    return ctx.measureText(text).width;
+  }
+  var rect = (ctx, c, x, y, w, h) => {
+    ctx.fillStyle = c;
+    ctx.fillRect(x, y, w, h);
+  };
+  function nameOnly(s2) {
+    const suf = ` ${s2.iso}`;
+    return s2.name.endsWith(suf) ? s2.name.slice(0, -suf.length) : s2.name;
+  }
+  var label = (s2) => nameOnly(s2).includes(String(s2.iso)) ? nameOnly(s2) : `${nameOnly(s2)} ${s2.iso}`;
+  var P = (b, px, py) => [b.x + b.w * px, b.y + b.h * py];
+  function proWide(ctx, b, bg, strip, ink, stripInk) {
+    rect(ctx, bg, b.x, b.y, b.w, b.h);
+    rect(ctx, strip, b.x, b.y + b.h * 0.76, b.w, b.h * 0.24);
+    const [lx] = P(b, 0.07, 0);
+    t(ctx, b.fmt, lx, b.y + b.h * 0.2, { size: b.h * 0.1, weight: 500, color: ink });
+    t(ctx, label(b.st).toUpperCase(), lx, b.y + b.h * 0.5, { size: b.h * 0.26, weight: 300, wdth: 118, color: ink, maxW: b.w * 0.86 });
+    t(ctx, "Film \xB7 Pel\xEDcula \xB7 Pellicola", lx, b.y + b.h * 0.65, { size: b.h * 0.075, weight: 400, color: ink, maxW: b.w * 0.6 });
+    const bw = t(ctx, b.st.brand, lx, b.y + b.h * 0.94, { size: b.h * 0.13, weight: 800, color: stripInk });
+    t(ctx, "Professional", lx + bw + b.h * 0.05, b.y + b.h * 0.94, { size: b.h * 0.13, weight: 400, color: stripInk });
+  }
+  function darkCenter(ctx, b, bg, strip, ink, stripInk) {
+    rect(ctx, bg, b.x, b.y, b.w, b.h);
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillRect(b.x, b.y, b.w, b.h * 0.22);
+    rect(ctx, strip, b.x, b.y + b.h * 0.74, b.w, b.h * 0.26);
+    const cx = b.x + b.w / 2;
+    t(ctx, label(b.st), cx, b.y + b.h * 0.52, { size: b.h * 0.3, weight: 300, wdth: 90, color: ink, align: "center", maxW: b.w * 0.86 });
+    t(ctx, b.st.process === "E-6" ? "Color Reversal Film" : "Color Negative Film", cx + b.w * 0.18, b.y + b.h * 0.64, { size: b.h * 0.07, weight: 500, color: ink, align: "center" });
+    t(ctx, `${b.st.brand} Professional`, cx, b.y + b.h * 0.92, { size: b.h * 0.12, weight: 700, color: stripInk, align: "center", maxW: b.w * 0.8 });
+  }
+  function bwCode(ctx, b, bg, ink, sub, code) {
+    rect(ctx, bg, b.x, b.y, b.w, b.h);
+    const cx = b.x + b.w / 2;
+    t(ctx, `${b.st.iso}${code}`, cx, b.y + b.h * 0.55, { size: b.h * 0.42, weight: 800, wdth: 125, color: ink, align: "center", maxW: b.w * 0.88 });
+    t(ctx, "BLACK & WHITE NEGATIVE FILM", cx, b.y + b.h * 0.69, { size: b.h * 0.065, weight: 600, color: ink, align: "center", track: 0.05 });
+    t(ctx, `${b.st.brand} Professional`, cx, b.y + b.h * 0.88, { size: b.h * 0.12, weight: 800, color: sub, align: "center" });
+  }
+  function consumerStripe(ctx, b, bg, stripe, nameInk, ink, accent) {
+    rect(ctx, bg, b.x, b.y, b.w, b.h);
+    rect(ctx, stripe, b.x, b.y + b.h * 0.3, b.w, b.h * 0.4);
+    const [lx] = P(b, 0.06, 0);
+    t(ctx, b.st.brand, lx, b.y + b.h * 0.2, { size: b.h * 0.13, weight: 900, color: accent });
+    t(ctx, nameOnly(b.st).toUpperCase(), lx, b.y + b.h * 0.62, { size: b.h * 0.3, weight: 900, wdth: 100, color: nameInk, stroke: accent, maxW: b.w * 0.62 });
+    t(ctx, String(b.st.iso), b.x + b.w * 0.94, b.y + b.h * 0.63, { size: b.h * 0.28, weight: 900, wdth: 80, color: nameInk, align: "right" });
+    t(ctx, `${b.fmt}  \xB7  ${b.st.process}`, lx, b.y + b.h * 0.9, { size: b.h * 0.08, weight: 700, color: ink });
+  }
+  function whiteTag(ctx, b, bg, base, tag, tagInk, ink) {
+    rect(ctx, bg, b.x, b.y, b.w, b.h);
+    rect(ctx, base, b.x, b.y + b.h * 0.72, b.w, b.h * 0.28);
+    ctx.fillStyle = base;
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y + b.h * 0.72);
+    ctx.lineTo(b.x + b.w * 0.35, b.y + b.h * 0.55);
+    ctx.lineTo(b.x + b.w * 0.5, b.y + b.h * 0.72);
+    ctx.fill();
+    const [lx] = P(b, 0.06, 0);
+    t(ctx, b.st.brand.toUpperCase(), lx, b.y + b.h * 0.22, { size: b.h * 0.1, weight: 800, color: base, track: 0.05 });
+    const numeric = /^\d+$/.test(b.st.name);
+    const tagText = numeric ? b.st.name : nameOnly(b.st);
+    ctx.font = `italic 900 ${b.h * 0.24}px ${F}`;
+    const tw = Math.min(ctx.measureText(tagText).width, b.w * 0.5) + b.h * 0.12;
+    ctx.fillStyle = tag;
+    ctx.beginPath();
+    ctx.roundRect(b.x + b.w * 0.94 - tw, b.y + b.h * 0.3, tw, b.h * 0.3, b.h * 0.06);
+    ctx.fill();
+    t(ctx, tagText, b.x + b.w * 0.94 - tw / 2, b.y + b.h * 0.53, { size: b.h * 0.24, weight: 900, italic: true, color: tagInk, align: "center", maxW: b.w * 0.5 });
+    t(ctx, numeric ? "Fujicolor" : String(b.st.iso), lx, b.y + b.h * 0.55, { size: b.h * (numeric ? 0.13 : 0.2), weight: 800, italic: true, color: ink, maxW: b.w * 0.42 });
+    t(ctx, `${b.fmt}  \xB7  ${b.st.process}`, lx, b.y + b.h * 0.92, { size: b.h * 0.08, weight: 700, color: "#ffffff" });
+  }
+  function slidePanel(ctx, b, frame, tag, tagInk, ink) {
+    rect(ctx, frame, b.x, b.y, b.w, b.h);
+    rect(ctx, "#f7f7f4", b.x + b.w * 0.05, b.y + b.h * 0.08, b.w * 0.9, b.h * 0.56);
+    rect(ctx, "#b9b9b9", b.x + b.w * 0.05, b.y + b.h * 0.42, b.w * 0.9, b.h * 0.012);
+    const lab = label(b.st);
+    ctx.font = `600 ${b.h * 0.2}px ${F}`;
+    const tw = Math.min(ctx.measureText(lab).width + b.h * 0.12, b.w * 0.6);
+    rect(ctx, tag, b.x + b.w * 0.9 - tw, b.y + b.h * 0.32, tw, b.h * 0.24);
+    t(ctx, lab, b.x + b.w * 0.9 - tw / 2, b.y + b.h * 0.5, { size: b.h * 0.2, weight: 600, wdth: 90, color: tagInk, align: "center", maxW: tw * 0.9 });
+    t(ctx, `${b.st.process}  \xB7  ${b.fmt}`, b.x + b.w * 0.09, b.y + b.h * 0.24, { size: b.h * 0.07, weight: 600, color: ink });
+    t(ctx, "FOR PROFESSIONALS", b.x + b.w * 0.9, b.y + b.h * 0.62, { size: b.h * 0.055, weight: 700, color: ink, align: "right" });
+    t(ctx, `${b.st.brand.toUpperCase()}CHROME`.replace("FUJIFILMCHROME", "FUJICHROME"), b.x + b.w * 0.92, b.y + b.h * 0.88, { size: b.h * 0.12, weight: 800, wdth: 110, color: "#ffffff", align: "right", maxW: b.w * 0.7 });
+  }
+  function bwHeavy(ctx, b, bg, ink, accent) {
+    rect(ctx, bg, b.x, b.y, b.w, b.h);
+    const cx = b.x + b.w / 2;
+    t(ctx, b.st.brand.toUpperCase(), cx, b.y + b.h * 0.2, { size: b.h * 0.15, weight: 900, wdth: 85, color: ink, align: "center" });
+    const words = nameOnly(b.st).toUpperCase().split(" ");
+    const main = words[0], rest = words.slice(1).join(" ");
+    t(ctx, main, cx, b.y + b.h * 0.52, { size: b.h * 0.34, weight: 900, wdth: 72, color: accent, stroke: ink, align: "center", maxW: b.w * 0.75 });
+    if (rest) {
+      ctx.font = `900 ${b.h * 0.13}px ${F}`;
+      const tw = Math.min(ctx.measureText(rest).width + b.h * 0.12, b.w * 0.7);
+      rect(ctx, ink, cx - tw / 2, b.y + b.h * 0.56, tw, b.h * 0.16);
+      t(ctx, rest, cx, b.y + b.h * 0.69, { size: b.h * 0.13, weight: 900, wdth: 85, color: bg, align: "center", maxW: tw * 0.9 });
+    }
+    t(ctx, b.st.process === "C-41" ? "C41 PROCESS B&W FILM" : "BLACK & WHITE FILM", cx, b.y + b.h * 0.82, { size: b.h * 0.065, weight: 600, color: ink, align: "center", track: 0.04 });
+    rect(ctx, ink, b.x + b.w * 0.08, b.y + b.h * 0.88, b.w * 0.84, b.h * 0.012);
+    t(ctx, `ISO ${b.st.iso}  \xB7  ${b.fmt}`, cx, b.y + b.h * 0.97, { size: b.h * 0.065, weight: 700, color: ink, align: "center" });
+  }
+  function outlineDelta(ctx, b, bg, ink, tint) {
+    rect(ctx, bg, b.x, b.y, b.w, b.h);
+    const cx = b.x + b.w / 2;
+    t(ctx, b.st.brand.toUpperCase(), cx, b.y + b.h * 0.2, { size: b.h * 0.14, weight: 900, wdth: 85, color: ink, align: "center" });
+    t(ctx, nameOnly(b.st).toUpperCase(), cx, b.y + b.h * 0.42, { size: b.h * 0.22, weight: 900, wdth: 80, color: tint, stroke: ink, align: "center", maxW: b.w * 0.8 });
+    t(ctx, String(b.st.iso), cx, b.y + b.h * 0.7, { size: b.h * 0.3, weight: 900, wdth: 85, color: ink, align: "center" });
+    t(ctx, "PROFESSIONAL", cx, b.y + b.h * 0.8, { size: b.h * 0.07, weight: 800, color: tint, align: "center", track: 0.08 });
+    rect(ctx, ink, b.x, b.y + b.h * 0.86, b.w, b.h * 0.14);
+    t(ctx, b.st.process === "C-41" ? "C41 PROCESS" : "BLACK & WHITE FILM", cx, b.y + b.h * 0.96, { size: b.h * 0.07, weight: 700, color: bg, align: "center" });
+  }
+  function cineBig(ctx, b, bg, ink, edge) {
+    rect(ctx, bg, b.x, b.y, b.w, b.h);
+    rect(ctx, edge, b.x, b.y, b.w, b.h * 0.1);
+    rect(ctx, edge, b.x, b.y + b.h * 0.9, b.w, b.h * 0.1);
+    ctx.fillStyle = bg;
+    for (let i = 0; i < 14; i++) for (const yy of [0.025, 0.925]) ctx.fillRect(b.x + b.w * (0.02 + i * 0.07), b.y + b.h * yy, b.w * 0.035, b.h * 0.05);
+    const words = b.st.brand.length > 8 ? [b.st.brand.slice(0, 4), b.st.brand.slice(4)] : [b.st.brand];
+    words.forEach((w, i) => t(ctx, w, b.x + b.w * 0.07, b.y + b.h * (words.length === 2 ? 0.48 + i * 0.3 : 0.62), {
+      size: b.h * (words.length === 2 ? 0.32 : 0.36),
+      weight: 400,
+      wdth: 75,
+      italic: true,
+      color: ink,
+      maxW: b.w * 0.5
+    }));
+    t(ctx, nameOnly(b.st), b.x + b.w * 0.93, b.y + b.h * 0.42, { size: b.h * 0.2, weight: 800, wdth: 75, color: ink, align: "right", maxW: b.w * 0.38 });
+    const kind = /T$/.test(nameOnly(b.st)) ? "Tungsten" : /D$/.test(nameOnly(b.st)) ? "Daylight" : b.st.process === "B&W" ? "Black & White" : "Motion Picture";
+    t(ctx, kind, b.x + b.w * 0.93, b.y + b.h * 0.56, { size: b.h * 0.08, weight: 600, color: ink, align: "right" });
+    t(ctx, `${b.st.process} \xB7 ${b.fmt}`, b.x + b.w * 0.93, b.y + b.h * 0.8, { size: b.h * 0.065, weight: 600, color: ink, align: "right" });
+  }
+  function boldWide(ctx, b, bg, ink, accent) {
+    rect(ctx, bg, b.x, b.y, b.w, b.h);
+    const cx = b.x + b.w / 2;
+    t(ctx, b.st.brand.toUpperCase(), cx, b.y + b.h * 0.3, { size: b.h * 0.08, weight: 800, color: ink, align: "center", track: 0.12 });
+    t(ctx, nameOnly(b.st).toUpperCase(), cx, b.y + b.h * 0.6, { size: b.h * 0.28, weight: 600, wdth: 110, color: ink, align: "center", maxW: b.w * 0.86 });
+    t(ctx, `ISO ${b.st.iso} ${b.st.process === "B&W" ? "BLACK & WHITE" : "COLOUR"} FILM`, cx, b.y + b.h * 0.76, { size: b.h * 0.075, weight: 800, color: accent, align: "center", track: 0.05 });
+    t(ctx, b.fmt, cx, b.y + b.h * 0.92, { size: b.h * 0.065, weight: 600, color: ink, align: "center" });
+  }
+  function instantBox(ctx, b, bg, band, ink) {
+    rect(ctx, bg, b.x, b.y, b.w, b.h);
+    rect(ctx, band, b.x, b.y, b.w * 0.08, b.h);
+    rect(ctx, "#ffffff", b.x + b.w * 0.6, b.y + b.h * 0.18, b.w * 0.3, b.h * 0.62);
+    rect(ctx, band, b.x + b.w * 0.62, b.y + b.h * 0.22, b.w * 0.26, b.h * 0.42);
+    ctx.strokeStyle = "rgba(0,0,0,0.15)";
+    ctx.lineWidth = b.h * 0.01;
+    ctx.strokeRect(b.x + b.w * 0.6, b.y + b.h * 0.18, b.w * 0.3, b.h * 0.62);
+    t(ctx, b.st.brand.toLowerCase(), b.x + b.w * 0.13, b.y + b.h * 0.3, { size: b.h * 0.11, weight: 800, color: ink });
+    t(ctx, nameOnly(b.st), b.x + b.w * 0.13, b.y + b.h * 0.56, { size: b.h * 0.17, weight: 800, wdth: 85, color: ink, maxW: b.w * 0.44 });
+    t(ctx, `ISO ${b.st.iso}`, b.x + b.w * 0.13, b.y + b.h * 0.85, { size: b.h * 0.08, weight: 700, color: ink });
+  }
+  var KY = "#F6C000";
+  var KP = "#9B6CB6";
+  function paint(ctx, b) {
+    const st = b.st, s2 = st.style, id = st.id, n = st.name;
+    if (/portra/.test(id)) return proWide(ctx, b, id.includes("800") ? "#B8732E" : id.includes("160") ? "#C9A3D8" : KP, KY, "#ffffff", "#1a1a1a");
+    if (/ektacolor|kodak-proimage/.test(id)) return proWide(ctx, b, s2.band, KY, "#ffffff", "#1a1a1a");
+    if (/ektar/.test(id)) return darkCenter(ctx, b, "#5A1A1E", KY, "#f3e6d8", "#B0161E");
+    if (/ektachrome|elite-chrome/.test(id)) return darkCenter(ctx, b, "#1C1C1C", KY, "#f3f3f3", "#1a1a1a");
+    if (id === "kodak-trix-400") return bwCode(ctx, b, KY, "#1F6B3A", "#C8102E", "TX");
+    if (/tmax|plus-x/.test(id)) return bwCode(ctx, b, KY, s2.band, "#C8102E", id.includes("plus-x") ? "PX" : id.includes("p3200") ? "TMZ" : st.iso === 100 ? "TMX" : "TMY");
+    if (id === "kodak-bw400cn") return bwCode(ctx, b, "#f4efe4", "#1a1a1a", "#C8102E", "CN");
+    if (/vision3|double-x|cinestill/.test(id)) return cineBig(ctx, b, st.brand === "CineStill" ? s2.band === "#D7262E" ? "#D7262E" : s2.band : "#232323", "#ffffff", "#111111");
+    if (st.brand === "Kodak") return consumerStripe(ctx, b, KY, s2.band, KY, "#1a1a1a", "#C8102E");
+    if (st.brand === "Fujifilm") {
+      if (st.process === "E-6") return slidePanel(ctx, b, s2.body, s2.band === "#F5F5F2" ? s2.body : s2.band, "#ffffff", "#1a1a1a");
+      if (st.process === "instant") return instantBox(ctx, b, "#f7f7f4", s2.band, "#1a1a1a");
+      if (st.process === "B&W") return bwHeavy(ctx, b, "#f4f4f1", "#141414", "#ffffff");
+      if (/pro-|natura/.test(id)) return darkCenter(ctx, b, s2.body === "#EDEDED" ? "#2E6B3A" : s2.body, "#EDEDED", "#ffffff", "#1a1a1a");
+      return whiteTag(ctx, b, "#ffffff", /c200|superia/.test(id) ? "#0C9A48" : s2.band, "#D7262E", "#ffffff", "#0C9A48");
+    }
+    if (st.brand === "Ilford" || st.brand === "Kentmere") {
+      if (/delta|xp2/.test(id)) return outlineDelta(ctx, b, "#ECECEA", "#141414", s2.band === "#1B1B1B" ? "#9A9A9A" : s2.band);
+      return bwHeavy(ctx, b, "#f7f7f4", "#141414", id.includes("hp5") ? "#2BB673" : s2.band);
+    }
+    if (st.process === "instant") return instantBox(ctx, b, "#f7f7f4", s2.band, "#1a1a1a");
+    if (st.process === "B&W") return /adox|rollei|foma|kosmo|jch|shanghai|ferrania|agfa/.test(id) ? bwHeavy(ctx, b, s2.body === "#1B1B1B" ? "#f4f4f1" : s2.body, "#141414", s2.band) : bwHeavy(ctx, b, "#f4f4f1", "#141414", s2.band);
+    if (st.process === "E-6") return slidePanel(ctx, b, s2.body, s2.band, "#ffffff", "#ffffff");
+    const bg = /F5F5F2|F4EFE4|EDEDED/i.test(s2.body) ? s2.band : s2.body;
+    return boldWide(ctx, b, bg, "#ffffff", /F5F5F2|FFFFFF/i.test(s2.bandText) && bg === s2.band ? "#ffffff" : s2.bandText === bg ? "#ffffff" : s2.bandText);
+  }
+  function drawBox(ctx, st, S, format = "135") {
+    const w = S * 0.94, h = w / 1.6;
+    const x = (S - w) / 2, y = (S - h) / 2;
+    const fmt = format.startsWith("120") ? "120" : format === "110" ? "110" : format.startsWith("sheet") ? "4\xD75" : format.startsWith("instax") || format === "polaroid" ? "" : "135-36";
+    ctx.fillStyle = "rgba(0,0,0,0.14)";
+    ctx.beginPath();
+    ctx.roundRect(x + S * 0.01, y + S * 0.012, w, h, S * 8e-3);
+    ctx.fill();
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, S * 8e-3);
+    ctx.clip();
+    paint(ctx, { x, y, w, h, st, fmt });
+    ctx.restore();
+    ctx.strokeStyle = "rgba(0,0,0,0.12)";
+    ctx.lineWidth = S * 3e-3;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, S * 8e-3);
+    ctx.stroke();
+  }
+  var tplOf = (st) => st.id;
+
+  // ../prototypes/canister/entry.ts
+  var pick = [
+    "kodak-portra-400",
+    "kodak-gold-200",
+    "kodak-ektar-100",
+    "kodak-trix-400",
+    "fuji-c200",
+    "ilford-hp5-plus",
+    "cinestill-800t",
+    "fuji-velvia-50",
+    "ilford-delta-3200",
+    "harman-phoenix-200",
+    "kodak-ultramax-400",
+    "kodak-ektachrome-e100",
+    "fuji-400",
+    "lomo-cn-400",
+    "foma-fomapan-400",
+    "kodak-vision3-500t",
+    "fuji-instax-mini",
+    "polaroid-600-color"
+  ];
+  function png(st, S, fmt) {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = S;
+    drawBox(cv.getContext("2d"), st, S, fmt);
+    return cv.toDataURL("image/png");
+  }
+  var fmtFor = (st, want) => want === "120" && st.formats.includes("120-66") ? "120-66" : st.formats[0];
+  function render() {
+    const want = document.querySelector("input[name=fmt]:checked").value;
+    const grid = document.getElementById("grid");
+    grid.innerHTML = "";
+    for (const id of pick) {
+      const st = films.find((f3) => f3.id === id);
+      if (!st) continue;
+      const f2 = fmtFor(st, want);
+      const el = document.createElement("div");
+      el.className = "card";
+      el.innerHTML = `<div class="pair"><figure><img src="${canisterURL(st, f2, 360)}"><figcaption>\uC9C0\uAE08</figcaption></figure>
+      <figure class="new"><img src="${png(st, 360, f2)}"><figcaption>\uC0C8 \uC2DC\uC548</figcaption></figure></div>
+      <div class="small"><img src="${canisterURL(st, f2, 360)}"><img src="${png(st, 252, f2)}"></div><b>${st.brand} ${st.name}</b><small>${tplOf(st)}</small>`;
+      grid.appendChild(el);
+    }
+    const all = document.getElementById("all");
+    all.innerHTML = films.map((st) => `<figure><img src="${png(st, 252, fmtFor(st, want))}"><figcaption>${st.brand} ${st.name}</figcaption></figure>`).join("");
+  }
+  document.querySelectorAll("input[name=fmt]").forEach((r) => r.addEventListener("change", render));
+  document.fonts.load("900 20px Archivo").then(() => document.fonts.ready).then(render);
+})();
+</script>
+</body></html>
