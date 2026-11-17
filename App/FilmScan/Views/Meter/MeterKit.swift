@@ -38,6 +38,8 @@ struct MeterGear {
     var slowest: Double = 8
     /// P 모드에서 조리개 링을 최소 조리개에 두는 기종 (미놀타 X-700 등)
     var programAtMinAperture = false
+    /// 셔터를 직접 고를 수 없는 자동 카메라 (다이얼은 A만)
+    var shutterAuto = false
     var lens: MeterLens = .generic
     /// 바꿔 낄 수 있는 렌즈 (장비 탭, 같은 마운트)
     var lenses: [MeterLens] = []

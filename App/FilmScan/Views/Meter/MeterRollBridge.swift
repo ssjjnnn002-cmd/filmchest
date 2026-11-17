@@ -40,6 +40,15 @@ extension MeterGear {
         let mount = camera?.mount ?? roll.lens?.mount
         let swappable = lens.fixed ? [] : lenses.filter { !$0.mount.isEmpty && $0.mount == mount }.map(MeterLens.init)
         var gear = MeterGear(cameraName: roll.cameraName, lens: lens, lenses: swappable, film: roll.film, prewind: camera?.prewind)
+        // 셔터 범위: 카메라 목록(catalog/shutters.mjs)에서. 모르면 똑딱이는 자동, 그 밖은 1/1000–1초
+        let known = camera.flatMap { CameraCatalog.match(brand: $0.brand, model: $0.model) }
+        if let range = known?.shutter {
+            if range.count == 2 { gear.fastest = range[0]; gear.slowest = range[1] } else { gear.shutterAuto = true }
+        } else if camera?.bodyStyle == .compact {
+            gear.shutterAuto = true
+        } else {
+            gear.fastest = 1000; gear.slowest = 1
+        }
         gear.iso = roll.shotISO.map(Double.init)
         return gear
     }

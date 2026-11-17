@@ -12,6 +12,8 @@ struct CatalogCamera: Identifiable, Hashable {
     let lens: String?         // 렌즈 일체형이면 렌즈
     let battery: String?      // nil = 정보 없음
     var aka: [String] = []    // 다른 이름 (예: AF600 → Lite Touch, AF35M → 오토보이)
+    /// 셔터 범위: [] = 자동(고를 수 없음), [x, 초] = 1/x ~ 초. nil = 모름 (catalog/shutters.mjs)
+    var shutter: [Double]? = nil
 
     var id: String { "\(brand) \(model)" }
     var displayName: String { "\(brand) \(model)" }

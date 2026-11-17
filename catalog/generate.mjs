@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cameras } from './cameras.mjs'
+import { shutters } from './shutters.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const header = '// 자동 생성 파일 — 직접 고치지 말고 catalog/cameras.mjs를 고친 뒤 `node catalog/generate.mjs` 실행\n'
@@ -21,12 +22,19 @@ for (const c of cameras) {
   if (c.m && c.l) throw new Error(`마운트와 렌즈를 같이 적음: ${c.brand} ${c.model}`)
 }
 
+// 셔터 범위: [] = 자동(고를 수 없음), [x, 초] = 1/x ~ 초. 목록에 없는 기종은 비움(앱이 형태로 짐작)
+for (const k of Object.keys(shutters)) {
+  if (!cameras.some((c) => `${c.brand} ${c.model}` === k)) throw new Error(`셔터 목록에 없는 기종: ${k}`)
+}
+const shutterOf = (c) => { const v = shutters[`${c.brand} ${c.model}`]; return v === undefined ? undefined : v === 'auto' ? [] : v }
+
 // --- Swift
 const swiftFormat = { '135': '.f135', '135-half': '.halfFrame', '120-645': '.f120_645', '120-66': '.f120_66', '120-67': '.f120_67', '120-69': '.f120_69' }
 const s = (v) => (v === undefined ? 'nil' : JSON.stringify(v))
 const swiftRows = cameras.map((c) =>
   `        CatalogCamera(brand: ${s(c.brand)}, model: ${s(c.model)}, style: .${c.style}, format: ${swiftFormat[c.f ?? '135']}, ` +
-  `mount: ${s(c.m)}, lens: ${s(c.l)}, battery: ${s(c.b)}, aka: ${JSON.stringify(c.aka ?? [])}),`)
+  `mount: ${s(c.m)}, lens: ${s(c.l)}, battery: ${s(c.b)}, aka: ${JSON.stringify(c.aka ?? [])}` +
+  (shutterOf(c) ? `, shutter: [${shutterOf(c).join(', ')}]` : '') + '),')
 const swift = `${header}import FilmScanCore
 
 extension CameraCatalog {
@@ -45,6 +53,7 @@ const tsRows = cameras.map((c) => {
   if (c.l) o.lens = c.l
   if (c.b) o.battery = c.b
   if (c.aka?.length) o.aka = c.aka
+  if (shutterOf(c)) o.shutter = shutterOf(c)
   return `  ${JSON.stringify(o)},`
 })
 const ts = `${header}import type { CatalogCamera } from './cameras'

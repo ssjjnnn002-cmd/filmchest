@@ -12,6 +12,8 @@ export interface CatalogCamera {
   lens?: string
   battery?: string
   aka?: string[] // 다른 이름 (예: AF600 → Lite Touch)
+  /** 셔터 범위: [] = 자동(고를 수 없음), [x, 초] = 1/x ~ 초. 없으면 모름 (catalog/shutters.mjs) */
+  shutter?: number[]
 }
 
 export const catalog: CatalogCamera[] = catalogData
