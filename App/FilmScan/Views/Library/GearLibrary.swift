@@ -768,7 +768,7 @@ struct FilmLotEditView: View {
                 // 이미 있는 재고는 필름 종류·포맷을 바꾸지 않는다 (직접 만든 필름은 다 고칠 수 있다)
                 if canPickFilm {
                     FilmPickSection(filmID: Binding(get: { filmID.isEmpty ? nil : filmID }, set: { filmID = $0 ?? "" }),
-                                    format: format) { EmptyView() }
+                                    format: format, onFormat: { format = $0 }) { EmptyView() }
                 } else if let stock = FilmStockCatalog.stock(id: filmID) {
                     Section {
                         HStack(spacing: 14) {

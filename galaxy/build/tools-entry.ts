@@ -33,6 +33,8 @@ const tools: Record<string, (a: any) => Promise<unknown>> = {
     return { data: await blobToB64(r.blob), removed: r.removed }
   },
   async canister({ stock, format, size }) {
+    // 상자 그림 글꼴 (sync 스크립트가 넣은 Archivo) 을 불러온 뒤 그린다
+    await Promise.all([document.fonts.load("900 20px 'FilmBox Archivo'"), document.fonts.load("italic 900 20px 'FilmBox Archivo'")]).catch(() => undefined)
     return canisterURL(stock, format, size)
   },
   /** 렌즈 기본 모형 그림 (웹 장비 탭과 같은 그림) */

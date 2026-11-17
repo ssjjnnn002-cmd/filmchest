@@ -89,6 +89,9 @@ else {
   files.push('viewer3d')
   const tools = execFileSync(join(root, 'web/node_modules/.bin/esbuild'), [join(root, 'galaxy/build/tools-entry.ts'), '--bundle', '--format=iife', '--minify', '--target=es2020'],
     { cwd: join(root, 'web'), maxBuffer: 64 * 1024 * 1024 }).toString()
+    // 필름 상자 그림 글꼴 (Archivo, OFL)을 웹뷰 안에 넣는다
+    + ((f) => `;(()=>{const s=document.createElement('style');s.textContent=${JSON.stringify(f)};document.head.appendChild(s)})();`)(
+      ['Archivo.ttf', 'normal', 'Archivo-Italic.ttf', 'italic'].reduce((css, v, i, a) => i % 2 ? css : css + `@font-face{font-family:'FilmBox Archivo';src:url(data:font/ttf;base64,${readFileSync(join(root, 'web/public/fonts', v)).toString('base64')});font-weight:100 900;font-stretch:62% 125%;font-style:${a[i + 1]}}`, ''))
   writeFileSync(join(root, 'galaxy/src/webToolsJs.ts'), `// 자동 생성: galaxy/build/tools-entry.ts + web core (node scripts/sync-galaxy-core.mjs)\nexport const webToolsJs = ${JSON.stringify(tools)}\n`)
   files.push('webTools')
 }

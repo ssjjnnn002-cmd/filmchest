@@ -21,4 +21,13 @@ const ios = path.join(root, 'App/FilmScan/Resources/FilmBoxes')
 fs.rmSync(ios, { recursive: true, force: true })
 fs.mkdirSync(ios, { recursive: true })
 for (const [k, url] of Object.entries(out)) fs.writeFileSync(path.join(ios, `filmbox-${k}.png`), Buffer.from(url.split(',')[1], 'base64'))
+const gal = path.join(root, 'galaxy/assets/canisters')
+fs.rmSync(gal, { recursive: true, force: true })
+fs.mkdirSync(gal, { recursive: true })
+for (const [k, url] of Object.entries(out)) fs.writeFileSync(path.join(gal, `${k}.png`), Buffer.from(url.split(',')[1], 'base64'))
+fs.writeFileSync(path.join(root, 'galaxy/src/canisterShots.ts'), `/* 자동 생성: scripts/render-film-boxes.mjs — 웹 filmBox.ts와 같은 상자 그림. 필름 id + 규격(135·120·110·45·810·inst). */
+export const canisterShots: Record<string, number> = {
+${Object.keys(out).sort().map((k) => `  '${k}': require('../assets/canisters/${k}.png'),`).join('\n')}
+}
+`)
 console.log(`✓ ${Object.keys(out).length}장`)

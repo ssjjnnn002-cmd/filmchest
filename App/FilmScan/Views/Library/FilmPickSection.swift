@@ -12,7 +12,16 @@ struct FilmPickSection<Footer: View>: View {
     @Binding var filmID: String?
     /// 카메라·재고의 규격 (이 규격에 맞는 필름만)
     var format: FilmFormat
+    /// 재고 추가처럼 규격을 같이 고를 땐 모든 규격의 필름을 보여 주고, 고른 칸의 규격을 넘긴다
+    var onFormat: ((FilmFormat) -> Void)? = nil
     @ViewBuilder var footer: () -> Footer
+
+    /// 한 칸. format이 있으면 그 규격으로 보여 주고 고른다 (규격으로 묶을 때)
+    private struct PickItem: Identifiable {
+        let stock: FilmStock
+        var format: FilmFormat?
+        var id: String { "\(stock.id)|\(format?.rawValue ?? "")" }
+    }
 
     @Query(sort: \RollItem.loadedAt, order: .reverse) private var rolls: [RollItem]
     @Query private var lots: [FilmLotItem]
@@ -47,7 +56,7 @@ struct FilmPickSection<Footer: View>: View {
             ((stock[s.id] ?? 0) > 0 ? 0 : 1, -(used[s.id] ?? 0), recent.firstIndex(of: s.id) ?? .max, popularFilmIDs.firstIndex(of: s.id) ?? .max)
         }
         return FilmStockCatalog.allIncludingCustom
-            .filter { format.accepts($0.formats) }
+            .filter { onFormat != nil || format.accepts($0.formats) }
             .filter { search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search) }
             .sorted { rank($0) < rank($1) }
     }
@@ -67,7 +76,7 @@ struct FilmPickSection<Footer: View>: View {
         return top
     }
 
-    private var sections: [(title: String?, items: [FilmStock])] {
+    private var sections: [(title: String?, items: [PickItem])] {
         let stock = stockByFilm, used = usedByFilm
         let sort = FilmLotSort(rawValue: by) ?? .name
         func key(_ s: FilmStock) -> Int { sort == .count ? stock[s.id] ?? 0 : sort == .usage ? used[s.id] ?? 0 : 0 }
@@ -75,7 +84,17 @@ struct FilmPickSection<Footer: View>: View {
             (key($0), $0.displayName.lowercased(), $0.iso) < (key($1), $1.displayName.lowercased(), $1.iso)
         }
         let g = GearGroup(rawValue: group).flatMap { GearGroup.filmStock.contains($0) ? $0 : nil } ?? .brand
-        return groupSections(descending ? asc.reversed() : asc) { $0.groupKey(g) }
+        let sorted = descending ? Array(asc.reversed()) : asc
+        if g == .format {
+            // 35mm·120처럼 여러 규격으로 나오는 필름은 규격마다 한 칸씩
+            var items: [PickItem] = []
+            for st in sorted {
+                var seen = Set<String>()
+                for f in st.formats where seen.insert(f.family.title).inserted { items.append(PickItem(stock: st, format: f)) }
+            }
+            return groupSections(items) { $0.format!.family }
+        }
+        return groupSections(sorted.map { PickItem(stock: $0) }) { $0.stock.groupKey(g) }
     }
 
     var body: some View {
@@ -85,10 +104,25 @@ struct FilmPickSection<Footer: View>: View {
                 // 정렬·묶기: 필름 재고 탭과 같은 기준, 가로로 넘겨 본다
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
-                        ForEach(FilmLotSort.allCases) { s in chip(s.title, on: by == s.rawValue) { by = s.rawValue } }
-                        chip(descending ? "내림차순 ↓" : "오름차순 ↑", on: false) { descending.toggle() }
-                        Rectangle().fill(.secondary.opacity(0.3)).frame(width: 1, height: 20).padding(.horizontal, 4)
+                        // 묶기(1순위) → 오름/내림 → 정렬 기준(묶음 안 2순위, 눌러서 고름). 웹·갤럭시와 같음
                         ForEach(GearGroup.filmStock) { g in chip(g.title, on: group == g.rawValue) { group = g.rawValue } }
+                        Rectangle().fill(.secondary.opacity(0.3)).frame(width: 1, height: 20).padding(.horizontal, 4)
+                        chip(descending ? "내림차순 ↓" : "오름차순 ↑", on: false) { descending.toggle() }
+                        Menu {
+                            Picker("정렬 기준", selection: $by) {
+                                ForEach(FilmLotSort.allCases) { Text($0.title).tag($0.rawValue) }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("정렬 기준 · \((FilmLotSort(rawValue: by) ?? .name).title)")
+                                Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+                            }
+                            .font(.subheadline.weight(.medium)).lineLimit(1).fixedSize()
+                            .padding(.horizontal, 12).frame(height: 32)
+                            .foregroundStyle(.primary)
+                            .background(Color.secondary.opacity(0.12), in: Capsule())
+                        }
+                        .buttonStyle(.borderless)
                     }
                     .padding(.vertical, 2)
                 }
@@ -109,7 +143,7 @@ struct FilmPickSection<Footer: View>: View {
                 // 추천 6개는 가로로 넘겨 본다 (아래 칸이 바로 보이게)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 6) {
-                        ForEach(visible) { cell($0).frame(width: 96) }
+                        ForEach(visible) { cell(PickItem(stock: $0)).frame(width: 96) }
                         customCell.frame(width: 96)
                     }
                     .padding(.vertical, 4)
@@ -149,11 +183,18 @@ struct FilmPickSection<Footer: View>: View {
         .buttonStyle(.borderless)
     }
 
-    private func cell(_ stock: FilmStock) -> some View {
+    private func cell(_ item: PickItem) -> some View {
+        let stock = item.stock
         let count = stockByFilm[stock.id] ?? 0
-        return Button { filmID = stock.id } label: {
+        // 규격으로 묶은 칸은 그 규격, 아니면 지금 규격(안 맞으면 그 필름의 첫 규격)
+        let shown = item.format ?? (format.accepts(stock.formats) ? format : stock.formats.first ?? format)
+        let on = filmID == stock.id && shown.family.title == format.family.title
+        return Button {
+            filmID = stock.id
+            if let onFormat, shown.family.title != format.family.title || item.format != nil { onFormat(shown) }
+        } label: {
             VStack(spacing: 2) {
-                FilmCanisterView(stock: stock, format: format).frame(height: 84)
+                FilmCanisterView(stock: stock, format: shown).frame(height: 84)
                 VStack(spacing: 1) {
                     Text(stock.displayName).font(.caption2).lineLimit(2).multilineTextAlignment(.center)
                     if count > 0 {
@@ -165,8 +206,8 @@ struct FilmPickSection<Footer: View>: View {
                 .frame(height: 42, alignment: .top)
             }
             .padding(4)
-            .background(RoundedRectangle(cornerRadius: 10).fill(filmID == stock.id ? Theme.safelight.opacity(0.15) : .clear))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(filmID == stock.id ? Theme.safelight : .clear, lineWidth: 2))
+            .background(RoundedRectangle(cornerRadius: 10).fill(on ? Theme.safelight.opacity(0.15) : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(on ? Theme.safelight : .clear, lineWidth: 2))
         }
         .buttonStyle(.plain)
     }
