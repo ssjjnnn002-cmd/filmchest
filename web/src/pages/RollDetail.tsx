@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll } from '../db'
 import { useNav } from '../App'
-import { weatherText, type FilmFormat, type LocationSegment, type Roll, type ShootingDay } from '../core/types'
-import { useMeterOn } from '../core/devMode'
-import { exposureText, meterProgress, meterShotMeta, meterShotsByOrder } from '../core/meter'
+import { weatherText, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
+import { exposureText, meterFrameTitle, meterProgress, meterShotsByOrder, shotRowMeta } from '../core/meter'
+import { ManualRecord, RollShotEdit } from './ManualRecord'
 import { RollGalleryButton } from '../ui/GallerySave'
 import { Canister, cameraName, Confirm, Sheet, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedDays, sortedLocations } from '../ui/common'
 import { DayEdit, LabDropOff, LensChangeEdit, PlaceEdit } from './Editors'
@@ -18,7 +18,6 @@ import { refreshRollPhotoMeta } from '../core/importer'
 
 export function RollDetail({ id }: { id: string }) {
   const nav = useNav()
-  const meterOn = useMeterOn()
   const roll = useLiveQuery(() => db.rolls.get(id), [id])
   usePhotoMetaSync(roll, nav.toast)
   const frames = useLiveQuery(() => db.frames.where('rollId').equals(id).sortBy('index'), [id]) ?? []
@@ -35,12 +34,13 @@ export function RollDetail({ id }: { id: string }) {
   const [sheet, setSheet] = useState(false)
   const [framePrint, setFramePrint] = useState(false)
   const [confirm, setConfirm] = useState(false)
-  const [tab, setTab] = useState<'log' | 'meter' | null>(null)
+  const [recording, setRecording] = useState(false)
+  const [shotEdit, setShotEdit] = useState<number>()
+  const [allShots, setAllShots] = useState(false)
 
   if (!roll) return null
-  // 노출 탭: 상세 기록을 남긴 롤이면 (노출계는 보류)
-  const showExposure = meterOn || (roll.meterShots?.length ?? 0) > 0
-  const view = showExposure ? tab ?? 'log' : 'log'
+  // 컷 기록: 촬영 중이거나 상세 기록을 남긴 롤
+  const showShots = roll.status === 'loaded' || (roll.meterShots?.length ?? 0) > 0
   const locs = sortedLocations(roll)
   const rangeOf = (i: number) => {
     const s = locs[i].startFrame
@@ -68,8 +68,6 @@ export function RollDetail({ id }: { id: string }) {
       {/* 맨 위 큰 제목 바로 아래: 제목 편집 (비우면 필름 이름) */}
       <button className="title-edit" onClick={() => setTitleEdit(roll.title ?? '')}><Icon name="pencil" size={15} />제목 편집</button>
 
-      <TagField tags={roll.tags ?? []} setTags={(tags) => db.rolls.update(id, { tags })} />
-
       <div style={{ display: 'flex', gap: 16, alignItems: 'center', margin: '0 4px 8px' }}>
         <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={104} />
         <div style={{ display: 'grid', gap: 3, minWidth: 0, justifyItems: 'start' }}>
@@ -86,14 +84,12 @@ export function RollDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      {showExposure && <div className="segmented" role="tablist" aria-label="롤 내용" style={{ margin: '8px 0 4px' }}>
-        <button role="tab" aria-selected={view === 'log'} className={view === 'log' ? 'on' : ''} onClick={() => setTab('log')}>기록</button>
-        <button role="tab" aria-selected={view === 'meter'} className={view === 'meter' ? 'on' : ''} onClick={() => setTab('meter')}>노출</button>
-      </div>}
+      {/* 다음에 할 일을 맨 위에: 상세 기록 / 현상소 고르기 / 스캔 불러오기 (아이폰과 같음) */}
+      {roll.status === 'loaded' && <button className="btn primary block" style={{ margin: '4px 0 8px' }} onClick={() => setRecording(true)}>상세 기록</button>}
+      {roll.status === 'finished' && <div className="section"><button className="btn primary block" onClick={() => setDropOff(true)}>현상소 고르기</button><p className="footnote">고르면 스캔 대기로 넘어가요.</p></div>}
+      {roll.status === 'atLab' && <div className="section"><ScanButton rollId={id} /><p className="footnote">현상소에서 받은 zip이나 사진을 골라요.</p></div>}
 
-      {view === 'meter' ? <MeterPanel roll={roll} format={rollCameraFormat(camera, roll)} /> : null}
-
-      {view === 'log' && roll.status === 'imported' && frames.length > 0 && (
+      {roll.status === 'imported' && frames.length > 0 && (
         <div className="section">
           <div className="bleed"><FilmStrip roll={roll} frames={frames} onSelect={setViewing} /></div>
           <div style={{ display: 'grid', gap: 10 }}>
@@ -105,7 +101,8 @@ export function RollDetail({ id }: { id: string }) {
         </div>
       )}
 
-      {view === 'log' && <>
+      {showShots && <ShotsSection roll={roll} format={rollCameraFormat(camera, roll)} onEdit={setShotEdit} onAll={() => setAllShots(true)} />}
+
       <div className="section">
         <h2>촬영일</h2>
         <div className="group">
@@ -175,20 +172,8 @@ export function RollDetail({ id }: { id: string }) {
         </div>
       )}
 
-      <div className="section">
-        <div className="action-stack">
-          {roll.status === 'loaded' && <button className="btn primary" onClick={() => setDropOff(true)}>촬영 끝내기</button>}
-          {roll.status === 'finished' && <>
-            <button className="btn soft" onClick={() => setDropOff(true)}>현상소 고르기</button>
-            <button className="btn" onClick={() => db.rolls.update(id, { status: 'loaded' })}>다시 촬영 중으로</button>
-          </>}
-          {roll.status === 'atLab' && <>
-            <ScanButton rollId={id} />
-          </>}
-          {roll.status === 'imported' && <ScanButton rollId={id} label="다시 불러오기" />}
-          {roll.status === 'imported' && <button className="btn" onClick={() => { void syncPhotoMeta(id, nav.toast) }}>사진 날짜·위치 다시 맞추기</button>}
-        </div>
-      </div>
+      {/* 정리: 태그 · 프로젝트 · 메모 */}
+      <TagField tags={roll.tags ?? []} setTags={(tags) => db.rolls.update(id, { tags })} />
 
       <RollProjects roll={roll} />
 
@@ -202,8 +187,25 @@ export function RollDetail({ id }: { id: string }) {
             onBlur={(e) => db.rolls.update(id, { note: e.target.value.trim() || undefined })} />
         </div></div>
       </div>
-      </>}
 
+      {roll.status !== 'atLab' && (
+        <div className="section">
+        <div className="action-stack">
+          {roll.status === 'loaded' && <button className="btn primary" onClick={() => setDropOff(true)}>촬영 끝내기</button>}
+          {roll.status === 'finished' && <button className="btn" onClick={() => db.rolls.update(id, { status: 'loaded' })}>다시 촬영 중으로</button>}
+          {roll.status === 'imported' && <ScanButton rollId={id} label="다시 불러오기" />}
+          {roll.status === 'imported' && <button className="btn" onClick={() => { void syncPhotoMeta(id, nav.toast) }}>사진 날짜·위치 다시 맞추기</button>}
+        </div>
+      </div>
+      )}
+
+      {recording && <ManualRecord roll={roll} onClose={() => setRecording(false)} />}
+      {shotEdit !== undefined && <RollShotEdit roll={roll} pos={shotEdit} onClose={() => setShotEdit(undefined)} onToast={nav.toast} />}
+      {allShots && (
+        <Sheet title="컷 기록" onClose={() => setAllShots(false)} right={<button className="btn ghost" onClick={() => setAllShots(false)}><b>완료</b></button>}>
+          <AllShots roll={roll} format={rollCameraFormat(camera, roll)} onEdit={(p) => { setAllShots(false); setShotEdit(p) }} />
+        </Sheet>
+      )}
       {day && <DayEdit roll={roll} day={day === 'new' ? undefined : day} onClose={() => setDay(null)} />}
       {place && <PlaceEdit roll={roll} segment={place === 'new' ? undefined : place} onClose={() => setPlace(null)} />}
       {titleEdit !== undefined && (
@@ -239,7 +241,37 @@ function Info({ label, value }: { label: string; value: string }) {
   return <div className="row static"><span className="grow">{label}</span><span className="value">{value}</span></div>
 }
 
-function MeterPanel({ roll, format }: { roll: Roll; format: FilmFormat }) {
+/** 롤 화면의 컷 기록: 최근 5컷, 넘으면 전체 보기 (아이폰과 같음) */
+function ShotsSection({ roll, format, onEdit, onAll }: { roll: Roll; format: FilmFormat; onEdit: (pos: number) => void; onAll: () => void }) {
+  const shots = [...(roll.meterShots ?? [])].sort((a, b) => a.pos - b.pos)
+  const recent = shots.length > 6 ? [...shots].sort((a, b) => b.order - a.order).slice(0, 5).sort((a, b) => a.pos - b.pos) : shots
+  const { capacity } = meterProgress(shots.length, format)
+  return (
+    <div className="section">
+      <h2 className="section-title"><span>컷 기록</span>{shots.length > 0 && <span className="sub" style={{ fontWeight: 600 }}>{shots.length} / {capacity}컷</span>}</h2>
+      <div className="group">
+        {shots.length === 0 && <div className="row static sub">상세 기록에서 찍으면 여기에 쌓여요.</div>}
+        {recent.map((s) => <ShotRow key={s.pos} shot={s} prewind={!!roll.meterPrewind} onClick={() => onEdit(s.pos)} />)}
+        {shots.length > recent.length && <button className="row" onClick={onAll}><span className="grow">전체 {shots.length}컷 보기</span><Icon name="chev" size={16} /></button>}
+      </div>
+    </div>
+  )
+}
+
+function ShotRow({ shot, prewind, onClick }: { shot: MeterShot; prewind: boolean; onClick: () => void }) {
+  return (
+    <button className="row" onClick={onClick}>
+      <span className="grow">
+        {meterFrameTitle(shot.pos, prewind)}
+        <div className="sub">{shotRowMeta(shot)}</div>
+      </span>
+      <span className="value">{exposureText(shot)}</span>
+    </button>
+  )
+}
+
+/** 컷 기록 전체 (찍은 순서) */
+function AllShots({ roll, format, onEdit }: { roll: Roll; format: FilmFormat; onEdit: (pos: number) => void }) {
   const shots = meterShotsByOrder(roll.meterShots)
   const { shot, capacity, percent } = meterProgress(shots.length, format)
   const prewind = !!roll.meterPrewind
@@ -260,16 +292,7 @@ function MeterPanel({ roll, format }: { roll: Roll; format: FilmFormat }) {
       <div className="section">
         <h2>찍은 순서</h2>
         <div className="group">
-          {shots.length === 0 && <div className="row static sub">아직 기록한 컷이 없어요. 노출계에서 찍으면 여기에 쌓여요.</div>}
-          {shots.map((s) => (
-            <div key={s.pos} className="row static">
-              <span className="grow">
-                {s.order}번째
-                <div className="sub">{meterShotMeta(s, prewind)}</div>
-              </span>
-              <span className="value">{exposureText(s)}</span>
-            </div>
-          ))}
+          {shots.map((s) => <ShotRow key={s.pos} shot={s} prewind={prewind} onClick={() => onEdit(s.pos)} />)}
         </div>
       </div>
     </>

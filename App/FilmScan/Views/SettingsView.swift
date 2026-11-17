@@ -36,44 +36,37 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("화면") {
-                    Picker("테마", selection: $appearance) {
-                        ForEach(AppearanceMode.allCases) { Text($0.displayName).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Section("계정") {
+                // 계정 · 백업 · 저장을 한곳에 (웹·갤럭시와 같은 순서)
+                Section {
                     let _ = accountRevision
                     if GoogleAuth.isConnected {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(GoogleAuth.account ?? "구글 계정")
                             Text("기록과 사진을 내 구글 드라이브에 맞춰요").font(.caption).foregroundStyle(.secondary)
                         }
-                        Button("로그아웃", role: .destructive) { confirmLogout = true }
                     } else {
                         Button("구글로 로그인") { showLogin = true }.tint(Theme.safelight)
                     }
-                }
-
-                // 웹·갤럭시와 같은 자리: 계정 바로 아래 통계 · 백업 및 복구
-                Section {
-                    NavigationLink("통계") { StatsView() }
                     NavigationLink {
                         BackupRestoreView()
                     } label: {
                         LabeledContent("백업 및 복구", value: CloudStatus.text)
                     }
-                }
-                Section {
                     LabeledContent("이 앱에 저장된 양", value: Resolution.bytes(usedBytes) ?? "—")
+                    if GoogleAuth.isConnected {
+                        Button("로그아웃", role: .destructive) { confirmLogout = true }
+                    }
                 } header: {
-                    Text("저장")
+                    Text("계정 · 백업")
                 } footer: {
                     let _ = accountRevision
                     Text(GoogleAuth.isConnected
                          ? "기록과 사진은 이 앱과 내 구글 드라이브에 저장돼요. 같은 계정으로 로그인한 기기에서만 보여요."
                          : "기록과 사진은 이 앱 안에만 저장돼요. 앱을 지우면 함께 지워지니, 구글로 로그인하거나 백업해 두세요.")
+                }
+
+                Section {
+                    NavigationLink("통계") { StatsView() }
                 }
 
                 if Features.meter { meterSection }
@@ -96,6 +89,13 @@ struct SettingsView: View {
                     Text("앞으로 불러오는 스캔부터 적용돼요. 이미 저장한 사진은 그대로예요.")
                 }
 
+                Section("화면") {
+                    Picker("테마", selection: $appearance) {
+                        ForEach(AppearanceMode.allCases) { Text($0.displayName).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
                 if Subscriptions.subscriptionEnabled {
                     Section {
                         if Subscriptions.shared.isSubscribed {
@@ -112,11 +112,8 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("안내") {
-                    NavigationLink("개인정보 처리방침") { PrivacyPolicyView() }
-                }
-
                 Section {
+                    NavigationLink("개인정보 처리방침") { PrivacyPolicyView() }
                     LabeledContent("앱 버전", value: Self.appVersion)
                     Button {
                         if devMode { confirmDevOff = true } else { devCode = ""; askDevCode = true }
@@ -128,15 +125,11 @@ struct SettingsView: View {
                         NavigationLink("노출계 시험") { MeterLabView() }
                     }
                 } header: {
-                    Text("버전")
+                    Text("정보")
                 }
 
                 Section {
                     Button("모든 기록 지우기", role: .destructive) { confirmWipe = true }
-                } footer: {
-                    Text("필름함 \(Self.appVersion)")
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 24)
                 }
             }
             .formStyle(.grouped)

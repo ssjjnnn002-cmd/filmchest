@@ -81,6 +81,17 @@ export function meterShotMeta(shot: MeterShot, prewind = false): string {
   return parts.filter(Boolean).join(' · ')
 }
 
+/** 롤 화면 한 줄: 모드 · 화각 · 필터 · 장소 · 시간 (칸 번호는 앞에 따로). 아이폰 MeterShot.rowMeta와 같음 */
+export function shotRowMeta(shot: MeterShot): string {
+  const parts = [modeName[shot.mode] ?? shot.mode]
+  if (shot.focal) parts.push(`${shot.focal}mm`)
+  if (shot.filters?.length) parts.push(shot.filters.join(', '))
+  if (shot.place) parts.push(shot.place)
+  const d = shot.at ? new Date(shot.at) : undefined
+  if (d && !isNaN(+d)) parts.push(`${d.getMonth() + 1}.${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
+  return parts.filter(Boolean).join(' · ')
+}
+
 /** 맞출 때 앞뒤로 옮길 수 있는 칸 수 */
 export const meterAlignLimit = 6
 

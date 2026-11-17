@@ -58,44 +58,30 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
 
   return (
     <Sheet title="설정" onClose={onClose} left={<span />} right={<button className="btn ghost" onClick={onClose}><b>완료</b></button>}>
+      {/* 계정 · 백업 · 저장을 한곳에 (아이폰·갤럭시와 같은 순서) */}
       <div className="section">
-        <h2>화면</h2>
-        <div className="segmented slide" style={{ '--i': Math.max(0, themes.findIndex(([k]) => k === theme)), '--n': themes.length } as React.CSSProperties}>
-          {themes.map(([k, n]) => <button key={k} className={k === theme ? 'on' : ''} onClick={() => choose(k)}>{n}</button>)}
-        </div>
-      </div>
-
-      {driveAvailable && !inClaudeHost() && (
-        <div className="section">
-          <h2>계정</h2>
-          <div className="group">
-            {driveConnected() ? <>
-              <div className="row static"><span className="grow">{driveAccount() ?? '구글 계정'}<span className="sub">기록과 사진을 내 구글 드라이브에 맞춰요</span></span></div>
-              <button className="row danger" onClick={() => setLogout(true)}>로그아웃</button>
-            </> : <button className="row accent" onClick={() => setLogin(true)}>구글로 로그인</button>}
-          </div>
-        </div>
-      )}
-
-      <div className="section">
+        <h2>계정 · 백업</h2>
         <div className="group">
-          <button className="row" onClick={() => setSpending(true)}><span className="grow">통계</span><Icon name="chev" size={18} /></button>
+          {driveAvailable && !inClaudeHost() && (driveConnected()
+            ? <div className="row static"><span className="grow">{driveAccount() ?? '구글 계정'}<span className="sub">기록과 사진을 내 구글 드라이브에 맞춰요</span></span></div>
+            : <button className="row accent" onClick={() => setLogin(true)}>구글로 로그인</button>)}
           <button className="row" onClick={() => setBackupOpen(true)}><span className="grow">백업 및 복구</span><span className="value">{cloudStatus()}</span><Icon name="chev" size={18} /></button>
-        </div>
-        <p className="footnote">{lastBackupText()}</p>
-      </div>
-
-      <div className="section">
-        <h2>저장</h2>
-        <div className="group">
           <div className="row static"><span className="grow">이 브라우저에 저장된 양</span><span className="value">{bytesText(usage?.used) ?? '—'}</span></div>
+          {driveAvailable && !inClaudeHost() && driveConnected() && <button className="row danger" onClick={() => setLogout(true)}>로그아웃</button>}
         </div>
         <p className="footnote">
           {driveConnected()
             ? '기록과 사진은 이 브라우저와 내 구글 드라이브에 저장돼요. 같은 계정으로 로그인한 기기에서만 보여요.'
             : '기록과 사진은 이 브라우저 안에만 저장돼요. 브라우저 데이터를 지우면 함께 지워지니, 구글로 로그인하거나 백업해 두세요.'}
+          {' '}{lastBackupText()}
         </p>
         {inClaudeHost() && <p className="footnote">이 화면에서는 위치 확인과 장소 검색을 쓸 수 없어요. 장소는 이름과 좌표를 직접 넣어 주세요.</p>}
+      </div>
+
+      <div className="section">
+        <div className="group">
+          <button className="row" onClick={() => setSpending(true)}><span className="grow">통계</span><Icon name="chev" size={18} /></button>
+        </div>
       </div>
 
       {apk && (
@@ -116,15 +102,16 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
 
 
       <div className="section">
-        <h2>안내</h2>
-        <div className="group">
-          <button className="row" onClick={() => setPrivacy(true)}>개인정보 처리방침</button>
+        <h2>화면</h2>
+        <div className="segmented slide" style={{ '--i': Math.max(0, themes.findIndex(([k]) => k === theme)), '--n': themes.length } as React.CSSProperties}>
+          {themes.map(([k, n]) => <button key={k} className={k === theme ? 'on' : ''} onClick={() => choose(k)}>{n}</button>)}
         </div>
       </div>
 
       <div className="section">
-        <h2>버전</h2>
+        <h2>정보</h2>
         <div className="group">
+          <button className="row" onClick={() => setPrivacy(true)}>개인정보 처리방침</button>
           <div className="row static">
             <span className="grow">앱 버전</span>
             <span className="value">{__APP_VERSION__}</span>
@@ -144,7 +131,6 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         <button className="row" style={{ color: '#c0392b' }} onClick={() => setConfirm(true)}>모든 기록 지우기</button>
       </div>
 
-      <p className="footnote" style={{ textAlign: 'center', marginTop: 24 }}>필름함 {__APP_VERSION__}</p>
       {privacy && (
         <Sheet title="개인정보 처리방침" onClose={() => setPrivacy(false)}>
           <PrivacyPolicy />

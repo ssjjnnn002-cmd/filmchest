@@ -3,8 +3,8 @@ import SwiftData
 import FilmScanCore
 
 struct RollDetailView: View {
-    /// 노출 탭: 상세 기록을 남긴 롤이면 보인다 (노출계는 보류)
-    private var showExposure: Bool { Features.meter || !roll.meterShots.isEmpty }
+    /// 컷 기록: 촬영 중이거나 상세 기록을 남긴 롤
+    private var showShots: Bool { roll.status == .loaded || !roll.meterShots.isEmpty }
     @Bindable var roll: RollItem
     @Environment(Router.self) private var router
     @Environment(\.modelContext) private var context
@@ -43,17 +43,7 @@ struct RollDetailView: View {
     @State private var shotEdit: Int?
     @State private var viewing: ViewerTarget?
     @State private var confirmDelete = false
-    @State private var detailTab: DetailTab
-
-    init(roll: RollItem) {
-        self.roll = roll
-        _detailTab = State(initialValue: .log)
-    }
-
-    private enum DetailTab: String, CaseIterable {
-        case log = "기록"
-        case meter = "노출"
-    }
+    @State private var recording = false
     /// 목록 가장자리 여백 (필름을 화면 끝까지 늘이려고 잰다)
     @State private var stripInset: CGFloat = 16
 
@@ -82,7 +72,19 @@ struct RollDetailView: View {
             .listSectionSpacing(4)
             header
 
-            // 다음에 할 일을 맨 위에 크게: 현상소 고르기 / 스캔 불러오기
+            // 다음에 할 일을 맨 위에 크게: 상세 기록 / 현상소 고르기 / 스캔 불러오기
+            if roll.status == .loaded {
+                Section {
+                    Button { recording = true } label: {
+                        Label("상세 기록", systemImage: "dial.medium").font(.headline)
+                            .frame(maxWidth: .infinity).padding(.vertical, 8)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.safelight)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                }
+            }
             if roll.status == .finished || roll.status == .atLab {
                 Section {
                     Button {
@@ -103,24 +105,8 @@ struct RollDetailView: View {
                 }
             }
 
-            TagField(tags: Binding(get: { roll.tags }, set: { roll.tags = $0 }))
-                .disabled(showDropOff)
 
-            if showExposure {
-            Section {
-                Picker("보기", selection: $detailTab) {
-                    ForEach(DetailTab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-            }
-            }
-
-            if showExposure && detailTab == .meter {
-                meterSummary
-                meterShots
-            } else if roll.status == .imported, !(roll.frames ?? []).isEmpty {
+            if roll.status == .imported, !(roll.frames ?? []).isEmpty {
                 Section {
                     VStack(spacing: 10) {
                         Button { showContactSheet = true } label: {
@@ -153,7 +139,8 @@ struct RollDetailView: View {
                 }
             }
 
-            if !showExposure || detailTab == .log {
+            if showShots { shotsSection }
+
             Section {
                 ForEach(roll.sortedDays) { day in
                     Button { editingDay = day } label: {
@@ -238,9 +225,9 @@ struct RollDetailView: View {
             }
             }
 
-            Section {
-                statusActions
-            }
+            // 정리: 태그 · 프로젝트 · 메모
+            TagField(tags: Binding(get: { roll.tags }, set: { roll.tags = $0 }))
+                .disabled(showDropOff)
 
             RollProjectsSection(roll: roll)
 
@@ -256,6 +243,9 @@ struct RollDetailView: View {
                         .font(.footnote).textCase(nil).fixedSize().tint(Theme.safelight)
                 }
             }
+
+            if roll.status != .atLab {
+                Section { statusActions }
             }
         }
         .scrollContentBackground(.hidden)
@@ -311,6 +301,9 @@ struct RollDetailView: View {
         .onChange(of: showDropOff) { _, open in
             if open { dropOffWasLoaded = roll.status == .loaded }
         }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $recording) { RollManualRecordView(roll: roll) }
+        #endif
         .sheet(isPresented: Binding(get: { shotEdit != nil }, set: { if !$0 { shotEdit = nil } })) {
             if let shotEdit { FrameShotEditView(roll: roll, pos: shotEdit) }
         }
@@ -332,52 +325,40 @@ struct RollDetailView: View {
         }
     }
 
-    private var meterSummary: some View {
-        let shots = roll.meterShots
-        let capacity = roll.format.framesPerRoll
-        let percent = capacity > 0 ? Int((Double(shots.count) / Double(capacity) * 100).rounded()) : 0
-        let prewind = roll.meterPrewind == true
+    /// 롤 화면의 컷 기록: 최근 5컷, 넘으면 전체 보기
+    private var shotsSection: some View {
+        let shots = roll.meterShots.sorted { $0.pos < $1.pos }
+        let recent = shots.count > 6 ? Array(roll.meterShots.sorted { $0.order > $1.order }.prefix(5)).sorted { $0.pos < $1.pos } : shots
         return Section {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("\(percent)%").font(.largeTitle.bold().monospacedDigit())
-                    Spacer()
-                    Text("\(shots.count) / \(capacity)컷").foregroundStyle(.secondary)
-                }
-                ProgressView(value: Double(min(shots.count, capacity)), total: Double(max(capacity, 1)))
-                    .tint(Theme.safelight)
-                if shots.count > capacity {
-                    Text("\(capacity)컷을 넘겨 \(shots.count - capacity)장 더 찍었어요.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+            if shots.isEmpty {
+                Text("상세 기록에서 찍으면 여기에 쌓여요.").foregroundStyle(.secondary)
             }
-        } footer: {
-            Text((prewind ? "역순으로 기록 중이에요. " : "") + "스캔을 불러오면 1번 칸의 기록이 첫 장에, 같은 번호끼리 붙어요.")
+            ForEach(recent, id: \.pos) { shot in shotRow(shot) }
+            if shots.count > recent.count {
+                NavigationLink("전체 \(shots.count)컷 보기") { RollShotsView(roll: roll) }
+            }
+        } header: {
+            HStack {
+                Text("컷 기록")
+                Spacer()
+                if !shots.isEmpty { Text("\(shots.count) / \(roll.format.framesPerRoll)컷").textCase(nil) }
+            }
         }
     }
 
-    private var meterShots: some View {
-        let shots = roll.meterShots.sorted { ($0.order, $0.pos) < ($1.order, $1.pos) }
-        let prewind = roll.meterPrewind == true
-        return Section("찍은 순서") {
-            if shots.isEmpty {
-                Text("아직 기록한 컷이 없어요. 노출계에서 찍으면 여기에 쌓여요.")
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(shots, id: \.pos) { shot in
-                Button { shotEdit = shot.pos } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\(shot.order)번째")
-                            Text(shot.sequenceMeta(prewind: prewind)).font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 8)
-                        Text(shot.exposureLine).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
-                    }
+    private func shotRow(_ shot: MeterShot) -> some View {
+        Button { shotEdit = shot.pos } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(MeterShot.frameTitle(shot.pos, prewind: roll.meterPrewind == true))
+                    Text(shot.rowMeta).font(.caption).foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
+                Spacer(minLength: 8)
+                Text(shot.exposureLine).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
             }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     private var header: some View {
@@ -420,10 +401,9 @@ struct RollDetailView: View {
         case .loaded:
             Button("촬영 끝내기") { showDropOff = true }
         case .finished:
-            Button("현상소 고르기", systemImage: "shippingbox") { showDropOff = true }
             Button("다시 촬영 중으로", systemImage: "arrow.uturn.backward") { roll.status = .loaded }
         case .atLab:
-            Button("스캔 불러오기", systemImage: "doc.zipper") { router.pickZip(for: roll) }
+            EmptyView()
         case .imported:
             Button("다시 불러오기", systemImage: "arrow.clockwise") { router.pickZip(for: roll) }
             if (roll.frames ?? []).contains(where: { $0.assetIdentifier != nil }) {
@@ -502,5 +482,75 @@ struct RollDetailView: View {
         #else
         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Photos.app"))
         #endif
+    }
+}
+
+/// 컷 기록 전체 (찍은 순서). 누르면 그 컷 고치기
+struct RollShotsView: View {
+    @Bindable var roll: RollItem
+    @State private var shotEdit: Int?
+
+    var body: some View {
+        List {
+            meterSummary
+            meterShots
+        }
+        .scrollContentBackground(.hidden)
+        .background(Theme.paper)
+        .navigationTitle("컷 기록")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .sheet(isPresented: Binding(get: { shotEdit != nil }, set: { if !$0 { shotEdit = nil } })) {
+            if let shotEdit { FrameShotEditView(roll: roll, pos: shotEdit) }
+        }
+    }
+
+    private var meterSummary: some View {
+        let shots = roll.meterShots
+        let capacity = roll.format.framesPerRoll
+        let percent = capacity > 0 ? Int((Double(shots.count) / Double(capacity) * 100).rounded()) : 0
+        let prewind = roll.meterPrewind == true
+        return Section {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(percent)%").font(.largeTitle.bold().monospacedDigit())
+                    Spacer()
+                    Text("\(shots.count) / \(capacity)컷").foregroundStyle(.secondary)
+                }
+                ProgressView(value: Double(min(shots.count, capacity)), total: Double(max(capacity, 1)))
+                    .tint(Theme.safelight)
+                if shots.count > capacity {
+                    Text("\(capacity)컷을 넘겨 \(shots.count - capacity)장 더 찍었어요.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        } footer: {
+            Text((prewind ? "역순으로 기록 중이에요. " : "") + "스캔을 불러오면 1번 칸의 기록이 첫 장에, 같은 번호끼리 붙어요.")
+        }
+    }
+
+    private var meterShots: some View {
+        let shots = roll.meterShots.sorted { ($0.order, $0.pos) < ($1.order, $1.pos) }
+        let prewind = roll.meterPrewind == true
+        return Section("찍은 순서") {
+            if shots.isEmpty {
+                Text("아직 기록한 컷이 없어요. 상세 기록에서 찍으면 여기에 쌓여요.")
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(shots, id: \.pos) { shot in
+                Button { shotEdit = shot.pos } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(shot.order)번째")
+                            Text(shot.sequenceMeta(prewind: prewind)).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        Text(shot.exposureLine).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 }

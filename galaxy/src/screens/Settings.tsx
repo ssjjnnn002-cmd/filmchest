@@ -217,43 +217,33 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   return (
     <>
       <Sheet title="설정" onClose={onClose} left={null} right={<SheetBtn label="완료" accent onPress={onClose} />}>
+        {/* 계정 · 백업 · 저장을 한곳에 (아이폰·웹과 같은 순서) */}
+        <Section title="계정 · 백업" foot={(driveConnected()
+          ? '기록과 사진은 이 앱과 내 구글 드라이브에 저장돼요. 같은 계정으로 로그인한 기기에서만 보여요.'
+          : '기록과 사진은 이 앱 안에만 저장돼요. 앱을 지우면 함께 지워지니, 구글로 로그인하거나 백업해 두세요.') + ' ' + lastBackupText()}>
+          <Group>
+            {driveConnected()
+              ? <Row static><RowText sub="기록과 사진을 내 구글 드라이브에 맞춰요">{driveAccount() ?? '구글 계정'}</RowText></Row>
+              : <Row onPress={() => setLogin(true)}><Text style={{ color: c.safelight, fontSize: 17 }}>구글로 로그인</Text></Row>}
+            <Row chev value={cloudStatus()} onPress={() => setBackupOpen(true)}><RowText>백업 및 복구</RowText></Row>
+            <Row static value={bytesText(usage?.used) ?? '—'}><RowText>이 앱에 저장된 양</RowText></Row>
+            {driveConnected() ? <Row onPress={() => setLogout(true)}><RowText color={c.danger}>로그아웃</RowText></Row> : null}
+          </Group>
+        </Section>
+
+        <Section>
+          <Group>
+            <Row chev onPress={() => setSpending(true)}><RowText>통계</RowText></Row>
+          </Group>
+        </Section>
+
         <Section title="화면">
           <Segmented value={theme} options={themes} onChange={choose} />
         </Section>
 
-        <Section title="계정">
-          <Group>
-            {driveConnected() ? [
-              <Row key="a" static><RowText sub="기록과 사진을 내 구글 드라이브에 맞춰요">{driveAccount() ?? '구글 계정'}</RowText></Row>,
-              <Row key="o" onPress={() => setLogout(true)}><RowText color={c.danger}>로그아웃</RowText></Row>,
-            ] : <Row onPress={() => setLogin(true)}><Text style={{ color: c.safelight, fontSize: 17 }}>구글로 로그인</Text></Row>}
-          </Group>
-        </Section>
-
-        <Section foot={lastBackupText()}>
-          <Group>
-            <Row chev onPress={() => setSpending(true)}><RowText>통계</RowText></Row>
-            <Row chev value={cloudStatus()} onPress={() => setBackupOpen(true)}><RowText>백업 및 복구</RowText></Row>
-          </Group>
-        </Section>
-
-        <Section title="저장" foot={driveConnected()
-          ? '기록과 사진은 이 앱과 내 구글 드라이브에 저장돼요. 같은 계정으로 로그인한 기기에서만 보여요.'
-          : '기록과 사진은 이 앱 안에만 저장돼요. 앱을 지우면 함께 지워지니, 구글로 로그인하거나 백업해 두세요.'}>
-          <Group>
-            <Row static value={bytesText(usage?.used) ?? '—'}><RowText>이 앱에 저장된 양</RowText></Row>
-          </Group>
-        </Section>
-
-
-        <Section title="안내">
+        <Section title="정보" foot="앱 버전은 아이폰, 갤럭시, 웹이 같습니다.">
           <Group>
             <Row onPress={() => setPrivacy(true)}>개인정보 처리방침</Row>
-          </Group>
-        </Section>
-
-        <Section title="버전" foot="앱 버전은 아이폰, 갤럭시, 웹이 같습니다.">
-          <Group>
             <Row static value={APP_VERSION}><RowText>앱 버전</RowText></Row>
             <Row chev value={update} onPress={() => { void withWork(async () => {
               try {
@@ -269,7 +259,6 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
           <Row onPress={() => setConfirm(true)}><RowText color="#c0392b">모든 기록 지우기</RowText></Row>
         </Group>
 
-        <View style={{ marginTop: 24, alignItems: 'center' }}><Footnote>필름함 {APP_VERSION}</Footnote></View>
       </Sheet>
       {dialogs}
     </>

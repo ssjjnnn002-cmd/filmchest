@@ -118,35 +118,51 @@ export function ManualRecord({ roll, onClose }: { roll: Roll; onClose: () => voi
   )
 }
 
-function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: Camera; allLenses: GearLens[]; onClose: () => void }) {
-  const insets = useSafeAreaInsets()
+/** 이 롤의 카메라·렌즈로 정하는 다이얼 자리 (기록 화면과 컷 고치기가 같이 쓴다) */
+function setupOf(roll: Roll, camera: Camera | undefined, allLenses: GearLens[]) {
   const film = rollFilm(roll)
   const frames = framesPerRoll[rollCameraFormat(camera, roll)] ?? 36
   const iso = roll.shotISO ?? film?.iso ?? 400
-  const [shots, setShots] = useState<MeterShot[]>(() => [...(roll.meterShots ?? [])].sort((a, b) => a.pos - b.pos))
-  // 렌즈: 고정형이면 이름에서, 아니면 다음 컷에 끼운 렌즈 → 롤 렌즈. 바꿔 낄 수 있는 렌즈는 같은 마운트
+  // 렌즈: 고정형이면 이름에서, 아니면 같은 마운트 렌즈
   const fixedName = camera?.fixedLens ?? roll.cameraFixedLens
   const mount = camera?.mount ?? allLenses.find((l) => l.id === roll.lensId)?.mount
-  const lensList = useMemo(() => (fixedName ? [] : allLenses.filter((l) => l.mount && l.mount === mount).map(lensOf)), [allLenses, fixedName, mount])
-  const [lens, setLens] = useState<Lens>(() => {
+  const lensList: Lens[] = fixedName ? [] : allLenses.filter((l) => l.mount && l.mount === mount).map(lensOf)
+  const lensById = (lid?: string): Lens | undefined => {
     if (fixedName) return fixedLens(fixedName)
-    const cur = allLenses.find((l) => l.id === (lensIdAt(roll, shots.length + 1) ?? roll.lensId))
-    return cur ? lensOf(cur) : { id: 'generic', name: '렌즈', min: 50, max: 50, open: 1.4, close: 22 }
-  })
+    const l = allLenses.find((x) => x.id === lid)
+    return l ? lensOf(l) : undefined
+  }
   // 셔터 범위·P 모드: 카메라 목록. 모르면 똑딱이는 완전 자동, 그 밖은 1/1000–1초
   const known = camera ? catalogMatch(camera.brand, camera.model) : undefined
   const range = known?.shutter ?? (camera?.style === 'compact' ? [] : [1000, 1])
   const manual = range.length === 2
   const program = known ? !!known.program : camera?.style === 'compact'
-  const [dial, setDial] = useState<Dial>(() => {
+  const baseDial = (lens: Lens): Dial => {
     const aps = apertures(lens.open, lens.close)
     const fullAuto = !manual && program
     const stops = dialOf.stops(manual ? speeds(range[0], range[1]) : [], manual, program)
     const sp = stops.map((v, i) => [v, i]).filter(([v]) => v > 0)
     return { stops, aps, s: manual && sp.length ? sp[nearest(sp.map(([v]) => v), 1 / 125)][1] : 0,
       a: fullAuto ? 0 : 1 + nearest(aps, 8), c: 6, fullAuto, lastA: 0 }
+  }
+  return { film, frames, iso, lensList, lensById, baseDial }
+}
+const GENERIC: Lens = { id: 'generic', name: '렌즈', min: 50, max: 50, open: 1.4, close: 22 }
+
+function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: Camera; allLenses: GearLens[]; onClose: () => void }) {
+  const insets = useSafeAreaInsets()
+  const setup = useMemo(() => setupOf(roll, camera, allLenses), [roll.id, camera, allLenses])
+  const { film, frames, iso, lensList } = setup
+  const [shots, setShots] = useState<MeterShot[]>(() => [...(roll.meterShots ?? [])].sort((a, b) => a.pos - b.pos))
+  // 이어서: 마지막에 찍은 컷의 렌즈·필터·다이얼 값에서 다시 시작
+  const last = useMemo(() => [...(roll.meterShots ?? [])].sort((a, b) => b.order - a.order)[0], [])
+  const [lens, setLens] = useState<Lens>(() =>
+    (last?.lensId ? setup.lensById(last.lensId) : undefined) ?? setup.lensById(lensIdAt(roll, shots.length + 1) ?? roll.lensId) ?? GENERIC)
+  const [dial, setDial] = useState<Dial>(() => {
+    const base = setup.baseDial(lens)
+    return last ? dialOf.fromShot(last, base, base.aps) : base
   })
-  const [filters, setFilters] = useState<string[]>([])
+  const [filters, setFilters] = useState<string[]>(() => last?.filters ?? [])
   const [frame, setFrame] = useState(() => Math.max(0, ...(roll.meterShots ?? []).map((s) => s.pos)) + 1)
   const [placeName, setPlaceName] = useState('')
   const [point, setPoint] = useState<GeoPoint>()
@@ -637,5 +653,22 @@ function ShotEdit({ shot, like, lenses, current, iso, onClose, onSave, onDelete 
         {ask ? <Confirm message="이 칸 기록을 지울까요?" action="지우기" onCancel={() => setAsk(false)} onConfirm={onDelete} /> : null}
       </View>
     </Modal>
+  )
+}
+
+/** 롤 화면에서 여는 컷 고치기 (상세 기록과 같은 화면) */
+export function RollShotEdit({ roll, pos, onClose, onToast }: { roll: Roll; pos: number; onClose: () => void; onToast: (t: string) => void }) {
+  const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId], null)
+  const allLenses = useLiveQuery(() => db.lenses.toArray(), [], null)
+  const shot = roll.meterShots?.find((s) => s.pos === pos)
+  if ((camera === null && roll.cameraId) || !allLenses || !shot) return null
+  const setup = setupOf(roll, camera ?? undefined, allLenses)
+  const current = setup.lensById(shot.lensId ?? lensIdAt(roll, pos) ?? roll.lensId) ?? GENERIC
+  const save = (list: MeterShot[]) => db.rolls.update(roll.id, { meterShots: list })
+  return (
+    <ShotEdit shot={shot} like={setup.baseDial(current)} lenses={setup.lensList.length ? setup.lensList : [current]} current={current} iso={setup.iso}
+      onClose={onClose}
+      onSave={(s) => { void save((roll.meterShots ?? []).map((x) => (x.pos === s.pos ? { ...s, edited: true } : x))); onClose(); onToast(`${s.pos}번을 고쳤어요`) }}
+      onDelete={() => { void save((roll.meterShots ?? []).filter((x) => x.pos !== pos)); onClose(); onToast(`${pos}번 기록을 지웠어요`) }} />
   )
 }

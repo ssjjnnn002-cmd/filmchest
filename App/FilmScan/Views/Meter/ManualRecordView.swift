@@ -45,8 +45,15 @@ struct ManualRecordView: View {
         let fullAuto = gear.shutterAuto && gear.program
         let stops = DialState.stops(speeds: model.shutters, manual: manual, program: gear.program)
         let start = manual ? (stops.indices.filter { stops[$0] > 0 }.min { abs(log2(stops[$0] * 125)) < abs(log2(stops[$1] * 125)) } ?? 0) : 0
-        _dial = State(initialValue: DialState(shutterStops: stops, apertures: model.apertures, s: start,
-                                              a: fullAuto ? 0 : 1 + MeterMath.nearest(model.apertures, 8), c: 6, fullAuto: fullAuto))
+        var first = DialState(shutterStops: stops, apertures: model.apertures, s: start,
+                              a: fullAuto ? 0 : 1 + MeterMath.nearest(model.apertures, 8), c: 6, fullAuto: fullAuto)
+        // 이어서: 마지막에 찍은 컷의 렌즈·필터·다이얼 값에서 다시 시작
+        if let last = shots.max(by: { $0.order < $1.order }) {
+            if let id = last.lensId, let l = gear.lenses.first(where: { $0.id == id }) { model.setLens(l) }
+            model.filters = last.filters ?? []
+            first = DialState(shot: last, like: first, apertures: model.apertures)
+        }
+        _dial = State(initialValue: first)
         _frame = State(initialValue: (shots.map(\.pos).max() ?? 0) + 1)
         _rewindAngle = State(initialValue: Double(shots.count) * -150)
     }

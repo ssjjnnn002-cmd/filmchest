@@ -584,6 +584,23 @@ extension MeterShot {
         return parts.joined(separator: " · ")
     }
 
+    static func parseAt(_ s: String) -> Date? {
+        let f = ISO8601DateFormatter()
+        if let d = f.date(from: s) { return d }
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.date(from: s)
+    }
+
+    /// 롤 화면 한 줄: 모드 · 화각 · 필터 · 장소 · 시간 (칸 번호는 앞에 따로)
+    var rowMeta: String {
+        var parts = [Self.modeName(mode)]
+        if let focal { parts.append("\(focal)mm") }
+        if let filters, !filters.isEmpty { parts.append(filters.joined(separator: ", ")) }
+        if let place, !place.isEmpty { parts.append(place) }
+        if let at, let d = Self.parseAt(at) { let f = DateFormatter(); f.dateFormat = "M.d HH:mm"; parts.append(f.string(from: d)) }
+        return parts.joined(separator: " · ")
+    }
+
     var exposureNote: ExposureNote {
         ExposureNote(aperture: aperture, shutter: shutter, compensation: comp, flash: flash, program: Self.exposureProgram(mode))
     }

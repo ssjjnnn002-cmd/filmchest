@@ -7,8 +7,9 @@ import Svg, { Path } from 'react-native-svg'
 import { db, deleteRoll } from '../data'
 import { useLiveQuery } from '../store'
 import { useNav } from '../App'
-import { weatherText, type FilmFormat, type LocationSegment, type Roll, type ShootingDay } from '../core/types'
-import { exposureText, meterProgress, meterShotMeta, meterShotsByOrder } from '../core/meter'
+import { weatherText, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
+import { exposureText, meterFrameTitle, meterProgress, meterShotsByOrder, shotRowMeta } from '../core/meter'
+import { ManualRecord, RollShotEdit } from './ManualRecord'
 import { bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedDays, sortedLocations } from '../core/display'
 import { Btn, Canister, Field, Group, Progress, Row, RowText, Section, Segmented, StatusBadge, Sub } from '../kit'
 import { Icon } from '../icons'
@@ -24,7 +25,6 @@ import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
 import { ScanButton } from './Pending'
 import { driveConnected, syncPhotosToDrive } from '../drive'
 import { refreshRollPhotoMeta } from '../scan'
-import { features } from '../core/features'
 
 export function RollDetail({ id }: { id: string }) {
   const c = useTheme()
@@ -45,10 +45,13 @@ export function RollDetail({ id }: { id: string }) {
   const [sheet, setSheet] = useState(false)
   const [framePrint, setFramePrint] = useState(false)
   const [confirm, setConfirm] = useState(false)
-  const [tab, setTab] = useState<'log' | 'meter' | null>(null)
+  const [recording, setRecording] = useState(false)
+  const [shotEdit, setShotEdit] = useState<number>()
+  const [allShots, setAllShots] = useState(false)
 
   if (!roll) return <Page title="" onBack={nav.pop} large={false}><View /></Page>
-  const view = tab ?? 'log'
+  // 컷 기록: 촬영 중이거나 상세 기록을 남긴 롤
+  const showShots = roll.status === 'loaded' || (roll.meterShots?.length ?? 0) > 0
   const locs = sortedLocations(roll)
   const rangeOf = (i: number) => {
     const s = locs[i].startFrame
@@ -85,8 +88,6 @@ export function RollDetail({ id }: { id: string }) {
         <Icon name="pencil" size={15} color={c.muted} />
         <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted }}>제목 편집</Text>
       </Pressable>
-      <TagField tags={roll.tags ?? []} setTags={(tags) => db.rolls.update(id, { tags })} />
-
       <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center', marginHorizontal: 4, marginBottom: 8 }}>
         <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={104} />
         <View style={{ gap: 3, minWidth: 0, flex: 1, alignItems: 'flex-start' }}>
@@ -103,15 +104,12 @@ export function RollDetail({ id }: { id: string }) {
         </View>
       </View>
 
-      {features.meter || (roll.meterShots?.length ?? 0) > 0 ? (
-        <View style={{ marginTop: 8, marginBottom: 4 }}>
-          <Segmented value={view} options={[['log', '기록'], ['meter', '노출']]} onChange={setTab} />
-        </View>
-      ) : null}
+      {/* 다음에 할 일을 맨 위에: 촬영 중이면 상세 기록 */}
+      {roll.status === 'loaded' ? <View style={{ marginTop: 4, marginBottom: 8 }}><Btn label="상세 기록" kind="primary" block onPress={() => setRecording(true)} /></View> : null}
+      {roll.status === 'finished' ? <Section foot="고르면 스캔 대기로 넘어가요."><Btn label="현상소 고르기" kind="primary" block onPress={() => setDropOff(true)} /></Section> : null}
+      {roll.status === 'atLab' ? <Section foot="현상소에서 받은 zip이나 사진을 골라요."><ScanButton rollId={id} big /></Section> : null}
 
-      {view === 'meter' ? <MeterPanel roll={roll} format={rollCameraFormat(camera, roll)} /> : null}
-
-      {view === 'log' && roll.status === 'imported' && frames.length > 0 ? (
+      {roll.status === 'imported' && frames.length > 0 ? (
         <Section foot="갤러리에 저장을 누르면 사진 앱에 바로 들어가요.">
           <FilmStrip roll={roll} frames={frames} onSelect={setViewing} />
           <View style={{ gap: 10 }}>
@@ -122,7 +120,8 @@ export function RollDetail({ id }: { id: string }) {
         </Section>
       ) : null}
 
-      {view === 'log' ? <>
+      {showShots ? <ShotsSection roll={roll} format={rollCameraFormat(camera, roll)} onEdit={setShotEdit} onAll={() => setAllShots(true)} /> : null}
+
       <Section title="촬영일" foot={roll.days.length > 0 ? '눌러서 수정하거나 삭제할 수 있어요.' : undefined}>
         <Group>
           {sortedDays(roll).map((d) => (
@@ -177,19 +176,8 @@ export function RollDetail({ id }: { id: string }) {
         </Section>
       ) : null}
 
-      <Section>
-        <View style={{ gap: 10 }}>
-          {roll.status === 'loaded' ? <Btn label="촬영 끝내기" kind="primary" size="stack" block onPress={() => setDropOff(true)} /> : null}
-          {roll.status === 'finished' ? <>
-            <Btn label="현상소 고르기" kind="soft" size="stack" block onPress={() => setDropOff(true)} />
-            <Btn label="다시 촬영 중으로" size="stack" block onPress={() => db.rolls.update(id, { status: 'loaded' })} />
-          </> : null}
-          {roll.status === 'atLab' ? <ScanButton rollId={id} big /> : null}
-          {roll.status === 'imported' ? <ScanButton rollId={id} label="다시 불러오기" big /> : null}
-          {roll.status === 'imported' ? <Btn label="사진 날짜·위치 다시 맞추기" size="stack" block onPress={() => { void syncPhotoMeta(id, nav.toast) }} /> : null}
-        </View>
-      </Section>
-
+      {/* 정리: 태그 · 프로젝트 · 메모 */}
+      <TagField tags={roll.tags ?? []} setTags={(tags) => db.rolls.update(id, { tags })} />
       <RollProjects roll={roll} />
 
       <Section title="메모" right={
@@ -207,8 +195,25 @@ export function RollDetail({ id }: { id: string }) {
           </View>
         </Group>
       </Section>
-      </> : null}
 
+      {roll.status !== 'atLab' ? (
+      <Section>
+        <View style={{ gap: 10 }}>
+          {roll.status === 'loaded' ? <Btn label="촬영 끝내기" kind="primary" size="stack" block onPress={() => setDropOff(true)} /> : null}
+          {roll.status === 'finished' ? <Btn label="다시 촬영 중으로" size="stack" block onPress={() => db.rolls.update(id, { status: 'loaded' })} /> : null}
+          {roll.status === 'imported' ? <ScanButton rollId={id} label="다시 불러오기" big /> : null}
+          {roll.status === 'imported' ? <Btn label="사진 날짜·위치 다시 맞추기" size="stack" block onPress={() => { void syncPhotoMeta(id, nav.toast) }} /> : null}
+        </View>
+      </Section>
+      ) : null}
+
+      {recording ? <ManualRecord roll={roll} onClose={() => setRecording(false)} /> : null}
+      {shotEdit !== undefined ? <RollShotEdit roll={roll} pos={shotEdit} onClose={() => setShotEdit(undefined)} onToast={nav.toast} /> : null}
+      {allShots ? (
+        <Sheet title="컷 기록" onClose={() => setAllShots(false)} right={<SheetBtn label="완료" accent onPress={() => setAllShots(false)} />}>
+          <AllShots roll={roll} format={rollCameraFormat(camera, roll)} onEdit={(p) => { setAllShots(false); setShotEdit(p) }} />
+        </Sheet>
+      ) : null}
       {day ? <DayEdit roll={roll} day={day === 'new' ? undefined : day} onClose={() => setDay(null)} /> : null}
       {place ? <PlaceEdit roll={roll} segment={place === 'new' ? undefined : place} onClose={() => setPlace(null)} /> : null}
       {titleEdit !== undefined ? (
@@ -237,7 +242,32 @@ export function RollDetail({ id }: { id: string }) {
   )
 }
 
-function MeterPanel({ roll, format }: { roll: Roll; format: FilmFormat }) {
+/** 롤 화면의 컷 기록: 최근 5컷, 넘으면 전체 보기 (웹과 같음) */
+function ShotsSection({ roll, format, onEdit, onAll }: { roll: Roll; format: FilmFormat; onEdit: (pos: number) => void; onAll: () => void }) {
+  const shots = [...(roll.meterShots ?? [])].sort((a, b) => a.pos - b.pos)
+  const recent = shots.length > 6 ? [...shots].sort((a, b) => b.order - a.order).slice(0, 5).sort((a, b) => a.pos - b.pos) : shots
+  const { capacity } = meterProgress(shots.length, format)
+  return (
+    <Section title="컷 기록" right={shots.length ? <Sub>{shots.length} / {capacity}컷</Sub> : undefined}>
+      <Group>
+        {shots.length === 0 ? <Row static><Sub>상세 기록에서 찍으면 여기에 쌓여요.</Sub></Row> : null}
+        {recent.map((s) => <ShotRow key={s.pos} shot={s} prewind={!!roll.meterPrewind} onPress={() => onEdit(s.pos)} />)}
+        {shots.length > recent.length ? <Row chev onPress={onAll}><RowText>전체 {shots.length}컷 보기</RowText></Row> : null}
+      </Group>
+    </Section>
+  )
+}
+
+function ShotRow({ shot, prewind, onPress }: { shot: MeterShot; prewind: boolean; onPress: () => void }) {
+  return (
+    <Row onPress={onPress} value={exposureText(shot)}>
+      <RowText sub={shotRowMeta(shot)}>{meterFrameTitle(shot.pos, prewind)}</RowText>
+    </Row>
+  )
+}
+
+/** 컷 기록 전체 (찍은 순서) */
+function AllShots({ roll, format, onEdit }: { roll: Roll; format: FilmFormat; onEdit: (pos: number) => void }) {
   const c = useTheme()
   const shots = meterShotsByOrder(roll.meterShots)
   const { shot, capacity, percent } = meterProgress(shots.length, format)
@@ -258,12 +288,7 @@ function MeterPanel({ roll, format }: { roll: Roll; format: FilmFormat }) {
       </Section>
       <Section title="찍은 순서">
         <Group>
-          {shots.length === 0 ? <Row static><Sub>아직 기록한 컷이 없어요. 노출계에서 찍으면 여기에 쌓여요.</Sub></Row> : null}
-          {shots.map((s) => (
-            <Row key={s.pos} static value={exposureText(s)}>
-              <RowText sub={meterShotMeta(s, prewind)}>{s.order}번째</RowText>
-            </Row>
-          ))}
+          {shots.map((s) => <ShotRow key={s.pos} shot={s} prewind={prewind} onPress={() => onEdit(s.pos)} />)}
         </Group>
       </Section>
     </>
