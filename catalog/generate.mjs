@@ -26,7 +26,9 @@ for (const c of cameras) {
 for (const k of Object.keys(shutters)) {
   if (!cameras.some((c) => `${c.brand} ${c.model}` === k)) throw new Error(`셔터 목록에 없는 기종: ${k}`)
 }
-const shutterOf = (c) => { const v = shutters[`${c.brand} ${c.model}`]; return v === undefined ? undefined : v === 'auto' ? [] : v }
+// shutter: [] = 셔터 자동(조리개 우선, 다이얼 A만), [x, 초] = 1/x ~ 초. program: P 모드가 있음 (완전 자동이면 [] + program)
+const shutterOf = (c) => { const v = shutters[`${c.brand} ${c.model}`]; return v === undefined ? undefined : typeof v === 'string' ? [] : v.filter((x) => typeof x === 'number') }
+const programOf = (c) => { const v = shutters[`${c.brand} ${c.model}`]; return v === 'P' || (Array.isArray(v) && v.includes('P')) }
 
 // --- Swift
 const swiftFormat = { '135': '.f135', '135-half': '.halfFrame', '120-645': '.f120_645', '120-66': '.f120_66', '120-67': '.f120_67', '120-69': '.f120_69' }
@@ -34,7 +36,7 @@ const s = (v) => (v === undefined ? 'nil' : JSON.stringify(v))
 const swiftRows = cameras.map((c) =>
   `        CatalogCamera(brand: ${s(c.brand)}, model: ${s(c.model)}, style: .${c.style}, format: ${swiftFormat[c.f ?? '135']}, ` +
   `mount: ${s(c.m)}, lens: ${s(c.l)}, battery: ${s(c.b)}, aka: ${JSON.stringify(c.aka ?? [])}` +
-  (shutterOf(c) ? `, shutter: [${shutterOf(c).join(', ')}]` : '') + '),')
+  (shutterOf(c) ? `, shutter: [${shutterOf(c).join(', ')}]` : '') + (programOf(c) ? ', program: true' : '') + '),')
 const swift = `${header}import FilmScanCore
 
 extension CameraCatalog {
@@ -54,6 +56,7 @@ const tsRows = cameras.map((c) => {
   if (c.b) o.battery = c.b
   if (c.aka?.length) o.aka = c.aka
   if (shutterOf(c)) o.shutter = shutterOf(c)
+  if (programOf(c)) o.program = true
   return `  ${JSON.stringify(o)},`
 })
 const ts = `${header}import type { CatalogCamera } from './cameras'

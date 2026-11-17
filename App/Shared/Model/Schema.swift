@@ -550,13 +550,15 @@ struct MeterShot: Codable, Hashable, Sendable {
     var place: String?
     var lat: Double?
     var lon: Double?
+    /// 그 컷에 끼운 렌즈 (장비 탭 렌즈 id, 렌즈 고정형은 "fixed")
+    var lensId: String?
 }
 
 extension MeterShot {
     var exposureLine: String {
         var parts: [String] = []
         if let aperture, aperture > 0 { parts.append(FrameCaptionFormat.aperture(aperture)) }
-        if let shutter, shutter > 0 { parts.append(FrameCaptionFormat.shutter(shutter)) }
+        if let shutter, shutter != 0 { parts.append(FrameCaptionFormat.shutter(shutter)) }
         if parts.isEmpty { parts.append("자동") }
         if comp != 0 { parts.append(Self.formatComp(comp)) }
         if flash { parts.append("플래시") }

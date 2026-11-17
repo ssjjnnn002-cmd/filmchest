@@ -40,6 +40,8 @@ struct MeterGear {
     var programAtMinAperture = false
     /// 셔터를 직접 고를 수 없는 자동 카메라 (다이얼은 A만)
     var shutterAuto = false
+    /// P(프로그램) 모드가 있음 (셔터 자동이면서 P면 완전 자동 카메라)
+    var program = false
     var lens: MeterLens = .generic
     /// 바꿔 낄 수 있는 렌즈 (장비 탭, 같은 마운트)
     var lenses: [MeterLens] = []
@@ -59,9 +61,14 @@ enum MeterMath {
     static let isoList: [Double] = [25, 32, 40, 50, 64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400]
     static let comps: [Double] = (-6...6).map { Double($0) / 3 }
 
+    /// 이 카메라의 셔터 속도. 1/400·1/300·1/6000처럼 표준 단계가 아닌 최고·최저 값도 넣는다
     static func shutters(fastest: Double, slowest: Double) -> [Double] {
-        allShutters.filter { $0 >= 1 / fastest - 1e-9 && $0 <= slowest + 1e-9 }
+        var list = allShutters.filter { $0 >= 1 / fastest - 1e-9 && $0 <= slowest + 1e-9 }
+        for v in [1 / fastest, slowest] where !list.contains(where: { abs(log2($0 / v)) < 0.05 }) { list.append(v) }
+        return list.sorted()
     }
+    /// B(벌브) 자리 (값이 0보다 작으면 벌브)
+    static let bulb = -1.0
 
     /// 렌즈 최대 개방값(3.5 같은)도 넣는다
     static func apertures(open: Double, close: Double) -> [Double] {
@@ -78,8 +85,8 @@ enum MeterMath {
     }
 
     static func fmtA(_ n: Double) -> String { "f/" + trim(n) }
-    static func fmtS(_ t: Double) -> String { t >= 1 ? "\(trim(t))\"" : "1/\(Int((1 / t).rounded()))" }
-    static func lcdS(_ t: Double) -> String { t >= 1 ? "\(trim(t))\"" : "\(Int((1 / t).rounded()))" }
+    static func fmtS(_ t: Double) -> String { t < 0 ? "B" : t >= 1 ? "\(trim(t))\"" : "1/\(Int((1 / t).rounded()))" }
+    static func lcdS(_ t: Double) -> String { t < 0 ? "B" : t >= 1 ? "\(trim(t))\"" : "\(Int((1 / t).rounded()))" }
     static func fmtC(_ c: Double) -> String {
         let k = Int((c * 3).rounded())
         if k == 0 { return "0" }

@@ -14,6 +14,8 @@ struct CatalogCamera: Identifiable, Hashable {
     var aka: [String] = []    // 다른 이름 (예: AF600 → Lite Touch, AF35M → 오토보이)
     /// 셔터 범위: [] = 자동(고를 수 없음), [x, 초] = 1/x ~ 초. nil = 모름 (catalog/shutters.mjs)
     var shutter: [Double]? = nil
+    /// P(프로그램) 모드가 있음
+    var program = false
 
     var id: String { "\(brand) \(model)" }
     var displayName: String { "\(brand) \(model)" }

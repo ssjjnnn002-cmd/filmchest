@@ -44,8 +44,10 @@ extension MeterGear {
         let known = camera.flatMap { CameraCatalog.match(brand: $0.brand, model: $0.model) }
         if let range = known?.shutter {
             if range.count == 2 { gear.fastest = range[0]; gear.slowest = range[1] } else { gear.shutterAuto = true }
+            gear.program = known?.program ?? false
         } else if camera?.bodyStyle == .compact {
-            gear.shutterAuto = true
+            // 모르는 똑딱이는 완전 자동으로
+            gear.shutterAuto = true; gear.program = true
         } else {
             gear.fastest = 1000; gear.slowest = 1
         }

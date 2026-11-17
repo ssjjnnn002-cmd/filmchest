@@ -303,6 +303,8 @@ export interface MeterShot {
   place?: string
   lat?: number
   lon?: number
+  /** 그 컷에 끼운 렌즈 (장비 탭 렌즈 id) */
+  lensId?: string | null
 }
 
 /** 규격별 한 롤 컷 수 */

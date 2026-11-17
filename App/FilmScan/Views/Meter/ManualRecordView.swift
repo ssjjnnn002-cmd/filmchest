@@ -40,11 +40,13 @@ struct ManualRecordView: View {
         let model = MeterModel(gear: g, shots: shots, rollPrewind: rollPrewind ?? false)
         _m = StateObject(wrappedValue: model)
         self.onSave = onSave; self.onClose = onClose
-        // 자동 카메라는 A, 아니면 1/125 · f/8
-        let auto = gear.shutterAuto
-        _dial = State(initialValue: DialState(shutters: auto ? [] : model.shutters, apertures: model.apertures,
-                                              s: auto ? 0 : 1 + MeterMath.nearest(model.shutters, 1.0 / 125),
-                                              a: gear.modes == ["P"] ? 0 : 1 + MeterMath.nearest(model.apertures, 8), c: 6))
+        // 다이얼 자리: 이 카메라가 지원하는 것만 (P 모드·셔터 범위·B). 수동 카메라는 1/125 · f/8에서 시작
+        let manual = !gear.shutterAuto
+        let fullAuto = gear.shutterAuto && gear.program
+        let stops = DialState.stops(speeds: model.shutters, manual: manual, program: gear.program)
+        let start = manual ? (stops.indices.filter { stops[$0] > 0 }.min { abs(log2(stops[$0] * 125)) < abs(log2(stops[$1] * 125)) } ?? 0) : 0
+        _dial = State(initialValue: DialState(shutterStops: stops, apertures: model.apertures, s: start,
+                                              a: fullAuto ? 0 : 1 + MeterMath.nearest(model.apertures, 8), c: 6, fullAuto: fullAuto))
         _frame = State(initialValue: (shots.map(\.pos).max() ?? 0) + 1)
         _rewindAngle = State(initialValue: Double(shots.count) * -150)
     }
@@ -52,13 +54,10 @@ struct ManualRecordView: View {
     var body: some View {
         VStack(spacing: 12) {
             header
-            RecordDials(dial: $dial)
-            HStack(alignment: .center, spacing: 10) {
-                CompDial(index: $dial.c).frame(width: 118)
-                placeTimeCard
-            }
+            RecordDials(dial: $dial, onLocked: show).padding(.top, 18)
+            placeTimeCard.padding(.top, 6)
             Spacer(minLength: 0)
-            rollPart
+            rollPart.padding(.bottom, 34)
         }
         .padding(.horizontal, 16)
         .padding(.top, 6)
@@ -88,7 +87,7 @@ struct ManualRecordView: View {
         }
         .sheet(item: $editing) { t in
             if let shot = m.shots.first(where: { $0.pos == t.pos }) {
-                ShotDialEditor(shot: shot, shutters: dial.shutters, apertures: dial.apertures) { edited in
+                ShotDialEditor(shot: shot, like: dial, lenses: m.gear.lenses.isEmpty ? [m.lens] : m.gear.lenses, current: m.lens) { edited in
                     m.update(edited); onSave(m.shots, m.prewind); show("\(t.pos)번을 고쳤어요")
                 } onDelete: {
                     m.shots.removeAll { $0.pos == t.pos }; onSave(m.shots, m.prewind); show("\(t.pos)번 기록을 지웠어요")
@@ -208,7 +207,9 @@ struct ManualRecordView: View {
     /// 셔터: 지금 다이얼 값으로 이 칸을 기록하고, 셔터가 닫힌 뒤 레버가 감기며 다음 칸으로
     private func fire() {
         guard !busy else { return }
-        let t = dial.shutter ?? 1.0 / 125
+        // 소리·감기 대기 시간 (B는 1초로)
+        let t = (dial.shutter ?? 1.0 / 125) < 0 ? 1 : (dial.shutter ?? 1.0 / 125)
+        // (B는 1초, P·A는 1/125로 소리를 낸다)
         MeterSound.shared.shutter(t)
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
         shutterDown = true
@@ -218,6 +219,7 @@ struct ManualRecordView: View {
         var shot = MeterShot(pos: frame, order: m.shots.count + 1, mode: dial.mode, aperture: dial.aperture, shutter: dial.shutter,
                              comp: dial.comp, flash: dial.flash, ev: 0, focal: m.lens.isZoom ? nil : m.lens.min,
                              at: ISO8601DateFormatter().string(from: at), filters: m.filters.isEmpty ? nil : m.filters)
+        shot.lensId = m.lens.id
         shot.place = placeName.isEmpty ? nil : placeName
         shot.lat = point?.latitude; shot.lon = point?.longitude
         let old = m.shots.first { $0.pos == frame }
@@ -272,56 +274,91 @@ struct ManualRecordView: View {
 
 // MARK: 다이얼 상태 (메인 화면과 컷 고치기가 같이 쓴다)
 
-/// 셔터 [A, 값…] · 조리개 [A, 값…, ⚡] · 노출 보정 (−2 … +2)
+/// 셔터 [P?, A, 값…, B] · 조리개 [A, 값…, ⚡] · 노출 보정 (−2 … +2)
+/// 셔터 자리 값: P = -2, A = 0, B = -1, 그 밖은 초
 struct DialState {
-    var shutters: [Double]
+    static let P = -2.0, A = 0.0
+    var shutterStops: [Double]
     var apertures: [Double]
     var s: Int
     var a: Int
     var c: Int
+    /// 완전 자동 카메라 (셔터·조리개·보정을 직접 못 정함): 조리개 다이얼은 자동/⚡만
+    var fullAuto = false
     /// ⚡에서 빠져나올 때 돌아갈 조리개 자리
     var lastAperture: Int = 0
 
-    var shutterLabels: [String] { ["A"] + shutters.map(MeterMath.lcdS) }
-    var apertureLabels: [String] { ["A"] + apertures.map(MeterMath.trim) + ["⚡"] }
-    var flashIndex: Int { apertures.count + 1 }
+    /// 이 카메라의 셔터 자리: P 모드가 있으면 맨 앞 P, 셔터를 고를 수 있으면 A · 값 · B, 조리개 우선 자동은 A만, 완전 자동은 P만
+    static func stops(speeds: [Double], manual: Bool, program: Bool) -> [Double] {
+        if !manual { return program ? [P] : [A] }
+        return (program ? [P] : []) + [A] + speeds + [MeterMath.bulb]
+    }
+
+    var shutterLabels: [String] { shutterStops.map { $0 == Self.P ? "P" : $0 == Self.A ? "A" : MeterMath.lcdS($0) } }
+    var shutterAccent: Set<Int> { Set(shutterStops.indices.filter { shutterStops[$0] <= 0 }) }
+    var program: Bool { shutterStops.indices.contains(s) && shutterStops[s] == Self.P }
+    /// 조작해도 의미 없는 다이얼은 흐리게 막는다
+    var shutterEnabled: Bool { shutterStops.count > 1 }
+    var apertureEnabled: Bool { !program }
+    var compEnabled: Bool { !fullAuto }
+
+    var apertureLabels: [String] { fullAuto ? ["A", "⚡"] : ["A"] + apertures.map(MeterMath.trim) + ["⚡"] }
+    var flashIndex: Int { fullAuto ? 1 : apertures.count + 1 }
     var flash: Bool { a == flashIndex }
-    var shutter: Double? { s == 0 || s > shutters.count ? nil : shutters[s - 1] }
-    var aperture: Double? { a == 0 || flash || a > apertures.count ? nil : apertures[a - 1] }
-    var comp: Double { MeterMath.comps[c] }
-    var mode: String { aperture != nil && shutter != nil ? "M" : aperture != nil ? "A" : shutter != nil ? "S" : "P" }
+    var shutter: Double? {
+        guard shutterStops.indices.contains(s) else { return nil }
+        let v = shutterStops[s]
+        return v == Self.P || v == Self.A ? nil : v
+    }
+    var aperture: Double? { program || fullAuto || a == 0 || flash || a > apertures.count ? nil : apertures[a - 1] }
+    var comp: Double { compEnabled ? MeterMath.comps[c] : 0 }
+    var mode: String { program ? "P" : aperture != nil && shutter != nil ? "M" : aperture != nil ? "A" : shutter != nil ? "S" : "P" }
 
     mutating func toggleFlash() {
         if flash { a = lastAperture } else { lastAperture = a; a = flashIndex }
     }
 
-    init(shutters: [Double], apertures: [Double], s: Int, a: Int, c: Int) {
-        self.shutters = shutters; self.apertures = apertures; self.s = s; self.a = a; self.c = c
+    init(shutterStops: [Double], apertures: [Double], s: Int, a: Int, c: Int, fullAuto: Bool) {
+        self.shutterStops = shutterStops; self.apertures = apertures; self.s = s; self.a = a; self.c = c; self.fullAuto = fullAuto
     }
 
-    /// 기록된 컷 값으로 다이얼을 맞춘다 (컷 고치기)
-    init(shot: MeterShot, shutters: [Double], apertures: [Double]) {
-        self.shutters = shutters; self.apertures = apertures
-        s = shutters.isEmpty ? 0 : shot.shutter.map { 1 + MeterMath.nearest(shutters, $0) } ?? 0
-        let ap = shot.aperture.map { 1 + MeterMath.nearest(apertures, $0) } ?? 0
-        a = shot.flash ? apertures.count + 1 : ap
+    /// 기록된 컷 값으로 다이얼을 맞춘다 (컷 고치기). 카메라 자리(셔터·자동 여부)는 like에서, 조리개는 그 컷 렌즈에서
+    init(shot: MeterShot, like t: DialState, apertures: [Double]) {
+        shutterStops = t.shutterStops; self.apertures = apertures; fullAuto = t.fullAuto
+        let stops = t.shutterStops
+        let speeds = stops.indices.filter { stops[$0] > 0 }
+        if let v = shot.shutter, v < 0, let b = stops.firstIndex(of: MeterMath.bulb) { s = b }
+        else if let v = shot.shutter, v > 0, !speeds.isEmpty { s = speeds[MeterMath.nearest(speeds.map { stops[$0] }, v)] }
+        else if shot.mode == "P", let p = stops.firstIndex(of: Self.P) { s = p }
+        else { s = stops.firstIndex(of: Self.A) ?? 0 }
+        let ap = fullAuto ? 0 : shot.aperture.map { 1 + MeterMath.nearest(apertures, $0) } ?? 0
+        a = shot.flash ? (fullAuto ? 1 : apertures.count + 1) : ap
         c = MeterMath.comps.indices.min { abs(MeterMath.comps[$0] - shot.comp) < abs(MeterMath.comps[$1] - shot.comp) } ?? 6
         lastAperture = ap
     }
 }
 
-/// 셔터 · 조리개(⚡) 다이얼
+/// 셔터 · (가운데 작게) 노출 보정 · 조리개(⚡) 다이얼. 그 카메라에서 의미 없는 다이얼은 흐리게 막는다
 struct RecordDials: View {
     @Binding var dial: DialState
+    /// 막힌 다이얼을 눌렀을 때 알림
+    var onLocked: (String) -> Void = { _ in }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            TopDial(title: "셔터", labels: dial.shutterLabels, index: $dial.s, size: 150,
-                    big: dial.shutter.map(MeterMath.fmtS) ?? (dial.shutters.isEmpty ? "자동 셔터" : "자동"),
-                    accent: [0], snaps: [0])
-            TopDial(title: "조리개", labels: dial.apertureLabels, index: $dial.a, size: 150,
-                    big: dial.flash ? "플래시" : dial.aperture.map(MeterMath.fmtA) ?? "자동",
-                    accent: [0, dial.flashIndex], snaps: [0, dial.flashIndex])
+        // 카메라 윗면처럼: 셔터 · 노출 보정 · 조리개
+        HStack(alignment: .top, spacing: 4) {
+            TopDial(title: "셔터", labels: dial.shutterLabels, index: $dial.s, size: 132,
+                    big: dial.program ? "P 자동" : dial.shutter.map(MeterMath.fmtS) ?? "자동",
+                    accent: dial.shutterAccent, snaps: dial.shutterAccent, bigSize: 24,
+                    disabled: !dial.shutterEnabled,
+                    onDisabledTap: { onLocked(dial.fullAuto ? "이 카메라는 셔터·조리개를 자동으로 정해요" : "이 카메라는 셔터를 자동으로 정해요") })
+            CompDial(index: $dial.c, disabled: !dial.compEnabled) { onLocked("이 카메라는 노출 보정이 없어요") }
+                .padding(.top, 20)
+            TopDial(title: "조리개", labels: dial.apertureLabels, index: $dial.a, size: 132,
+                    big: dial.flash ? "플래시" : dial.program ? "P 자동" : dial.aperture.map(MeterMath.fmtA) ?? "자동",
+                    accent: [0, dial.flashIndex], snaps: [0, dial.flashIndex], bigSize: 24,
+                    disabled: !dial.apertureEnabled,
+                    onDisabledTap: { onLocked("P 모드에서는 조리개도 카메라가 정해요") })
         }
     }
 }
@@ -362,9 +399,13 @@ struct PlaceTimeCard: View {
 /// 노출 보정 작은 다이얼 (가운데 0)
 struct CompDial: View {
     @Binding var index: Int
+    var disabled = false
+    var onLocked: () -> Void = {}
     var body: some View {
-        TopDial(title: "노출 보정", labels: MeterMath.comps.map { $0 == 0 ? "0" : $0 == $0.rounded() ? MeterMath.fmtC($0) : "·" }, index: $index, size: 104,
-                big: MeterMath.comps[index] == 0 ? "±0" : MeterMath.fmtC(MeterMath.comps[index]), accent: [6], snaps: [6], bigSize: 20)
+        TopDial(title: "노출 보정", labels: MeterMath.comps.map { $0 == 0 ? "0" : $0 == $0.rounded() ? MeterMath.fmtC($0) : "·" }, index: $index, size: 88,
+                big: disabled || MeterMath.comps[index] == 0 ? "±0" : MeterMath.fmtC(MeterMath.comps[index]), accent: [6], snaps: [6], bigSize: 18,
+                disabled: disabled, onDisabledTap: onLocked)
+            .frame(width: 96)
     }
 }
 
@@ -381,13 +422,16 @@ struct TopDial: View {
     /// 걸리는 느낌을 세게 줄 칸
     var snaps: Set<Int> = []
     var bigSize: CGFloat = 26
+    /// 이 카메라에서 의미 없는 다이얼: 흐리게, 돌아가지 않음
+    var disabled = false
+    var onDisabledTap: (() -> Void)? = nil
     @State private var start: Int?
 
     /// 칸 사이 각도: 글자 높이만큼은 벌리고, 많지 않으면 넉넉히
     private var step: Double {
         // 점(·)으로만 적는 칸이 있으면 촘촘해도 겹치지 않는다
         if labels.contains("·") { return 20 }
-        let r = Double(size / 2 - 24)
+        let r = Double(size / 2 - (size < 100 ? 20 : 24))
         let minStep = 15.5 / r * 180 / .pi
         return max(minStep, min(30, 300 / Double(max(labels.count - 1, 1))))
     }
@@ -398,15 +442,12 @@ struct TopDial: View {
                 knob
                 ZStack {
                     ForEach(labels.indices, id: \.self) { i in
-                        let rel = Double(i - index) * step
-                        let flip = cos(rel * .pi / 180) < 0
                         Text(labels[i])
                             .font(.system(size: labels[i] == "·" ? 16 : size < 120 ? 11 : (labels[i].count > 3 ? 11 : 13), weight: i == index ? .heavy : .semibold))
                             .monospacedDigit().lineLimit(1).fixedSize()
                             .foregroundStyle(accent.contains(i) ? Color.meterOrange : .white)
                             .opacity(i == index ? 1 : 0.62)
-                            .rotationEffect(.degrees(flip ? 180 : 0))
-                            .offset(x: size / 2 - 24)
+                            .offset(x: size / 2 - (size < 100 ? 20 : 24))
                             .rotationEffect(.degrees(Double(i) * step))
                     }
                 }
@@ -420,8 +461,11 @@ struct TopDial: View {
                 // 맞춤 표시 (오른쪽, 고정)
                 Image(systemName: "arrowtriangle.left.fill").font(.system(size: 11)).foregroundStyle(Color.meterOrange).offset(x: 12)
             }
+            .opacity(disabled ? 0.32 : 1)
             .contentShape(Circle())
+            .onTapGesture { if disabled { onDisabledTap?() } }
             .gesture(DragGesture(minimumDistance: 2).onChanged { v in
+                guard !disabled else { return }
                 if start == nil { start = index }
                 let d = Int(((-v.translation.height - v.translation.width) / 20).rounded())
                 let next = min(max((start ?? index) + d, 0), labels.count - 1)
@@ -432,7 +476,7 @@ struct TopDial: View {
                 }
             }.onEnded { _ in start = nil })
             Text(big).font(.system(size: bigSize, weight: .semibold, design: .rounded)).monospacedDigit()
-                .foregroundStyle(index == 0 && accent.contains(0) ? Color.meterSub : .white)
+                .foregroundStyle(disabled || (index == 0 && accent.contains(0)) ? Color.meterSub : .white)
                 .lineLimit(1).minimumScaleFactor(0.6)
             Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.meterSub)
         }
@@ -513,11 +557,18 @@ struct ShotDialEditor: View {
     @State private var placeSheet = false
     @State private var timeSheet = false
     @State private var filterSheet = false
+    @State private var lensSheet = false
     @State private var askDelete = false
+    @State private var toast: String?
+    let lenses: [MeterLens]
+    @State private var lens: MeterLens
 
-    init(shot: MeterShot, shutters: [Double], apertures: [Double], onSave: @escaping (MeterShot) -> Void, onDelete: @escaping () -> Void) {
-        self.shot = shot; self.onSave = onSave; self.onDelete = onDelete
-        _dial = State(initialValue: DialState(shot: shot, shutters: shutters, apertures: apertures))
+    init(shot: MeterShot, like: DialState, lenses: [MeterLens], current: MeterLens, onSave: @escaping (MeterShot) -> Void, onDelete: @escaping () -> Void) {
+        self.shot = shot; self.onSave = onSave; self.onDelete = onDelete; self.lenses = lenses
+        // 그 컷에 끼웠던 렌즈 (모르면 지금 렌즈)
+        let l = lenses.first { $0.id == shot.lensId } ?? current
+        _lens = State(initialValue: l)
+        _dial = State(initialValue: DialState(shot: shot, like: like, apertures: MeterMath.apertures(open: l.open, close: l.close)))
         _filters = State(initialValue: shot.filters ?? [])
         _placeName = State(initialValue: shot.place ?? "")
         _point = State(initialValue: shot.lat.flatMap { la in shot.lon.map { GeoPoint(latitude: la, longitude: $0) } })
@@ -529,13 +580,29 @@ struct ShotDialEditor: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    RecordDials(dial: $dial)
-                    HStack(alignment: .center, spacing: 10) {
-                        CompDial(index: $dial.c).frame(width: 118)
-                        PlaceTimeCard(place: placeName.isEmpty ? "없음" : placeName,
-                                      time: time.formatted(date: .abbreviated, time: .shortened),
-                                      onPlace: { placeSheet = true }, onTime: { timeSheet = true })
+                    RecordDials(dial: $dial, onLocked: { toast = $0 }).padding(.top, 8)
+                    if let toast { Text(toast).font(.footnote).foregroundStyle(Color.meterSub) }
+                    PlaceTimeCard(place: placeName.isEmpty ? "없음" : placeName,
+                                  time: time.formatted(date: .abbreviated, time: .shortened),
+                                  onPlace: { placeSheet = true }, onTime: { timeSheet = true })
+                        .padding(.top, 6)
+                    Button {
+                        if lens.fixed || lenses.count < 2 { return }
+                        lensSheet = true
+                    } label: {
+                        HStack {
+                            Text("렌즈").foregroundStyle(Color.meterSub)
+                            Spacer()
+                            Text(lens.name).lineLimit(1).truncationMode(.middle)
+                            if !lens.fixed && lenses.count > 1 {
+                                Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.meterSub)
+                            }
+                        }
+                        .font(.system(size: 15)).padding(.horizontal, 14).frame(height: 44)
+                        .background(Color.meterPanel, in: RoundedRectangle(cornerRadius: 16))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.meterLine))
                     }
+                    .buttonStyle(.plain)
                     Button { filterSheet = true } label: {
                         HStack {
                             Text("필터").foregroundStyle(Color.meterSub)
@@ -571,6 +638,37 @@ struct ShotDialEditor: View {
                 }
                 .presentationDetents([.medium])
             }
+            .sheet(isPresented: $lensSheet) {
+                NavigationStack {
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            ForEach(lenses) { l in
+                                Button {
+                                    // 렌즈를 바꾸면 그 렌즈 조리개로 (값은 가장 가까운 곳)
+                                    let keep = dial.aperture
+                                    lens = l
+                                    dial.apertures = MeterMath.apertures(open: l.open, close: l.close)
+                                    if !dial.flash { dial.a = keep.map { 1 + MeterMath.nearest(dial.apertures, $0) } ?? 0 }
+                                    else { dial.a = dial.apertures.count + 1 }
+                                    lensSheet = false
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading) { Text(l.name).bold(); Text(l.rangeText + " f/\(MeterMath.trim(l.open))").font(.caption).foregroundStyle(Color.meterSub) }
+                                        Spacer()
+                                        if l.id == lens.id { Text("끼움").font(.caption.bold()).foregroundStyle(Color.meterOrange) }
+                                    }
+                                    .padding(12).background(Color(white: 0.16), in: RoundedRectangle(cornerRadius: 12))
+                                }
+                                .foregroundStyle(.white)
+                            }
+                        }
+                        .padding(16)
+                    }
+                    .navigationTitle("렌즈").navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("완료") { lensSheet = false } } }
+                }
+                .presentationDetents([.medium])
+            }
             .confirmationDialog("이 칸 기록을 지울까요?", isPresented: $askDelete, titleVisibility: .visible) {
                 Button("지우기", role: .destructive) { onDelete(); dismiss() }
             }
@@ -581,6 +679,7 @@ struct ShotDialEditor: View {
     private func save() {
         var s = shot
         s.mode = dial.mode; s.aperture = dial.aperture; s.shutter = dial.shutter; s.flash = dial.flash; s.comp = dial.comp
+        if s.lensId != lens.id { s.lensId = lens.id; s.focal = lens.isZoom ? nil : lens.min }
         s.filters = filters.isEmpty ? nil : filters
         s.place = placeName.isEmpty ? nil : placeName
         s.lat = point?.latitude; s.lon = point?.longitude

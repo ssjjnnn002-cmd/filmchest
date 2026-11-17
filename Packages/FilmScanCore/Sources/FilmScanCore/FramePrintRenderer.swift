@@ -3,7 +3,9 @@ import CoreGraphics
 
 /// 프레임 아래 글씨. 웹 frameCaption.ts와 같은 규칙.
 public enum FrameCaptionFormat {
+    /// 셔터 표시. 0보다 작으면 B(벌브)
     public static func shutter(_ seconds: Double) -> String {
+        if seconds < 0 { return "B" }
         guard seconds.isFinite, seconds > 0 else { return "" }
         if seconds >= 1 {
             let whole = seconds.rounded()
