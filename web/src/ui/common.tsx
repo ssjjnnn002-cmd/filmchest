@@ -490,7 +490,7 @@ export function WorkBanner() {
 export function Canister({ film, format = '135', size = 48, className }: { film?: FilmStock; format?: FilmFormat; size?: number; className?: string }) {
   const url = useMemo(() => (film ? canisterURL(film, format) : undefined), [film, format])
   if (!url) return <div style={{ width: size, height: size, display: 'grid', placeItems: 'center', color: 'var(--muted)' }}><Icon name="film" size={size * 0.6} /></div>
-  return <img src={url} width={size} height={size} alt={filmDisplayName(film)} className={className} />
+  return <img src={url} width={size} height={size} alt={filmDisplayName(film)} className={className} style={{ objectFit: 'contain' }} />
 }
 
 export function useObjectURL(blob?: Blob) {

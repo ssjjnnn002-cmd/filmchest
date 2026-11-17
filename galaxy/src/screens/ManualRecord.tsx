@@ -1,3 +1,4 @@
+import { filmBoxColors } from '../filmBoxColors'
 // 웹 pages/ManualRecord.tsx — 상세 기록 (노출계 없이): 카메라 윗면 다이얼로 셔터 · 노출 보정 · 조리개(맨 끝 ⚡)를 맞추고,
 // 셔터를 누르면 레버가 감기며 그 칸에 장소·시간과 함께 남는다. 배치·규칙은 아이폰·웹과 같다 (소리만 없음)
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -289,7 +290,7 @@ function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: C
             {/* 1번 칸(맨 오른쪽)도 가운데로 올 수 있게 끝에 필름 여백 (웹과 같음) */}
             <View style={{ width: Math.max(0, (width - 104) / 2), height: 112, backgroundColor: '#2a1a0f' }} />
           </ScrollView>
-          <Canister iso={iso} frames={frames} body={film?.style.body} band={film?.style.band} />
+          <Canister iso={iso} frames={frames} colors={film ? filmBoxColors[film.id] ?? [film.style.body, film.style.band] : undefined} />
         </View>
       </View>
 
@@ -592,9 +593,11 @@ function Cell({ p, shot, next, onPress }: { p: number; shot?: MeterShot; next: b
 }
 
 /** 화면 왼쪽 끝에 걸친 135 필름통 */
-function Canister({ iso, frames, body, band }: { iso: number; frames: number; body?: string; band?: string }) {
+function Canister({ iso, frames, colors }: { iso: number; frames: number; colors?: [string, string] }) {
   const lum = (h?: string) => { const n = parseInt(String(h ?? '#888').replace('#', ''), 16); return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 }
-  const label = body ?? '#f0b43a', numColor = body && lum(body) < 0.25 ? band ?? label : label
+  // 라벨은 상자처럼 위 바탕색 · 아래 띠색 (웹·아이폰과 같음)
+  const label = colors?.[0] ?? '#f0b43a', band = colors?.[1] ?? label
+  const numColor = lum(label) < 0.25 ? (lum(band) < 0.25 ? '#f0b43a' : band) : label
   return (
     <View pointerEvents="none" style={{ position: 'absolute', left: -18, top: -10, width: 80, height: 132, opacity: 0.85 }}>
       <Svg width={80} height={132} viewBox="0 0 80 132">
@@ -604,6 +607,7 @@ function Canister({ iso, frames, body, band }: { iso: number; frames: number; bo
         </Defs>
         <Rect x={2} y={9} width={64} height={114} fill="#0b0b0c" />
         <Rect x={2} y={11} width={33} height={110} fill={label} />
+        <Rect x={2} y={66} width={33} height={55} fill={band} />
         <G rotation={-90} origin="62, 117"><SvgText x={62} y={117} fontSize={22} fontWeight="700" fill={numColor}>{iso}</SvgText></G>
         <G rotation={-90} origin="62, 71"><SvgText x={62} y={71} fontSize={22} fontWeight="700" fill={numColor}>{frames}<TSpan fontSize={11}>exp.</TSpan></SvgText></G>
         <Path d="M63 8 C67 7.5 70 9 71.5 12 C70.5 15 72.5 18 71.8 22 L72.2 110 C73 114 71 117 71.8 121 C70 124.5 67 124.8 63 124 Z" fill="#232221" stroke="#55524e" strokeWidth={0.6} />

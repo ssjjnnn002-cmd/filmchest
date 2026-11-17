@@ -16,7 +16,8 @@ const dom = execFileSync('/Applications/Google Chrome.app/Contents/MacOS/Google 
   ['--headless=new', '--disable-gpu', '--virtual-time-budget=30000', '--dump-dom', `file://${tmp}/p.html`], { maxBuffer: 1 << 30 }).toString()
 const m = dom.match(/<pre id="out">([\s\S]*?)<\/pre>/)
 if (!m) throw new Error('그림을 못 뽑았어요')
-const out = JSON.parse(m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"'))
+const { out, colors, plain } = JSON.parse(m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"'))
+const png = (url) => Buffer.from(url.split(',')[1], 'base64')
 const ios = path.join(root, 'App/FilmScan/Resources/FilmBoxes')
 fs.rmSync(ios, { recursive: true, force: true })
 fs.mkdirSync(ios, { recursive: true })
@@ -30,4 +31,10 @@ export const canisterShots: Record<string, number> = {
 ${Object.keys(out).sort().map((k) => `  '${k}': require('../assets/canisters/${k}.png'),`).join('\n')}
 }
 `)
+// 상자 두 색 (상세 기록 필름통 라벨) · 장착하기 버튼 그림
+fs.writeFileSync(path.join(ios, 'filmbox-colors.json'), JSON.stringify(colors))
+fs.writeFileSync(path.join(ios, 'filmbox-plain-canister.png'), png(plain))
+fs.writeFileSync(path.join(root, 'web/public/plain-canister.png'), png(plain))
+fs.writeFileSync(path.join(gal, 'plain-canister.png'), png(plain))
+fs.writeFileSync(path.join(root, 'galaxy/src/filmBoxColors.ts'), `/* 자동 생성: scripts/render-film-boxes.mjs — 필름 상자의 큰 두 색 [바탕, 띠] */\nexport const filmBoxColors: Record<string, [string, string]> = ${JSON.stringify(colors)}\n`)
 console.log(`✓ ${Object.keys(out).length}장`)

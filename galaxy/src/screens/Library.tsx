@@ -1,7 +1,7 @@
 // 웹 pages/Library.tsx
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { BackupNudge } from '../BackupNudge'
-import { Animated, Easing, LayoutAnimation, Pressable, Vibration, View, type LayoutRectangle } from 'react-native'
+import { Animated, Easing, Image, LayoutAnimation, Pressable, Vibration, View, type LayoutRectangle } from 'react-native'
 import { Text } from '../text'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { db, kept } from '../data'
@@ -211,7 +211,8 @@ export function Library() {
             flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 18, borderRadius: 22,
             backgroundColor: c.safelight, opacity: editing ? 0.4 : 1, transform: [{ scale: pressed ? 0.98 : 1 }],
           })}>
-            <Canister film={filmById('kodak-portra-400')} size={52} />
+            {/* 글씨 없는 필름통 그림 (세 앱 같은 그림) */}
+            <Image source={require('../../assets/canisters/plain-canister.png')} style={{ width: 52, height: 52 }} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: '#fff', fontSize: 19, fontWeight: '600' }}>필름 장착하기</Text>
               <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>{empty > 0 ? `빈 카메라 ${empty}대` : '모든 카메라에 필름이 들어 있어요'}</Text>

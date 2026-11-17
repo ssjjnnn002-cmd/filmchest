@@ -1,3 +1,4 @@
+import { boxPalette } from '../core/filmBox'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -291,7 +292,7 @@ function Recorder({ roll, camera, allLenses, onClose }: {
             {/* 1번 칸(맨 오른쪽)도 가운데로 올 수 있게 끝에 필름 여백 */}
             <span className="mr-strip-end" aria-hidden="true" />
           </div>
-          <Canister iso={iso} frames={frames} body={film?.style.body} band={film?.style.band} />
+          <Canister iso={iso} frames={frames} colors={film ? boxPalette(film) : undefined} />
         </div>
       </div>
 
@@ -547,9 +548,11 @@ function Controls({ counter, flash, leverOut, rewind, down, onFlash, onShutter }
 }
 
 /** 화면 왼쪽 끝에 걸친 135 필름통 (노출계와 같음) */
-function Canister({ iso, frames, body, band }: { iso: number; frames: number; body?: string; band?: string }) {
+function Canister({ iso, frames, colors }: { iso: number; frames: number; colors?: [string, string] }) {
   const lum = (h?: string) => { const n = parseInt(String(h ?? '#888').replace('#', ''), 16); return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 }
-  const label = body ?? '#f0b43a', num = body && lum(body) < 0.25 ? band ?? label : label
+  // 라벨은 상자처럼 위 바탕색 · 아래 띠색 (아이폰·갤럭시와 같음)
+  const label = colors?.[0] ?? '#f0b43a', band = colors?.[1] ?? label
+  const num = lum(label) < 0.25 ? (lum(band) < 0.25 ? '#f0b43a' : band) : label
   return (
     <div className="mr-canister" aria-hidden="true">
       <svg viewBox="0 0 80 132">
@@ -560,6 +563,7 @@ function Canister({ iso, frames, body, band }: { iso: number; frames: number; bo
         </defs>
         <rect x="2" y="9" width="64" height="114" fill="#0b0b0c" />
         <rect x="2" y="11" width="33" height="110" fill={label} />
+        <rect x="2" y="66" width="33" height="55" fill={band} />
         <text transform="translate(62 117) rotate(-90)" fontSize="22" fontWeight="700" fill={num} letterSpacing="-.6">{iso}</text>
         <text transform="translate(62 71) rotate(-90)" fontSize="22" fontWeight="700" fill={num} letterSpacing="-.6">{frames}<tspan fontSize="11" letterSpacing=".1">exp.</tspan></text>
         <path d="M63 8 C67 7.5 70 9 71.5 12 C70.5 15 72.5 18 71.8 22 L72.2 110 C73 114 71 117 71.8 121 C70 124.5 67 124.8 63 124 Z" fill="#232221" stroke="#55524e" strokeWidth=".6" />

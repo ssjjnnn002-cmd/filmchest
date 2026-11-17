@@ -290,20 +290,38 @@ private struct Tongue: View {
     }
 }
 
-/// 화면 왼쪽 끝에 걸친 135 필름통: 필름 색 라벨 · 검은 칸에 큰 '400 36exp.' · 빛 막는 천 · 위아래 검은 마개
+/// 필름 상자의 큰 두 색 [바탕, 띠] (scripts/render-film-boxes.mjs가 만든 filmbox-colors.json)
+enum FilmBoxColors {
+    private static let table: [String: [String]] = {
+        guard let url = Bundle.main.url(forResource: "filmbox-colors", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let t = try? JSONDecoder().decode([String: [String]].self, from: data) else { return [:] }
+        return t
+    }()
+    static func of(_ id: String) -> (String, String)? {
+        guard let c = table[id], c.count >= 2 else { return nil }
+        return (c[0], c[1])
+    }
+}
+
+/// 화면 왼쪽 끝에 걸친 135 필름통: 상자와 같은 두 색 라벨 · 검은 칸에 큰 '400 36exp.' · 빛 막는 천 · 위아래 검은 마개
 struct MeterCanister: View {
     var film: FilmStock?
     var frames: Int
 
     var body: some View {
-        let body = film.map { Color(meterHex: $0.style.body) } ?? Color(meterHex: "#f0b43a")
-        let num = film.map { meterLuminance($0.style.body) < 0.25 ? Color(meterHex: $0.style.band) : Color(meterHex: $0.style.body) } ?? body
+        // 라벨은 상자처럼 위 바탕색 · 아래 띠색 (상자 그림이 없는 필름은 필름 색)
+        let pair = film.flatMap { FilmBoxColors.of($0.id) } ?? film.map { ($0.style.body, $0.style.band) } ?? ("#f0b43a", "#f0b43a")
+        let body = Color(meterHex: pair.0)
+        let band = Color(meterHex: pair.1)
+        let num = meterLuminance(pair.0) < 0.25 ? (meterLuminance(pair.1) < 0.25 ? Color(meterHex: "#f0b43a") : band) : body
         GeometryReader { geo in
             let s = geo.size.width / 80
             ZStack(alignment: .topLeading) {
                 Canvas { c, _ in
                     c.fill(Path(CGRect(x: 2, y: 9, width: 64, height: 114)), with: .color(Color(meterHex: "#0b0b0c")))
                     c.fill(Path(CGRect(x: 2, y: 11, width: 33, height: 110)), with: .color(body))
+                    c.fill(Path(CGRect(x: 2, y: 66, width: 33, height: 55)), with: .color(band))
                     // 빛 막는 천 (구겨진 가장자리)
                     var felt = Path()
                     felt.move(to: CGPoint(x: 63, y: 8))

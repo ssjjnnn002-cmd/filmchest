@@ -298,7 +298,8 @@ export function Library() {
       {gear === 'camera' && cameras && cameras.length > 0 && (
         <div style={{ display: 'grid', gap: 18 }}>
           <button className={`banner ${editing ? 'dimmed' : ''}`} onClick={() => nav.loadFilm()} tabIndex={editing ? -1 : 0}>
-            <Canister film={filmById('kodak-portra-400')} size={52} />
+            {/* 글씨 없는 필름통 그림 (세 앱 같은 그림) */}
+            <img src="/plain-canister.png" width={52} height={52} alt="" />
             <div style={{ flex: 1 }}>
               <b>필름 장착하기</b>
               <span>{empty > 0 ? `빈 카메라 ${empty}대` : '모든 카메라에 필름이 들어 있어요'}</span>

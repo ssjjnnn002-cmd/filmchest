@@ -28,7 +28,9 @@ function t(ctx: Ctx, text: string, x: number, y: number, o: Opt) {
   ;(ctx as unknown as { letterSpacing: string }).letterSpacing = '0px'
   return ctx.measureText(text).width
 }
-const rect = (ctx: Ctx, c: string, x: number, y: number, w: number, h: number) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h) }
+/** 상자에 칠한 큰 면 색 (처음 두 번), boxPalette가 읽는다 */
+let painted: string[] | null = null
+const rect = (ctx: Ctx, c: string, x: number, y: number, w: number, h: number) => { painted?.push(c); ctx.fillStyle = c; ctx.fillRect(x, y, w, h) }
 
 function nameOnly(s: FilmStock) {
   const suf = ` ${s.iso}`
@@ -252,10 +254,11 @@ function paint(ctx: Ctx, b: Box) {
   return boldWide(ctx, b, bg, '#ffffff', /F5F5F2|FFFFFF/i.test(s.bandText) && bg === s.band ? '#ffffff' : s.bandText === bg ? '#ffffff' : s.bandText)
 }
 
-/** 정사각 칸 가운데 가로 1.6 : 1 상자 정면 */
-export function drawBox(ctx: Ctx, st: FilmStock, S: number, format = '135') {
-  const w = S * 0.94, h = w / 1.6
-  const x = (S - w) / 2, y = (S - h) / 2
+/** 상자 정면 (가로 1.6 : 1). 정사각 칸(S×S) 가운데에 그린다. crop이면 칸이 상자 크기(S × boxHeight(S))라 여백 없이 꽉 채운다 */
+export const boxHeight = (S: number) => Math.round(S * 0.96 / 1.6 + S * 0.025)
+export function drawBox(ctx: Ctx, st: FilmStock, S: number, format = '135', crop = false) {
+  const w = S * (crop ? 0.97 : 0.94), h = w / 1.6
+  const x = crop ? S * 0.005 : (S - w) / 2, y = crop ? S * 0.005 : (S - h) / 2
   const fmt = boxFormatText(format)
   ctx.fillStyle = 'rgba(0,0,0,0.14)'
   ctx.beginPath(); ctx.roundRect(x + S * 0.01, y + S * 0.012, w, h, S * 0.008); ctx.fill()
@@ -265,6 +268,23 @@ export function drawBox(ctx: Ctx, st: FilmStock, S: number, format = '135') {
   ctx.restore()
   ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = S * 0.003
   ctx.beginPath(); ctx.roundRect(x, y, w, h, S * 0.008); ctx.stroke()
+}
+
+/** 상자의 큰 두 색 [바탕, 띠] — 상세 기록 화면 필름통 라벨을 상자와 비슷하게 칠할 때 쓴다 */
+const paletteCache = new Map<string, [string, string]>()
+export function boxPalette(st: FilmStock): [string, string] {
+  const ck = `${st.id}|${st.style.body}|${st.style.band}`
+  const hit = paletteCache.get(ck)
+  if (hit) return hit
+  const cv = document.createElement('canvas')
+  cv.width = 32; cv.height = 20
+  painted = []
+  try { paint(cv.getContext('2d')!, { x: 0, y: 0, w: 32, h: 20, st, fmt: '135-36' }) } finally { /* 아래에서 비움 */ }
+  const [a, b] = painted
+  painted = null
+  const pair: [string, string] = [a ?? st.style.body, b ?? a ?? st.style.band]
+  paletteCache.set(ck, pair)
+  return pair
 }
 
 /** 상자에 적는 규격 글씨 (같은 글씨면 같은 그림) */

@@ -369,7 +369,8 @@ struct LibraryView: View {
     private var loadFilmBanner: some View {
         Button { router.loadFilm() } label: {
             HStack(spacing: 14) {
-                FilmCanisterView(stock: FilmStockCatalog.stock(id: "kodak-portra-400"))
+                // 글씨 없는 필름통 그림 (세 앱 같은 그림)
+                Image("filmbox-plain-canister").resizable().scaledToFit()
                     .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("필름 장착하기").font(.headline)
