@@ -1,5 +1,6 @@
 // 기본 목록(web/src/core/films.ts · FilmStockCatalog.swift)에 더하는 필름.
 // 지금 살 수 있는 필름 + 단종됐지만 유통기한 지난 재고로 아직 구할 수 있는 필름(disc: true).
+// 단종 표시는 단종이 확실한 것만 (지역에 따라 아직 파는 필름은 표시하지 않음)
 // 고친 뒤 `node catalog/generate-films.mjs` → web/src/core/filmData.ts, FilmStockCatalogMore.swift 생성
 //
 // [id, 브랜드, 이름, ISO, 현상, 규격, [바탕, 띠, 글자, 띠 글자, 뚜껑?], disc?]
@@ -34,15 +35,15 @@ export const moreFilms = [
   ['kodak-elite-chrome-100', 'Kodak', 'Elite Chrome 100', 100, 'E-6', '35', [K, '#1F4E9C', '#FFFFFF', '#FFFFFF'], true],
 
   // ── Fujifilm (단종, 기한 지난 재고)
-  ['fuji-superia-200', 'Fujifilm', 'Superia 200', 200, 'C-41', '35', ['#0C8A4B', '#E2231A', '#FFFFFF', '#FFFFFF'], true],
+  ['fuji-superia-200', 'Fujifilm', 'Superia 200', 200, 'C-41', '35', ['#0C8A4B', '#E2231A', '#FFFFFF', '#FFFFFF']],
   ['fuji-superia-800', 'Fujifilm', 'Superia 800', 800, 'C-41', '35', ['#0C8A4B', '#5A2D82', '#FFFFFF', '#FFFFFF'], true],
   ['fuji-superia-1600', 'Fujifilm', 'Superia 1600', 1600, 'C-41', '35', ['#0C8A4B', K, '#FFFFFF', '#FFFFFF'], true],
   ['fuji-superia-venus-800', 'Fujifilm', 'Superia Venus 800', 800, 'C-41', '35', ['#C2185B', '#F5F5F2', '#FFFFFF', '#C2185B'], true],
   ['fuji-superia-reala-100', 'Fujifilm', 'Superia Reala 100', 100, 'C-41', 'both', ['#0C8A4B', '#1F4E9C', '#FFFFFF', '#FFFFFF'], true],
   ['fuji-natura-1600', 'Fujifilm', 'Natura 1600', 1600, 'C-41', '35', [K, '#C9A227', '#F5F5F2', K, CAP], true],
   ['fuji-pro-160ns', 'Fujifilm', 'Pro 160NS', 160, 'C-41', 'both', ['#EDEDED', '#3C9DD9', K, '#FFFFFF'], true],
-  ['fuji-industrial-100', 'Fujifilm', 'Fujicolor 100 Industrial', 100, 'C-41', '35', [W, '#E2231A', K, '#FFFFFF'], true],
-  ['fuji-superia-premium-400', 'Fujifilm', 'Superia Premium 400', 400, 'C-41', '35', ['#0C8A4B', '#C9A227', '#FFFFFF', K], true],
+  ['fuji-industrial-100', 'Fujifilm', 'Fujicolor 100 Industrial', 100, 'C-41', '35', [W, '#E2231A', K, '#FFFFFF']],
+  ['fuji-superia-premium-400', 'Fujifilm', 'Superia Premium 400', 400, 'C-41', '35', ['#0C8A4B', '#C9A227', '#FFFFFF', K]],
   ['fuji-neopan-acros-100', 'Fujifilm', 'Neopan Acros 100', 100, 'B&W', 'sheets', [K, '#C8102E', '#FFFFFF', '#FFFFFF', CAP], true],
   ['fuji-neopan-400', 'Fujifilm', 'Neopan 400', 400, 'B&W', 'both', [K, '#1F4E9C', '#FFFFFF', '#FFFFFF', CAP], true],
   ['fuji-neopan-1600', 'Fujifilm', 'Neopan 1600', 1600, 'B&W', '35', [K, '#5A2D82', '#FFFFFF', '#FFFFFF', CAP], true],

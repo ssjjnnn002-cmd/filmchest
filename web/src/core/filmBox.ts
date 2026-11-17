@@ -106,25 +106,28 @@ function kodakConsumer(ctx: Ctx, b: Box, bottom: string, tagline: string[]) {
   t(ctx, `1 ${b.fmt}`, rx, b.y + b.h * 0.92, { size: b.h * 0.05, weight: 600, color: '#F7C600', align: 'right' })
 }
 
-/** 흰 바탕 + 초록 아래 + 빨간 이름 딱지 (일상용 Fuji 느낌) */
-function whiteTag(ctx: Ctx, b: Box, bg: string, base: string, tag: string, tagInk: string, ink: string) {
-  rect(ctx, bg, b.x, b.y, b.w, b.h)
-  rect(ctx, base, b.x, b.y + b.h * 0.72, b.w, b.h * 0.28)
-  // 사선으로 걸친 색 띠
-  ctx.fillStyle = base
-  ctx.beginPath(); ctx.moveTo(b.x, b.y + b.h * 0.72); ctx.lineTo(b.x + b.w * 0.35, b.y + b.h * 0.55); ctx.lineTo(b.x + b.w * 0.5, b.y + b.h * 0.72); ctx.fill()
-  const [lx] = P(b, 0.06, 0)
-  t(ctx, b.st.brand.toUpperCase(), lx, b.y + b.h * 0.22, { size: b.h * 0.1, weight: 800, color: base, track: 0.05 })
-  const numeric = /^\d+$/.test(b.st.name)
-  const tagText = numeric ? b.st.name : nameOnly(b.st)
-  ctx.font = `italic 900 ${b.h * 0.24}px ${F}`
-  const tw = Math.min(ctx.measureText(tagText).width, b.w * 0.5) + b.h * 0.12
-  ctx.fillStyle = tag
-  ctx.beginPath(); ctx.roundRect(b.x + b.w * 0.94 - tw, b.y + b.h * 0.3, tw, b.h * 0.3, b.h * 0.06); ctx.fill()
-  t(ctx, tagText, b.x + b.w * 0.94 - tw / 2, b.y + b.h * 0.53, { size: b.h * 0.24, weight: 900, italic: true, color: tagInk, align: 'center', maxW: b.w * 0.5 })
-  t(ctx, numeric ? 'Fujicolor' : String(b.st.iso), lx, b.y + b.h * 0.55, { size: b.h * (numeric ? 0.13 : 0.2), weight: 800, italic: true, color: ink, maxW: b.w * 0.42 })
-  t(ctx, `${b.fmt}  ·  ${b.st.process}`, lx, b.y + b.h * 0.92, { size: b.h * 0.08, weight: 700, color: '#ffffff' })
+/** 후지 일상용 상자 (위 흰 바탕에 굵은 브랜드, 아래 초록, 왼쪽 아래→오른쪽 위 사선 색 띠에 기울인 흰 이름, 띠 앞 무지개 끝) */
+function fujiConsumer(ctx: Ctx, b: Box, word: string, label: string, band: string, green = '#0E9F4A') {
+  rect(ctx, '#FFFFFF', b.x, b.y, b.w, b.h)
+  const P2 = (px: number, py: number) => [b.x + b.w * px, b.y + b.h * py] as const
+  const poly = (c: string | CanvasGradient, pts: (readonly [number, number])[]) => {
+    ctx.fillStyle = c; ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fill()
+  }
+  // 아래 초록 (윗변은 왼쪽이 조금 높은 사선)
+  poly(green, [P2(0, 0.6), P2(0.34, 0.66), P2(1, 0.76), P2(1, 1), P2(0, 1)])
+  painted?.push(green)
+  // 무지개 끝 (띠 왼쪽 꼭지 앞)
+  const g = ctx.createLinearGradient(b.x + b.w * 0.1, 0, b.x + b.w * 0.36, 0)
+  for (const [o, c] of [[0, 'rgba(255,255,255,0)'], [0.25, '#F6E04B'], [0.5, '#F28C28'], [0.75, '#E2231A'], [1, band]] as const) g.addColorStop(o, c)
+  poly(g, [P2(0.1, 0.6), P2(0.36, 0.62), P2(0.36, 0.68), P2(0.1, 0.62)])
+  // 오른쪽으로 넓어지는 사선 띠
+  poly(band, [P2(0.34, 0.65), P2(1, 0.34), P2(1, 0.77)])
+  t(ctx, word, b.x + b.w * 0.94, b.y + b.h * 0.27, { size: b.h * 0.15, weight: 900, wdth: 100, color: '#1a1a1a', align: 'right', maxW: b.w * 0.62 })
+  t(ctx, label, b.x + b.w * 0.95, b.y + b.h * 0.67, { size: b.h * 0.24, weight: 700, wdth: 95, italic: true, color: '#ffffff', align: 'right', maxW: b.w * 0.42 })
+  t(ctx, '36', b.x + b.w * 0.07, b.y + b.h * 0.9, { size: b.h * 0.22, weight: 700, italic: true, color: '#ffffff' })
+  t(ctx, 'FILM FOR COLOR PRINTS', b.x + b.w * 0.2, b.y + b.h * 0.94, { size: b.h * 0.045, weight: 700, color: '#ffffff' })
 }
+
 
 /** 슬라이드 (초록 테두리, 흰 칸 + 파란 이름 딱지, 아래 띠에 이름) */
 function slidePanel(ctx: Ctx, b: Box, frame: string, tag: string, tagInk: string, ink: string) {
@@ -240,7 +243,15 @@ function paint(ctx: Ctx, b: Box) {
     if (st.process === 'instant') return instantBox(ctx, b, '#f7f7f4', s.band, '#1a1a1a')
     if (st.process === 'B&W') return bwHeavy(ctx, b, '#f4f4f1', '#141414', '#ffffff')
     if (/pro-|natura/.test(id)) return darkCenter(ctx, b, s.body === '#EDEDED' ? '#2E6B3A' : s.body, '#EDEDED', '#ffffff', '#1a1a1a')
-    return whiteTag(ctx, b, '#ffffff', /c200|superia/.test(id) ? '#0C9A48' : s.band, '#D7262E', '#ffffff', '#0C9A48')
+    // 일상용 (C200·200·400·Superia): 같은 틀, 띠 색과 이름만 다르다
+    const fc: Record<string, [string, string, string]> = {
+      'fuji-c200': ['FUJICOLOR', 'C200', '#B5174F'], 'fuji-200': ['FUJIFILM', '200', '#7B2D8E'], 'fuji-400': ['FUJIFILM', '400', '#1F4E9C'],
+      'fuji-superia-xtra-400': ['FUJICOLOR', 'X-TRA 400', '#D7262E'], 'fuji-superia-200': ['FUJICOLOR', 'SUPERIA 200', '#D7262E'],
+      'fuji-superia-800': ['FUJICOLOR', 'SUPERIA 800', '#5A2D82'], 'fuji-superia-1600': ['FUJICOLOR', 'SUPERIA 1600', '#1B1B1B'],
+      'fuji-superia-premium-400': ['FUJICOLOR', 'PREMIUM 400', '#C9A227'], 'fuji-industrial-100': ['FUJICOLOR', '100', '#D7262E'],
+    }
+    const k = fc[id] ?? ['FUJICOLOR', nameOnly(st), s.band]
+    return fujiConsumer(ctx, b, k[0], k[1], k[2])
   }
   if (st.brand === 'Ilford' || st.brand === 'Kentmere') {
     if (/delta|xp2/.test(id)) return outlineDelta(ctx, b, '#ECECEA', '#141414', s.band === '#1B1B1B' ? '#9A9A9A' : s.band)

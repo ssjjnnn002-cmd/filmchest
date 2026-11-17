@@ -8,7 +8,7 @@ import { moreFilms } from './films.mjs'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const header = '// 자동 생성 파일 — 직접 고치지 말고 catalog/films.mjs를 고친 뒤 `node catalog/generate-films.mjs` 실행\n'
 /** 기본 목록에 있는 필름 중 단종된 것 */
-const oldDisc = ['fuji-pro-400h', 'fuji-c200']
+const oldDisc = ['fuji-pro-400h'] // C200은 지금도 판매 중
 
 const fmt = { '35': ['135'], '120': ['120-66'], both: ['135', '120-66'], sheets: ['135', '120-66', 'sheet-45', 'sheet-810'], '110': ['110'] }
 const proc = new Set(['C-41', 'B&W', 'E-6', 'ECN-2', 'instant'])
