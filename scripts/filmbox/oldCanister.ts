@@ -135,14 +135,6 @@ function draw135(ctx: CanvasRenderingContext2D, st: FilmStock, S: number) {
   ctx.fillStyle = sty.band
   ctx.fillRect(bx, u(0.45), bw, u(0.14))
 
-  // DX 코드
-  const cell = bw / 12
-  for (let i = 0; i < 12; i++) for (let row = 0; row < 2; row++) {
-    const on = (((st.iso >> (i % 8)) ^ ((row * 0b10100110) >> i)) & 1) === 0 || i === 0
-    ctx.fillStyle = on ? '#C9CCCF' : '#1A1A1A'
-    ctx.fillRect(bx + i * cell, u(0.7) + row * cell * 0.9, cell, cell * 0.9)
-  }
-
   const cx = bx + bw / 2
   cylinderShade(ctx, bx, top, bw, bottom - top, [[0, shade(0.42)], [0.1, shade(0.12)], [0.3, light(0.22)], [0.45, light(0)], [0.8, shade(0.18)], [1, shade(0.5)]])
 

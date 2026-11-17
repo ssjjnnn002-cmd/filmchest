@@ -176,14 +176,15 @@ struct MeterFilmStrip: View {
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
-                        // 필름통까지 이어지는 필름 (칸·번호 없이)
-                        Perforated(width: max(240, geo.size.width))
+                        // 필름통까지 이어지는 필름 (칸·번호 없이). 맨 끝에서 마지막 컷이 딱 가운데에 오는 길이
+                        Perforated(width: max(60, geo.size.width / 2 - 52))
                         ForEach(Array(stride(from: range.hi, through: range.lo, by: -1)), id: \.self) { p in
                             Button { onTap(p) } label: { cell(p, shotMap[p]) }
                                 .buttonStyle(.plain).id(p)
                         }
+                        // 필름 앞쪽 (잘린 혀 모양) — 1번 칸이 가운데일 때 오른쪽에 보인다
                         Tongue()
-                        Color.clear.frame(width: max(0, geo.size.width / 2 - 52))
+                        Color.clear.frame(width: max(0, geo.size.width / 2 - 52 - 232))
                     }
                     .frame(height: 112)
                 }
