@@ -103,7 +103,7 @@ export function RollDetail({ id }: { id: string }) {
         </View>
       </View>
 
-      {features.meter ? (
+      {features.meter || (roll.meterShots?.length ?? 0) > 0 ? (
         <View style={{ marginTop: 8, marginBottom: 4 }}>
           <Segmented value={view} options={[['log', '기록'], ['meter', '노출']]} onChange={setTab} />
         </View>

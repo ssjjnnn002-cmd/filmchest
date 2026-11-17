@@ -26,7 +26,9 @@ export function formatAperture(n: number): string {
   return Number.isInteger(rounded) ? `f/${rounded}` : `f/${rounded}`
 }
 
+/** 셔터 표시. 0보다 작으면 B(벌브) */
 export function formatShutter(seconds: number): string {
+  if (seconds < 0) return 'B'
   if (!Number.isFinite(seconds) || seconds <= 0) return ''
   if (seconds >= 1) {
     const whole = Math.round(seconds)

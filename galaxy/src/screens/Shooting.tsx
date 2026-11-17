@@ -12,8 +12,7 @@ import { Icon } from '../icons'
 import { GlassBtn, Page } from '../page'
 import { useTheme } from '../theme'
 import { LabDropOff, PlaceEdit } from './Editors'
-import { Meter } from './Meter'
-import { features } from '../core/features'
+import { ManualRecord } from './ManualRecord'
 import { SettingsButton } from './Settings'
 
 export function Shooting() {
@@ -60,12 +59,13 @@ function LoadedCard({ roll }: { roll: Roll }) {
       </Pressable>
       <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 16 }}>
         {roll.locations.length === 0 ? <View style={{ flex: 1 }}><Btn label="장소 추가" icon="pin" kind="soft" block onPress={() => setPlacing(true)} /></View> : null}
-        <View style={{ flex: 1 }}><Btn label="촬영 끝내기" kind={features.meter ? 'soft' : 'primary'} block onPress={() => setDropOff(true)} /></View>
-        {features.meter ? <View style={{ flex: 1 }}><Btn label="노출계" kind="primary" block onPress={() => setMeter(true)} /></View> : null}
+        {/* 상세 기록: 다이얼로 컷마다 기록 (웹·아이폰과 같음) */}
+        <View style={{ flex: 1 }}><Btn label="상세 기록" kind="soft" block onPress={() => setMeter(true)} /></View>
+        <View style={{ flex: 1 }}><Btn label="촬영 끝내기" kind="primary" block onPress={() => setDropOff(true)} /></View>
       </View>
       {placing ? <PlaceEdit roll={roll} onClose={() => setPlacing(false)} /> : null}
       {dropOff ? <LabDropOff roll={roll} onClose={(ended) => { setDropOff(false); if (ended) nav.toPending(roll.id) }} /> : null}
-      {meter ? <Meter roll={roll} onClose={() => setMeter(false)} onEnd={() => { setMeter(false); setDropOff(true) }} /> : null}
+      {meter ? <ManualRecord roll={roll} onClose={() => setMeter(false)} /> : null}
     </View>
   )
 }
