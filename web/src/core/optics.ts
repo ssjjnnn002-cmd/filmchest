@@ -73,8 +73,9 @@ export const filterKinds = ['UV', 'CPL', 'ND2', 'ND4', 'ND8', 'ND16', 'Yellow', 
   'Black Pro-Mist 1/8', 'Black Pro-Mist 1/4', 'Black Pro-Mist 1/2']
 export const filterDiameters = ['37', '39', '40.5', '43', '46', '49', '52', '55', '58', '62', '67', '72', '77', '82']
 
+/** 그 규격 카메라에 넣을 수 있는 필름인지: 35mm(하프 포함)는 135, 120은 120 아무 크기, 110·시트·인스턴트는 같은 규격만 */
 export function filmFits(formats: string[], format: string) {
-  if (format === '135-half') return formats.includes('135')
-  const roll120 = format.startsWith('120')
-  return formats.some((item) => item.startsWith('120') === roll120)
+  if (format === '135' || format === '135-half') return formats.includes('135')
+  if (format.startsWith('120')) return formats.some((item) => item.startsWith('120'))
+  return formats.includes(format)
 }

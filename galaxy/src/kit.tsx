@@ -9,7 +9,7 @@ import { TextInput } from './textInput'
 import { Icon } from './icons'
 import { watchWork } from './core/work'
 import { useTheme } from './theme'
-import { statusName, type Camera, type FilmFormat, type RollStatus } from './core/types'
+import { statusName, type Camera, type FilmFormat, type RollStatus, filmPack } from './core/types'
 import { formatInfo } from './core/types'
 import type { FilmStock } from './core/films'
 import { canisterShots } from './canisterShots'
@@ -296,7 +296,9 @@ export function Card({ children, style }: { children: ReactNode; style?: ViewSty
 export function Canister({ film, format = '135', size = 48 }: { film?: FilmStock; format?: FilmFormat; size?: number }) {
   const c = useTheme()
   if (!film) return <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}><Icon name="film" size={size * 0.6} color={c.muted} /></View>
-  const src = canisterShots[`${film.id}-${formatInfo[format].is120 ? '120' : '135'}`]
+  // 35mm 통·120 롤은 미리 그려 둔 그림, 110·시트·인스턴트는 웹 그림을 그 자리에서 그린다
+  const pack = filmPack(format)
+  const src = pack === 'canister' || pack === 'roll' ? canisterShots[`${film.id}-${pack === 'roll' ? '120' : '135'}`] : undefined
   if (src) return <Image source={src} resizeMode="contain" style={{ width: size, height: size }} accessibilityLabel={film.name} />
   return <DrawnCanister film={film} format={format} size={size} />
 }
@@ -304,7 +306,7 @@ export function Canister({ film, format = '135', size = 48 }: { film?: FilmStock
 // 직접 추가한 필름: 웹 canister.ts로 그린 그림
 const drawn = new Map<string, string>()
 function DrawnCanister({ film, format, size }: { film: FilmStock; format: FilmFormat; size: number }) {
-  const key = `${film.id}|${film.name}|${film.iso}|${film.style.body}|${formatInfo[format].is120}`
+  const key = `${film.id}|${film.name}|${film.iso}|${film.style.body}|${format}`
   const [uri, setUri] = useState(drawn.get(key))
   useEffect(() => {
     if (drawn.has(key)) { setUri(drawn.get(key)); return }

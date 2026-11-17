@@ -24,22 +24,25 @@ const s = (body: string, band: string, text: string, bandText: string, cap = '#2
 })
 const both: FilmFormat[] = ['135', '120-66']
 const only135: FilmFormat[] = ['135']
+/** 35mm · 120 · 대형 시트(4×5, 8×10)로 나오는 필름 */
+const withSheets: FilmFormat[] = ['135', '120-66', 'sheet-45', 'sheet-810']
+const only = (...f: FilmFormat[]): FilmFormat[] => f
 
 const f = (id: string, brand: string, name: string, iso: number, process: FilmProcess, style: CanisterStyle,
   formats: FilmFormat[] = both): FilmStock => ({ id, brand, name, iso, process, formats, style })
 
 export const films: FilmStock[] = [
-  f('kodak-portra-160', 'Kodak', 'Portra 160', 160, 'C-41', s('#F4EFE4', '#E39B2D', '#3A2E22', '#FFFFFF')),
-  f('kodak-portra-400', 'Kodak', 'Portra 400', 400, 'C-41', s('#F4EFE4', '#F2A71B', '#3A2E22', '#FFFFFF')),
+  f('kodak-portra-160', 'Kodak', 'Portra 160', 160, 'C-41', s('#F4EFE4', '#E39B2D', '#3A2E22', '#FFFFFF'), withSheets),
+  f('kodak-portra-400', 'Kodak', 'Portra 400', 400, 'C-41', s('#F4EFE4', '#F2A71B', '#3A2E22', '#FFFFFF'), withSheets),
   f('kodak-portra-800', 'Kodak', 'Portra 800', 800, 'C-41', s('#F4EFE4', '#D9771E', '#3A2E22', '#FFFFFF')),
-  f('kodak-ektar-100', 'Kodak', 'Ektar 100', 100, 'C-41', s('#FFC20E', '#E2231A', '#1A1A1A', '#FFFFFF')),
+  f('kodak-ektar-100', 'Kodak', 'Ektar 100', 100, 'C-41', s('#FFC20E', '#E2231A', '#1A1A1A', '#FFFFFF'), withSheets),
   f('kodak-gold-200', 'Kodak', 'Gold 200', 200, 'C-41', s('#FDB913', '#C8102E', '#1A1A1A', '#FFFFFF')),
   f('kodak-ultramax-400', 'Kodak', 'UltraMax 400', 400, 'C-41', s('#FDB913', '#1F4E9C', '#1A1A1A', '#FFFFFF'), only135),
   f('kodak-colorplus-200', 'Kodak', 'ColorPlus 200', 200, 'C-41', s('#FDB913', '#5B3A8C', '#1A1A1A', '#FFFFFF'), only135),
   f('kodak-ektachrome-e100', 'Kodak', 'Ektachrome E100', 100, 'E-6', s('#1B1B1B', '#FDB913', '#FFFFFF', '#1B1B1B')),
   f('kodak-trix-400', 'Kodak', 'Tri-X 400', 400, 'B&W', s('#FDB913', '#1B1B1B', '#1B1B1B', '#FDB913')),
-  f('kodak-tmax-100', 'Kodak', 'T-Max 100', 100, 'B&W', s('#FDB913', '#2E5AA8', '#1B1B1B', '#FFFFFF')),
-  f('kodak-tmax-400', 'Kodak', 'T-Max 400', 400, 'B&W', s('#FDB913', '#C8102E', '#1B1B1B', '#FFFFFF')),
+  f('kodak-tmax-100', 'Kodak', 'T-Max 100', 100, 'B&W', s('#FDB913', '#2E5AA8', '#1B1B1B', '#FFFFFF'), withSheets),
+  f('kodak-tmax-400', 'Kodak', 'T-Max 400', 400, 'B&W', s('#FDB913', '#C8102E', '#1B1B1B', '#FFFFFF'), withSheets),
   f('kodak-vision3-250d', 'Kodak', 'Vision3 250D', 250, 'ECN-2', s('#2A2A2A', '#E8B02E', '#F2F2F2', '#1B1B1B'), only135),
   f('kodak-vision3-500t', 'Kodak', 'Vision3 500T', 500, 'ECN-2', s('#2A2A2A', '#3C7DD9', '#F2F2F2', '#FFFFFF'), only135),
   f('fuji-200', 'Fujifilm', '200', 200, 'C-41', s('#F5F5F2', '#00A15F', '#1B1B1B', '#FFFFFF'), only135),
@@ -47,13 +50,13 @@ export const films: FilmStock[] = [
   f('fuji-superia-xtra-400', 'Fujifilm', 'Superia X-TRA 400', 400, 'C-41', s('#0C8A4B', '#E2231A', '#FFFFFF', '#FFFFFF'), only135),
   f('fuji-c200', 'Fujifilm', 'Fujicolor C200', 200, 'C-41', s('#00A15F', '#F5F5F2', '#FFFFFF', '#00A15F'), only135),
   f('fuji-pro-400h', 'Fujifilm', 'Pro 400H', 400, 'C-41', s('#EDEDED', '#6CB33F', '#1B1B1B', '#FFFFFF')),
-  f('fuji-velvia-50', 'Fujifilm', 'Velvia 50', 50, 'E-6', s('#5A2D82', '#E2231A', '#FFFFFF', '#FFFFFF')),
+  f('fuji-velvia-50', 'Fujifilm', 'Velvia 50', 50, 'E-6', s('#5A2D82', '#E2231A', '#FFFFFF', '#FFFFFF'), withSheets),
   f('fuji-velvia-100', 'Fujifilm', 'Velvia 100', 100, 'E-6', s('#7A2A82', '#F5F5F2', '#FFFFFF', '#7A2A82')),
-  f('fuji-provia-100f', 'Fujifilm', 'Provia 100F', 100, 'E-6', s('#1E4FA0', '#F5F5F2', '#FFFFFF', '#1E4FA0')),
+  f('fuji-provia-100f', 'Fujifilm', 'Provia 100F', 100, 'E-6', s('#1E4FA0', '#F5F5F2', '#FFFFFF', '#1E4FA0'), withSheets),
   f('fuji-acros-100-ii', 'Fujifilm', 'Acros II 100', 100, 'B&W', s('#1B1B1B', '#9A9A9A', '#FFFFFF', '#1B1B1B')),
-  f('ilford-hp5-plus', 'Ilford', 'HP5 Plus', 400, 'B&W', s('#1B1B1B', '#F5F5F2', '#F5F5F2', '#1B1B1B', '#111111')),
-  f('ilford-fp4-plus', 'Ilford', 'FP4 Plus', 125, 'B&W', s('#1B1B1B', '#2F6DB5', '#F5F5F2', '#FFFFFF', '#111111')),
-  f('ilford-delta-100', 'Ilford', 'Delta 100', 100, 'B&W', s('#F5F5F2', '#1B1B1B', '#1B1B1B', '#F5F5F2')),
+  f('ilford-hp5-plus', 'Ilford', 'HP5 Plus', 400, 'B&W', s('#1B1B1B', '#F5F5F2', '#F5F5F2', '#1B1B1B', '#111111'), withSheets),
+  f('ilford-fp4-plus', 'Ilford', 'FP4 Plus', 125, 'B&W', s('#1B1B1B', '#2F6DB5', '#F5F5F2', '#FFFFFF', '#111111'), withSheets),
+  f('ilford-delta-100', 'Ilford', 'Delta 100', 100, 'B&W', s('#F5F5F2', '#1B1B1B', '#1B1B1B', '#F5F5F2'), withSheets),
   f('ilford-delta-400', 'Ilford', 'Delta 400', 400, 'B&W', s('#F5F5F2', '#E2231A', '#1B1B1B', '#FFFFFF')),
   f('ilford-delta-3200', 'Ilford', 'Delta 3200', 3200, 'B&W', s('#F5F5F2', '#5A2D82', '#1B1B1B', '#FFFFFF')),
   f('ilford-panf-plus-50', 'Ilford', 'Pan F Plus 50', 50, 'B&W', s('#1B1B1B', '#E85D9C', '#F5F5F2', '#FFFFFF', '#111111')),
@@ -67,8 +70,21 @@ export const films: FilmStock[] = [
   f('lomo-cn-400', 'Lomography', 'Color Negative 400', 400, 'C-41', s('#F5F5F2', '#E2231A', '#1B1B1B', '#FFFFFF')),
   f('lomo-cn-800', 'Lomography', 'Color Negative 800', 800, 'C-41', s('#F5F5F2', '#1F4E9C', '#1B1B1B', '#FFFFFF')),
   f('lomo-lomochrome-purple', 'Lomography', 'LomoChrome Purple', 400, 'C-41', s('#6B2C91', '#E85D9C', '#FFFFFF', '#FFFFFF')),
-  f('foma-fomapan-100', 'Foma', 'Fomapan 100', 100, 'B&W', s('#F5F5F2', '#2E8B57', '#1B1B1B', '#FFFFFF')),
+  f('foma-fomapan-100', 'Foma', 'Fomapan 100', 100, 'B&W', s('#F5F5F2', '#2E8B57', '#1B1B1B', '#FFFFFF'), withSheets),
   f('foma-fomapan-400', 'Foma', 'Fomapan 400', 400, 'B&W', s('#F5F5F2', '#C8102E', '#1B1B1B', '#FFFFFF')),
+  // 110 카트리지 (로모그래피)
+  f('lomo-tiger-110', 'Lomography', 'Tiger 200', 200, 'C-41', s('#F28C28', '#1B1B1B', '#1B1B1B', '#F28C28'), only('110')),
+  f('lomo-peacock-110', 'Lomography', 'Peacock 200', 200, 'C-41', s('#1E7F8C', '#F4C430', '#FFFFFF', '#1B1B1B'), only('110')),
+  f('lomo-orca-110', 'Lomography', 'Orca 100', 100, 'B&W', s('#1B1B1B', '#F5F5F2', '#F5F5F2', '#1B1B1B'), only('110')),
+  // 인스턴트 필름
+  f('fuji-instax-mini', 'Fujifilm', 'Instax Mini', 800, 'instant', s('#F5F5F2', '#E2231A', '#1B1B1B', '#FFFFFF'), only('instax-mini')),
+  f('fuji-instax-mini-mono', 'Fujifilm', 'Instax Mini Monochrome', 800, 'instant', s('#1B1B1B', '#9A9A9A', '#F5F5F2', '#1B1B1B'), only('instax-mini')),
+  f('fuji-instax-square', 'Fujifilm', 'Instax Square', 800, 'instant', s('#F5F5F2', '#1F4E9C', '#1B1B1B', '#FFFFFF'), only('instax-square')),
+  f('fuji-instax-wide', 'Fujifilm', 'Instax Wide', 800, 'instant', s('#F5F5F2', '#00A15F', '#1B1B1B', '#FFFFFF'), only('instax-wide')),
+  f('polaroid-600-color', 'Polaroid', '600 Color', 640, 'instant', s('#F5F5F2', '#E2231A', '#1B1B1B', '#FFFFFF'), only('polaroid')),
+  f('polaroid-itype-color', 'Polaroid', 'i-Type Color', 640, 'instant', s('#F5F5F2', '#2B6CB0', '#1B1B1B', '#FFFFFF'), only('polaroid')),
+  f('polaroid-sx70-color', 'Polaroid', 'SX-70 Color', 160, 'instant', s('#F5F5F2', '#F2A71B', '#1B1B1B', '#1B1B1B'), only('polaroid')),
+  f('polaroid-600-bw', 'Polaroid', '600 B&W', 640, 'instant', s('#1B1B1B', '#F5F5F2', '#F5F5F2', '#1B1B1B'), only('polaroid')),
 ]
 
 const genericFilmWord = new Set(['plus', 'super', 'ii', 'color', 'negative', 'pan'])

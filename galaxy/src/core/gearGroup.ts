@@ -1,7 +1,7 @@
 // 자동 복사: web/src/core/gearGroup.ts (node scripts/sync-galaxy-core.mjs). 여기서 고치지 말 것.
 // 묶어 보기 (내 장비 카메라·필름 재고, 필름 고르기 '더보기', 카메라 목록). 아이폰 GearGrouping.swift와 같은 이름·순서
 import type { BodyStyle, Camera, FilmLot } from './types'
-import { styleName } from './types'
+import { formatFamily, styleName } from './types'
 import type { FilmStock } from './films'
 import { filmById, filmDisplayName } from './films'
 
@@ -49,6 +49,7 @@ const processKey: Record<FilmStock['process'], Key> = {
   'B&W': { sort: '1', title: '흑백' },
   'E-6': { sort: '2', title: '슬라이드' },
   'ECN-2': { sort: '3', title: '영화용' },
+  instant: { sort: '4', title: '인스턴트' },
 }
 
 export function filmKey(f: FilmStock, g: GearGroup): Key {
@@ -66,7 +67,7 @@ export function filmSections(list: FilmStock[], g: GearGroup): { title?: string;
 }
 
 export function lotKey(l: FilmLot, g: GearGroup): Key {
-  if (g === 'format') return l.format.startsWith('120') ? { sort: '1', title: '120' } : { sort: '0', title: '35mm' }
+  if (g === 'format') return formatFamily(l.format)
   const f = filmById(l.filmId)
   if (!f) return { sort: '~', title: '기타' }
   return filmKey(f, g)

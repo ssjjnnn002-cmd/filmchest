@@ -901,7 +901,7 @@ private struct FilmLookPicker: View {
         let recent = rolls.map(\.filmStockID)
         _ = customFilms.count
         let list = FilmStockCatalog.allIncludingCustom
-            .filter { format == .halfFrame ? $0.formats.contains(.f135) : $0.formats.contains { $0.is120 == format.is120 } }
+            .filter { format.accepts($0.formats) }
             .filter { search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search) }
         func rank(_ stock: FilmStock) -> (Int, Int) {
             (recent.firstIndex(of: stock.id) ?? .max, Self.popular.firstIndex(of: stock.id) ?? .max)

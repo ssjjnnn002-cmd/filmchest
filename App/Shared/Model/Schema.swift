@@ -665,6 +665,7 @@ extension FilmFormat {
         case .f120_66: 12
         case .f120_67: 10
         case .f120_69: 8
+        default: nominalFrameCount
         }
     }
 }

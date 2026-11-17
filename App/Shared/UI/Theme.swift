@@ -64,7 +64,7 @@ enum CanisterCache {
     private static let cache = NSCache<NSString, CGImage>()
 
     private static func key(_ stock: FilmStock, _ format: FilmFormat) -> NSString {
-        "\(stock.id)|\(stock.name)|\(stock.iso)|\(stock.style.body)|\(format.is120)" as NSString
+        "\(stock.id)|\(stock.name)|\(stock.iso)|\(stock.style.body)|\(format.rawValue)" as NSString
     }
 
     static func cached(_ stock: FilmStock, format: FilmFormat) -> CGImage? { cache.object(forKey: key(stock, format)) }

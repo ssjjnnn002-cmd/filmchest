@@ -45,6 +45,7 @@ extension FilmStock {
         case .bw: ("1", "흑백")
         case .e6: ("2", "슬라이드")
         case .ecn2: ("3", "영화용")
+        case .instant: ("4", "인스턴트")
         }
     }
 
@@ -68,7 +69,7 @@ extension FilmLotItem {
     func groupKey(_ g: GearGroup) -> (sort: String, title: String) {
         let stock = FilmStockCatalog.stock(id: filmStockID)
         switch g {
-        case .format: return format.is120 ? ("1", "120") : ("0", "35mm")
+        case .format: return format.family
         case .brand, .iso, .process:
             guard let stock else { return ("~", "기타") }
             return stock.groupKey(g)

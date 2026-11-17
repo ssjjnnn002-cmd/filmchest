@@ -1,9 +1,11 @@
 // 앱(iOS)과 같은 데이터 구조. 저장은 IndexedDB(db.ts).
 
 export type FilmFormat = '135' | '135-half' | '120-645' | '120-66' | '120-67' | '120-69'
+  /** 특수 규격: 110 카트리지, 대형 시트 필름, 인스턴트 필름 (아이폰 FilmFormat과 같은 값) */
+  | '110' | 'sheet-45' | 'sheet-810' | 'instax-mini' | 'instax-square' | 'instax-wide' | 'polaroid'
 export type BodyStyle = 'slr' | 'compact' | 'rangefinder' | 'mediumFormat'
 export type RollStatus = 'loaded' | 'finished' | 'atLab' | 'imported'
-export type FilmProcess = 'C-41' | 'E-6' | 'B&W' | 'ECN-2'
+export type FilmProcess = 'C-41' | 'E-6' | 'B&W' | 'ECN-2' | 'instant'
 
 export interface GeoPoint {
   latitude: number
@@ -258,6 +260,29 @@ export const formatInfo: Record<FilmFormat, { name: string; aspect: number; perS
   '120-66': { name: '120 6×6', aspect: 1, perStrip: 3, count: 12, is120: true },
   '120-67': { name: '120 6×7', aspect: 70 / 56, perStrip: 3, count: 10, is120: true },
   '120-69': { name: '120 6×9', aspect: 84 / 56, perStrip: 2, count: 8, is120: true },
+  '110': { name: '110', aspect: 17 / 13, perStrip: 4, count: 24, is120: false },
+  'sheet-45': { name: '4×5 시트', aspect: 5 / 4, perStrip: 1, count: 1, is120: false },
+  'sheet-810': { name: '8×10 시트', aspect: 10 / 8, perStrip: 1, count: 1, is120: false },
+  'instax-mini': { name: '인스탁스 미니', aspect: 46 / 62, perStrip: 1, count: 10, is120: false },
+  'instax-square': { name: '인스탁스 스퀘어', aspect: 1, perStrip: 1, count: 10, is120: false },
+  'instax-wide': { name: '인스탁스 와이드', aspect: 99 / 62, perStrip: 1, count: 10, is120: false },
+  'polaroid': { name: '폴라로이드', aspect: 79 / 77, perStrip: 1, count: 8, is120: false },
+}
+
+/** 필름 겉모양: 35mm 통 · 120 롤 · 110 카트리지 · 시트 필름 상자 · 인스턴트 팩 */
+export type FilmPack = 'canister' | 'roll' | 'cartridge' | 'sheet' | 'instant'
+export function filmPack(f: FilmFormat): FilmPack {
+  if (formatInfo[f]?.is120) return 'roll'
+  if (f === '110') return 'cartridge'
+  if (f.startsWith('sheet')) return 'sheet'
+  if (f.startsWith('instax') || f === 'polaroid') return 'instant'
+  return 'canister'
+}
+/** 규격 묶음: 35mm · 120 · 110 · 시트 · 인스턴트 */
+export function formatFamily(f: FilmFormat): { sort: string; title: string } {
+  const p = filmPack(f)
+  return p === 'roll' ? { sort: '1', title: '120' } : p === 'cartridge' ? { sort: '2', title: '110' }
+    : p === 'sheet' ? { sort: '3', title: '시트 필름' } : p === 'instant' ? { sort: '4', title: '인스턴트' } : { sort: '0', title: '35mm' }
 }
 
 export const statusName: Record<RollStatus, string> = {
@@ -315,6 +340,7 @@ export interface MeterShot {
 /** 규격별 한 롤 컷 수 */
 export const framesPerRoll: Record<FilmFormat, number> = {
   '135': 36, '135-half': 72, '120-645': 15, '120-66': 12, '120-67': 10, '120-69': 8,
+  '110': 24, 'sheet-45': 1, 'sheet-810': 1, 'instax-mini': 10, 'instax-square': 10, 'instax-wide': 10, 'polaroid': 8,
 }
 
 /** 롤 보관함 프로젝트(폴더). 한 롤을 여러 프로젝트에 넣을 수 있다 */

@@ -10,6 +10,14 @@ public enum FilmFormat: String, Codable, CaseIterable, Sendable {
     case f120_66 = "120-66"
     case f120_67 = "120-67"
     case f120_69 = "120-69"
+    // 특수 규격 (웹·갤럭시 FilmFormat과 같은 값)
+    case f110 = "110"
+    case sheet45 = "sheet-45"
+    case sheet810 = "sheet-810"
+    case instaxMini = "instax-mini"
+    case instaxSquare = "instax-square"
+    case instaxWide = "instax-wide"
+    case polaroid = "polaroid"
 
     public var displayName: String {
         switch self {
@@ -19,6 +27,43 @@ public enum FilmFormat: String, Codable, CaseIterable, Sendable {
         case .f120_66: "120 6×6"
         case .f120_67: "120 6×7"
         case .f120_69: "120 6×9"
+        case .f110: "110"
+        case .sheet45: "4×5 시트"
+        case .sheet810: "8×10 시트"
+        case .instaxMini: "인스탁스 미니"
+        case .instaxSquare: "인스탁스 스퀘어"
+        case .instaxWide: "인스탁스 와이드"
+        case .polaroid: "폴라로이드"
+        }
+    }
+
+    /// 필름 겉모양: 35mm 통 · 120 롤 · 110 카트리지 · 시트 필름 상자 · 인스턴트 팩
+    public enum Pack: Sendable { case canister, roll, cartridge, sheet, instant }
+    public var pack: Pack {
+        switch self {
+        case .f135, .halfFrame: .canister
+        case .f120_645, .f120_66, .f120_67, .f120_69: .roll
+        case .f110: .cartridge
+        case .sheet45, .sheet810: .sheet
+        case .instaxMini, .instaxSquare, .instaxWide, .polaroid: .instant
+        }
+    }
+    /// 규격 묶음 (35mm · 120 · 110 · 시트 · 인스턴트)
+    public var family: (sort: String, title: String) {
+        switch pack {
+        case .canister: ("0", "35mm")
+        case .roll: ("1", "120")
+        case .cartridge: ("2", "110")
+        case .sheet: ("3", "시트 필름")
+        case .instant: ("4", "인스턴트")
+        }
+    }
+    /// 이 규격 카메라에 넣을 수 있는 필름인지: 35mm(하프 포함)는 135, 120은 120 아무 크기, 110·시트·인스턴트는 같은 규격만
+    public func accepts(_ formats: [FilmFormat]) -> Bool {
+        switch pack {
+        case .canister: formats.contains(.f135)
+        case .roll: formats.contains { $0.is120 }
+        default: formats.contains(self)
         }
     }
 
@@ -31,6 +76,13 @@ public enum FilmFormat: String, Codable, CaseIterable, Sendable {
         case .f120_66: 1.0
         case .f120_67: 70.0 / 56.0
         case .f120_69: 84.0 / 56.0
+        case .f110: 17.0 / 13.0
+        case .sheet45: 5.0 / 4.0
+        case .sheet810: 10.0 / 8.0
+        case .instaxMini: 46.0 / 62.0
+        case .instaxSquare: 1.0
+        case .instaxWide: 99.0 / 62.0
+        case .polaroid: 79.0 / 77.0
         }
     }
 
@@ -43,6 +95,8 @@ public enum FilmFormat: String, Codable, CaseIterable, Sendable {
         case .f120_66: 3
         case .f120_67: 3
         case .f120_69: 2
+        case .f110: 4
+        case .sheet45, .sheet810, .instaxMini, .instaxSquare, .instaxWide, .polaroid: 1
         }
     }
 
@@ -54,6 +108,10 @@ public enum FilmFormat: String, Codable, CaseIterable, Sendable {
         case .f120_66: 12
         case .f120_67: 10
         case .f120_69: 8
+        case .f110: 24
+        case .sheet45, .sheet810: 1
+        case .instaxMini, .instaxSquare, .instaxWide: 10
+        case .polaroid: 8
         }
     }
 

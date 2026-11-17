@@ -62,7 +62,7 @@ struct LoadFilmView: View {
         let recent = rolls.map(\.filmStockID)
         _ = customFilms.count // 직접 만든 필름이 바뀌면 다시 계산
         let list = FilmStockCatalog.allIncludingCustom
-            .filter { format == .halfFrame ? $0.formats.contains(.f135) : $0.formats.contains { $0.is120 == format.is120 } }
+            .filter { format.accepts($0.formats) }
             .filter { search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search) }
         // 추천 순서 (웹·갤럭시와 같음): 재고 있는 필름 먼저 → 그 안에서 많이 쓴 순 → 최근 쓴 순 → 기록이 없으면 많이 쓰는 필름 순
         let used = Dictionary(recent.map { ($0, 1) }, uniquingKeysWith: +)

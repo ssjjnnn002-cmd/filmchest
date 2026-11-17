@@ -5,6 +5,7 @@ public enum FilmProcess: String, Codable, Sendable {
     case e6 = "E-6"
     case bw = "B&W"
     case ecn2 = "ECN-2"
+    case instant = "instant"
 }
 
 /// 필름 통 일러스트 색상. 실제 패키지 색감을 참고한 근사값이며 사용자가 바꿀 수 있다.
@@ -47,7 +48,42 @@ public enum FilmStockCatalog {
         CanisterStyle(body: body, band: band, text: text, bandText: bandText, cap: cap)
     }
 
-    public static let all: [FilmStock] = [
+    /// 35mm · 120 · 대형 시트(4×5, 8×10)로 나오는 필름 (웹 withSheets와 같음)
+    private static let sheetFilms: Set<String> = ["kodak-portra-160", "kodak-portra-400", "kodak-ektar-100", "kodak-tmax-100", "kodak-tmax-400",
+                                                  "fuji-velvia-50", "fuji-provia-100f", "ilford-hp5-plus", "ilford-fp4-plus", "ilford-delta-100", "foma-fomapan-100"]
+
+    public static let all: [FilmStock] = base.map { s in
+        guard sheetFilms.contains(s.id) else { return s }
+        var x = s; x.formats = s.formats + [.sheet45, .sheet810]; return x
+    } + special
+
+    /// 110 · 인스턴트 필름 (웹 films.ts와 같음)
+    private static let special: [FilmStock] = [
+        FilmStock(id: "lomo-tiger-110", brand: "Lomography", name: "Tiger 200", iso: 200, process: .c41, formats: [.f110],
+                  style: s("#F28C28", "#1B1B1B", "#1B1B1B", "#F28C28")),
+        FilmStock(id: "lomo-peacock-110", brand: "Lomography", name: "Peacock 200", iso: 200, process: .c41, formats: [.f110],
+                  style: s("#1E7F8C", "#F4C430", "#FFFFFF", "#1B1B1B")),
+        FilmStock(id: "lomo-orca-110", brand: "Lomography", name: "Orca 100", iso: 100, process: .bw, formats: [.f110],
+                  style: s("#1B1B1B", "#F5F5F2", "#F5F5F2", "#1B1B1B")),
+        FilmStock(id: "fuji-instax-mini", brand: "Fujifilm", name: "Instax Mini", iso: 800, process: .instant, formats: [.instaxMini],
+                  style: s("#F5F5F2", "#E2231A", "#1B1B1B", "#FFFFFF")),
+        FilmStock(id: "fuji-instax-mini-mono", brand: "Fujifilm", name: "Instax Mini Monochrome", iso: 800, process: .instant, formats: [.instaxMini],
+                  style: s("#1B1B1B", "#9A9A9A", "#F5F5F2", "#1B1B1B")),
+        FilmStock(id: "fuji-instax-square", brand: "Fujifilm", name: "Instax Square", iso: 800, process: .instant, formats: [.instaxSquare],
+                  style: s("#F5F5F2", "#1F4E9C", "#1B1B1B", "#FFFFFF")),
+        FilmStock(id: "fuji-instax-wide", brand: "Fujifilm", name: "Instax Wide", iso: 800, process: .instant, formats: [.instaxWide],
+                  style: s("#F5F5F2", "#00A15F", "#1B1B1B", "#FFFFFF")),
+        FilmStock(id: "polaroid-600-color", brand: "Polaroid", name: "600 Color", iso: 640, process: .instant, formats: [.polaroid],
+                  style: s("#F5F5F2", "#E2231A", "#1B1B1B", "#FFFFFF")),
+        FilmStock(id: "polaroid-itype-color", brand: "Polaroid", name: "i-Type Color", iso: 640, process: .instant, formats: [.polaroid],
+                  style: s("#F5F5F2", "#2B6CB0", "#1B1B1B", "#FFFFFF")),
+        FilmStock(id: "polaroid-sx70-color", brand: "Polaroid", name: "SX-70 Color", iso: 160, process: .instant, formats: [.polaroid],
+                  style: s("#F5F5F2", "#F2A71B", "#1B1B1B", "#1B1B1B")),
+        FilmStock(id: "polaroid-600-bw", brand: "Polaroid", name: "600 B&W", iso: 640, process: .instant, formats: [.polaroid],
+                  style: s("#1B1B1B", "#F5F5F2", "#F5F5F2", "#1B1B1B")),
+    ]
+
+    private static let base: [FilmStock] = [
         // Kodak
         FilmStock(id: "kodak-portra-160", brand: "Kodak", name: "Portra 160", iso: 160, process: .c41,
                   style: s("#F4EFE4", "#E39B2D", "#3A2E22", "#FFFFFF")),
