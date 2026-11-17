@@ -225,12 +225,14 @@ function Recorder({ roll, camera, allLenses, onClose }: {
         </div>
       </div>
 
+      <div className="mr-space" />
       <RecordDials dial={dial} onChange={setDial} onLocked={show} />
 
       <PlaceTimeCard place={locating && !placeName ? '현재 위치 찾는 중…' : placeName || '없음'}
         time={useNow ? '기록하는 순간' : time.toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
         onPlace={() => setSheet('place')} onTime={() => { if (useNow) setTime(new Date()); setSheet('time') }} />
 
+      <div className="mr-space" />
       <div className="mr-bottom">
         <Controls counter={String(frame)} flash={dialOf.flash(dial)} leverOut={leverOut} rewind={rewind} down={down}
           onFlash={() => { setDial((d) => (dialOf.flash(d) ? { ...d, a: d.lastA } : { ...d, lastA: d.a, a: dialOf.flashIndex(d) })); buzz(15) }}
@@ -302,7 +304,7 @@ function RecordDials({ dial, onChange, onLocked }: { dial: Dial; onChange: (d: D
   const accentS = new Set(dial.stops.map((v, i) => (v <= 0 ? i : -1)).filter((i) => i >= 0))
   return (
     <div className="mr-dials">
-      <TopDial title="셔터" labels={dial.stops.map(dialS)} index={dial.s} onChange={(s) => onChange({ ...dial, s })} size={132}
+      <TopDial low title="셔터" labels={dial.stops.map(dialS)} index={dial.s} onChange={(s) => onChange({ ...dial, s })} size={132}
         big={program ? 'P 자동' : sh != null ? formatShutter(sh) : '자동'} accent={accentS} bigSize={24}
         disabled={dial.stops.length < 2} onLocked={() => onLocked(dial.fullAuto ? '이 카메라는 셔터·조리개를 자동으로 정해요' : '이 카메라는 셔터를 자동으로 정해요')} />
       <div className="mr-comp-dial">
@@ -310,7 +312,7 @@ function RecordDials({ dial, onChange, onLocked }: { dial: Dial; onChange: (d: D
           onChange={(c) => onChange({ ...dial, c })} size={88} big={dial.fullAuto || COMPS[dial.c] === 0 ? '±0' : formatComp(COMPS[dial.c])}
           accent={new Set([6])} bigSize={18} disabled={dial.fullAuto} onLocked={() => onLocked('이 카메라는 노출 보정이 없어요')} />
       </div>
-      <TopDial title="조리개" labels={dialOf.apLabels(dial)} index={dial.a} onChange={(a) => onChange({ ...dial, a })} size={132}
+      <TopDial low title="조리개" labels={dialOf.apLabels(dial)} index={dial.a} onChange={(a) => onChange({ ...dial, a })} size={132}
         big={flash ? '플래시' : program ? 'P 자동' : ap != null ? formatAperture(ap) : '자동'}
         accent={new Set([0, dialOf.flashIndex(dial)])} bigSize={24}
         disabled={program} onLocked={() => onLocked('P 모드에서는 조리개도 카메라가 정해요')} />
@@ -320,11 +322,14 @@ function RecordDials({ dial, onChange, onLocked }: { dial: Dial; onChange: (d: D
 
 /** 카메라 윗면에서 본 다이얼: 값이 방사형(바깥쪽으로)으로 적혀 겹치지 않고, 오른쪽 표시에 맞춘 값이 고른 값.
  *  위아래(또는 좌우)로 끌어서 돌린다. A·P·B·⚡·0 자리에서는 '딱' 하고 걸린다 */
-function TopDial({ title, labels, index, onChange, size, big, accent, bigSize, disabled, onLocked }: {
+function TopDial({ title, labels, index, onChange, size, big, accent, bigSize, disabled, onLocked, low }: {
   title: string; labels: string[]; index: number; onChange: (i: number) => void; size: number; big: string
   accent: Set<number>; bigSize: number; disabled?: boolean; onLocked?: () => void
+  /** 셔터·조리개는 노출 보정보다 아래에 */
+  low?: boolean
 }) {
-  const drag = useRef<{ x: number; y: number; start: number } | null>(null)
+  // 원을 그리며 돌린다: 손가락을 다이얼 가운데 기준 각도로 따라가서, 반 바퀴를 넘어가도 같은 방향으로 이어진다
+  const drag = useRef<{ cx: number; cy: number; last: number; turned: number; start: number } | null>(null)
   const moved = useRef(false)
   const c = size / 2, R = c - (size < 100 ? 20 : 24)
   const step = labels.includes('·') ? 20 : Math.max((15.5 / R) * (180 / Math.PI), Math.min(30, 300 / Math.max(labels.length - 1, 1)))
@@ -334,13 +339,25 @@ function TopDial({ title, labels, index, onChange, size, big, accent, bigSize, d
       stroke={i % 2 ? '#2e2e30' : '#737373'} strokeWidth="1.4" />
   }), [c])
   return (
-    <div className={`mr-dial ${disabled ? "off" : ""}`} style={{ width: size }}>
+    <div className={`mr-dial ${disabled ? 'off' : ''}`} style={{ width: size, marginTop: low ? 56 : 0 }}>
       <div className="mr-knob" style={{ width: size, height: size }}
         onClick={() => { if (disabled && !moved.current) onLocked?.() }}
-        onPointerDown={(e) => { moved.current = false; if (disabled) return; (e.target as Element).setPointerCapture?.(e.pointerId); drag.current = { x: e.clientX, y: e.clientY, start: index } }}
+        onPointerDown={(e) => {
+          moved.current = false; if (disabled) return
+          ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
+          const r = (e.currentTarget as Element).getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2
+          drag.current = { cx, cy, last: Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI, turned: 0, start: index }
+        }}
         onPointerMove={(e) => {
           const d = drag.current; if (!d) return
-          const n = Math.round((-(e.clientY - d.y) - (e.clientX - d.x)) / 20)
+          const dx = e.clientX - d.cx, dy = e.clientY - d.cy
+          if (dx * dx + dy * dy < 64) return
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI
+          let delta = angle - d.last
+          if (delta > 180) delta -= 360; else if (delta < -180) delta += 360
+          d.turned += delta; d.last = angle
+          // 시계 방향으로 끌면 다이얼도 시계 방향 (앞 칸이 표시로 온다)
+          const n = -Math.round(d.turned / step)
           const next = Math.min(Math.max(d.start + n, 0), labels.length - 1)
           if (n) moved.current = true
           if (next !== index) { onChange(next); buzz(accent.has(next) ? 15 : 4) }

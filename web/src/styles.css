@@ -881,3 +881,8 @@ a.row.accent { color: var(--safelight); }
 .mr-controls { align-self: center; }
 .mr-stripwrap { min-width: 0; }
 .mr-stripwrap .mr-strip { width: 100%; }
+/* 다이얼 묶음이 위에 몰리지 않게 위아래로 나눠 띄우고, 셔터 줄·필름은 위로 */
+.mr-space { flex: 1 1 6px; min-height: 6px; }
+.mr-dials { padding-top: 0; }
+.mr-comp-dial { padding-top: 0; }
+.mr-bottom { margin-top: 0; padding-bottom: calc(env(safe-area-inset-bottom) + 70px); }

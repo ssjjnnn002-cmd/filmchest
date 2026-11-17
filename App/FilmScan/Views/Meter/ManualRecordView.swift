@@ -54,10 +54,11 @@ struct ManualRecordView: View {
     var body: some View {
         VStack(spacing: 12) {
             header
-            RecordDials(dial: $dial, onLocked: show).padding(.top, 18)
+            Spacer(minLength: 6)
+            RecordDials(dial: $dial, onLocked: show)
             placeTimeCard.padding(.top, 6)
-            Spacer(minLength: 0)
-            rollPart.padding(.bottom, 34)
+            Spacer(minLength: 6)
+            rollPart.padding(.bottom, 70)
         }
         .padding(.horizontal, 16)
         .padding(.top, 6)
@@ -352,13 +353,15 @@ struct RecordDials: View {
                     accent: dial.shutterAccent, snaps: dial.shutterAccent, bigSize: 24,
                     disabled: !dial.shutterEnabled,
                     onDisabledTap: { onLocked(dial.fullAuto ? "이 카메라는 셔터·조리개를 자동으로 정해요" : "이 카메라는 셔터를 자동으로 정해요") })
+                .padding(.top, 56)
+            // 노출 보정은 자주 안 쓰니 위쪽에 작게
             CompDial(index: $dial.c, disabled: !dial.compEnabled) { onLocked("이 카메라는 노출 보정이 없어요") }
-                .padding(.top, 20)
             TopDial(title: "조리개", labels: dial.apertureLabels, index: $dial.a, size: 132,
                     big: dial.flash ? "플래시" : dial.program ? "P 자동" : dial.aperture.map(MeterMath.fmtA) ?? "자동",
                     accent: [0, dial.flashIndex], snaps: [0, dial.flashIndex], bigSize: 24,
                     disabled: !dial.apertureEnabled,
                     onDisabledTap: { onLocked("P 모드에서는 조리개도 카메라가 정해요") })
+                .padding(.top, 56)
         }
     }
 }
@@ -426,6 +429,9 @@ struct TopDial: View {
     var disabled = false
     var onDisabledTap: (() -> Void)? = nil
     @State private var start: Int?
+    /// 원을 그리며 돌린 각도 (반 바퀴를 넘어가도 같은 방향으로 이어진다)
+    @State private var lastAngle: Double?
+    @State private var turned = 0.0
 
     /// 칸 사이 각도: 글자 높이만큼은 벌리고, 많지 않으면 넉넉히
     private var step: Double {
@@ -466,15 +472,25 @@ struct TopDial: View {
             .onTapGesture { if disabled { onDisabledTap?() } }
             .gesture(DragGesture(minimumDistance: 2).onChanged { v in
                 guard !disabled else { return }
-                if start == nil { start = index }
-                let d = Int(((-v.translation.height - v.translation.width) / 20).rounded())
-                let next = min(max((start ?? index) + d, 0), labels.count - 1)
+                // 손가락을 다이얼 가운데 기준 각도로 따라간다: 시계 방향으로 끌면 다이얼도 시계 방향
+                let c = size / 2
+                let dx = v.location.x - c, dy = v.location.y - c
+                guard dx * dx + dy * dy > 64 else { return }
+                let angle = atan2(dy, dx) * 180 / .pi
+                if start == nil {
+                    start = index; turned = 0
+                    lastAngle = atan2(v.startLocation.y - c, v.startLocation.x - c) * 180 / .pi
+                }
+                var d = angle - (lastAngle ?? angle)
+                if d > 180 { d -= 360 } else if d < -180 { d += 360 }
+                turned += d; lastAngle = angle
+                let next = min(max((start ?? index) - Int((turned / step).rounded()), 0), labels.count - 1)
                 if next != index {
                     index = next
                     if snaps.contains(next) { UIImpactFeedbackGenerator(style: .heavy).impactOccurred() }
                     else { UISelectionFeedbackGenerator().selectionChanged() }
                 }
-            }.onEnded { _ in start = nil })
+            }.onEnded { _ in start = nil; lastAngle = nil })
             Text(big).font(.system(size: bigSize, weight: .semibold, design: .rounded)).monospacedDigit()
                 .foregroundStyle(disabled || (index == 0 && accent.contains(0)) ? Color.meterSub : .white)
                 .lineLimit(1).minimumScaleFactor(0.6)
