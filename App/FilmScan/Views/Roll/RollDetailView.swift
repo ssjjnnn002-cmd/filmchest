@@ -302,8 +302,11 @@ struct RollDetailView: View {
                 guard changed, (roll.frames ?? []).contains(where: { $0.assetIdentifier != nil }) else { return }
                 photoTask?.cancel()
                 photoTask = Task {
-                    let n = await RollImporter.rewritePhotos(for: roll)
-                    withAnimation { photoNote = n > 0 ? "사진 앱 사진도 바꿨어요 (\(n)장)" : "사진 앱 사진은 바꾸지 못했어요" }
+                    let r = await RollImporter.rewritePhotos(for: roll)
+                    withAnimation {
+                        photoNote = r.count == 0 ? "사진 앱 사진은 바꾸지 못했어요"
+                            : r.removedOld ? "사진 앱 사진도 바꿨어요 (\(r.count)장)" : "새 정보로 \(r.count)장 넣었어요 · 예전 사진은 남아 있어요"
+                    }
                     try? await Task.sleep(for: .seconds(2.5))
                     withAnimation { photoNote = nil }
                 }

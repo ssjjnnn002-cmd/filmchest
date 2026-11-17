@@ -7,10 +7,24 @@ import { filmById, filmDisplayName } from './films'
 export type GearGroup = 'none' | 'tag' | 'brand' | 'type' | 'iso' | 'process' | 'format'
 
 export const groupTitle: Record<GearGroup, string> = {
-  none: '묶지 않기', tag: '태그', brand: '브랜드', type: '유형', iso: 'ISO', process: '흑백·컬러', format: '35mm·120',
+  none: '묶지 않기', tag: '태그', brand: '브랜드', type: '유형', iso: 'ISO', process: '종류', format: '규격',
 }
 export const cameraGroups: GearGroup[] = ['none', 'tag', 'brand', 'type']
-export const filmStockGroups: GearGroup[] = ['none', 'brand', 'iso', 'process', 'format']
+/** 내 장비 필름 재고: 늘 묶어서 본다 (기본은 브랜드, 아이폰과 같음) */
+export const filmStockGroups: GearGroup[] = ['brand', 'iso', 'process', 'format']
+export const filmStockGroupOf = (v: string): GearGroup => (filmStockGroups.includes(v as GearGroup) ? (v as GearGroup) : 'brand')
+
+/** 내 장비 필름 재고 정렬: 알파벳 · 재고량 · 자주 사용 */
+export type FilmLotSort = 'name' | 'count' | 'usage'
+export const filmLotSortTitle: Record<FilmLotSort, string> = { name: '알파벳', count: '재고량', usage: '자주 사용' }
+
+/** 재고를 고른 기준으로 늘어놓는다 (같으면 이름순). used = 필름 id → 쓴 롤 수 */
+export function sortLots(lots: FilmLot[], by: FilmLotSort, desc: boolean, used: Record<string, number>): FilmLot[] {
+  const name = (l: FilmLot) => filmDisplayName(filmById(l.filmId)).toLowerCase()
+  const key = (l: FilmLot) => (by === 'count' ? l.count : by === 'usage' ? used[l.filmId] ?? 0 : 0)
+  const asc = [...lots].sort((a, b) => key(a) - key(b) || name(a).localeCompare(name(b)))
+  return desc ? asc.reverse() : asc
+}
 /** 필름 고르기 (none은 '추천' 순) */
 export const filmPickGroups: GearGroup[] = ['none', 'brand', 'iso', 'process']
 

@@ -13,13 +13,14 @@ enum GearGroup: String, CaseIterable, Identifiable {
         case .brand: "브랜드"
         case .type: "유형"
         case .iso: "ISO"
-        case .process: "흑백·컬러"
-        case .format: "35mm·120"
+        case .process: "종류"
+        case .format: "규격"
         }
     }
 
     static let camera: [GearGroup] = [.none, .tag, .brand, .type]
-    static let filmStock: [GearGroup] = [.none, .brand, .iso, .process, .format]
+    /// 내 장비 필름 재고: 늘 묶어서 본다 (기본은 브랜드)
+    static let filmStock: [GearGroup] = [.brand, .iso, .process, .format]
     /// 필름 고르기 (none은 '추천' 순)
     static let filmPick: [GearGroup] = [.none, .brand, .iso, .process]
 }
@@ -107,6 +108,51 @@ struct GearGroupMenu: View {
                 .background(on ? Theme.safelight : Theme.card, in: RoundedRectangle(cornerRadius: 12))
         }
         .accessibilityValue(GearGroup(rawValue: value)?.title ?? "")
+    }
+}
+
+/// 내 장비 필름 재고 정렬: 알파벳 · 재고량 · 자주 사용 (웹·갤럭시와 같음)
+enum FilmLotSort: String, CaseIterable, Identifiable {
+    case name, count, usage
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .name: "알파벳"
+        case .count: "재고량"
+        case .usage: "자주 사용"
+        }
+    }
+}
+
+/// 내 장비 필름 탭의 '정렬·묶기' 버튼 (정렬 기준 · 오름/내림 · 묶기 기준)
+struct FilmLotMenu: View {
+    @Binding var group: String
+    @Binding var sort: String
+    @Binding var descending: Bool
+
+    var body: some View {
+        Menu {
+            Section("정렬") {
+                Picker("정렬", selection: $sort) {
+                    ForEach(FilmLotSort.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                Picker("순서", selection: $descending) {
+                    Text("오름차순").tag(false)
+                    Text("내림차순").tag(true)
+                }
+            }
+            Section("묶기") {
+                Picker("묶기", selection: $group) {
+                    ForEach(GearGroup.filmStock) { Text($0.title).tag($0.rawValue) }
+                }
+            }
+        } label: {
+            Label("정렬·묶기", systemImage: "arrow.up.arrow.down")
+                .labelStyle(.iconOnly)
+                .padding(9)
+                .foregroundStyle(.white)
+                .background(Theme.safelight, in: RoundedRectangle(cornerRadius: 12))
+        }
     }
 }
 

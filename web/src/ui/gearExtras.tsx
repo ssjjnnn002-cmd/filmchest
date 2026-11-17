@@ -4,7 +4,7 @@ import { db } from '../db'
 import { defaultAccessoryKinds, uid } from '../core/types'
 import { getPref, setPref } from '../platform'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
-import { filmPickGroups, groupTitle, type GearGroup } from '../core/gearGroup'
+import { filmLotSortTitle, filmPickGroups, filmStockGroups, groupTitle, type FilmLotSort, type GearGroup } from '../core/gearGroup'
 import { Icon } from './common'
 
 const cleanTag = (raw: string) => raw.trim().replace(/^#+/, '').trim()
@@ -179,6 +179,39 @@ export function GroupMenu({ value, options, onChange }: { value: GearGroup; opti
                 <span style={{ width: 22, color: 'var(--safelight)' }}>{g === value ? '✓' : ''}</span>{groupTitle[g]}
               </button>
             ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** 내 장비 필름 탭의 '정렬·묶기' 버튼: 정렬 기준 · 오름/내림 · 묶기 기준 (아이폰 FilmLotMenu와 같음) */
+export function FilmLotMenu({ group, sort, desc, onGroup, onSort, onDesc }: {
+  group: GearGroup; sort: FilmLotSort; desc: boolean
+  onGroup: (g: GearGroup) => void; onSort: (s: FilmLotSort) => void; onDesc: (d: boolean) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const item = (on: boolean, label: string, act: () => void) => (
+    <button key={label} type="button" role="menuitemradio" aria-checked={on} className="row" onClick={() => { act(); setOpen(false) }}>
+      <span style={{ width: 22, color: 'var(--safelight)' }}>{on ? '✓' : ''}</span>{label}
+    </button>
+  )
+  return (
+    <div style={{ position: 'relative' }}>
+      <button type="button" className="icon-toggle on" aria-label="정렬·묶기" title="정렬·묶기" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name="sort" size={20} />
+      </button>
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 29 }} onClick={() => setOpen(false)} />
+          <div className="menu" style={{ top: 46 }} role="menu">
+            <div className="menu-title">정렬</div>
+            {(Object.keys(filmLotSortTitle) as FilmLotSort[]).map((k) => item(k === sort, filmLotSortTitle[k], () => onSort(k)))}
+            {item(!desc, '오름차순', () => onDesc(false))}
+            {item(desc, '내림차순', () => onDesc(true))}
+            <div className="menu-title">묶기</div>
+            {filmStockGroups.map((g) => item(g === group, groupTitle[g], () => onGroup(g)))}
           </div>
         </>
       )}

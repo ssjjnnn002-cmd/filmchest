@@ -32,7 +32,11 @@ struct LibraryView: View {
     @AppStorage("gearGrouped") private var grouped = false
     /// 카메라·필름 재고 묶어 보기 (브랜드·유형·ISO…). 카메라는 예전 '태그별로 묶기'를 이어받는다
     @AppStorage("gearGroupCamera") private var cameraGroupRaw = ""
-    @AppStorage("gearGroupFilm") private var filmGroupRaw = GearGroup.none.rawValue
+    @AppStorage("gearGroupFilm") private var filmGroupRaw = GearGroup.brand.rawValue
+    @AppStorage("filmLotSort") private var filmSortRaw = FilmLotSort.name.rawValue
+    @AppStorage("filmLotSortDesc") private var filmSortDesc = false
+    /// 필름 재고는 늘 묶어서 (예전 '묶지 않기'는 브랜드로)
+    private var filmGroup: GearGroup { GearGroup(rawValue: filmGroupRaw).flatMap { GearGroup.filmStock.contains($0) ? $0 : nil } ?? .brand }
     private var cameraGroup: GearGroup {
         cameraGroupRaw.isEmpty ? (grouped ? .tag : .none) : GearGroup(rawValue: cameraGroupRaw) ?? .none
     }
@@ -105,7 +109,9 @@ struct LibraryView: View {
                     if gear == .camera {
                         GearGroupMenu(value: Binding(get: { cameraGroup.rawValue }, set: { v in withAnimation { cameraGroupRaw = v } }), options: GearGroup.camera)
                     } else if gear == .film {
-                        GearGroupMenu(value: Binding(get: { filmGroupRaw }, set: { v in withAnimation { filmGroupRaw = v } }), options: GearGroup.filmStock)
+                        FilmLotMenu(group: Binding(get: { filmGroup.rawValue }, set: { v in withAnimation { filmGroupRaw = v } }),
+                                    sort: Binding(get: { filmSortRaw }, set: { v in withAnimation { filmSortRaw = v } }),
+                                    descending: Binding(get: { filmSortDesc }, set: { v in withAnimation { filmSortDesc = v } }))
                     } else {
                         Button {
                             withAnimation { grouped.toggle() }
@@ -137,7 +143,7 @@ struct LibraryView: View {
             }
             if gear != .camera && !editing {
                 GearBrowser(tab: gear, layout: layout, tag: tagFilter, search: search, grouped: grouped,
-                            filmGroup: GearGroup(rawValue: filmGroupRaw) ?? .none)
+                            filmGroup: filmGroup, filmSort: FilmLotSort(rawValue: filmSortRaw) ?? .name, filmSortDesc: filmSortDesc)
                     .padding(.horizontal)
                     .padding(.vertical, 8)
             } else if hasCameras && visible.isEmpty {

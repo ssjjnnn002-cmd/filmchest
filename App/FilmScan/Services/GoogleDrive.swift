@@ -313,6 +313,7 @@ enum WebFormat {
         let lots: [[String: Any]] = all(FilmLotItem.self).map { x in clean([
             "id": id(x.id), "filmId": x.filmStockID, "format": x.formatRaw, "count": x.count, "lowAt": x.lowAt, "storage": x.storageRaw,
             "expiresAt": ms(x.expiresAt), "purchasedAt": ms(x.purchasedAt), "price": x.price, "seller": x.seller, "createdAt": ms(x.createdAt), "updatedAt": ms(x.updatedAt),
+            "storagePlace": x.storagePlace,
         ]) }
         let films: [[String: Any]] = all(CustomFilmItem.self).map { x in clean([
             "id": x.id, "name": x.name, "iso": x.iso, "color": x.colorHex, "bw": x.isBlackAndWhite, "createdAt": ms(x.createdAt), "updatedAt": ms(x.updatedAt),
@@ -431,6 +432,7 @@ enum WebFormat {
             x.updatedAt = date(r["updatedAt"])
             x.filmStockID = str(r, "filmId") ?? ""; x.formatRaw = str(r, "format") ?? x.formatRaw; x.count = int(r, "count") ?? 0
             x.lowAt = int(r, "lowAt") ?? 1; x.storageRaw = str(r, "storage") ?? x.storageRaw; x.expiresAt = date(r["expiresAt"])
+            x.storagePlace = str(r, "storagePlace")
             x.purchasedAt = date(r["purchasedAt"]); x.price = str(r, "price"); x.seller = str(r, "seller")
             x.createdAt = date(r["createdAt"]) ?? x.createdAt
         }

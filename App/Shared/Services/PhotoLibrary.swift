@@ -207,6 +207,34 @@ enum PhotoLibrary {
     }
     private static let rotateFormat = "kr.filmchest.rotate"
 
+    /// 사진 앱 사진의 원본 파일 (돌리기 편집 전). 임시 폴더에 복사해서 돌려준다 (쓴 뒤 지울 것)
+    static func originalFile(assetID: String) async -> (url: URL, name: String, favorite: Bool)? {
+        guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject else { return nil }
+        let options = PHContentEditingInputRequestOptions()
+        options.isNetworkAccessAllowed = true
+        options.canHandleAdjustmentData = { $0.formatIdentifier == rotateFormat }
+        let input: PHContentEditingInput? = await withCheckedContinuation { c in
+            asset.requestContentEditingInput(with: options) { input, _ in c.resume(returning: input) }
+        }
+        guard let src = input?.fullSizeImageURL else { return nil }
+        let name = PHAssetResource.assetResources(for: asset).first { $0.type == .photo }?.originalFilename ?? src.lastPathComponent
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("orig-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let out = dir.appendingPathComponent(src.lastPathComponent)
+        guard (try? FileManager.default.copyItem(at: src, to: out)) != nil else { return nil }
+        return (out, name, asset.isFavorite)
+    }
+
+    /// 사진들을 지운다 (사진 앱이 한 번 묻는다). 지웠으면 true
+    static func delete(assetIDs: [String]) async -> Bool {
+        let assets = PHAsset.fetchAssets(withLocalIdentifiers: assetIDs, options: nil)
+        guard assets.count > 0 else { return true }
+        do {
+            try await PHPhotoLibrary.shared().performChanges { PHAssetChangeRequest.deleteAssets(assets) }
+            return true
+        } catch { return false }
+    }
+
     /// 사진 앱의 하트(즐겨찾기)와 맞춘다
     static func setFavorite(assetID: String, _ value: Bool) async {
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject else { return }

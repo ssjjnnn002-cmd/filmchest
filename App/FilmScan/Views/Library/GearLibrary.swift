@@ -163,7 +163,10 @@ struct GearBrowser: View {
     var tag: String? = nil
     var search = ""
     var grouped = false
-    var filmGroup: GearGroup = .none
+    var filmGroup: GearGroup = .brand
+    var filmSort: FilmLotSort = .name
+    var filmSortDesc = false
+    @Query private var allRolls: [RollItem]
     @Query(sort: \LensItem.createdAt) private var allLenses: [LensItem]
     @Query(sort: \FilterItem.createdAt) private var allFilters: [FilterItem]
     @Query(sort: \FilmLotItem.createdAt, order: .reverse) private var allLots: [FilmLotItem]
@@ -179,6 +182,17 @@ struct GearBrowser: View {
     private var lenses: [LensItem] { allLenses.filter { keep($0.tags, [$0.displayName, $0.specLine, $0.mount]) } }
     private var filters: [FilterItem] { allFilters.filter { keep($0.tags, [$0.name, $0.kindName, $0.diameterText]) } }
     private var lots: [FilmLotItem] { allLots.filter { keep([], [$0.title, $0.metaLine]) } }
+    private var sortedLots: [FilmLotItem] {
+        let used = Dictionary(allRolls.filter { $0.deletedAt == nil }.map { ($0.filmStockID, 1) }, uniquingKeysWith: +)
+        func name(_ l: FilmLotItem) -> String { l.title.lowercased() }
+        let asc: [FilmLotItem]
+        switch filmSort {
+        case .name: asc = lots.sorted { name($0) < name($1) }
+        case .count: asc = lots.sorted { ($0.count, name($0)) < ($1.count, name($1)) }
+        case .usage: asc = lots.sorted { (used[$0.filmStockID] ?? 0, name($0)) < (used[$1.filmStockID] ?? 0, name($1)) }
+        }
+        return filmSortDesc ? asc.reversed() : asc
+    }
     private var hasAny: Bool {
         switch tab {
         case .camera: true
@@ -224,9 +238,8 @@ struct GearBrowser: View {
                 if allLots.isEmpty { empty("필름 재고가 없어요", "가진 롤을 등록해 보세요.") }
                 else if lots.isEmpty { noMatch }
                 else {
-                    // 브랜드·ISO·흑백/컬러·35mm/120으로 묶어 볼 수 있다 (묶음 안은 이름순)
-                    let secs = filmGroup == .none ? [(title: String?.none, items: lots)]
-                        : groupSections(lots.sorted { $0.title.lowercased() < $1.title.lowercased() }) { $0.groupKey(filmGroup) }
+                    // 브랜드·ISO·종류·규격으로 묶고, 묶음 안은 알파벳·재고량·자주 사용 순 (오름/내림)
+                    let secs = groupSections(sortedLots) { $0.groupKey(filmGroup) }
                     sections(secs) { items in
                         if layout == .grid {
                             grid(items) { lot in Button { lotEdit = lot } label: { FilmGearCard(lot: lot) }.buttonStyle(.plain) }
@@ -395,8 +408,13 @@ private struct FilmGearCard: View {
             FilmCanisterView(stock: FilmStockCatalog.stock(id: lot.filmStockID), format: lot.format)
                 .frame(height: 110)
                 .frame(maxWidth: .infinity)
-            Text(lot.title).font(.headline).lineLimit(2)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .topLeading)
+            // 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게)
+            VStack(alignment: .leading, spacing: 1) {
+                let stock = FilmStockCatalog.stock(id: lot.filmStockID)
+                Text(stock?.brand.nilIfBlank ?? " ").font(.caption.weight(.medium)).foregroundStyle(.secondary).lineLimit(1)
+                Text(stock.map { $0.brand.isEmpty ? $0.name : $0.name } ?? lot.title).font(.headline).lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, minHeight: 58, alignment: .topLeading)
             Text(lot.metaLine).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 .frame(maxWidth: .infinity, minHeight: 32, alignment: .topLeading)
             lot.lotBadge.frame(minHeight: 16, alignment: .leading)
@@ -459,7 +477,7 @@ private extension FilterItem {
 }
 
 private extension FilmLotItem {
-    var metaLine: String { "\(format.displayName) · \(storage.displayName) · \(count)롤" }
+    var metaLine: String { "\(format.displayName) · \(storageText) · \(count)롤" }
     @ViewBuilder var lotBadge: some View {
         if expired {
             Text("기한 지남").font(.caption.weight(.semibold)).foregroundStyle(.red)
@@ -723,6 +741,7 @@ struct FilmLotEditView: View {
     @State private var count = 1
     @State private var lowAt = 1
     @State private var storage: FilmStorage = .fridge
+    @State private var storagePlace = ""
     @State private var hasExpiry = false
     @State private var expiry = Date()
     @State private var hasDate = false
@@ -741,15 +760,45 @@ struct FilmLotEditView: View {
                         Text("목록에서 찾을 수 없는 필름이에요. 그대로 저장해도 되고, 아래에서 다시 고를 수 있어요.")
                     }
                 }
-                FilmLookPicker(filmID: $filmID, format: format)
-                Section("보관") {
-                    Picker("포맷", selection: $format) {
-                        ForEach(FilmFormat.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                // 이미 있는 재고는 필름 종류·포맷을 바꾸지 않는다 (직접 만든 필름은 다 고칠 수 있다)
+                if canPickFilm {
+                    FilmLookPicker(filmID: $filmID, format: format)
+                } else if let stock = FilmStockCatalog.stock(id: filmID) {
+                    Section {
+                        HStack(spacing: 14) {
+                            FilmCanisterView(stock: stock, format: format).frame(width: 52, height: 52)
+                            VStack(alignment: .leading, spacing: 2) {
+                                if !stock.brand.isEmpty { Text(stock.brand).font(.caption).foregroundStyle(.secondary) }
+                                Text(stock.name).font(.headline)
+                                Text(format.displayName).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
                     }
-                    Stepper("수량 \(count)롤", value: $count, in: 0...99)
+                }
+                Section("보관") {
+                    if canPickFilm {
+                        Picker("포맷", selection: $format) {
+                            ForEach(FilmFormat.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                        }
+                    }
+                    // 수량: 바로 적거나 −/+ 로
+                    HStack {
+                        Text("수량")
+                        Spacer()
+                        TextField("0", value: $count, format: .number)
+                            .multilineTextAlignment(.trailing).frame(width: 56)
+                            #if os(iOS)
+                            .keyboardType(.numberPad)
+                            #endif
+                            .onChange(of: count) { _, v in if v < 0 || v > 99 { count = min(max(v, 0), 99) } }
+                        Stepper("수량", value: $count, in: 0...99).labelsHidden()
+                    }
                     Stepper("부족 알림 \(lowAt)롤 이하", value: $lowAt, in: 0...20)
                     Picker("보관", selection: $storage) {
                         ForEach(FilmStorage.allCases) { Text($0.displayName).tag($0) }
+                    }
+                    if storage == .custom {
+                        TextField("보관 장소 (예: 카메라 가방)", text: $storagePlace)
                     }
                     Toggle("유통기한", isOn: $hasExpiry)
                     if hasExpiry {
@@ -778,6 +827,7 @@ struct FilmLotEditView: View {
                 count = lot.count
                 lowAt = lot.lowAt
                 storage = lot.storage
+                storagePlace = lot.storagePlace ?? ""
                 hasExpiry = lot.expiresAt != nil
                 expiry = lot.expiresAt ?? Date()
                 hasDate = lot.purchasedAt != nil
@@ -792,6 +842,12 @@ struct FilmLotEditView: View {
                 }
             }
         }
+    }
+
+    /// 새 재고, 목록에 없는 필름, 직접 만든 필름이면 필름 종류·포맷을 고른다
+    private var canPickFilm: Bool {
+        guard lot != nil, let stock = FilmStockCatalog.stock(id: filmID) else { return true }
+        return stock.isCustom
     }
 
     private func save() {
@@ -809,6 +865,7 @@ struct FilmLotEditView: View {
         target.count = count
         target.lowAt = lowAt
         target.storage = storage
+        target.storagePlace = storage == .custom ? storagePlace.nilIfBlank : nil
         target.expiresAt = hasExpiry ? expiry : nil
         target.purchasedAt = hasDate ? date : nil
         target.price = PriceText.grouped(price).nilIfBlank

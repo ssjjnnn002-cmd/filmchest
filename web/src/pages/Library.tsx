@@ -10,8 +10,8 @@ import { CameraCover, Canister, GlassGroup, Icon, PageHeader, rollFilmName } fro
 import { CameraEdit } from './CameraEdit'
 import { GearAdd, GearBoard, type GearKind } from './Gear'
 import { usePhotoIsCutout } from '../photoStore'
-import { GroupMenu, TagFilter, TagLine, migrateAccessories, tagSections } from '../ui/gearExtras'
-import { cameraGroups, cameraKey, filmStockGroups, groupSections, type GearGroup } from '../core/gearGroup'
+import { GroupMenu, TagFilter, TagLine, migrateAccessories, tagSections, FilmLotMenu } from '../ui/gearExtras'
+import { cameraGroups, cameraKey, groupSections, type GearGroup, filmStockGroupOf, type FilmLotSort } from '../core/gearGroup'
 import { Settings } from './Settings'
 import { getPref, setPref } from '../platform'
 import { cameraPhotoURL } from '../photoStore'
@@ -43,7 +43,10 @@ export function Library() {
   const [grouped, setGrouped] = useState(getPref('gearGrouped', '' as string) === '1')
   // 카메라·필름 재고 묶어 보기 (브랜드·유형·ISO…). 카메라는 예전 '태그별로 묶기'를 이어받는다 (아이폰과 같음)
   const [cameraGroup, setCameraGroup] = useState<GearGroup>(() => (getPref('gearGroupCamera', '' as string) as GearGroup) || (grouped ? 'tag' : 'none'))
-  const [filmGroup, setFilmGroup] = useState<GearGroup>(() => (getPref('gearGroupFilm', 'none' as string) as GearGroup))
+  // 필름 재고: 늘 묶어서 (예전 '묶지 않기'는 브랜드로), 정렬은 알파벳·재고량·자주 사용 + 오름/내림
+  const [filmGroup, setFilmGroup] = useState<GearGroup>(() => filmStockGroupOf(getPref('gearGroupFilm', 'brand' as string)))
+  const [filmSort, setFilmSort] = useState<FilmLotSort>(() => (getPref('filmLotSort', 'name' as string) as FilmLotSort))
+  const [filmSortDesc, setFilmSortDesc] = useState(() => getPref('filmLotSortDesc', '' as string) === '1')
   const query = search.trim().toLowerCase()
   useEffect(() => { void migrateAccessories() }, [])
   const lensTags = useLiveQuery(async () => (await db.lenses.toArray()).flatMap((x) => x.tags ?? []), []) ?? []
@@ -263,7 +266,9 @@ export function Library() {
               onChange={(e) => setSearch(e.target.value)} aria-label="장비 검색" />
           </label>
           {gear === 'camera' && <GroupMenu value={cameraGroup} options={cameraGroups} onChange={(g) => { setCameraGroup(g); setPref('gearGroupCamera', g) }} />}
-          {gear === 'film' && <GroupMenu value={filmGroup} options={filmStockGroups} onChange={(g) => { setFilmGroup(g); setPref('gearGroupFilm', g) }} />}
+          {gear === 'film' && <FilmLotMenu group={filmGroup} sort={filmSort} desc={filmSortDesc}
+            onGroup={(g) => { setFilmGroup(g); setPref('gearGroupFilm', g) }} onSort={(v) => { setFilmSort(v); setPref('filmLotSort', v) }}
+            onDesc={(d) => { setFilmSortDesc(d); setPref('filmLotSortDesc', d ? '1' : '') }} />}
           {(gear === 'lens' || gear === 'filter') && (
             <button type="button" className={`icon-toggle ${grouped ? 'on' : ''}`} aria-pressed={grouped} aria-label="태그별로 묶기" title="태그별로 묶기"
               onClick={() => { setGrouped(!grouped); setPref('gearGrouped', grouped ? '' : '1') }}>
@@ -276,7 +281,7 @@ export function Library() {
         <TagFilter tags={gear === 'camera' ? (cameras ?? []).flatMap((c) => c.tags ?? []) : gear === 'lens' ? lensTags : filterTags} value={tag} onChange={setTag} />
       )}
 
-      {gear !== 'camera' && !editing && <GearBoard kind={gear} layout={layout} tag={tag} search={search} grouped={grouped} filmGroup={filmGroup} />}
+      {gear !== 'camera' && !editing && <GearBoard kind={gear} layout={layout} tag={tag} search={search} grouped={grouped} filmGroup={filmGroup} filmSort={filmSort} filmSortDesc={filmSortDesc} />}
 
       {gear === 'camera' && cameras && cameras.length === 0 && (
         <div className="empty">

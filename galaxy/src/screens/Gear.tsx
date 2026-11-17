@@ -13,7 +13,7 @@ import { lensesFor } from '../core/lenses'
 import { filmFits, filterDiameters, filterKinds, groupPrice, lensSpec, parseLens } from '../core/optics'
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
 import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
-import { groupSections, lotKey, type GearGroup } from '../core/gearGroup'
+import { groupSections, lotKey, sortLots, type FilmLotSort, type GearGroup } from '../core/gearGroup'
 import { FilmPickGrid } from '../FilmPickGrid'
 import { deleteCameraPhoto, readBytes, saveCameraPhoto, useCameraPhoto, usePhotoIsCutout } from '../files'
 import { Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Footnote, Group, LensPicture, Row, Section, Segmented, Select, Sub } from '../kit'
@@ -26,7 +26,9 @@ import { CustomFilmEdit } from './CustomFilmEdit'
 import { FilmPickSortBar, PhotoRows, GroupTitle, OptionalDate, TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../gearExtras'
 
 export type GearKind = 'lens' | 'filter' | 'film'
-const storageName: Record<FilmStorage, string> = { fridge: '냉장고', freezer: '냉동고', drawer: '서랍', room: '상온' }
+const storageName: Record<FilmStorage, string> = { fridge: '냉장고', freezer: '냉동고', drawer: '서랍', room: '상온', custom: '직접 입력' }
+/** 보관 장소 글자 (직접 입력이면 적은 글자) */
+const storageText = (l: Pick<FilmLot, 'storage' | 'storagePlace'>) => (l.storage === 'custom' ? l.storagePlace?.trim() || '직접 입력' : storageName[l.storage])
 const formats = Object.keys(formatInfo) as FilmFormat[]
 
 function knownSellers() {
@@ -136,7 +138,9 @@ async function storePhoto(id: string, uri?: string, cleared?: boolean) {
   else if (cleared) await deleteCameraPhoto(id)
 }
 
-export function GearBoard({ kind, layout, tag, search = '', grouped = false, filmGroup = 'none' }: { kind: GearKind; layout: string; tag?: string; search?: string; grouped?: boolean; filmGroup?: GearGroup }) {
+export function GearBoard({ kind, layout, tag, search = '', grouped = false, filmGroup = 'brand', filmSort = 'name', filmSortDesc = false }: { kind: GearKind; layout: string; tag?: string; search?: string; grouped?: boolean; filmGroup?: GearGroup; filmSort?: FilmLotSort; filmSortDesc?: boolean }) {
+  // 자주 사용: 필름마다 쓴 롤 수
+  const used = useLiveQuery(async () => { const m: Record<string, number> = {}; for (const r of await db.rolls.toArray()) if (!r.deletedAt) m[r.filmId] = (m[r.filmId] ?? 0) + 1; return m }, []) ?? {}
   const c = useTheme()
   const allLenses = useLiveQuery(() => db.lenses.orderBy('createdAt').toArray(), [])
   const allFilters = useLiveQuery(() => db.filters.orderBy('createdAt').toArray(), [])
@@ -148,7 +152,7 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
     (!tag || !!tags?.includes(tag)) && (!q || [...text, ...(tags ?? [])].some((t) => t?.toLowerCase().includes(q)))
   const lenses = (allLenses ?? []).filter((l) => keep(l.tags, [l.brand, l.model, l.mount, lensSpec(l)]))
   const filters = (allFilters ?? []).filter((f) => keep(f.tags, [f.name, kindOf(f), f.diameter]))
-  const lots = (allLots ?? []).filter((l) => keep(undefined, [filmDisplayName(filmById(l.filmId)), storageName[l.storage]]))
+  const lots = (allLots ?? []).filter((l) => keep(undefined, [filmDisplayName(filmById(l.filmId)), storageText(l)]))
   const all = kind === 'lens' ? allLenses : kind === 'filter' ? allFilters : allLots
   const shown = kind === 'lens' ? lenses : kind === 'filter' ? filters : lots
   const empty = kind === 'lens' ? ['렌즈가 없어요', '가진 렌즈를 등록해 보세요.']
@@ -202,8 +206,8 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
       {kind === 'filter' && filters.length > 0 && sections(filters, filterCell, grouped ? undefined
         : [...new Set(filters.map(kindOf))].sort((a, b) => kindOrder(a) - kindOrder(b)).map((k) => ({ title: k, items: filters.filter((f) => kindOf(f) === k) })))}
       {/* 필름 재고: 브랜드·ISO·흑백/컬러·35mm/120으로 묶어 볼 수 있다 (묶음 안은 이름순, 웹과 같음) */}
-      {kind === 'film' && lots.length > 0 && (filmGroup === 'none' ? [{ title: undefined as string | undefined, items: lots }]
-        : groupSections([...lots].sort((a, b) => filmDisplayName(filmById(a.filmId)).localeCompare(filmDisplayName(filmById(b.filmId)))), (l) => lotKey(l, filmGroup)))
+      {/* 필름 재고: 브랜드·ISO·종류·규격으로 묶고, 묶음 안은 알파벳·재고량·자주 사용 순 (오름/내림, 웹과 같음) */}
+      {kind === 'film' && lots.length > 0 && (groupSections(sortLots(lots, filmSort, filmSortDesc, used), (l) => lotKey(l, filmGroup)) as { title?: string; items: FilmLot[] }[])
         .map((sec, n) => <View key={sec.title ?? n} style={{ gap: 8 }}>{sec.title ? <GroupTitle>{`${sec.title} · ${sec.items.length}`}</GroupTitle> : null}{box(sec.items.map((lot) => {
         const film = filmById(lot.filmId)
         const late = !!lot.expiresAt && lot.expiresAt < Date.now()
@@ -211,8 +215,10 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
           <Pressable key={lot.id} onPress={() => setEdit(lot.id)} style={grid ? { ...card, alignItems: 'flex-start' } : row}>
             <Canister film={film} format={lot.format} size={grid ? 96 : 52} />
             <View style={{ flex: grid ? undefined : 1, gap: 2, alignSelf: 'stretch' }}>
-              {title(filmDisplayName(film))}
-              {sub(`${formatInfo[lot.format].name} · ${storageName[lot.storage]} · ${lot.count}롤`, grid ? 2 : 1)}
+              {/* 바둑판: 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게, 웹·아이폰과 같음) */}
+              {grid ? <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: c.muted, lineHeight: 15 }}>{film?.brand || ' '}</Text> : null}
+              {title(grid && film?.brand ? film.name : filmDisplayName(film))}
+              {sub(`${formatInfo[lot.format].name} · ${storageText(lot)} · ${lot.count}롤`, grid ? 2 : 1)}
               <Text style={{ color: late ? '#ff453a' : '#ff9f0a', fontSize: 13, height: 18, opacity: late || lot.count <= lot.lowAt ? 1 : 0 }}>{late ? '기한 지남' : '부족'}</Text>
             </View>
           </Pressable>
@@ -455,6 +461,7 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
   const [count, setCount] = useState(String(lot?.count ?? 1))
   const [lowAt, setLowAt] = useState(String(lot?.lowAt ?? 1))
   const [storage, setStorage] = useState<FilmStorage>(lot?.storage ?? 'fridge')
+  const [storagePlace, setStoragePlace] = useState(lot?.storagePlace ?? '')
   const [expires, setExpires] = useState(lot?.expiresAt)
   const [date, setDate] = useState(lot?.purchasedAt)
   const [price, setPrice] = useState(groupPrice(lot?.price ?? ''))
@@ -483,12 +490,14 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
     return top
   }, [stocks, showAll, filmId])
   const pickedCustom = custom.find((r) => r.id === filmId)
+  // 이미 있는 재고는 필름 종류·포맷을 바꾸지 않는다 (목록에 없는 필름·직접 만든 필름은 고를 수 있다, 웹·아이폰과 같음)
+  const fixedFilm = lot && filmById(filmId) && !filmId.startsWith('custom-') ? filmById(filmId) : undefined
   const save = async () => {
     const data: FilmLot = {
       id: lot?.id ?? uid(), filmId, format,
       count: Math.max(0, Math.min(99, Number(count) || 0)),
       lowAt: Math.max(0, Math.min(20, Number(lowAt) || 0)),
-      storage, expiresAt: expires,
+      storage, storagePlace: storage === 'custom' ? storagePlace.trim() || undefined : undefined, expiresAt: expires,
       purchasedAt: date, price: groupPrice(price) || undefined, seller: seller.trim() || undefined,
       createdAt: lot?.createdAt ?? Date.now(),
     }
@@ -499,7 +508,21 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
   return (
     <Sheet title={lot ? '필름 수정' : '필름 추가'} onClose={onClose}
       right={<SheetBtn label="저장" accent disabled={!filmId} onPress={save} />}>
-      <Section title={showAll ? '필름' : '필름 · 최근 사용'}>
+      {fixedFilm ? (
+        <Section>
+          <Group>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, paddingVertical: 10 }}>
+              <Canister film={fixedFilm} format={format} size={52} />
+              <View style={{ flex: 1 }}>
+                {fixedFilm.brand ? <Sub>{fixedFilm.brand}</Sub> : null}
+                <Text style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>{fixedFilm.brand ? fixedFilm.name : filmDisplayName(fixedFilm)}</Text>
+                <Sub>{formatInfo[format].name}</Sub>
+              </View>
+            </View>
+          </Group>
+        </Section>
+      ) : null}
+      {!fixedFilm ? <Section title={showAll ? '필름' : '필름 · 최근 사용'}>
         <Group>
           {showAll ? <Field label="필름 검색" value={search} onChangeText={setSearch} /> : null}
           {showAll ? <FilmPickSortBar value={pickSort} onChange={setPickSort} /> : null}
@@ -514,13 +537,21 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
           </Row>
         </Group>
         {lot && filmId && !filmById(filmId) ? <Footnote>목록에서 찾을 수 없는 필름이에요. 그대로 저장해도 되고, 다시 고를 수 있어요.</Footnote> : null}
-      </Section>
+      </Section> : null}
       <Section title="보관">
         <Group>
-          <Chips>{formats.map((item) => <Chip key={item} label={formatInfo[item].name} active={format === item} onPress={() => setFormat(item)} />)}</Chips>
-          <Field label="수량" value={count} onChangeText={setCount} keyboardType="number-pad" />
+          {!fixedFilm ? <Chips>{formats.map((item) => <Chip key={item} label={formatInfo[item].name} active={format === item} onPress={() => setFormat(item)} />)}</Chips> : null}
+          {/* 수량: 바로 적거나 −/+ 로 (웹·아이폰과 같음) */}
+          <View style={{ minHeight: 52, paddingHorizontal: 18, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={{ flex: 1, fontSize: 17, color: c.ink }}>수량</Text>
+            <Btn label="−" size="small" onPress={() => setCount(String(Math.max(0, (Number(count) || 0) - 1)))} />
+            <TextInput value={count} onChangeText={(t) => setCount(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad"
+              style={{ width: 56, textAlign: 'center', fontSize: 17, color: c.ink, paddingVertical: 6, borderRadius: 10, backgroundColor: c.fill }} />
+            <Btn label="+" size="small" onPress={() => setCount(String(Math.min(99, (Number(count) || 0) + 1)))} />
+          </View>
           <Field label="부족 알림" value={lowAt} onChangeText={setLowAt} keyboardType="number-pad" />
           <Chips>{(Object.keys(storageName) as FilmStorage[]).map((item) => <Chip key={item} label={storageName[item]} active={storage === item} onPress={() => setStorage(item)} />)}</Chips>
+          {storage === 'custom' ? <Field label="보관 장소" value={storagePlace} onChangeText={setStoragePlace} placeholder="예: 카메라 가방" /> : null}
           <Row onPress={() => setExpires(expires === undefined ? Date.now() : undefined)}>
             <Text style={{ flex: 1 }}>유통기한</Text>
             <Text>{expires === undefined ? '없음' : new Date(expires).toISOString().slice(0, 10)}</Text>

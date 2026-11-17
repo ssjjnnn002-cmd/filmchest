@@ -736,6 +736,8 @@ enum PriceSum {
 
 enum FilmStorage: String, CaseIterable, Identifiable {
     case fridge, freezer, drawer, room
+    /// 직접 입력 (FilmLotItem.storagePlace)
+    case custom
     var id: String { rawValue }
     var displayName: String {
         switch self {
@@ -743,6 +745,7 @@ enum FilmStorage: String, CaseIterable, Identifiable {
         case .freezer: "냉동고"
         case .drawer: "서랍"
         case .room: "상온"
+        case .custom: "직접 입력"
         }
     }
 }
@@ -790,6 +793,8 @@ final class FilmLotItem {
     var count: Int = 1
     var lowAt: Int = 1
     var storageRaw: String = FilmStorage.room.rawValue
+    /// 보관 장소를 직접 적었을 때 (storage == .custom)
+    var storagePlace: String?
     var expiresAt: Date?
     var purchasedAt: Date?
     var price: String?
@@ -815,6 +820,8 @@ final class FilmLotItem {
     }
     var expired: Bool { expiresAt.map { $0 < Date() } ?? false }
     var low: Bool { count <= lowAt }
+    /// 보관 장소 글자 (직접 입력이면 적은 글자)
+    var storageText: String { storage == .custom ? (storagePlace?.nilIfBlank ?? "직접 입력") : storage.displayName }
 }
 
 /// 프로젝트 폴더 색 16가지 (웹·갤럭시와 같은 순서)

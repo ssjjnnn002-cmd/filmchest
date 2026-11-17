@@ -154,7 +154,8 @@ export interface GearFilter {
   createdAt: number
 }
 
-export type FilmStorage = 'fridge' | 'freezer' | 'drawer' | 'room'
+/** custom = 직접 입력 (FilmLot.storagePlace) */
+export type FilmStorage = 'fridge' | 'freezer' | 'drawer' | 'room' | 'custom'
 
 export interface FilmLot {
   id: string
@@ -163,6 +164,8 @@ export interface FilmLot {
   count: number
   lowAt: number
   storage: FilmStorage
+  /** 보관 장소를 직접 적었을 때 (storage === 'custom') */
+  storagePlace?: string
   expiresAt?: number
   purchasedAt?: number
   price?: string

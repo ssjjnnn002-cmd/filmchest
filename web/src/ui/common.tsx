@@ -57,6 +57,8 @@ const icons: Record<string, IconDef> = {
   left: { d: 'M14.8 5.2 8 12l6.8 6.8', width: 2.2 },
   right: { d: 'M9.2 5.2 16 12l-6.8 6.8', width: 2.2 },
   chev: { d: 'M9.5 6l6 6-6 6', width: 2.2 },
+  /** 정렬 (위·아래 화살표) */
+  sort: { d: 'M7 4v16M7 4 3.5 7.5M7 4l3.5 3.5M17 20V4M17 20l-3.5-3.5M17 20l3.5-3.5', width: 2 },
   /** 칩 펼침 (갤럭시 칩에서 씀, 웹 ChipSelect의 CSS 화살표와 같은 모양) */
   chevDown: { d: 'M6 9l6 6 6-6', width: 2.6 },
   star: { d: 'M12 3.4l2.6 5.3 5.8.85-4.2 4.1 1 5.8L12 16.7l-5.2 2.75 1-5.8-4.2-4.1 5.8-.85z' },

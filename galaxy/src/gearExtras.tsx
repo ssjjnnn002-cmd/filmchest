@@ -7,7 +7,7 @@ import { DateTimePickerAndroid as Picker } from '@react-native-community/datetim
 import { db } from './data'
 import { defaultAccessoryKinds, uid } from './core/types'
 import { Chip, Chips, Group, Row, Section, Segmented } from './kit'
-import { filmPickGroups, groupTitle, type GearGroup } from './core/gearGroup'
+import { filmLotSortTitle, filmPickGroups, filmStockGroups, groupTitle, type FilmLotSort, type GearGroup } from './core/gearGroup'
 import { getPref, setPref, useLiveQuery } from './store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from './suggest'
 import { useTheme } from './theme'
@@ -240,3 +240,46 @@ export function FilmPickSortBar({ value, onChange }: { value: GearGroup; onChang
     </View>
   )
 }
+
+/** 내 장비 필름 탭의 '정렬·묶기' 버튼: 정렬 기준 · 오름/내림 · 묶기 기준 (웹 FilmLotMenu와 같음) */
+export function FilmLotMenu({ group, sort, desc, onGroup, onSort, onDesc }: {
+  group: GearGroup; sort: FilmLotSort; desc: boolean
+  onGroup: (g: GearGroup) => void; onSort: (s: FilmLotSort) => void; onDesc: (d: boolean) => void
+}) {
+  const c = useTheme()
+  const ref = useRef<View>(null)
+  const [at, setAt] = useState<{ x: number; y: number }>()
+  const open = () => ref.current?.measureInWindow((x, y, w, h) => setAt({ x: x + w, y: y + h + 6 }))
+  const head = (t: string) => <Text style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, fontSize: 12, fontWeight: '600', color: c.muted }}>{t}</Text>
+  const item = (on: boolean, label: string, act: () => void) => (
+    <Pressable key={label} accessibilityRole="menuitem" accessibilityState={{ checked: on }} onPress={() => { act(); setAt(undefined) }}
+      style={({ pressed }) => ({ minHeight: 44, paddingVertical: 9, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', backgroundColor: pressed ? c.fill : 'transparent' })}>
+      <Text style={{ width: 22, color: c.safelight, fontSize: 17 }}>{on ? '✓' : ''}</Text>
+      <Text style={{ fontSize: 17, color: c.ink }}>{label}</Text>
+    </Pressable>
+  )
+  return (
+    <>
+      <Pressable ref={ref} accessibilityRole="button" accessibilityLabel="정렬·묶기" onPress={open}
+        style={{ width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: c.safelight }}>
+        <Icon name="sort" size={20} color="#fff" />
+      </Pressable>
+      {at ? (
+        <Modal transparent visible animationType="fade" onRequestClose={() => setAt(undefined)} statusBarTranslucent>
+          <Pressable style={{ flex: 1 }} onPress={() => setAt(undefined)}>
+            <View style={{ position: 'absolute', right: Dimensions.get('window').width - at.x, top: at.y, minWidth: 200, borderRadius: 18, overflow: 'hidden',
+              backgroundColor: c.glass, boxShadow: '0px 12px 40px rgba(0,0,0,0.2)' }}>
+              {head('정렬')}
+              {(Object.keys(filmLotSortTitle) as FilmLotSort[]).map((k) => item(k === sort, filmLotSortTitle[k], () => onSort(k)))}
+              {item(!desc, '오름차순', () => onDesc(false))}
+              {item(desc, '내림차순', () => onDesc(true))}
+              {head('묶기')}
+              {filmStockGroups.map((g) => item(g === group, groupTitle[g], () => onGroup(g)))}
+            </View>
+          </Pressable>
+        </Modal>
+      ) : null}
+    </>
+  )
+}
+

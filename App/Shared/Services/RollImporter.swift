@@ -292,15 +292,42 @@ extension RollImporter {
                              rollID: snapshot.roll.id, exposure: snapshot.exposures[frame.index - roll.meterOffset])
     }
 
-    /// 롤 카메라를 바꾼 뒤: 사진 앱에 저장한 사진의 촬영 정보를 새 기록으로 다시 쓴다 (돌린 것은 그대로). 바꾼 장 수
+    /// 롤 카메라를 바꾼 뒤: 사진 앱 사진을 새 촬영 정보로 다시 넣는다.
+    /// 사진 앱은 처음 넣은 원본의 카메라 정보를 보여 줘서(편집본에 써도 안 바뀜), 원본에 새 정보를 쓴 사진을 같은 앨범에 새로 넣고
+    /// 예전 사진은 지운다 (사진 앱이 한 번 묻는다. 거절하면 예전 사진도 남는다). 날짜·위치·즐겨찾기·돌린 것은 이어 간다.
+    /// 돌려준 값: (바꾼 장 수, 예전 사진을 지웠는지)
     @MainActor
-    static func rewritePhotos(for roll: RollItem) async -> Int {
-        let frames = (roll.frames ?? []).filter { $0.assetIdentifier != nil }
-        guard !frames.isEmpty, (try? await PhotoLibrary.requestAccess()) != nil else { return 0 }
-        let items = frames.map { (assetID: $0.assetIdentifier!, turns: $0.turns, metadata: metadata(for: $0, roll: roll)) }
-        let done = Set(await PhotoLibrary.setRotation(items))
-        for f in frames where done.contains(f.assetIdentifier!) { f.photoRotation = f.turns }
-        return done.count
+    static func rewritePhotos(for roll: RollItem) async -> (count: Int, removedOld: Bool) {
+        let frames = (roll.frames ?? []).filter { $0.assetIdentifier != nil }.sorted { $0.index < $1.index }
+        guard !frames.isEmpty, (try? await PhotoLibrary.requestAccess()) != nil else { return (0, true) }
+        let album = PhotoLibrary.existingAlbum(id: roll.albumIdentifier)
+        var old: [String] = []
+        var rotate: [(assetID: String, turns: Int, metadata: FrameMetadata?)] = []
+        var replaced: [(FrameItem, String)] = []
+        for frame in frames {
+            guard let oldID = frame.assetIdentifier, let meta = metadata(for: frame, roll: roll),
+                  let orig = await PhotoLibrary.originalFile(assetID: oldID) else { continue }
+            defer { try? FileManager.default.removeItem(at: orig.url.deletingLastPathComponent()) }
+            let out = orig.url.deletingLastPathComponent().appendingPathComponent("new-" + orig.url.lastPathComponent)
+            guard (try? MetadataWriter.write(source: orig.url, destination: out, metadata: meta)) != nil else { continue }
+            let location = meta.location?.point.map {
+                CLLocation(coordinate: CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude),
+                           altitude: $0.altitude ?? 0, horizontalAccuracy: 50, verticalAccuracy: -1, timestamp: meta.date ?? Date())
+            }
+            guard let newID = try? await PhotoLibrary.add(fileURL: out, originalName: orig.name, date: meta.date, location: location, to: album),
+                  !newID.isEmpty else { continue }
+            if orig.favorite { await PhotoLibrary.setFavorite(assetID: newID, true) }
+            if frame.turns != 0 { rotate.append((assetID: newID, turns: frame.turns, metadata: meta)) }
+            old.append(oldID)
+            replaced.append((frame, newID))
+        }
+        for (frame, newID) in replaced { frame.assetIdentifier = newID; frame.photoRotation = 0 }
+        if !rotate.isEmpty {
+            let done = Set(await PhotoLibrary.setRotation(rotate))
+            for (frame, newID) in replaced where done.contains(newID) { frame.photoRotation = frame.turns }
+        }
+        let removed = await PhotoLibrary.delete(assetIDs: old)
+        return (replaced.count, removed)
     }
 
     /// 사진 파일 속 날짜·위치·카메라 정보를 지금 롤 기록으로 다시 쓴 사본 (드라이브에 올릴 때). 못 쓰면 nil
