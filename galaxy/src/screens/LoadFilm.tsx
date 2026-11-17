@@ -4,9 +4,7 @@ import { Pressable, ScrollView, View } from 'react-native'
 import { Text } from '../text'
 import { db, kept } from '../data'
 import { getPref, useLiveQuery } from '../store'
-import { filmSections, type GearGroup } from '../core/gearGroup'
-import { FilmPickSortBar } from '../gearExtras'
-import { FilmPickGrid } from '../FilmPickGrid'
+import { FilmPicker } from '../FilmPickGrid'
 import type { Roll } from '../core/types'
 import { formatInfo, uid } from '../core/types'
 import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films'
@@ -26,9 +24,6 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const allLenses = useLiveQuery(() => db.lenses.toArray(), []) ?? []
   const [cameraId, setCameraId] = useState(initialCameraId)
   const [filmId, setFilmId] = useState<string>()
-  const [showAll, setShowAll] = useState(false)
-  const [pickSort, setPickSort] = useState<GearGroup>(() => getPref('filmPickSort', 'none' as string) as GearGroup)
-  const [search, setSearch] = useState('')
   const [lensId, setLensId] = useState('')
   const [newLens, setNewLens] = useState('')
   const [push, setPush] = useState(0)
@@ -72,28 +67,6 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const expired = !!film && hasExpiredLot(lots, film.id)
   const stock = film ? stockCount(lots, film.id) : 0
   const [confirmExpired, setConfirmExpired] = useState(false)
-
-  // 추천 순서 (웹과 같음): 재고 있는 필름 먼저 → 그 안에서 많이 쓴 순 → 최근 쓴 순 → 기록이 없으면 많이 쓰는 필름 순
-  const stocks = useMemo(() => {
-    const fmt = camera?.format ?? '135'
-    const recent = rolls.map((r) => r.filmId)
-    const used = new Map<string, number>()
-    for (const id of recent) used.set(id, (used.get(id) ?? 0) + 1)
-    const at = (list: string[], id: string) => (list.indexOf(id) < 0 ? 1e9 : list.indexOf(id))
-    const rank = (id: string) => [stockCount(lots, id) > 0 ? 0 : 1, -(used.get(id) ?? 0), at(recent, id), at(popularFilms, id)]
-    return allFilms()
-      .filter((f) => (fmt === '135-half' ? f.formats.includes('135') : f.formats.some((x) => formatInfo[x].is120 === formatInfo[fmt].is120)))
-      .filter((f) => !search || filmDisplayName(f).toLowerCase().includes(search.toLowerCase()))
-      .sort((a, b) => { const ra = rank(a.id), rb = rank(b.id); return ra[0] - rb[0] || ra[1] - rb[1] || ra[2] - rb[2] || ra[3] - rb[3] })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [camera, rolls, search, customRows])
-
-  const visible = useMemo(() => {
-    if (showAll) return stocks
-    const top = stocks.slice(0, 6)
-    if (film && !top.includes(film) && stocks.includes(film)) top[5] = film
-    return top
-  }, [stocks, showAll, film])
 
   // 렌즈 교환식 카메라는 렌즈를 골라야 장착할 수 있다
   const lensReady = !camera?.mount || (lensId === '__new' ? !!newLens.trim() : !!lensId)
@@ -181,24 +154,9 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
         </Section>
       ) : null}
 
-      <Section title={showAll ? '필름' : '필름 · 추천'}>
-        <Group>
-          {showAll ? <Field label="필름 검색" value={search} onChangeText={setSearch} /> : null}
-          {showAll ? <FilmPickSortBar value={pickSort} onChange={setPickSort} /> : null}
-          {/* 추천 6개는 가로로 넘겨 보고, 더보기는 바둑판(브랜드·ISO·흑백/컬러로 묶으면 묶음마다 제목) (웹과 같음) */}
-          <FilmPickGrid films={visible} value={filmId} onPick={setFilmId} format={camera?.format} sort={showAll ? pickSort : 'none'} scroll={!showAll}
-            note={(f) => (stockCount(lots, f.id) > 0 ? `재고 ${stockCount(lots, f.id)}롤` : '')} onCustom={() => setCustomEdit('new')} />
-          {film?.id.startsWith('custom-') ? (
-            <Row onPress={() => setCustomEdit(film.id)} style={{ justifyContent: 'center' }}>
-              <Text style={{ fontSize: 17, color: c.safelight }}>{filmDisplayName(film)} 수정</Text>
-            </Row>
-          ) : null}
-          <Row onPress={() => { setShowAll(!showAll); setSearch('') }} style={{ justifyContent: 'center' }}>
-            <Text style={{ fontSize: 17, color: c.safelight }}>{showAll ? '접기' : `더보기 (${stocks.length}종)`}</Text>
-          </Row>
-        </Group>
-        {stock > 0 ? <Footnote>재고 {stock}롤 · 장착하면 1롤 빼요</Footnote> : null}
-      </Section>
+      <FilmPicker format={camera?.format ?? '135'} filmId={filmId} onPick={setFilmId}
+        onAddCustom={() => setCustomEdit('new')} onEditCustom={(id) => setCustomEdit(id)}
+        footer={stock > 0 ? <Footnote>재고 {stock}롤 · 장착하면 1롤 빼요</Footnote> : null} />
 
       {/* 필름을 고르기 전에도 보인다 (감도는 '선택 안 됨') */}
       {true ? (

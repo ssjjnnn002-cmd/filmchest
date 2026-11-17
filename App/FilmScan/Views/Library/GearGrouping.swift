@@ -21,8 +21,6 @@ enum GearGroup: String, CaseIterable, Identifiable {
     static let camera: [GearGroup] = [.none, .tag, .brand, .type]
     /// 내 장비 필름 재고: 늘 묶어서 본다 (기본은 브랜드)
     static let filmStock: [GearGroup] = [.brand, .iso, .process, .format]
-    /// 필름 고르기 (none은 '추천' 순)
-    static let filmPick: [GearGroup] = [.none, .brand, .iso, .process]
 }
 
 /// 같은 묶음 이름끼리 모으고, sort 값 순서로 묶음을 늘어놓는다 (묶음 안 순서는 그대로)
@@ -54,15 +52,10 @@ extension FilmStock {
         case .brand: (brand.lowercased(), brand.isEmpty ? "기타" : brand)
         case .iso: (String(format: "%06d", iso), "ISO \(iso)")
         case .process: processGroup
+        case .format: formats.first?.family ?? ("", "")
         default: ("", "")
         }
     }
-}
-
-/// 필름 목록을 고른 기준으로 묶는다 (묶음 안은 이름순)
-func filmSections(_ list: [FilmStock], by g: GearGroup) -> [(title: String?, items: [FilmStock])] {
-    guard g != .none else { return [(nil, list)] }
-    return groupSections(list.sorted { ($0.displayName.lowercased(), $0.iso) < ($1.displayName.lowercased(), $1.iso) }) { $0.groupKey(g) }
 }
 
 extension FilmLotItem {
@@ -157,13 +150,3 @@ struct FilmLotMenu: View {
     }
 }
 
-/// 필름 고르기 '더보기'에서 쓰는 기준 줄 (추천 · 브랜드 · ISO · 흑백·컬러)
-struct FilmPickSortBar: View {
-    @Binding var value: String
-    var body: some View {
-        Picker("정렬", selection: $value) {
-            ForEach(GearGroup.filmPick) { Text($0 == .none ? "추천" : $0.title).tag($0.rawValue) }
-        }
-        .pickerStyle(.segmented)
-    }
-}

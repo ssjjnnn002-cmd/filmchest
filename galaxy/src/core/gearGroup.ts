@@ -26,8 +26,6 @@ export function sortLots(lots: FilmLot[], by: FilmLotSort, desc: boolean, used: 
   const asc = [...lots].sort((a, b) => key(a) - key(b) || name(a).localeCompare(name(b)))
   return desc ? asc.reverse() : asc
 }
-/** 필름 고르기 (none은 '추천' 순) */
-export const filmPickGroups: GearGroup[] = ['none', 'brand', 'iso', 'process']
 
 type Key = { sort: string; title: string }
 
@@ -56,14 +54,18 @@ export function filmKey(f: FilmStock, g: GearGroup): Key {
   if (g === 'brand') return { sort: f.brand.toLowerCase(), title: f.brand || '기타' }
   if (g === 'iso') return { sort: String(f.iso).padStart(6, '0'), title: `ISO ${f.iso}` }
   if (g === 'process') return processKey[f.process]
+  if (g === 'format') return formatFamily(f.formats[0] ?? '135')
   return { sort: '', title: '' }
 }
 
-/** 필름 목록을 고른 기준으로 묶는다 (묶음 안은 이름순) */
-export function filmSections(list: FilmStock[], g: GearGroup): { title?: string; items: FilmStock[] }[] {
-  if (g === 'none') return [{ items: list }]
-  const byName = [...list].sort((a, b) => filmDisplayName(a).toLowerCase().localeCompare(filmDisplayName(b).toLowerCase()) || a.iso - b.iso)
-  return groupSections(byName, (f) => filmKey(f, g))
+/** 필름 고르기(장착·재고 추가 '더보기'): 필름 재고 탭과 같은 정렬(알파벳·재고량·자주 사용, 오름/내림)과 묶기.
+ *  stock = 필름 id → 재고 롤 수, used = 필름 id → 쓴 롤 수 */
+export function filmPickSections(list: FilmStock[], g: GearGroup, by: FilmLotSort, desc: boolean,
+  stock: Record<string, number>, used: Record<string, number>): { title?: string; items: FilmStock[] }[] {
+  const name = (f: FilmStock) => filmDisplayName(f).toLowerCase()
+  const key = (f: FilmStock) => (by === 'count' ? stock[f.id] ?? 0 : by === 'usage' ? used[f.id] ?? 0 : 0)
+  const asc = [...list].sort((a, b) => key(a) - key(b) || name(a).localeCompare(name(b)) || a.iso - b.iso)
+  return groupSections(desc ? asc.reverse() : asc, (f) => filmKey(f, g))
 }
 
 export function lotKey(l: FilmLot, g: GearGroup): Key {

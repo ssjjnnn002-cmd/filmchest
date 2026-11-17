@@ -767,7 +767,8 @@ struct FilmLotEditView: View {
                 }
                 // 이미 있는 재고는 필름 종류·포맷을 바꾸지 않는다 (직접 만든 필름은 다 고칠 수 있다)
                 if canPickFilm {
-                    FilmLookPicker(filmID: $filmID, format: format)
+                    FilmPickSection(filmID: Binding(get: { filmID.isEmpty ? nil : filmID }, set: { filmID = $0 ?? "" }),
+                                    format: format) { EmptyView() }
                 } else if let stock = FilmStockCatalog.stock(id: filmID) {
                     Section {
                         HStack(spacing: 14) {
@@ -880,117 +881,3 @@ struct FilmLotEditView: View {
     }
 }
 
-private struct FilmLookPicker: View {
-    @Binding var filmID: String
-    var format: FilmFormat
-    @Query(sort: \CustomFilmItem.createdAt, order: .reverse) private var customFilms: [CustomFilmItem]
-    @Query(sort: \RollItem.loadedAt, order: .reverse) private var rolls: [RollItem]
-    @State private var search = ""
-    @State private var showAll = false
-    @AppStorage("filmPickSort") private var pickSort = GearGroup.none.rawValue
-    @State private var customEdit: CustomFilmTarget?
-
-    private enum CustomFilmTarget: Identifiable {
-        case new, edit(CustomFilmItem)
-        var id: String { if case .edit(let item) = self { item.id } else { "new" } }
-    }
-
-    private static let popular = ["kodak-portra-400", "kodak-gold-200", "ilford-hp5-plus", "kodak-ultramax-400",
-                                  "fuji-400", "kodak-trix-400", "cinestill-800t", "kodak-ektar-100"]
-
-    private var stocks: [FilmStock] {
-        let recent = rolls.map(\.filmStockID)
-        _ = customFilms.count
-        let list = FilmStockCatalog.allIncludingCustom
-            .filter { format.accepts($0.formats) }
-            .filter { search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search) }
-        func rank(_ stock: FilmStock) -> (Int, Int) {
-            (recent.firstIndex(of: stock.id) ?? .max, Self.popular.firstIndex(of: stock.id) ?? .max)
-        }
-        return list.sorted { rank($0) < rank($1) }
-    }
-
-    /// 고른 필름은 포맷·검색·순서와 상관없이 늘 보이게 (수정할 때 저장된 필름이 안 보여 못 고치던 것)
-    private var visibleStocks: [FilmStock] {
-        let selected = FilmStockCatalog.stock(id: filmID)
-        if showAll {
-            guard let selected, !stocks.contains(selected) else { return stocks }
-            return [selected] + stocks
-        }
-        var top = Array(stocks.prefix(6))
-        if let selected, !top.contains(selected) {
-            if top.count < 6 { top.append(selected) } else { top[top.count - 1] = selected }
-        }
-        return top
-    }
-
-    var body: some View {
-        Section {
-            if showAll {
-                TextField("필름 검색", text: $search)
-                FilmPickSortBar(value: $pickSort)
-            }
-            // 더보기에서 브랜드·ISO·흑백/컬러로 묶으면 묶음마다 제목을 달고 따로 늘어놓는다 (묶음마다 한 줄씩)
-            let secs = filmSections(visibleStocks, by: showAll ? GearGroup(rawValue: pickSort) ?? .none : .none)
-            ForEach(Array(secs.enumerated()), id: \.offset) { i, sec in
-                VStack(alignment: .leading, spacing: 6) {
-                    if let t = sec.title {
-                        Text("\(t) · \(sec.items.count)").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                    }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 6)], spacing: 10) {
-                        ForEach(sec.items) { stock in
-                    Button { filmID = stock.id } label: {
-                        VStack(spacing: 2) {
-                            FilmCanisterView(stock: stock, format: format).frame(height: 84)
-                            Text(stock.displayName).font(.caption2).lineLimit(2).multilineTextAlignment(.center)
-                                .frame(height: 28, alignment: .top)
-                        }
-                        .padding(4)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(filmID == stock.id ? Theme.safelight.opacity(0.15) : .clear))
-                        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(filmID == stock.id ? Theme.safelight : .clear, lineWidth: 2))
-                    }
-                    .buttonStyle(.plain)
-                        }
-                        if i == secs.count - 1 {
-                            Button { customEdit = .new } label: {
-                    VStack(spacing: 2) {
-                        RoundedRectangle(cornerRadius: 16)
-                            .strokeBorder(Theme.safelight.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                            .overlay(Image(systemName: "plus").font(.title2.weight(.light)).foregroundStyle(Theme.safelight))
-                            .frame(width: 76, height: 76)
-                            .frame(height: 84)
-                        Text("직접 추가").font(.caption2.weight(.semibold)).foregroundStyle(Theme.safelight)
-                            .frame(height: 28, alignment: .top)
-                    }
-                    .padding(4)
-                }
-                .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-            if let film = FilmStockCatalog.stock(id: filmID), film.isCustom, let item = customFilms.first(where: { $0.id == film.id }) {
-                Button("\(film.displayName) 수정", systemImage: "pencil") { customEdit = .edit(item) }
-                    .frame(maxWidth: .infinity)
-            }
-            Button {
-                withAnimation { showAll.toggle() }
-                if !showAll { search = "" }
-            } label: {
-                Label(showAll ? "접기" : "더보기 (\(stocks.count)종)", systemImage: showAll ? "chevron.up" : "chevron.down")
-                    .frame(maxWidth: .infinity)
-            }
-        } header: {
-            Text(showAll ? "필름" : "필름 · 최근 사용")
-        }
-        .sheet(item: $customEdit) { target in
-            switch target {
-            case .new:
-                CustomFilmEditView(item: nil) { if let id = $0 { filmID = id } }
-            case .edit(let item):
-                CustomFilmEditView(item: item) { filmID = $0 ?? "" }
-            }
-        }
-    }
-}

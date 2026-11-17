@@ -55,7 +55,7 @@ public enum FilmStockCatalog {
     public static let all: [FilmStock] = base.map { s in
         guard sheetFilms.contains(s.id) else { return s }
         var x = s; x.formats = s.formats + [.sheet45, .sheet810]; return x
-    } + special
+    } + special + more
 
     /// 110 · 인스턴트 필름 (웹 films.ts와 같음)
     private static let special: [FilmStock] = [

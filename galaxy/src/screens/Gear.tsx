@@ -14,7 +14,7 @@ import { filmFits, filterDiameters, filterKinds, groupPrice, lensSpec, parseLens
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
 import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
 import { groupSections, lotKey, sortLots, type FilmLotSort, type GearGroup } from '../core/gearGroup'
-import { FilmPickGrid } from '../FilmPickGrid'
+import { FilmPicker } from '../FilmPickGrid'
 import { deleteCameraPhoto, readBytes, saveCameraPhoto, useCameraPhoto, usePhotoIsCutout } from '../files'
 import { Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Footnote, Group, LensPicture, Row, Section, Segmented, Select, Sub } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
@@ -23,7 +23,7 @@ import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
 import { useTheme } from '../theme'
 import { Icon } from '../icons'
 import { CustomFilmEdit } from './CustomFilmEdit'
-import { FilmPickSortBar, PhotoRows, GroupTitle, OptionalDate, TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../gearExtras'
+import { PhotoRows, GroupTitle, OptionalDate, TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../gearExtras'
 
 export type GearKind = 'lens' | 'filter' | 'film'
 const storageName: Record<FilmStorage, string> = { fridge: '냉장고', freezer: '냉동고', drawer: '서랍', room: '상온', custom: '직접 입력' }
@@ -474,29 +474,8 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
   const [price, setPrice] = useState(groupPrice(lot?.price ?? ''))
   const [seller, setSeller] = useState(lot?.seller ?? '')
   const c = useTheme()
-  const [search, setSearch] = useState('')
-  const [showAll, setShowAll] = useState(false)
-  const [pickSort, setPickSort] = useState<GearGroup>(() => getPref('filmPickSort', 'none' as string) as GearGroup)
   const [customEdit, setCustomEdit] = useState<CustomFilmRow | 'new' | null>(null)
   const [confirm, setConfirm] = useState(false)
-  const stocks = useMemo(() => {
-    const recent = rolls.map((roll) => roll.filmId)
-    const list = allFilms().filter((stock) => filmFits(stock.formats, format))
-      .filter((stock) => !search || filmDisplayName(stock).toLowerCase().includes(search.toLowerCase()))
-    const rank = (stock: { id: string }) => [(recent.indexOf(stock.id) < 0 ? 999 : recent.indexOf(stock.id)), (popularFilms.indexOf(stock.id) < 0 ? 999 : popularFilms.indexOf(stock.id))] as const
-    return list.sort((a, b) => rank(a)[0] - rank(b)[0] || rank(a)[1] - rank(b)[1])
-  }, [rolls, format, search, custom])
-  // 고른 필름은 접혀 있어도 늘 보이게 (수정할 때 다시 찾지 않도록)
-  const visible = useMemo(() => {
-    // 고른 필름은 포맷·검색·순서와 상관없이 늘 보이게 (수정할 때 저장된 필름이 안 보여 못 고치던 것)
-    const picked = filmById(filmId)
-    const has = (list: typeof stocks) => !!picked && list.some((s) => s.id === picked.id)
-    if (showAll) return picked && !has(stocks) ? [picked, ...stocks] : stocks
-    const top = stocks.slice(0, 6)
-    if (picked && !has(top)) { if (top.length < 6) top.push(picked); else top[5] = picked }
-    return top
-  }, [stocks, showAll, filmId])
-  const pickedCustom = custom.find((r) => r.id === filmId)
   // 이미 있는 재고는 필름 종류·포맷을 바꾸지 않는다 (목록에 없는 필름·직접 만든 필름은 고를 수 있다, 웹·아이폰과 같음)
   const fixedFilm = lot && filmById(filmId) && !filmId.startsWith('custom-') ? filmById(filmId) : undefined
   const save = async () => {
@@ -529,22 +508,11 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
           </Group>
         </Section>
       ) : null}
-      {!fixedFilm ? <Section title={showAll ? '필름' : '필름 · 최근 사용'}>
-        <Group>
-          {showAll ? <Field label="필름 검색" value={search} onChangeText={setSearch} /> : null}
-          {showAll ? <FilmPickSortBar value={pickSort} onChange={setPickSort} /> : null}
-          <FilmPickGrid films={visible} value={filmId} onPick={setFilmId} format={format} sort={showAll ? pickSort : 'none'} onCustom={() => setCustomEdit('new')} />
-          {pickedCustom ? (
-            <Row onPress={() => setCustomEdit(pickedCustom)} style={{ justifyContent: 'center' }}>
-              <Text style={{ fontSize: 17, color: c.safelight }}>{pickedCustom.name} 수정</Text>
-            </Row>
-          ) : null}
-          <Row onPress={() => { setShowAll(!showAll); setSearch('') }} style={{ justifyContent: 'center' }}>
-            <Text style={{ fontSize: 17, color: c.safelight }}>{showAll ? '접기' : `더보기 (${stocks.length}종)`}</Text>
-          </Row>
-        </Group>
-        {lot && filmId && !filmById(filmId) ? <Footnote>목록에서 찾을 수 없는 필름이에요. 그대로 저장해도 되고, 다시 고를 수 있어요.</Footnote> : null}
-      </Section> : null}
+      {!fixedFilm ? (
+        <FilmPicker format={format} filmId={filmId || undefined} onPick={setFilmId}
+          onAddCustom={() => setCustomEdit('new')} onEditCustom={(id) => setCustomEdit(custom.find((r) => r.id === id) ?? null)}
+          footer={lot && filmId && !filmById(filmId) ? <Footnote>목록에서 찾을 수 없는 필름이에요. 그대로 저장해도 되고, 다시 고를 수 있어요.</Footnote> : null} />
+      ) : null}
       <Section title="보관">
         <Group>
           {!fixedFilm ? <Chips>{formats.map((item) => <Chip key={item} label={formatInfo[item].name} active={format === item} onPress={() => setFormat(item)} />)}</Chips> : null}

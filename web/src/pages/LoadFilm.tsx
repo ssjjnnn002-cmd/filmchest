@@ -2,15 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, kept } from '../db'
 import type { Roll } from '../core/types'
-import { formatInfo, uid } from '../core/types'
-import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films'
+import { uid } from '../core/types'
+import { filmById } from '../core/films'
 import { hasExpiredLot, lotToUse, stockCount } from '../core/filmStock'
 import { CustomFilmEdit } from './CustomFilmEdit'
 import { lensesFor } from '../core/lenses'
-import { CameraCover, Canister, Confirm, Sheet, toInputDate } from '../ui/common'
-import { currentPlace, getPref, locationAvailable, weatherAt } from '../platform'
-import { filmSections, type GearGroup } from '../core/gearGroup'
-import { FilmPickSortBar } from '../ui/gearExtras'
+import { CameraCover, Confirm, Sheet, toInputDate } from '../ui/common'
+import { currentPlace, locationAvailable, weatherAt } from '../platform'
+import { FilmPicker } from '../ui/FilmPicker'
 
 export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: string; onClose: (loaded?: Roll) => void }) {
   const cameras = useLiveQuery(() => db.cameras.orderBy('sortOrder').filter((c) => !c.deletedAt).toArray(), [])
@@ -19,10 +18,6 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const allLenses = useLiveQuery(() => db.lenses.toArray(), []) ?? []
   const [cameraId, setCameraId] = useState(initialCameraId)
   const [filmId, setFilmId] = useState<string>()
-  const [showAll, setShowAll] = useState(false)
-  // 더보기에서 필름을 묶는 기준 (추천·브랜드·ISO·흑백/컬러). 세 앱 같음
-  const [pickSort, setPickSort] = useState<GearGroup>(() => getPref('filmPickSort', 'none' as string) as GearGroup)
-  const [search, setSearch] = useState('')
   const [lensId, setLensId] = useState('')
   const [newLens, setNewLens] = useState('')
   const [push, setPush] = useState(0)
@@ -66,27 +61,6 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const expired = !!film && hasExpiredLot(lots, film.id)
   const stock = film ? stockCount(lots, film.id) : 0
   const [confirmExpired, setConfirmExpired] = useState(false)
-
-  // 추천 순서: 재고 있는 필름 먼저 → 그 안에서 많이 쓴 순 → 최근 쓴 순 → 기록이 없으면 많이 쓰는 필름 순
-  const stocks = useMemo(() => {
-    const fmt = camera?.format ?? '135'
-    const recent = rolls.map((r) => r.filmId)
-    const used = new Map<string, number>()
-    for (const id of recent) used.set(id, (used.get(id) ?? 0) + 1)
-    const at = (list: string[], id: string) => (list.indexOf(id) < 0 ? 1e9 : list.indexOf(id))
-    const rank = (id: string) => [stockCount(lots, id) > 0 ? 0 : 1, -(used.get(id) ?? 0), at(recent, id), at(popularFilms, id)]
-    return allFilms()
-      .filter((f) => (fmt === '135-half' ? f.formats.includes('135') : f.formats.some((x) => formatInfo[x].is120 === formatInfo[fmt].is120)))
-      .filter((f) => !search || filmDisplayName(f).toLowerCase().includes(search.toLowerCase()))
-      .sort((a, b) => { const ra = rank(a.id), rb = rank(b.id); return ra[0] - rb[0] || ra[1] - rb[1] || ra[2] - rb[2] || ra[3] - rb[3] })
-  }, [camera, rolls, search, customRows, lots])
-
-  const visible = useMemo(() => {
-    if (showAll) return stocks
-    const top = stocks.slice(0, 6)
-    if (film && !top.includes(film) && stocks.includes(film)) top[5] = film
-    return top
-  }, [stocks, showAll, film])
 
   // 렌즈 교환식 카메라는 렌즈를 골라야 장착할 수 있다
   const lensReady = !camera?.mount || (lensId === '__new' ? !!newLens.trim() : !!lensId)
@@ -175,50 +149,9 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
         </div>
       )}
 
-      <div className="section">
-        <h2>{showAll ? '필름' : '필름 · 추천'}</h2>
-        <div className="group">
-          {showAll && (
-            <div className="field">
-              <label htmlFor="film-q">필름 검색</label>
-              <input id="film-q" className="input" value={search} onChange={(e) => setSearch(e.target.value)} />
-            </div>
-          )}
-          {showAll && <FilmPickSortBar value={pickSort} onChange={setPickSort} />}
-          {/* 더보기에서 브랜드·ISO·흑백/컬러로 묶으면 묶음마다 제목을 단다 */}
-          {filmSections(visible, showAll ? pickSort : 'none').map((sec, i, all) => (
-            <div key={sec.title ?? i}>
-              {sec.title && <h3 className="group-title" style={{ margin: '10px 16px 0' }}>{sec.title} · {sec.items.length}</h3>}
-              {/* 추천 6개는 가로로 넘겨 본다 (아래 감도·촬영일 칸이 바로 보이게) */}
-              <div className={`film-grid ${showAll ? '' : 'scroll'}`}>
-                {sec.items.map((f) => (
-                  <button key={f.id} className={`film-pick ${f.id === filmId ? 'on' : ''}`} onClick={() => setFilmId(f.id)}>
-                    <Canister film={f} format={camera?.format} size={84} />
-                    <span>{filmDisplayName(f)}</span>
-                    <small className="film-stock">{stockCount(lots, f.id) > 0 ? `재고 ${stockCount(lots, f.id)}롤` : ''}</small>
-                  </button>
-                ))}
-                {i === all.length - 1 && (
-                  <button className="film-pick custom-add" onClick={() => setCustomEdit('new')}>
-                    <span className="custom-plus" aria-hidden="true">+</span>
-                    <span>직접 추가</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-          {film?.id.startsWith('custom-') && (
-            <button className="row accent" style={{ justifyContent: 'center' }} onClick={() => setCustomEdit(film.id)}>
-              {filmDisplayName(film)} 수정
-            </button>
-          )}
-          <button className="row" style={{ justifyContent: 'center', color: 'var(--safelight)' }}
-            onClick={() => { setShowAll(!showAll); setSearch('') }}>
-            {showAll ? '접기' : `더보기 (${stocks.length}종)`}
-          </button>
-        </div>
-        {stock > 0 && <p className="footnote">재고 {stock}롤 · 장착하면 1롤 빼요</p>}
-      </div>
+      <FilmPicker format={camera?.format ?? '135'} filmId={filmId} onPick={setFilmId}
+        onAddCustom={() => setCustomEdit('new')} onEditCustom={(id) => setCustomEdit(id)}
+        footer={stock > 0 && <p className="footnote">재고 {stock}롤 · 장착하면 1롤 빼요</p>} />
 
       {/* 필름을 고르기 전에도 보인다 (감도는 '선택 안 됨') */}
       {(

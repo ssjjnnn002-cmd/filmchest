@@ -1,4 +1,5 @@
 import type { FilmFormat, FilmProcess } from './types'
+import { discontinuedFilmIds, moreFilmRows } from './filmData'
 
 // 필름 통 일러스트 색. 실제 패키지 색감을 참고한 근사값 (iOS 앱과 같음)
 export interface CanisterStyle {
@@ -85,7 +86,13 @@ export const films: FilmStock[] = [
   f('polaroid-itype-color', 'Polaroid', 'i-Type Color', 640, 'instant', s('#F5F5F2', '#2B6CB0', '#1B1B1B', '#FFFFFF'), only('polaroid')),
   f('polaroid-sx70-color', 'Polaroid', 'SX-70 Color', 160, 'instant', s('#F5F5F2', '#F2A71B', '#1B1B1B', '#1B1B1B'), only('polaroid')),
   f('polaroid-600-bw', 'Polaroid', '600 B&W', 640, 'instant', s('#1B1B1B', '#F5F5F2', '#F5F5F2', '#1B1B1B'), only('polaroid')),
+  // 지금 판매 + 단종됐지만 구할 수 있는 필름 (catalog/films.mjs에서 생성)
+  ...moreFilmRows.map(([id, brand, name, iso, process, formats, st]) =>
+    f(id, brand, name, iso, process, s(st[0], st[1], st[2], st[3], st[4]), formats)),
 ]
+
+/** 단종 필름 (목록에 '단종'으로 작게 표시) */
+export const isDiscontinued = (id?: string) => !!id && discontinuedFilmIds.has(id)
 
 const genericFilmWord = new Set(['plus', 'super', 'ii', 'color', 'negative', 'pan'])
 

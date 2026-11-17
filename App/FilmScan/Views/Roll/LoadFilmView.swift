@@ -25,18 +25,6 @@ struct LoadFilmView: View {
     @State private var pushPull = 0          // 증감 스톱
     @State private var startToday = true
     @State private var startDate = Date()
-    @State private var search = ""
-    @State private var showAllFilms = false
-    /// 더보기에서 필름을 묶는 기준 (추천·브랜드·ISO·흑백/컬러). 세 앱 같음
-    @AppStorage("filmPickSort") private var pickSort = GearGroup.none.rawValue
-    @Query(sort: \CustomFilmItem.createdAt, order: .reverse) private var customFilms: [CustomFilmItem]
-    /// 직접 만들 필름 편집 (nil이 아니면 시트). 새로 만들 땐 .new
-    @State private var customEdit: CustomEditTarget?
-
-    enum CustomEditTarget: Identifiable {
-        case new, edit(CustomFilmItem)
-        var id: String { if case .edit(let item) = self { return item.id }; return "new" }
-    }
 
     private var available: [CameraItem] { cameras.filter { $0.deletedAt == nil } }
     private var camera: CameraItem? { available.first { $0.id == cameraID } }
@@ -54,33 +42,6 @@ struct LoadFilmView: View {
     private var mountLenses: [LensItem] {
         guard let mount = camera?.mount?.nilIfBlank else { return [] }
         return lenses.filter { $0.mount.caseInsensitiveCompare(mount) == .orderedSame }
-    }
-
-    /// 추천 순서로 (재고 있는 것 → 많이 쓴 것)
-    private var stocks: [FilmStock] {
-        let format = camera?.format ?? .f135
-        let recent = rolls.map(\.filmStockID)
-        _ = customFilms.count // 직접 만든 필름이 바뀌면 다시 계산
-        let list = FilmStockCatalog.allIncludingCustom
-            .filter { format.accepts($0.formats) }
-            .filter { search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search) }
-        // 추천 순서 (웹·갤럭시와 같음): 재고 있는 필름 먼저 → 그 안에서 많이 쓴 순 → 최근 쓴 순 → 기록이 없으면 많이 쓰는 필름 순
-        let used = Dictionary(recent.map { ($0, 1) }, uniquingKeysWith: +)
-        func rank(_ s: FilmStock) -> (Int, Int, Int, Int) {
-            (stockCount(s.id) > 0 ? 0 : 1, -(used[s.id] ?? 0), recent.firstIndex(of: s.id) ?? .max, Self.popular.firstIndex(of: s.id) ?? .max)
-        }
-        return list.sorted { rank($0) < rank($1) }
-    }
-
-    private static let popular = ["kodak-portra-400", "kodak-gold-200", "ilford-hp5-plus", "kodak-ultramax-400",
-                                  "fuji-400", "kodak-trix-400", "cinestill-800t", "kodak-ektar-100"]
-
-    /// 기본은 6개만. 선택한 필름이 뒤에 있으면 함께 보여준다.
-    private var visibleStocks: [FilmStock] {
-        if showAllFilms { return stocks }
-        var top = Array(stocks.prefix(6))
-        if let film, !top.contains(film), stocks.contains(film) { top[top.count - 1] = film }
-        return top
     }
 
     private var shotISO: Int? {
@@ -131,51 +92,7 @@ struct LoadFilmView: View {
                     }
                 }
 
-                Section {
-                    if showAllFilms {
-                        TextField("필름 검색", text: $search)
-                        FilmPickSortBar(value: $pickSort)
-                    }
-                    if showAllFilms {
-                    // 더보기에서 브랜드·ISO·흑백/컬러로 묶으면 묶음마다 제목을 달고 따로 늘어놓는다 (묶음마다 한 줄씩)
-                    let secs = filmSections(visibleStocks, by: GearGroup(rawValue: pickSort) ?? .none)
-                    ForEach(Array(secs.enumerated()), id: \.offset) { i, sec in
-                        VStack(alignment: .leading, spacing: 6) {
-                            if let t = sec.title {
-                                Text("\(t) · \(sec.items.count)").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                            }
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 6)], spacing: 10) {
-                                ForEach(sec.items) { filmCell($0) }
-                                if i == secs.count - 1 { customCell }
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    } else {
-                        // 추천 6개는 가로로 넘겨 본다 (아래 감도·촬영일 칸이 바로 보이게)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(alignment: .top, spacing: 6) {
-                                ForEach(visibleStocks) { filmCell($0).frame(width: 96) }
-                                customCell.frame(width: 96)
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                    if let film, film.isCustom, let item = customFilms.first(where: { $0.id == film.id }) {
-                        Button("\(film.displayName) 수정", systemImage: "pencil") { customEdit = .edit(item) }
-                            .frame(maxWidth: .infinity)
-                    }
-                    Button {
-                        withAnimation { showAllFilms.toggle() }
-                        if !showAllFilms { search = "" }
-                    } label: {
-                        Label(showAllFilms ? "접기" : "더보기 (\(stocks.count)종)",
-                              systemImage: showAllFilms ? "chevron.up" : "chevron.down")
-                            .frame(maxWidth: .infinity)
-                    }
-                } header: {
-                    Text(showAllFilms ? "필름" : "필름 · 추천")
-                } footer: {
+                FilmPickSection(filmID: $filmID, format: camera?.format ?? .f135) {
                     if let film, stockCount(film.id) > 0 { Text("재고 \(stockCount(film.id))롤 · 장착하면 1롤 빼요") }
                 }
 
@@ -209,12 +126,6 @@ struct LoadFilmView: View {
             .confirmationDialog("유통기한이 지난 필름이에요.", isPresented: $confirmExpired, titleVisibility: .visible) {
                 Button("그래도 장착") { Task { await load() } }
                 Button("취소", role: .cancel) {}
-            }
-            .sheet(item: $customEdit) { target in
-                switch target {
-                case .new: CustomFilmEditView(item: nil) { filmID = $0 }
-                case .edit(let item): CustomFilmEditView(item: item) { filmID = $0 }
-                }
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
@@ -251,45 +162,6 @@ struct LoadFilmView: View {
         guard let camera, camera.isInterchangeable else { return }
         let last = rolls.first { $0.camera?.id == camera.id && $0.lastLensID != nil }?.lastLensID
         lensID = mountLenses.contains { $0.id == last } ? last : nil
-    }
-
-    private func filmCell(_ stock: FilmStock) -> some View {
-        Button { filmID = stock.id } label: {
-            VStack(spacing: 2) {
-                FilmCanisterView(stock: stock, format: camera?.format ?? .f135)
-                    .frame(height: 84)
-                VStack(spacing: 1) {
-                    Text(stock.displayName).font(.caption2).lineLimit(2).multilineTextAlignment(.center)
-                    if stockCount(stock.id) > 0 {
-                        Text("재고 \(stockCount(stock.id))롤")
-                            .font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
-                    }
-                }
-                .frame(height: 42, alignment: .top)
-            }
-            .padding(4)
-            .background(RoundedRectangle(cornerRadius: 10)
-                .fill(filmID == stock.id ? Theme.safelight.opacity(0.15) : .clear))
-            .overlay(RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(filmID == stock.id ? Theme.safelight : .clear, lineWidth: 2))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var customCell: some View {
-        Button { customEdit = .new } label: {
-            VStack(spacing: 2) {
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Theme.safelight.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                    .overlay(Image(systemName: "plus").font(.title2.weight(.light)).foregroundStyle(Theme.safelight))
-                    .frame(width: 76, height: 76)
-                    .frame(height: 84)
-                Text("직접 추가").font(.caption2.weight(.semibold)).foregroundStyle(Theme.safelight)
-                    .frame(height: 42, alignment: .top)
-            }
-            .padding(4)
-        }
-        .buttonStyle(.plain)
     }
 
     private func cameraChip(_ c: CameraItem) -> some View {

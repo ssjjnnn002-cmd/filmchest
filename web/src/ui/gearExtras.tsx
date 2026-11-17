@@ -4,7 +4,7 @@ import { db } from '../db'
 import { defaultAccessoryKinds, uid } from '../core/types'
 import { getPref, setPref } from '../platform'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
-import { filmLotSortTitle, filmPickGroups, filmStockGroups, groupTitle, type FilmLotSort, type GearGroup } from '../core/gearGroup'
+import { filmLotSortTitle, filmStockGroups, groupTitle, type FilmLotSort, type GearGroup } from '../core/gearGroup'
 import { Icon } from './common'
 
 const cleanTag = (raw: string) => raw.trim().replace(/^#+/, '').trim()
@@ -219,14 +219,3 @@ export function FilmLotMenu({ group, sort, desc, onGroup, onSort, onDesc }: {
   )
 }
 
-/** 필름 고르기 '더보기'에서 쓰는 기준 줄 (추천 · 브랜드 · ISO · 흑백·컬러). 고른 값은 기억한다 */
-export function FilmPickSortBar({ value, onChange }: { value: GearGroup; onChange: (g: GearGroup) => void }) {
-  return (
-    <div className="segmented" role="tablist" aria-label="정렬" style={{ margin: '8px 12px' }}>
-      {filmPickGroups.map((g) => (
-        <button key={g} type="button" role="tab" aria-selected={g === value} className={g === value ? 'on' : ''}
-          onClick={() => { onChange(g); setPref('filmPickSort', g) }}>{g === 'none' ? '추천' : groupTitle[g]}</button>
-      ))}
-    </div>
-  )
-}

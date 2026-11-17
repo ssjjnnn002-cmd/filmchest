@@ -7,7 +7,7 @@ import { DateTimePickerAndroid as Picker } from '@react-native-community/datetim
 import { db } from './data'
 import { defaultAccessoryKinds, uid } from './core/types'
 import { Chip, Chips, Group, Row, Section, Segmented } from './kit'
-import { filmLotSortTitle, filmPickGroups, filmStockGroups, groupTitle, type FilmLotSort, type GearGroup } from './core/gearGroup'
+import { filmLotSortTitle, filmStockGroups, groupTitle, type FilmLotSort, type GearGroup } from './core/gearGroup'
 import { getPref, setPref, useLiveQuery } from './store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from './suggest'
 import { useTheme } from './theme'
@@ -231,15 +231,6 @@ export function GroupMenu({ value, options, onChange }: { value: GearGroup; opti
   )
 }
 
-/** 필름 고르기 '더보기'에서 쓰는 기준 줄 (추천 · 브랜드 · ISO · 흑백·컬러). 고른 값은 기억한다 (웹 FilmPickSortBar와 같음) */
-export function FilmPickSortBar({ value, onChange }: { value: GearGroup; onChange: (g: GearGroup) => void }) {
-  return (
-    <View style={{ marginVertical: 8, marginHorizontal: 12 }}>
-      <Segmented value={value} options={filmPickGroups.map((g) => [g, g === 'none' ? '추천' : groupTitle[g]] as [GearGroup, string])}
-        onChange={(g) => { onChange(g); setPref('filmPickSort', g) }} />
-    </View>
-  )
-}
 
 /** 내 장비 필름 탭의 '정렬·묶기' 버튼: 정렬 기준 · 오름/내림 · 묶기 기준 (웹 FilmLotMenu와 같음) */
 export function FilmLotMenu({ group, sort, desc, onGroup, onSort, onDesc }: {
