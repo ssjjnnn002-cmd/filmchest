@@ -305,7 +305,13 @@ struct RollDetailView: View {
         .fullScreenCover(isPresented: $recording) { RollManualRecordView(roll: roll) }
         #endif
         .sheet(isPresented: Binding(get: { shotEdit != nil }, set: { if !$0 { shotEdit = nil } })) {
-            if let shotEdit { FrameShotEditView(roll: roll, pos: shotEdit) }
+            if let shotEdit {
+                #if os(iOS)
+                RollShotDialEditor(roll: roll, pos: shotEdit)
+                #else
+                FrameShotEditView(roll: roll, pos: shotEdit)
+                #endif
+            }
         }
         #if os(iOS)
         .fullScreenCover(item: $viewing) { FrameViewer(roll: roll, index: $0.index) }
@@ -502,7 +508,13 @@ struct RollShotsView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .sheet(isPresented: Binding(get: { shotEdit != nil }, set: { if !$0 { shotEdit = nil } })) {
-            if let shotEdit { FrameShotEditView(roll: roll, pos: shotEdit) }
+            if let shotEdit {
+                #if os(iOS)
+                RollShotDialEditor(roll: roll, pos: shotEdit)
+                #else
+                FrameShotEditView(roll: roll, pos: shotEdit)
+                #endif
+            }
         }
     }
 

@@ -32,7 +32,9 @@ struct ManualRecordView: View {
     @State private var editing: EditTarget?
     @State private var toast: String?
     struct EditTarget: Identifiable { var pos: Int; var id: Int { pos } }
-    enum Sheet: String, Identifiable { case filter, lens; var id: String { rawValue } }
+    enum Sheet: String, Identifiable { case filter, lens, iso; var id: String { rawValue } }
+    /// 장착한 필름 감도 (카메라 ISO를 이와 다르게 맞추면 오버·언더로 기록)
+    private var box: Double { m.gear.film.map { Double($0.iso) } ?? m.iso }
 
     init(gear: MeterGear, shots: [MeterShot], rollPrewind: Bool?, iso: Double?, onSave: @escaping ([MeterShot], Bool) -> Void, onClose: @escaping () -> Void) {
         var g = gear
@@ -40,24 +42,29 @@ struct ManualRecordView: View {
         let model = MeterModel(gear: g, shots: shots, rollPrewind: rollPrewind ?? false)
         _m = StateObject(wrappedValue: model)
         self.onSave = onSave; self.onClose = onClose
-        // 다이얼 자리: 이 카메라가 지원하는 것만 (P 모드·셔터 범위·B). 수동 카메라는 1/125 · f/8에서 시작
+        var first = Self.baseDial(gear, model: model)
+        // 이어서: 마지막에 찍은 컷의 렌즈·필터·다이얼 값에서 다시 시작
+        if let last = shots.max(by: { $0.order < $1.order }) {
+            if let id = last.lensId, let l = gear.lenses.first(where: { $0.id == id }) { model.setLens(l) }
+            model.filters = last.filters ?? []
+            if let iso = last.iso { model.iso = iso }
+            first = DialState(shot: last, like: first, apertures: model.apertures)
+        }
+        _dial = State(initialValue: first)
+        _frame = State(initialValue: (shots.map(\.pos).max() ?? 0) + 1)
+        _rewindAngle = State(initialValue: Double(shots.count) * -150)
+    }
+
+    /// 다이얼 자리: 이 카메라가 지원하는 것만 (P 모드·셔터 범위·B·노출 보정). 수동 카메라는 1/125 · f/8에서 시작
+    static func baseDial(_ gear: MeterGear, model: MeterModel) -> DialState {
         let manual = !gear.shutterAuto
         let fullAuto = gear.shutterAuto && gear.program
         let stops = DialState.stops(speeds: model.shutters, manual: manual, program: gear.program)
         let start = manual ? (stops.indices.filter { stops[$0] > 0 }.min { abs(log2(stops[$0] * 125)) < abs(log2(stops[$1] * 125)) } ?? 0) : 0
         // 노출 보정: 이 카메라에 있는 값만 (XA는 역광 +1.5 하나, 기계식은 없음)
         let comps = gear.comps.map { $0.isEmpty ? [0] : $0 } ?? (fullAuto ? [0] : MeterMath.comps)
-        var first = DialState(shutterStops: stops, apertures: model.apertures, s: start,
-                              a: fullAuto ? 0 : 1 + MeterMath.nearest(model.apertures, 8), c: comps.firstIndex(of: 0) ?? 0, fullAuto: fullAuto, comps: comps)
-        // 이어서: 마지막에 찍은 컷의 렌즈·필터·다이얼 값에서 다시 시작
-        if let last = shots.max(by: { $0.order < $1.order }) {
-            if let id = last.lensId, let l = gear.lenses.first(where: { $0.id == id }) { model.setLens(l) }
-            model.filters = last.filters ?? []
-            first = DialState(shot: last, like: first, apertures: model.apertures)
-        }
-        _dial = State(initialValue: first)
-        _frame = State(initialValue: (shots.map(\.pos).max() ?? 0) + 1)
-        _rewindAngle = State(initialValue: Double(shots.count) * -150)
+        return DialState(shutterStops: stops, apertures: model.apertures, s: start,
+                         a: fullAuto ? 0 : 1 + MeterMath.nearest(model.apertures, 8), c: comps.firstIndex(of: 0) ?? 0, fullAuto: fullAuto, comps: comps)
     }
 
     var body: some View {
@@ -86,18 +93,20 @@ struct ManualRecordView: View {
                 ScrollView {
                     if kind == .filter {
                         FilterChips(selected: $m.filters).padding(16)
+                    } else if kind == .iso {
+                        IsoChips(selected: $m.iso, box: box).padding(16)
                     } else {
                         lensList
                     }
                 }
-                .navigationTitle(kind == .filter ? "필터" : "렌즈 교체").navigationBarTitleDisplayMode(.inline)
+                .navigationTitle(kind == .filter ? "필터" : kind == .iso ? "카메라 ISO" : "렌즈 교체").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("완료") { sheet = nil } } }
             }
             .presentationDetents([.medium]).preferredColorScheme(.dark)
         }
         .sheet(item: $editing) { t in
             if let shot = m.shots.first(where: { $0.pos == t.pos }) {
-                ShotDialEditor(shot: shot, like: dial, lenses: m.gear.lenses.isEmpty ? [m.lens] : m.gear.lenses, current: m.lens, iso: m.iso) { edited in
+                ShotDialEditor(shot: shot, like: dial, lenses: m.gear.lenses.isEmpty ? [m.lens] : m.gear.lenses, current: m.lens, iso: m.iso, box: box) { edited in
                     m.update(edited); onSave(m.shots, m.prewind); show("\(t.pos)번을 고쳤어요")
                 } onDelete: {
                     m.shots.removeAll { $0.pos == t.pos }; onSave(m.shots, m.prewind); show("\(t.pos)번 기록을 지웠어요")
@@ -131,8 +140,13 @@ struct ManualRecordView: View {
 
     private var pills: some View {
         HStack(spacing: 6) {
-            pill { show("장착한 필름 감도예요") } label: {
-                HStack(spacing: 4) { Text("ISO").foregroundStyle(Color.meterSub); Text(MeterMath.trim(m.iso)).bold() }
+            // 카메라 ISO: 필름 감도와 다르게 맞추면 파랗게 + 오버·언더 스톱
+            pill(active: m.iso != box, activeColor: Color(red: 0.62, green: 0.79, blue: 1)) { sheet = .iso } label: {
+                HStack(spacing: 4) {
+                    Text("ISO").foregroundStyle(m.iso != box ? Color.black.opacity(0.6) : Color.meterSub)
+                    Text(MeterMath.trim(m.iso)).bold()
+                    if m.iso != box { Text(MeterMath.fmtC(log2(box / m.iso))).font(.system(size: 13, weight: .heavy)) }
+                }
             }
             pill(active: !m.filters.isEmpty, activeColor: Color(red: 0.62, green: 0.79, blue: 1)) { sheet = .filter } label: {
                 HStack(spacing: 4) {
@@ -230,6 +244,7 @@ struct ManualRecordView: View {
                              comp: dial.comp, flash: dial.flash, ev: 0, focal: m.lens.isZoom ? nil : m.lens.min,
                              at: ISO8601DateFormatter().string(from: at), filters: m.filters.isEmpty ? nil : m.filters)
         shot.lensId = m.lens.id
+        shot.iso = m.iso != box ? m.iso : nil
         shot.place = placeName.isEmpty ? nil : placeName
         shot.lat = point?.latitude; shot.lon = point?.longitude
         let old = m.shots.first { $0.pos == frame }
@@ -544,6 +559,33 @@ struct TopDial: View {
 }
 
 /// 필터 칩 (여러 개 고를 수 있음, '없음'은 전부 해제)
+/// 카메라 ISO 고르기: 필름 감도보다 낮게 맞추면 오버(더 밝게), 높게 맞추면 언더(더 어둡게)
+struct IsoChips: View {
+    @Binding var selected: Double
+    var box: Double
+    /// 필름 감도 기준 스톱 ("+1 오버", "−⅔ 언더")
+    static func stops(_ iso: Double, box: Double) -> String {
+        let s = log2(box / iso)
+        return MeterMath.fmtC(s) + (s > 0 ? " 오버" : " 언더")
+    }
+    private var list: [Double] { MeterMath.isoList.filter { $0 >= box / 8 && $0 <= box * 8 } }
+    var body: some View {
+        // 카메라 윗면 ISO 다이얼처럼 돌려서 고른다. 필름 감도 자리에서 '딱' 걸린다
+        let values = list
+        let boxIndex = values.firstIndex(of: box) ?? MeterMath.nearest(values, box)
+        VStack(spacing: 14) {
+            TopDial(title: selected == box ? "필름 그대로" : Self.stops(selected, box: box),
+                    labels: values.map(MeterMath.trim),
+                    index: Binding(get: { values.firstIndex(of: selected) ?? MeterMath.nearest(values, selected) }, set: { selected = values[$0] }),
+                    size: 220, big: "ISO \(MeterMath.trim(selected))", accent: [boxIndex], snaps: [boxIndex], bigSize: 28,
+                    titleColor: selected == box ? .meterSub : Color(white: 0.86))
+            Text("필름 감도(ISO \(MeterMath.trim(box)))보다 낮게 맞추면 더 밝게(오버), 높게 맞추면 더 어둡게(언더) 찍혀요.")
+                .font(.footnote).foregroundStyle(Color.meterSub).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
 struct FilterChips: View {
     @Binding var selected: [String]
     var body: some View {
@@ -604,10 +646,13 @@ struct ShotDialEditor: View {
     @State private var toast: String?
     let lenses: [MeterLens]
     @State private var lens: MeterLens
-    var iso: Double = 400
+    @State private var iso: Double = 400
+    @State private var isoSheet = false
+    var box: Double = 400
 
-    init(shot: MeterShot, like: DialState, lenses: [MeterLens], current: MeterLens, iso: Double, onSave: @escaping (MeterShot) -> Void, onDelete: @escaping () -> Void) {
-        self.shot = shot; self.onSave = onSave; self.onDelete = onDelete; self.lenses = lenses; self.iso = iso
+    init(shot: MeterShot, like: DialState, lenses: [MeterLens], current: MeterLens, iso: Double, box: Double, onSave: @escaping (MeterShot) -> Void, onDelete: @escaping () -> Void) {
+        self.shot = shot; self.onSave = onSave; self.onDelete = onDelete; self.lenses = lenses; self.box = box
+        _iso = State(initialValue: shot.iso ?? box)
         // 그 컷에 끼웠던 렌즈 (모르면 지금 렌즈)
         let l = lenses.first { $0.id == shot.lensId } ?? current
         _lens = State(initialValue: l)
@@ -646,6 +691,18 @@ struct ShotDialEditor: View {
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.meterLine))
                     }
                     .buttonStyle(.plain)
+                    Button { isoSheet = true } label: {
+                        HStack {
+                            Text("카메라 ISO").foregroundStyle(Color.meterSub)
+                            Spacer()
+                            Text(iso == box ? "\(MeterMath.trim(iso)) (필름 그대로)" : "\(MeterMath.trim(iso)) · \(IsoChips.stops(iso, box: box))")
+                            Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.meterSub)
+                        }
+                        .font(.system(size: 15)).padding(.horizontal, 14).frame(height: 44)
+                        .background(Color.meterPanel, in: RoundedRectangle(cornerRadius: 16))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.meterLine))
+                    }
+                    .buttonStyle(.plain)
                     Button { filterSheet = true } label: {
                         HStack {
                             Text("필터").foregroundStyle(Color.meterSub)
@@ -673,6 +730,14 @@ struct ShotDialEditor: View {
             }
             .sheet(isPresented: $placeSheet) { placeSheetView(name: $placeName, point: $point) { placeSheet = false } }
             .sheet(isPresented: $timeSheet) { timeSheetView(time: $time, onNow: { time = Date(); timeSheet = false }, onDone: { timeSheet = false }) }
+            .sheet(isPresented: $isoSheet) {
+                NavigationStack {
+                    ScrollView { IsoChips(selected: $iso, box: box).padding(16) }
+                        .navigationTitle("카메라 ISO").navigationBarTitleDisplayMode(.inline)
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("완료") { isoSheet = false } } }
+                }
+                .presentationDetents([.medium])
+            }
             .sheet(isPresented: $filterSheet) {
                 NavigationStack {
                     ScrollView { FilterChips(selected: $filters).padding(16) }
@@ -728,8 +793,35 @@ struct ShotDialEditor: View {
         s.lat = point?.latitude; s.lon = point?.longitude
         s.at = ISO8601DateFormatter().string(from: time)
         s.memo = memo.isEmpty ? nil : memo
+        s.iso = iso != box ? iso : nil
         onSave(s)
         dismiss()
+    }
+}
+
+/// 롤 화면 컷 기록에서 여는 컷 고치기 (상세 기록과 같은 다이얼 화면, 웹·갤럭시 RollShotEdit과 같음)
+struct RollShotDialEditor: View {
+    let roll: RollItem
+    let pos: Int
+    @Query private var lenses: [LensItem]
+
+    var body: some View {
+        var gear = MeterGear.from(roll: roll, lenses: lenses)
+        let box = roll.film.map { Double($0.iso) } ?? 400
+        if let iso = roll.shotISO { gear.iso = Double(iso) }
+        let model = MeterModel(gear: gear, shots: roll.meterShots, rollPrewind: roll.meterPrewind ?? false)
+        return Group {
+            if let shot = roll.meterShots.first(where: { $0.pos == pos }) {
+                ShotDialEditor(shot: shot, like: ManualRecordView.baseDial(gear, model: model),
+                               lenses: gear.lenses.isEmpty ? [model.lens] : gear.lenses, current: model.lens, iso: model.iso, box: box) { edited in
+                    var e = edited
+                    e.edited = true
+                    roll.meterShots = roll.meterShots.map { $0.pos == pos ? e : $0 }
+                } onDelete: {
+                    roll.meterShots.removeAll { $0.pos == pos }
+                }
+            }
+        }
     }
 }
 

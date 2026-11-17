@@ -305,6 +305,8 @@ export interface MeterShot {
   lon?: number
   /** 그 컷에 끼운 렌즈 (장비 탭 렌즈 id) */
   lensId?: string | null
+  /** 카메라에 맞춘 ISO (필름 감도와 다르게 맞췄을 때만. 낮으면 오버, 높으면 언더) */
+  iso?: number
 }
 
 /** 규격별 한 롤 컷 수 */

@@ -558,6 +558,8 @@ struct MeterShot: Codable, Hashable, Sendable {
     var lon: Double?
     /// 그 컷에 끼운 렌즈 (장비 탭 렌즈 id, 렌즈 고정형은 "fixed")
     var lensId: String?
+    /// 카메라에 맞춘 ISO (필름 감도와 다르게 맞췄을 때만. 낮으면 오버, 높으면 언더)
+    var iso: Double?
 }
 
 extension MeterShot {
@@ -601,6 +603,7 @@ extension MeterShot {
     var rowMeta: String {
         var parts = [Self.modeName(mode)]
         if let focal { parts.append("\(focal)mm") }
+        if let iso { parts.append("ISO \(Int(iso))") }
         if let filters, !filters.isEmpty { parts.append(filters.joined(separator: ", ")) }
         if let place, !place.isEmpty { parts.append(place) }
         if let at, let d = Self.parseAt(at) { let f = DateFormatter(); f.dateFormat = "M.d HH:mm"; parts.append(f.string(from: d)) }

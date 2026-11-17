@@ -88,6 +88,7 @@ export function meterShotMeta(shot: MeterShot, prewind = false): string {
 export function shotRowMeta(shot: MeterShot): string {
   const parts = [modeName[shot.mode] ?? shot.mode]
   if (shot.focal) parts.push(`${shot.focal}mm`)
+  if (shot.iso) parts.push(`ISO ${shot.iso}`)
   if (shot.filters?.length) parts.push(shot.filters.join(', '))
   if (shot.place) parts.push(shot.place)
   const d = shot.at ? new Date(shot.at) : undefined

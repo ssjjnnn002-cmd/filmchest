@@ -890,3 +890,7 @@ a.row.accent { color: var(--safelight); }
 .mr-dial-title.on { color: #dbdbdb; }
 /* 셔터 줄만 위로 (필름 띠는 그대로) */
 .mr-controls { margin-bottom: calc(min(100%, 318px) * -58 / 360 + 30px); }
+/* 카메라 ISO 다이얼 (아이폰 IsoChips와 같음): 시트 안에서도 상세 기록처럼 검은 바탕 */
+.mr-iso-dial { display: grid; justify-items: center; padding: 18px 0 14px; border-radius: 18px; background: #000; color: #fff; margin: 4px 0 8px; }
+/* 상세 기록(.mr-overlay, z 1000) 위에서 여는 시트·확인 창은 그 위로 */
+body:has(.mr-overlay) .sheet-root, body:has(.mr-overlay) .alert-backdrop { z-index: 1100; }

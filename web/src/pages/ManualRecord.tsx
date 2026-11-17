@@ -149,13 +149,16 @@ function Recorder({ roll, camera, allLenses, onClose }: {
     return last ? dialOf.fromShot(last, base, base.aps) : base
   })
   const [filters, setFilters] = useState<string[]>(() => last?.filters ?? [])
+  // 카메라 ISO: 필름 감도(box)와 다르게 맞추면 오버·언더로 컷마다 기록
+  const box = film?.iso ?? iso
+  const [camIso, setCamIso] = useState(() => last?.iso ?? iso)
   const [frame, setFrame] = useState(() => Math.max(0, ...(roll.meterShots ?? []).map((s) => s.pos)) + 1)
   const [placeName, setPlaceName] = useState('')
   const [point, setPoint] = useState<GeoPoint>()
   const [locating, setLocating] = useState(true)
   const [useNow, setUseNow] = useState(true)
   const [time, setTime] = useState(() => new Date())
-  const [sheet, setSheet] = useState<'place' | 'time' | 'filter' | 'lens'>()
+  const [sheet, setSheet] = useState<'place' | 'time' | 'filter' | 'lens' | 'iso'>()
   const [editing, setEditing] = useState<number>()
   const [toast, setToast] = useState<string>()
   const [leverOut, setLeverOut] = useState(false)
@@ -205,7 +208,7 @@ function Recorder({ roll, camera, allLenses, onClose }: {
       pos: frame, order: old?.order ?? shots.length + 1, mode: dialOf.mode(dial), aperture: dialOf.aperture(dial), shutter: sh,
       comp: dialOf.comp(dial), flash: dialOf.flash(dial), ev: 0, focal: lens.max > lens.min ? null : lens.min,
       at: (useNow ? new Date() : time).toISOString(), edited: false, filters: filters.length ? filters : undefined,
-      memo: old?.memo, tags: old?.tags, place: placeName || undefined, lat: point?.latitude, lon: point?.longitude, lensId: lens.id,
+      memo: old?.memo, tags: old?.tags, place: placeName || undefined, lat: point?.latitude, lon: point?.longitude, lensId: lens.id, iso: camIso !== box ? camIso : undefined,
     }
     save([...shots.filter((s) => s.pos !== frame), shot].sort((a, b) => a.pos - b.pos))
     if (old) show(`${frame}번을 새로 기록했어요`)
@@ -235,7 +238,9 @@ function Recorder({ roll, camera, allLenses, onClose }: {
           {film && <span>{filmDisplayName(film)} · {frames}컷</span>}
         </div>
         <div className="mr-pills">
-          <button className="mr-pill" onClick={() => show('장착한 필름 감도예요')}><span className="sub">ISO</span> <b>{iso}</b></button>
+          <button className={`mr-pill ${camIso !== box ? 'filt' : ''}`} aria-label="카메라 ISO" onClick={() => setSheet('iso')}>
+            <span className="sub">ISO</span> <b>{camIso}</b>{camIso !== box && <b> {formatComp(Math.log2(box / camIso))}</b>}
+          </button>
           <button className={`mr-pill ${filters.length ? 'filt' : ''}`} aria-label="필터" onClick={() => setSheet('filter')}>
             <FilterIcon />{filters.length ? <span>{filters.length > 1 ? `${filters[0]}+${filters.length - 1}` : filters[0]}</span> : null}
           </button>
@@ -248,7 +253,7 @@ function Recorder({ roll, camera, allLenses, onClose }: {
       </div>
 
       <div className="mr-space" />
-      <RecordDials dial={dial} onChange={setDial} onLocked={show} iso={iso} />
+      <RecordDials dial={dial} onChange={setDial} onLocked={show} iso={camIso} />
 
       <PlaceTimeCard place={locating && !placeName ? '현재 위치 찾는 중…' : placeName || '없음'}
         time={useNow ? '기록하는 순간' : time.toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -299,6 +304,7 @@ function Recorder({ roll, camera, allLenses, onClose }: {
           <FilterChips value={filters} onChange={setFilters} />
         </Sheet>
       )}
+      {sheet === 'iso' && <IsoSheet value={camIso} box={box} onChange={setCamIso} onClose={() => setSheet(undefined)} />}
       {sheet === 'lens' && (
         <LensSheet lenses={lensList} current={lens} onClose={() => setSheet(undefined)} onPick={(l) => {
           setLens(l)
@@ -307,7 +313,7 @@ function Recorder({ roll, camera, allLenses, onClose }: {
         }} />
       )}
       {editShot && (
-        <ShotEdit shot={editShot} like={dial} lenses={lensList.length ? lensList : [lens]} current={lens} iso={iso}
+        <ShotEdit shot={editShot} like={dial} lenses={lensList.length ? lensList : [lens]} current={lens} iso={camIso} box={box}
           onClose={() => setEditing(undefined)}
           onSave={(s) => { save(shots.map((x) => (x.pos === s.pos ? { ...s, edited: true } : x))); setEditing(undefined); show(`${s.pos}번을 고쳤어요`) }}
           onDelete={() => { save(shots.filter((x) => x.pos !== editShot.pos)); setEditing(undefined); show(`${editShot.pos}번 기록을 지웠어요`) }} />
@@ -436,6 +442,23 @@ function TimeSheet({ time, onChange, onNow, onDone }: { time: Date; onChange: (d
   )
 }
 
+/** 카메라 ISO 고르기: 필름 감도보다 낮게 맞추면 오버(더 밝게), 높게 맞추면 언더(더 어둡게). 아이폰 IsoChips와 같음 */
+const isoStops = (v: number, box: number) => { const s = Math.log2(box / v); return `${formatComp(s)} ${s > 0 ? '오버' : '언더'}` }
+function IsoSheet({ value, box, onChange, onClose }: { value: number; box: number; onChange: (v: number) => void; onClose: () => void }) {
+  const list = [25, 32, 40, 50, 64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400].filter((v) => v >= box / 8 && v <= box * 8)
+  return (
+    <Sheet title="카메라 ISO" onClose={onClose} right={<button className="btn ghost" onClick={onClose}><b>완료</b></button>}>
+      {/* 카메라 윗면 ISO 다이얼처럼 돌려서 고른다. 필름 감도 자리에서 '딱' 걸린다 */}
+      <div className="mr-iso-dial">
+        <TopDial title={value === box ? '필름 그대로' : isoStops(value, box)} titleOn={value !== box} labels={list.map(String)}
+          index={Math.max(0, list.indexOf(value))} onChange={(i) => onChange(list[i])} size={220} big={`ISO ${value}`}
+          accent={new Set([Math.max(0, list.indexOf(box))])} bigSize={28} />
+      </div>
+      <p className="footnote">필름 감도(ISO {box})보다 낮게 맞추면 더 밝게(오버), 높게 맞추면 더 어둡게(언더) 찍혀요.</p>
+    </Sheet>
+  )
+}
+
 function FilterChips({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
   return (
     <div className="suggest" style={{ padding: 12 }}>
@@ -546,8 +569,8 @@ function Canister({ iso, frames, body, band }: { iso: number; frames: number; bo
 }
 
 // ───────── 컷 고치기 (메인과 같은 다이얼 배치, 그 컷 값으로 맞춰서 연다)
-function ShotEdit({ shot, like, lenses, current, iso, onClose, onSave, onDelete }: {
-  shot: MeterShot; like: Dial; lenses: Lens[]; current: Lens; iso: number; onClose: () => void; onSave: (s: MeterShot) => void; onDelete: () => void
+function ShotEdit({ shot, like, lenses, current, box, onClose, onSave, onDelete }: {
+  shot: MeterShot; like: Dial; lenses: Lens[]; current: Lens; iso: number; box: number; onClose: () => void; onSave: (s: MeterShot) => void; onDelete: () => void
 }) {
   const [lens, setLens] = useState<Lens>(() => lenses.find((l) => l.id === shot.lensId) ?? current)
   const [dial, setDial] = useState<Dial>(() => dialOf.fromShot(shot, like, apertures(lens.open, lens.close)))
@@ -556,7 +579,8 @@ function ShotEdit({ shot, like, lenses, current, iso, onClose, onSave, onDelete 
   const [point, setPoint] = useState<GeoPoint | undefined>(shot.lat != null && shot.lon != null ? { latitude: shot.lat, longitude: shot.lon } : undefined)
   const [time, setTime] = useState(() => (shot.at ? new Date(shot.at) : new Date()))
   const [memo, setMemo] = useState(shot.memo ?? '')
-  const [sheet, setSheet] = useState<'place' | 'time' | 'filter' | 'lens'>()
+  const [sheet, setSheet] = useState<'place' | 'time' | 'filter' | 'lens' | 'iso'>()
+  const [camIso, setCamIso] = useState(shot.iso ?? box)
   const [ask, setAsk] = useState(false)
   const [note, setNote] = useState<string>()
   const save = () => {
@@ -564,7 +588,7 @@ function ShotEdit({ shot, like, lenses, current, iso, onClose, onSave, onDelete 
     onSave({
       ...shot, mode: dialOf.mode(dial), aperture: dialOf.aperture(dial), shutter: dialOf.shutter(dial), flash: dialOf.flash(dial), comp: dialOf.comp(dial),
       filters: filters.length ? filters : undefined, place: placeName || undefined, lat: point?.latitude, lon: point?.longitude,
-      at: time.toISOString(), memo: memo || undefined,
+      at: time.toISOString(), memo: memo || undefined, iso: camIso !== box ? camIso : undefined,
       ...(changed ? { lensId: lens.id, focal: lens.max > lens.min ? null : lens.min } : {}),
     })
   }
@@ -576,13 +600,16 @@ function ShotEdit({ shot, like, lenses, current, iso, onClose, onSave, onDelete 
         <button className="mr-text strong" onClick={save}>저장</button>
       </div>
       <div className="mr-edit-body">
-        <RecordDials dial={dial} onChange={setDial} onLocked={setNote} iso={iso} />
+        <RecordDials dial={dial} onChange={setDial} onLocked={setNote} iso={camIso} />
         {note && <p className="mr-note">{note}</p>}
         <PlaceTimeCard place={placeName || '없음'} time={time.toLocaleString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
           onPlace={() => setSheet('place')} onTime={() => setSheet('time')} />
         <div className="mr-card">
           <button className="mr-line" onClick={() => { if (!lens.fixed && lenses.length > 1) setSheet('lens') }}>
             <span className="k">렌즈</span><span className="v">{lens.name}</span>{!lens.fixed && lenses.length > 1 && <span className="chev">›</span>}
+          </button>
+          <button className="mr-line" onClick={() => setSheet('iso')}>
+            <span className="k">카메라 ISO</span><span className="v">{camIso === box ? `${camIso} (필름 그대로)` : `${camIso} · ${isoStops(camIso, box)}`}</span><span className="chev">›</span>
           </button>
           <button className="mr-line" onClick={() => setSheet('filter')}>
             <span className="k">필터</span><span className="v">{filters.length ? filters.join('+') : '없음'}</span><span className="chev">›</span>
@@ -609,6 +636,7 @@ function ShotEdit({ shot, like, lenses, current, iso, onClose, onSave, onDelete 
           setSheet(undefined)
         }} />
       )}
+      {sheet === 'iso' && <IsoSheet value={camIso} box={box} onChange={setCamIso} onClose={() => setSheet(undefined)} />}
       {ask && <Confirm message="이 칸 기록을 지울까요?" action="지우기" onCancel={() => setAsk(false)} onConfirm={onDelete} />}
     </div>,
     document.body,
@@ -625,7 +653,7 @@ export function RollShotEdit({ roll, pos, onClose, onToast }: { roll: Roll; pos:
   const current = setup.lensById(shot.lensId ?? lensIdAt(roll, pos) ?? roll.lensId) ?? GENERIC
   const save = (list: MeterShot[]) => db.rolls.update(roll.id, { meterShots: list })
   return (
-    <ShotEdit shot={shot} like={setup.baseDial(current)} lenses={setup.lensList.length ? setup.lensList : [current]} current={current} iso={setup.iso}
+    <ShotEdit shot={shot} like={setup.baseDial(current)} lenses={setup.lensList.length ? setup.lensList : [current]} current={current} iso={setup.iso} box={setup.film?.iso ?? setup.iso}
       onClose={onClose}
       onSave={(s) => { void save((roll.meterShots ?? []).map((x) => (x.pos === s.pos ? { ...s, edited: true } : x))); onClose(); onToast(`${s.pos}번을 고쳤어요`) }}
       onDelete={() => { void save((roll.meterShots ?? []).filter((x) => x.pos !== pos)); onClose(); onToast(`${pos}번 기록을 지웠어요`) }} />
