@@ -47,7 +47,7 @@ function LoadedCard({ roll }: { roll: Roll }) {
       <Pressable onPress={() => nav.push({ type: 'roll', id: roll.id })} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, opacity: pressed ? 0.85 : 1 })}>
         <View style={{ width: 96 }}>
           {camera ? <CameraCover camera={camera} height={72} /> : <View style={{ height: 72 }} />}
-          <View style={{ position: 'absolute', right: -6, bottom: -8 }}><Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={44} /></View>
+          <View style={{ position: 'absolute', right: 2, bottom: -8 }}><Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={44} /></View>
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text numberOfLines={1} style={{ fontSize: 18, fontWeight: '700', color: c.ink }}>{cameraName(camera, roll)}</Text>

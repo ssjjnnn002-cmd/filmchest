@@ -454,7 +454,7 @@ select.input { appearance: none; -webkit-appearance: none; color: var(--muted); 
 .shooting-main { display: flex; align-items: center; gap: 14px; padding: 16px; border: 0; background: none; text-align: left; cursor: pointer; width: 100%; color: inherit; }
 .shooting-main > svg { color: var(--faint); flex-shrink: 0; }
 .shooting-art { width: 96px; flex-shrink: 0; position: relative; }
-.shooting-can { position: absolute; right: -6px; bottom: -8px; }
+.shooting-can { position: absolute; right: 2px; bottom: -8px; }
 .shooting-actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; padding: 0 16px 16px; }
 .row > svg:last-child:not(:first-child) { color: var(--faint); flex-shrink: 0; }
 .row > .roll-row { flex: 1; }

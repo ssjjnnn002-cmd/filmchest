@@ -95,7 +95,7 @@ struct LoadedRollCard: View {
                 .overlay(alignment: .bottomTrailing) {
                     FilmCanisterView(stock: roll.film, format: roll.format)
                         .frame(width: 40, height: 40)
-                        .offset(x: 10, y: 8)
+                        .offset(x: 2, y: 8) // 오른쪽 글자와 붙지 않게 조금 왼쪽 (웹·갤럭시와 같음)
                 }
             VStack(alignment: .leading, spacing: 4) {
                 Text(roll.cameraName).font(.headline)
