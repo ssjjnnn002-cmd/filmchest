@@ -160,8 +160,8 @@ p { margin: 0; }
 .glass-btn:active:not(:disabled) { transform: scale(0.94); }
 .glass-btn svg { width: 22px; height: 22px; }
 .glass-group { display: inline-flex; border-radius: 22px; padding: 0 4px; }
-.glass-group > button { width: 48px; height: 44px; border: 0; background: none; color: inherit; display: grid; place-items: center; cursor: pointer; }
-.glass-group > button svg { width: 23px; height: 23px; }
+.glass-group > button, .glass-group > div > button { width: 48px; height: 44px; border: 0; background: none; color: inherit; display: grid; place-items: center; cursor: pointer; }
+.glass-group > button svg, .glass-group > div > button svg { width: 23px; height: 23px; }
 .glass-group > button:active { opacity: 0.5; }
 
 /* 예전 머리 (점차 PageHeader로) */
