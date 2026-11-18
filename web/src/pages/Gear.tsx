@@ -21,6 +21,7 @@ import { CustomFilmEdit } from './CustomFilmEdit'
 import { FilmPicker } from '../ui/FilmPicker'
 import { PhotoActions } from '../ui/PhotoActions'
 import { TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../ui/gearExtras'
+import { searchMatch } from '../core/searchAlias'
 
 export type GearKind = 'lens' | 'filter' | 'film'
 const storageName: Record<FilmStorage, string> = { fridge: '냉장고', freezer: '냉동고', drawer: '서랍', room: '상온', custom: '직접 입력' }
@@ -150,7 +151,7 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
   const [edit, setEdit] = useState<string | null>(null)
   const q = search.trim().toLowerCase()
   const keep = (tags: string[] | undefined, text: (string | undefined)[]) =>
-    (!tag || !!tags?.includes(tag)) && (!q || [...text, ...(tags ?? [])].some((t) => t?.toLowerCase().includes(q)))
+    (!tag || !!tags?.includes(tag)) && (!q || searchMatch(q, [...text, ...(tags ?? [])]))
   const lenses = (allLenses ?? []).filter((l) => keep(l.tags, [l.brand, l.model, l.mount, lensSpec(l)]))
   const filters = (allFilters ?? []).filter((f) => keep(f.tags, [f.name, kindOf(f), f.diameter]))
   const lots = (allLots ?? []).filter((l) => keep(undefined, [filmDisplayName(filmById(l.filmId)), storageText(l)]))

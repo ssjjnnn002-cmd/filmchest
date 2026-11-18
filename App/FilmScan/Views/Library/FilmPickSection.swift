@@ -57,7 +57,7 @@ struct FilmPickSection<Footer: View>: View {
         }
         return FilmStockCatalog.allIncludingCustom
             .filter { onFormat != nil || format.accepts($0.formats) }
-            .filter { search.isEmpty || $0.displayName.localizedCaseInsensitiveContains(search) }
+            .filter { search.isEmpty || SearchAlias.matches(search, [$0.displayName, $0.brand, $0.name, String($0.iso)]) }
             .sorted { rank($0) < rank($1) }
     }
 

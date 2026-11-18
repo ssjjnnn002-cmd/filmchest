@@ -1,6 +1,7 @@
 import type { BodyStyle, FilmFormat } from './types'
 import { styleName, formatInfo } from './types'
 import { catalogData } from './cameraData'
+import { searchLatin } from './searchAlias'
 
 /** 앱이 알고 있는 필름 카메라 (iOS 앱과 같은 목록). 배터리는 확실한 것만. */
 export interface CatalogCamera {
@@ -38,13 +39,13 @@ export const catalogBrands = [...new Set(catalog.map((c) => c.brand))].sort()
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, '')
 
 export function brandsMatching(text: string) {
-  const q = text.trim().toLowerCase()
-  return q ? catalogBrands.filter((b) => b.toLowerCase().includes(q)) : catalogBrands
+  const q = norm(searchLatin(text))
+  return q ? catalogBrands.filter((b) => norm(b).includes(q)) : catalogBrands
 }
 
 export function modelsMatching(brand: string, text: string) {
   const b = brand.trim().toLowerCase()
-  const q = norm(text)
+  const q = norm(searchLatin(text)) // 한글로 써도 찾는다 (니콘 → nikon)
   // 다른 이름으로도 찾고, 제조사를 안 썼으면 "제조사+모델"로도 찾는다
   return catalog.filter((c) => (!b || c.brand.toLowerCase() === b) && (!q || norm(c.model).includes(q)
     || (c.aka ?? []).some((a) => norm(a).includes(q)) || (!b && norm(`${c.brand}${c.model}`).includes(q))))

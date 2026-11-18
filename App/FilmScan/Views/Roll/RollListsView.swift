@@ -408,7 +408,7 @@ struct RollsView: View {
             if !search.isEmpty {
                 let text = [r.filmName, r.cameraName, r.labName ?? "", r.note ?? "",
                             r.locations.map { "\($0.name) \($0.memo ?? "")" }.joined(separator: " "), r.tags.joined(separator: " ")]
-                if !text.contains(where: { $0.localizedCaseInsensitiveContains(search) }) { return false }
+                if !SearchAlias.matches(search, text) { return false }
             }
             return true
         }

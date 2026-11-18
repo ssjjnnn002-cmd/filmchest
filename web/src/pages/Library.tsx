@@ -16,6 +16,7 @@ import { Settings } from './Settings'
 import { getPref, setPref } from '../platform'
 import { cameraPhotoURL } from '../photoStore'
 import { seedExample } from '../seed'
+import { searchMatch } from '../core/searchAlias'
 
 export const batteryDue = (c: Camera) =>
   !!c.batteryAt && !(c.battery ?? '').startsWith('필요 없음') && Date.now() - c.batteryAt > 365 * 864e5
@@ -83,7 +84,7 @@ export function Library() {
     .map((id) => byId.get(id))
     .filter((c): c is Camera => !!c)
     .filter((c) => editing || !tag || (c.tags ?? []).includes(tag))
-    .filter((c) => editing || !query || [c.brand, c.model, c.nickname, c.mount, c.fixedLens, ...(c.tags ?? [])].some((t) => t?.toLowerCase().includes(query)))
+    .filter((c) => editing || !query || searchMatch(query, [c.brand, c.model, c.nickname, c.mount, c.fixedLens, ...(c.tags ?? [])]))
 
   const toggleLayout = () => {
     const next = layout === 'grid' ? 'list' : 'grid'

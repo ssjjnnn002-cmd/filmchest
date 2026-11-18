@@ -12,6 +12,7 @@ import { RollCard, RollRow } from '../ui/RollRow'
 import { tagSections } from '../ui/gearExtras'
 import { getPref, setPref } from '../platform'
 import { ProjectStrip } from './Projects'
+import { searchMatch } from '../core/searchAlias'
 
 type Grouping = 'month' | 'quarter' | 'half' | 'year' | 'tag'
 const groupingName: Record<Grouping, string> = { month: '월', quarter: '분기', half: '반기', year: '년', tag: '태그' }
@@ -62,7 +63,7 @@ export function Rolls() {
     if (tag && !r.tags?.includes(tag)) return false
     if (search) {
       const text = [rollFilmName(r), cameraName(r), r.lab, r.note, ...r.locations.map((l) => `${l.name} ${l.memo ?? ''}`), ...(r.tags ?? [])].join(' ').toLowerCase()
-      if (!text.includes(search.toLowerCase())) return false
+      if (!searchMatch(search, [text])) return false
     }
     return true
   }), [rolls, favoritesOnly, filmId, cameraId, status, tag, search, cameras])

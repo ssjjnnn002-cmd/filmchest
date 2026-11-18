@@ -11,6 +11,7 @@ import { filmLotSortTitle, filmPickSections, filmStockGroupOf, filmStockGroups, 
 import { formatFamily } from '../core/types'
 import { getPref, setPref } from '../platform'
 import { Canister } from './common'
+import { searchMatch } from '../core/searchAlias'
 
 const sorts = Object.keys(filmLotSortTitle) as FilmLotSort[]
 
@@ -56,7 +57,7 @@ export function FilmPicker({ format, anyFormat, filmId, onPick, onAddCustom, onE
     const rank = (id: string) => [(stock[id] ?? 0) > 0 ? 0 : 1, -(used[id] ?? 0), at(recent, id), at(popularFilms, id)]
     return allFilms()
       .filter((f) => anyFormat || filmFits(f.formats, format))
-      .filter((f) => !search || filmDisplayName(f).toLowerCase().includes(search.toLowerCase()))
+      .filter((f) => !search || searchMatch(search, [filmDisplayName(f), f.brand, f.name, String(f.iso)]))
       .sort((a, b) => { const ra = rank(a.id), rb = rank(b.id); return ra[0] - rb[0] || ra[1] - rb[1] || ra[2] - rb[2] || ra[3] - rb[3] })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rolls, format, anyFormat, search, customRows, stock, used])

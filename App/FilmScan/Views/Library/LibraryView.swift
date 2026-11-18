@@ -49,7 +49,7 @@ struct LibraryView: View {
             guard c.deletedAt == nil else { return false }
             if editing { return true }
             if let tagFilter, !c.tags.contains(tagFilter) { return false }
-            return q.isEmpty || ([c.displayName, c.nickname ?? "", c.mount ?? "", c.fixedLensName ?? ""] + c.tags).contains { $0.localizedCaseInsensitiveContains(q) }
+            return q.isEmpty || SearchAlias.matches(q, [c.displayName, c.nickname, c.mount, c.fixedLensName] + c.tags)
         }
     }
     private var hasCameras: Bool { cameras.contains { $0.deletedAt == nil } }

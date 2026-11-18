@@ -21,6 +21,7 @@ import { usePhotoIsCutout } from '../files'
 import { FilmLotMenu, GroupMenu, GroupTitle, TagFilter, TagLine, migrateAccessories, tagSections } from '../gearExtras'
 import { cameraGroups, cameraKey, groupSections, type GearGroup, filmStockGroupOf, type FilmLotSort } from '../core/gearGroup'
 import { Settings } from './Settings'
+import { searchMatch } from '../core/searchAlias'
 
 export const batteryDue = (c: Camera) =>
   !!c.batteryAt && !(c.battery ?? '').startsWith('필요 없음') && Date.now() - c.batteryAt > 365 * 864e5
@@ -76,7 +77,7 @@ export function Library() {
     .map((id) => byId.get(id))
     .filter((x): x is Camera => !!x)
     .filter((x) => editing || !tag || (x.tags ?? []).includes(tag))
-    .filter((x) => editing || !query || [x.brand, x.model, x.nickname, x.mount, x.fixedLens, ...(x.tags ?? [])].some((t) => t?.toLowerCase().includes(query)))
+    .filter((x) => editing || !query || searchMatch(query, [x.brand, x.model, x.nickname, x.mount, x.fixedLens, ...(x.tags ?? [])]))
 
   const toggleLayout = () => {
     const next = layout === 'grid' ? 'list' : 'grid'

@@ -43,15 +43,15 @@ enum CameraCatalog {
 
     /// 제조사 입력 자동완성
     static func brands(matching text: String) -> [String] {
-        let q = text.trimmingCharacters(in: .whitespaces).lowercased()
+        let q = SearchAlias.norm(SearchAlias.latin(text.trimmingCharacters(in: .whitespaces)))
         guard !q.isEmpty else { return [] }
-        return brands.filter { $0.lowercased().hasPrefix(q) || $0.lowercased().contains(q) }
+        return brands.filter { SearchAlias.norm($0).contains(q) }
     }
 
     /// 모델 입력 자동완성 (제조사가 있으면 그 제조사 안에서)
     static func models(brand: String, matching text: String) -> [CatalogCamera] {
         let b = brand.trimmingCharacters(in: .whitespaces).lowercased()
-        let q = text.trimmingCharacters(in: .whitespaces).lowercased().replacingOccurrences(of: " ", with: "")
+        let q = SearchAlias.latin(text.trimmingCharacters(in: .whitespaces)).lowercased().replacingOccurrences(of: " ", with: "") // 한글로 써도 찾는다
         func norm(_ s: String) -> String { s.lowercased().replacingOccurrences(of: " ", with: "") }
         // 다른 이름(별칭)으로도 찾는다. 제조사를 안 썼으면 "브랜드+모델"로도 찾는다.
         return all.filter { cam in

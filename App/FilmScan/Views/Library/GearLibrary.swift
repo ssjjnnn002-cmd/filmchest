@@ -177,7 +177,7 @@ struct GearBrowser: View {
     private func keep(_ tags: [String], _ text: [String]) -> Bool {
         if let tag, !tags.contains(tag) { return false }
         let q = search.trimmingCharacters(in: .whitespaces)
-        return q.isEmpty || (text + tags).contains { $0.localizedCaseInsensitiveContains(q) }
+        return q.isEmpty || SearchAlias.matches(q, text + tags)
     }
     private var lenses: [LensItem] { allLenses.filter { keep($0.tags, [$0.displayName, $0.specLine, $0.mount]) } }
     private var filters: [FilterItem] { allFilters.filter { keep($0.tags, [$0.name, $0.kindName, $0.diameterText]) } }

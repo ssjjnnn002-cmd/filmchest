@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { moreFilms } from './films.mjs'
+import { searchAliases } from './search-aliases.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const header = '// 자동 생성 파일 — 직접 고치지 말고 catalog/films.mjs를 고친 뒤 `node catalog/generate-films.mjs` 실행\n'
@@ -57,4 +58,48 @@ extension FilmStock {
 }
 `
 fs.writeFileSync(path.join(root, 'Packages/FilmScanCore/Sources/FilmScanCore/FilmStockCatalogMore.swift'), swift)
-console.log(`필름 ${moreFilms.length}종 추가 (단종 ${disc.length})`)
+// 한글 검색 별칭 (웹·갤럭시 TS, 아이폰 Swift 같은 표)
+const aliasPairs = Object.entries(searchAliases).sort((a, b) => b[0].length - a[0].length)
+const searchHeader = '// 자동 생성 파일 — 직접 고치지 말고 catalog/search-aliases.mjs를 고친 뒤 `node catalog/generate-films.mjs` 실행\n'
+fs.writeFileSync(path.join(root, 'web/src/core/searchAlias.ts'), `${searchHeader}// 한글로 검색해도 찾게 (표시는 영어). 낱말마다: 영어로 바꾼 것 또는 그대로가 칸들 어딘가에 있으면 맞음
+const aliases: [string, string][] = ${JSON.stringify(aliasPairs)}
+
+const norm = (s: string) => s.toLowerCase().replace(/[\\s\\-.·/&']+/g, '')
+const latin = (s: string) => aliases.reduce((t, [ko, en]) => t.split(ko).join(en), s.toLowerCase())
+
+/** 검색어(한글·영어 섞어도)가 칸들(fields)에 맞는지 */
+export function searchMatch(query: string, fields: (string | undefined | null)[]): boolean {
+  const words = query.trim().split(/\\s+/).filter(Boolean)
+  if (!words.length) return true
+  const hay = norm(fields.filter(Boolean).join(' '))
+  return words.every((w) => hay.includes(norm(latin(w))) || hay.includes(norm(w)))
+}
+
+/** 한글 이름을 영어로 바꾼 검색어 (자동 완성 목록용) */
+export const searchLatin = (query: string) => latin(query.trim())
+`)
+const sq = (v) => JSON.stringify(v)
+fs.writeFileSync(path.join(root, 'App/Shared/Model/SearchAlias.swift'), `${searchHeader}import Foundation
+
+/// 한글로 검색해도 찾게 (표시는 영어). 웹 core/searchAlias.ts와 같은 표·같은 규칙
+enum SearchAlias {
+    static let aliases: [(String, String)] = [
+${aliasPairs.map(([k, v]) => `        (${sq(k)}, ${sq(v)}),`).join('\n')}
+    ]
+
+    static func norm(_ s: String) -> String {
+        s.lowercased().replacingOccurrences(of: "[\\\\s\\\\-.·/&']+", with: "", options: .regularExpression)
+    }
+    static func latin(_ s: String) -> String {
+        aliases.reduce(s.lowercased()) { $0.replacingOccurrences(of: $1.0, with: $1.1) }
+    }
+    /// 검색어(한글·영어 섞어도)가 칸들에 맞는지
+    static func matches(_ query: String, _ fields: [String?]) -> Bool {
+        let words = query.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        if words.isEmpty { return true }
+        let hay = norm(fields.compactMap { $0 }.joined(separator: " "))
+        return words.allSatisfy { hay.contains(norm(latin($0))) || hay.contains(norm($0)) }
+    }
+}
+`)
+console.log(`필름 ${moreFilms.length}종 추가 (단종 ${disc.length}), 검색 별칭 ${aliasPairs.length}개`)
