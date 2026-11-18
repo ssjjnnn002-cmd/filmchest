@@ -56,7 +56,7 @@ export const moreFilms = [
   ['ilford-sfx-200', 'Ilford', 'SFX 200', 200, 'B&W', 'both', [K, '#B22222', '#F5F5F2', '#FFFFFF', CAP]],
   ['ilford-ortho-plus', 'Ilford', 'Ortho Plus 80', 80, 'B&W', 'sheets', [K, '#2E8B57', '#F5F5F2', '#FFFFFF', CAP]],
   ['kentmere-pan-100', 'Kentmere', 'Pan 100', 100, 'B&W', '35', [W, '#1F7A8C', K, '#FFFFFF']],
-  ['harman-phoenix-ii-200', 'Harman', 'Phoenix II 200', 200, 'C-41', '35', ['#F15A22', '#F5F5F2', '#FFFFFF', '#F15A22']],
+  ['harman-phoenix-ii-200', 'Harman', 'Phoenix II 200', 200, 'C-41', 'both', ['#F15A22', '#F5F5F2', '#FFFFFF', '#F15A22']],
 
   // ── CineStill · Lomography
   ['cinestill-bwxx', 'CineStill', 'BwXX', 250, 'B&W', 'both', [K, '#9A9A9A', '#FFFFFF', K, CAP]],
@@ -81,7 +81,7 @@ export const moreFilms = [
   ['adox-chs-100-ii', 'Adox', 'CHS 100 II', 100, 'B&W', 'sheets', ['#F2A71B', K, K, '#F2A71B']],
   ['adox-silvermax-100', 'Adox', 'Silvermax 100', 100, 'B&W', '35', ['#9A9A9A', K, K, '#FFFFFF']],
   ['adox-scala-50', 'Adox', 'Scala 50', 50, 'B&W', 'both', [K, '#E2231A', '#FFFFFF', '#FFFFFF', CAP]],
-  ['adox-color-mission-200', 'Adox', 'Color Mission 200', 200, 'C-41', 'both', ['#F2A71B', '#1F4E9C', K, '#FFFFFF'], true],
+  ['adox-color-mission-200', 'Adox', 'Color Mission 200', 200, 'C-41', 'both', ['#F2A71B', '#1F4E9C', K, '#FFFFFF']],
   ['agfa-apx-100', 'AgfaPhoto', 'APX 100', 100, 'B&W', 'both', [W, '#E2231A', K, '#FFFFFF']],
   ['agfa-apx-400', 'AgfaPhoto', 'APX 400', 400, 'B&W', '35', [W, '#1F4E9C', K, '#FFFFFF']],
   ['agfa-ct-precisa-100', 'AgfaPhoto', 'CT Precisa 100', 100, 'E-6', '35', ['#1F4E9C', '#E2231A', '#FFFFFF', '#FFFFFF']],

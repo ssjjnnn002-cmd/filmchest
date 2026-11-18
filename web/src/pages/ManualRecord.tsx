@@ -338,7 +338,8 @@ function Recorder({ roll, camera, allLenses, onClose }: {
             <h2 className="section-title"><span>컷 기록</span><span className="sub" style={{ fontWeight: 600 }}>{shots.length} / {frames}컷</span></h2>
             <div className="group">
               {shots.length === 0 && <div className="row static sub">아직 기록한 컷이 없어요.</div>}
-              {[...shots].sort((a, b) => a.pos - b.pos).map((s) => (
+              {/* 마지막에 찍은 컷이 맨 위 */}
+              {[...shots].sort((a, b) => b.order - a.order || b.pos - a.pos).map((s) => (
                 <button key={s.pos} className="row" onClick={() => { setSheet(undefined); setEditing(s.pos) }}>
                   <span className="grow">{meterFrameTitle(s.pos, !!roll.meterPrewind)}<div className="sub">{shotRowMeta(s)}</div></span>
                   <span className="value">{exposureText(s)}</span>

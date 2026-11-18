@@ -90,6 +90,7 @@ export const canisterShots: Record<string, number> = {
   'fuji-velvia-50-810': require('../assets/canisters/fuji-velvia-50-810.png'),
   'harman-phoenix-200-120': require('../assets/canisters/harman-phoenix-200-120.png'),
   'harman-phoenix-200-135': require('../assets/canisters/harman-phoenix-200-135.png'),
+  'harman-phoenix-ii-200-120': require('../assets/canisters/harman-phoenix-ii-200-120.png'),
   'harman-phoenix-ii-200-135': require('../assets/canisters/harman-phoenix-ii-200-135.png'),
   'ilford-delta-100-120': require('../assets/canisters/ilford-delta-100-120.png'),
   'ilford-delta-100-135': require('../assets/canisters/ilford-delta-100-135.png'),

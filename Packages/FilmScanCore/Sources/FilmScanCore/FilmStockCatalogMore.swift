@@ -84,7 +84,7 @@ extension FilmStockCatalog {
                   style: CanisterStyle(body: "#1B1B1B", band: "#2E8B57", text: "#F5F5F2", bandText: "#FFFFFF", cap: "#111111")),
         FilmStock(id: "kentmere-pan-100", brand: "Kentmere", name: "Pan 100", iso: 100, process: .bw, formats: [.f135],
                   style: CanisterStyle(body: "#F5F5F2", band: "#1F7A8C", text: "#1B1B1B", bandText: "#FFFFFF")),
-        FilmStock(id: "harman-phoenix-ii-200", brand: "Harman", name: "Phoenix II 200", iso: 200, process: .c41, formats: [.f135],
+        FilmStock(id: "harman-phoenix-ii-200", brand: "Harman", name: "Phoenix II 200", iso: 200, process: .c41, formats: [.f135, .f120_66],
                   style: CanisterStyle(body: "#F15A22", band: "#F5F5F2", text: "#FFFFFF", bandText: "#F15A22")),
         FilmStock(id: "cinestill-bwxx", brand: "CineStill", name: "BwXX", iso: 250, process: .bw, formats: [.f135, .f120_66],
                   style: CanisterStyle(body: "#1B1B1B", band: "#9A9A9A", text: "#FFFFFF", bandText: "#1B1B1B", cap: "#111111")),
@@ -167,7 +167,7 @@ extension FilmStockCatalog {
     ]
 
     /// 단종됐지만 기한 지난 재고로 아직 구할 수 있는 필름
-    public static let discontinuedIDs: Set<String> = ["fuji-pro-400h", "kodak-portra-160nc", "kodak-portra-160vc", "kodak-portra-400nc", "kodak-portra-400vc", "kodak-portra-400uc", "kodak-ektar-25", "kodak-gold-100", "kodak-max-800", "kodak-ektacolor-pro-160", "kodak-bw400cn", "kodak-plus-x-125", "kodak-ektachrome-e100vs", "kodak-ektachrome-e100g", "kodak-elite-chrome-100", "fuji-superia-800", "fuji-superia-1600", "fuji-superia-venus-800", "fuji-superia-reala-100", "fuji-natura-1600", "fuji-pro-160ns", "fuji-neopan-acros-100", "fuji-neopan-400", "fuji-neopan-1600", "fuji-velvia-100f", "fuji-astia-100f", "fuji-sensia-100", "fuji-provia-400x", "adox-color-mission-200", "agfa-vista-plus-200", "agfa-vista-plus-400", "agfa-ultra-100", "agfa-rsx-ii-100", "konica-centuria-200", "konica-centuria-400"]
+    public static let discontinuedIDs: Set<String> = ["fuji-pro-400h", "kodak-portra-160nc", "kodak-portra-160vc", "kodak-portra-400nc", "kodak-portra-400vc", "kodak-portra-400uc", "kodak-ektar-25", "kodak-gold-100", "kodak-max-800", "kodak-ektacolor-pro-160", "kodak-bw400cn", "kodak-plus-x-125", "kodak-ektachrome-e100vs", "kodak-ektachrome-e100g", "kodak-elite-chrome-100", "fuji-superia-800", "fuji-superia-1600", "fuji-superia-venus-800", "fuji-superia-reala-100", "fuji-natura-1600", "fuji-pro-160ns", "fuji-neopan-acros-100", "fuji-neopan-400", "fuji-neopan-1600", "fuji-velvia-100f", "fuji-astia-100f", "fuji-sensia-100", "fuji-provia-400x", "agfa-vista-plus-200", "agfa-vista-plus-400", "agfa-ultra-100", "agfa-rsx-ii-100", "konica-centuria-200", "konica-centuria-400"]
 }
 
 extension FilmStock {

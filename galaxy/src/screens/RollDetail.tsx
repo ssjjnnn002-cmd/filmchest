@@ -298,7 +298,8 @@ function RollCameraPick({ roll, onClose }: { roll: Roll; onClose: () => void }) 
 function ShotsSection({ roll, format, onEdit, onAll }: { roll: Roll; format: FilmFormat; onEdit: (pos: number) => void; onAll: () => void }) {
   // 컷 번호 순서 (역순 감기여도 1번부터). 촬영 중이면 최근 5컷, 다 찍은 롤은 전부 (아이폰과 같음)
   const num = (x: MeterShot) => Number(meterFrameTitle(x.pos, !!roll.meterPrewind).replace(/\D/g, '')) || x.pos
-  const byNumber = (list: MeterShot[]) => [...list].sort((a, b) => num(a) - num(b))
+  // 큰 번호(최근)부터: 36, 35, 34 … (웹·아이폰과 같음)
+  const byNumber = (list: MeterShot[]) => [...list].sort((a, b) => num(b) - num(a))
   const shots = byNumber(roll.meterShots ?? [])
   const recent = roll.status === 'loaded' && shots.length > 6 ? byNumber([...shots].sort((a, b) => b.order - a.order).slice(0, 5)) : shots
   const { capacity } = meterProgress(shots.length, format)
@@ -324,7 +325,7 @@ function ShotRow({ shot, prewind, onPress }: { shot: MeterShot; prewind: boolean
 /** 컷 기록 전체 (찍은 순서) */
 function AllShots({ roll, format, onEdit }: { roll: Roll; format: FilmFormat; onEdit: (pos: number) => void }) {
   const c = useTheme()
-  const shots = meterShotsByOrder(roll.meterShots)
+  const shots = meterShotsByOrder(roll.meterShots).reverse() // 마지막에 찍은 컷부터
   const { shot, capacity, percent } = meterProgress(shots.length, format)
   const prewind = !!roll.meterPrewind
   return (

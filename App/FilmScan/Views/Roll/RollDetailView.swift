@@ -365,7 +365,8 @@ struct RollDetailView: View {
     private func byNumber(_ list: [MeterShot]) -> [MeterShot] {
         let prewind = roll.meterPrewind == true
         func n(_ s: MeterShot) -> Int { Int(MeterShot.frameTitle(s.pos, prewind: prewind).filter(\.isNumber)) ?? s.pos }
-        return list.sorted { n($0) < n($1) }
+        // 큰 번호(최근)부터: 36, 35, 34 … (웹·갤럭시와 같음)
+        return list.sorted { n($0) > n($1) }
     }
 
     /// 롤 화면의 컷 기록: 촬영 중이면 최근 5컷(넘으면 전체 보기), 다 찍은 롤은 1번부터 전부
@@ -578,9 +579,10 @@ struct RollShotsView: View {
     }
 
     private var meterShots: some View {
-        let shots = roll.meterShots.sorted { ($0.order, $0.pos) < ($1.order, $1.pos) }
+        // 마지막에 찍은 컷부터 (웹·갤럭시와 같음)
+        let shots = roll.meterShots.sorted { ($0.order, $0.pos) > ($1.order, $1.pos) }
         let prewind = roll.meterPrewind == true
-        return Section("찍은 순서") {
+        return Section("찍은 순서 · 최근부터") {
             if shots.isEmpty {
                 Text("아직 기록한 컷이 없어요. 상세 기록에서 찍으면 여기에 쌓여요.")
                     .foregroundStyle(.secondary)

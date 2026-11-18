@@ -370,7 +370,11 @@ struct LibraryView: View {
         Button { router.loadFilm() } label: {
             HStack(spacing: 14) {
                 // 글씨 없는 필름통 그림 (세 앱 같은 그림)
-                Image("filmbox-plain-canister").resizable().scaledToFit()
+                // 앱에 낱장으로 넣은 PNG라 UIImage로 읽는다 (Image("…")는 에셋 카탈로그만 찾는다)
+                Group {
+                    if let ui = UIImage(named: "filmbox-plain-canister") { Image(uiImage: ui).resizable().scaledToFit() }
+                    else { Image(systemName: "film").resizable().scaledToFit().padding(6) }
+                }
                     .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("필름 장착하기").font(.headline)

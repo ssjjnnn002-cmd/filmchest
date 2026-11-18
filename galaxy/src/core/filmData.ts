@@ -44,7 +44,7 @@ export const moreFilmRows: [string, string, string, number, FilmProcess, FilmFor
   ["ilford-sfx-200","Ilford","SFX 200",200,"B&W",["135","120-66"],["#1B1B1B","#B22222","#F5F5F2","#FFFFFF","#111111"]],
   ["ilford-ortho-plus","Ilford","Ortho Plus 80",80,"B&W",["135","120-66","sheet-45","sheet-810"],["#1B1B1B","#2E8B57","#F5F5F2","#FFFFFF","#111111"]],
   ["kentmere-pan-100","Kentmere","Pan 100",100,"B&W",["135"],["#F5F5F2","#1F7A8C","#1B1B1B","#FFFFFF"]],
-  ["harman-phoenix-ii-200","Harman","Phoenix II 200",200,"C-41",["135"],["#F15A22","#F5F5F2","#FFFFFF","#F15A22"]],
+  ["harman-phoenix-ii-200","Harman","Phoenix II 200",200,"C-41",["135","120-66"],["#F15A22","#F5F5F2","#FFFFFF","#F15A22"]],
   ["cinestill-bwxx","CineStill","BwXX",250,"B&W",["135","120-66"],["#1B1B1B","#9A9A9A","#FFFFFF","#1B1B1B","#111111"]],
   ["lomo-color-92","Lomography","Color '92 400",400,"C-41",["135","120-66"],["#F4C430","#E2231A","#1B1B1B","#FFFFFF"]],
   ["lomo-metropolis","Lomography","LomoChrome Metropolis",200,"C-41",["135","120-66"],["#3A3A3A","#9A9A9A","#F5F5F2","#1B1B1B"]],
@@ -87,4 +87,4 @@ export const moreFilmRows: [string, string, string, number, FilmProcess, FilmFor
 ]
 
 /** 단종됐지만 기한 지난 재고로 아직 구할 수 있는 필름 */
-export const discontinuedFilmIds = new Set<string>(["fuji-pro-400h","kodak-portra-160nc","kodak-portra-160vc","kodak-portra-400nc","kodak-portra-400vc","kodak-portra-400uc","kodak-ektar-25","kodak-gold-100","kodak-max-800","kodak-ektacolor-pro-160","kodak-bw400cn","kodak-plus-x-125","kodak-ektachrome-e100vs","kodak-ektachrome-e100g","kodak-elite-chrome-100","fuji-superia-800","fuji-superia-1600","fuji-superia-venus-800","fuji-superia-reala-100","fuji-natura-1600","fuji-pro-160ns","fuji-neopan-acros-100","fuji-neopan-400","fuji-neopan-1600","fuji-velvia-100f","fuji-astia-100f","fuji-sensia-100","fuji-provia-400x","adox-color-mission-200","agfa-vista-plus-200","agfa-vista-plus-400","agfa-ultra-100","agfa-rsx-ii-100","konica-centuria-200","konica-centuria-400"])
+export const discontinuedFilmIds = new Set<string>(["fuji-pro-400h","kodak-portra-160nc","kodak-portra-160vc","kodak-portra-400nc","kodak-portra-400vc","kodak-portra-400uc","kodak-ektar-25","kodak-gold-100","kodak-max-800","kodak-ektacolor-pro-160","kodak-bw400cn","kodak-plus-x-125","kodak-ektachrome-e100vs","kodak-ektachrome-e100g","kodak-elite-chrome-100","fuji-superia-800","fuji-superia-1600","fuji-superia-venus-800","fuji-superia-reala-100","fuji-natura-1600","fuji-pro-160ns","fuji-neopan-acros-100","fuji-neopan-400","fuji-neopan-1600","fuji-velvia-100f","fuji-astia-100f","fuji-sensia-100","fuji-provia-400x","agfa-vista-plus-200","agfa-vista-plus-400","agfa-ultra-100","agfa-rsx-ii-100","konica-centuria-200","konica-centuria-400"])

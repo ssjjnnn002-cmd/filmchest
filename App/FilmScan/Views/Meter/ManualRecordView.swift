@@ -876,7 +876,8 @@ private struct RollShotsSheet: View {
                     .listRowBackground(Color.clear)
                 }
                 Section {
-                    let shots = m.shots.sorted { $0.pos < $1.pos }
+                    // 마지막에 찍은 컷이 맨 위, 아래로 갈수록 먼저 찍은 컷
+                    let shots = m.shots.sorted { ($0.order, $0.pos) > ($1.order, $1.pos) }
                     if shots.isEmpty {
                         Text("아직 기록한 컷이 없어요.").foregroundStyle(.secondary)
                     }

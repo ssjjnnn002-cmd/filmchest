@@ -221,7 +221,7 @@ function instantBox(ctx: Ctx, b: Box, bg: string, band: string, ink: string) {
 const KY = '#F6C000', KP = '#9B6CB6'
 function paint(ctx: Ctx, b: Box) {
   const st = b.st, s = st.style, id = st.id
-  if (/portra/.test(id)) return proWide(ctx, b, id.includes('800') ? '#B8732E' : id.includes('160') ? '#C9A3D8' : KP, KY, '#ffffff', '#1a1a1a')
+  if (/portra/.test(id)) return proWide(ctx, b, id.includes('800') ? '#5B5FB8' : id.includes('160') ? '#C9A3D8' : KP, KY, '#ffffff', '#1a1a1a')
   if (/ektacolor|kodak-proimage/.test(id)) return proWide(ctx, b, s.band, KY, '#ffffff', '#1a1a1a')
   if (/ektar/.test(id)) return darkCenter(ctx, b, '#5A1A1E', KY, '#f3e6d8', '#B0161E')
   if (/ektachrome|elite-chrome/.test(id)) return darkCenter(ctx, b, '#1C1C1C', KY, '#f3f3f3', '#1a1a1a')
@@ -255,11 +255,14 @@ function paint(ctx: Ctx, b: Box) {
   }
   if (st.brand === 'Ilford' || st.brand === 'Kentmere') {
     if (/delta|xp2/.test(id)) return outlineDelta(ctx, b, '#ECECEA', '#141414', s.band === '#1B1B1B' ? '#9A9A9A' : s.band)
-    return bwHeavy(ctx, b, '#f7f7f4', '#141414', id.includes('hp5') ? '#2BB673' : s.band)
+    // Kentmere는 흰 바탕에 보라 띠 (실물 상자)
+    return bwHeavy(ctx, b, '#f7f7f4', '#141414', id.includes('hp5') ? '#2BB673' : st.brand === 'Kentmere' ? '#7B3F98' : s.band)
   }
   if (st.process === 'instant') return instantBox(ctx, b, '#f7f7f4', s.band, '#1a1a1a')
   if (st.process === 'B&W') return /adox|rollei|foma|kosmo|jch|shanghai|ferrania|agfa/.test(id) ? bwHeavy(ctx, b, s.body === '#1B1B1B' ? '#f4f4f1' : s.body, '#141414', s.band) : bwHeavy(ctx, b, '#f4f4f1', '#141414', s.band)
   if (st.process === 'E-6') return slidePanel(ctx, b, s.body, s.band, '#ffffff', '#ffffff')
+  // Harman Phoenix II: 짙은 남색 바탕 (실물 상자)
+  if (id === 'harman-phoenix-ii-200') return boldWide(ctx, b, '#1E2B57', '#ffffff', '#9FC3FF')
   // 그 밖의 컬러: 꽉 찬 바탕 + 넓은 이름
   const bg = /F5F5F2|F4EFE4|EDEDED/i.test(s.body) ? s.band : s.body
   return boldWide(ctx, b, bg, '#ffffff', /F5F5F2|FFFFFF/i.test(s.bandText) && bg === s.band ? '#ffffff' : s.bandText === bg ? '#ffffff' : s.bandText)

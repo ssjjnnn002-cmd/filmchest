@@ -329,7 +329,8 @@ function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: C
           <RollSheetHead film={film} format={rollCameraFormat(camera, roll)} line1={`ISO ${box} · ${cameraName(camera, roll)}`} line2={lens.name} count={`${shots.length} / ${frames}컷`} />
           <Group>
             {shots.length === 0 ? <Row static><RowText sub="">아직 기록한 컷이 없어요.</RowText></Row> : null}
-            {[...shots].sort((a, b) => a.pos - b.pos).map((s) => (
+            {/* 마지막에 찍은 컷이 맨 위 */}
+            {[...shots].sort((a, b) => b.order - a.order || b.pos - a.pos).map((s) => (
               <Row key={s.pos} onPress={() => { setSheet(undefined); setEditing(s.pos) }} value={exposureText(s)}>
                 <RowText sub={shotRowMeta(s)}>{meterFrameTitle(s.pos, !!roll.meterPrewind)}</RowText>
               </Row>
