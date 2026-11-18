@@ -403,9 +403,9 @@ function CameraCard({ camera, roll }: { camera: Camera; roll?: Roll }) {
     <div className="card">
       <div className={`cover ${bleed ? 'bleed' : ''}`} onClick={open}>{bleed ? <CameraCover camera={camera} height={136} fill /> : <CameraCover camera={camera} />}</div>
       <div className="name" onClick={open}>
+        {/* 브랜드는 이름 위에 작게 (필름·렌즈와 같은 방식, 아이폰과 같음) */}
+        <small className="lot-brand">{camera.brand || '\u00a0'}{batteryDue(camera) && <> <span className="battery-due">배터리 교체</span></>}</small>
         <b className="truncate">{camera.model}</b>
-        <span className="sub">{camera.brand}</span>{' '}
-        {batteryDue(camera) && <span className="battery-due">배터리 교체</span>}
         <TagLine tags={camera.tags} />
       </div>
       <hr />
@@ -429,7 +429,8 @@ function CameraRow({ camera, roll }: { camera: Camera; roll?: Roll }) {
       <button className="row" style={{ padding: 0, minHeight: 0 }} onClick={() => nav.push({ type: 'camera', id: camera.id })}>
         <div style={{ width: 68, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}><CameraCover camera={camera} height={52} fill={bleed} /></div>
         <div className="grow">
-          <b className="truncate" style={{ display: 'block', fontWeight: 600 }}>{camera.brand} {camera.model}</b>
+          {camera.brand && <small className="lot-brand">{camera.brand}</small>}
+          <b className="truncate" style={{ display: 'block', fontWeight: 600 }}>{camera.model || camera.brand}</b>
           <span className="sub truncate" style={roll ? { color: 'var(--safelight)' } : undefined}>
             {roll ? rollFilmName(roll) : '비어 있음'}{batteryDue(camera) && <span className="battery-due"> · 배터리 교체</span>}
           </span>

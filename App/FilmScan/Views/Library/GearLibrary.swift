@@ -326,11 +326,12 @@ private struct LensGearCard: View {
             } else {
                 GearPhotoThumb(data: lens.photo, symbol: "camera.aperture", card: true)
             }
-            Text(lens.model.isEmpty ? "렌즈" : lens.model).font(.headline).lineLimit(2)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .topLeading)
-            Text(lens.brand.nilIfBlank ?? " ")
-                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                .opacity(lens.brand.nilIfBlank == nil ? 0 : 1)
+            // 브랜드는 이름 위에 작게 (필름·카메라와 같은 방식)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(lens.brand.nilIfBlank ?? " ").font(.caption.weight(.medium)).foregroundStyle(.secondary).lineLimit(1)
+                Text(lens.model.isEmpty ? "렌즈" : lens.model).font(.headline).lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, minHeight: 62, alignment: .topLeading)
             Text(lens.specLine.isEmpty ? " " : lens.specLine)
                 .font(.caption2).foregroundStyle(.secondary).lineLimit(2, reservesSpace: true)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -350,8 +351,11 @@ private struct LensGearRow: View {
                 else { GearPhotoThumb(data: lens.photo, symbol: "camera.aperture") }
             }
             .frame(width: 68, height: 52).clipShape(RoundedRectangle(cornerRadius: 8))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(lens.displayName.trimmingCharacters(in: .whitespaces).isEmpty ? "렌즈" : lens.displayName)
+            VStack(alignment: .leading, spacing: 2) {
+                if let brand = lens.brand.nilIfBlank {
+                    Text(brand).font(.caption2.weight(.medium)).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Text(lens.model.nilIfBlank ?? "렌즈")
                     .font(.subheadline.weight(.semibold)).lineLimit(1)
                 Text(lens.specLine.nilIfBlank ?? lens.mount.nilIfBlank ?? " ").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 TagLine(tags: lens.tags)
@@ -433,8 +437,12 @@ private struct FilmGearRow: View {
             FilmCanisterView(stock: FilmStockCatalog.stock(id: lot.filmStockID), format: lot.format, fill: true)
                 .frame(width: 64, height: 40)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(lot.title).font(.subheadline.weight(.semibold)).lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                let stock = FilmStockCatalog.stock(id: lot.filmStockID)
+                if let brand = stock?.brand.nilIfBlank {
+                    Text(brand).font(.caption2.weight(.medium)).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Text(stock.map { $0.brand.isEmpty ? $0.displayName : $0.name } ?? lot.title).font(.subheadline.weight(.semibold)).lineLimit(1)
                 Text(lot.metaLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)

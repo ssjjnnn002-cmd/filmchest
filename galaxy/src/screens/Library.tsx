@@ -317,10 +317,11 @@ function CameraCard({ camera, roll, editing }: { camera: Camera; roll?: Roll; ed
         {bleed ? <CameraCover camera={camera} height={136} fill /> : <CameraCover camera={camera} />}
       </Pressable>
       <Pressable disabled={editing} onPress={open} style={{ minWidth: 0 }}>
-        <Text numberOfLines={1} style={{ fontSize: 19, fontWeight: '700', color: c.ink }}>{camera.model}</Text>
-        <Text numberOfLines={1} style={{ fontSize: 15, color: c.muted }}>
-          {camera.brand}{batteryDue(camera) ? <Text style={{ color: c.warn, fontSize: 12, fontWeight: '600' }}>{'  '}배터리 교체</Text> : null}
+        {/* 브랜드는 이름 위에 작게 (필름·렌즈와 같은 방식, 웹·아이폰과 같음) */}
+        <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: c.muted, lineHeight: 15 }}>
+          {camera.brand || ' '}{batteryDue(camera) ? <Text style={{ color: c.warn, fontSize: 12, fontWeight: '600' }}>{'  '}배터리 교체</Text> : null}
         </Text>
+        <Text numberOfLines={1} style={{ fontSize: 19, fontWeight: '700', color: c.ink }}>{camera.model}</Text>
         <TagLine tags={camera.tags} />
       </Pressable>
       <View style={{ height: 0.5, backgroundColor: c.sep }} />
@@ -350,7 +351,8 @@ function CameraRow({ camera, roll, editing }: { camera: Camera; roll?: Roll; edi
       <Pressable disabled={editing} onPress={() => nav.push({ type: 'camera', id: camera.id })} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 }}>
         <View style={{ width: 68, borderRadius: 8, overflow: 'hidden' }}><CameraCover camera={camera} height={52} fill={bleed} /></View>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text numberOfLines={1} style={{ fontSize: 17, fontWeight: '600', color: c.ink }}>{camera.brand} {camera.model}</Text>
+          {camera.brand ? <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: c.muted, lineHeight: 15 }}>{camera.brand}</Text> : null}
+          <Text numberOfLines={1} style={{ fontSize: 17, fontWeight: '600', color: c.ink }}>{camera.model || camera.brand}</Text>
           <Text numberOfLines={1} style={{ fontSize: 14, color: roll ? c.safelight : c.muted }}>
             {roll ? rollFilmName(roll) : '비어 있음'}{batteryDue(camera) ? <Text style={{ color: c.warn, fontSize: 12, fontWeight: '600' }}>  배터리 교체</Text> : null}
           </Text>

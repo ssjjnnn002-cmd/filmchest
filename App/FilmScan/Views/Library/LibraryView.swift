@@ -418,13 +418,11 @@ private struct CameraCard: View {
                             .padding(.top, 8)
                     }
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(camera.model)
-                            .font(.headline)
-                            .lineLimit(1)
+                    // 브랜드는 이름 위에 작게 (필름·렌즈와 같은 방식)
+                    VStack(alignment: .leading, spacing: 1) {
                         HStack(spacing: 4) {
-                            Text(camera.brand)
-                                .font(.caption)
+                            Text(camera.brand.nilIfBlank ?? " ")
+                                .font(.caption.weight(.medium))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                             if camera.batteryDue {
@@ -434,6 +432,9 @@ private struct CameraCard: View {
                                     .lineLimit(1)
                             }
                         }
+                        Text(camera.model)
+                            .font(.headline)
+                            .lineLimit(1)
                         TagLine(tags: camera.tags)
                     }
                 }
@@ -515,9 +516,13 @@ private struct CameraListRow: View {
                     CameraCoverView(camera: camera, fill: camera.bleedsPhoto)
                         .frame(width: 68, height: 52)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        // 브랜드는 이름 위에 작게
+                        if let brand = camera.brand.nilIfBlank {
+                            Text(brand).font(.caption2.weight(.medium)).foregroundStyle(.secondary).lineLimit(1)
+                        }
                         HStack(spacing: 4) {
-                            Text(camera.displayName).font(.subheadline.weight(.semibold)).lineLimit(1)
+                            Text(camera.model.nilIfBlank ?? camera.displayName).font(.subheadline.weight(.semibold)).lineLimit(1)
                             if camera.batteryDue {
                                 Image(systemName: "battery.25").font(.caption).foregroundStyle(.orange)
                                     .accessibilityLabel("배터리 교체할 때가 됐어요")

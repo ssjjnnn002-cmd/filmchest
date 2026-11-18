@@ -169,8 +169,10 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
       <GearImage id={lens.id} hasPhoto={lens.hasPhoto} tall={grid}
         fallback={(size) => <LensPicture brand={lens.brand} model={lens.model} mount={lens.mount} width={size === 50 ? 68 : '100%'} height={size === 50 ? 52 : 110} />} />
       <View style={{ flex: grid ? undefined : 1, gap: 2 }}>
+        {/* 브랜드는 이름 위에 작게 (필름·카메라와 같은 방식) */}
+        {grid || lens.brand ? <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: c.muted, lineHeight: 15 }}>{lens.brand || ' '}</Text> : null}
         {title(lens.model || '렌즈')}
-        {sub(grid ? lens.brand : [lens.brand, lensSpec(lens)].filter(Boolean).join(' · '))}
+        {grid ? null : sub(lensSpec(lens) || lens.mount || ' ')}
         {grid && sub(lensSpec(lens), 2)}
         <TagLine tags={lens.tags} />
       </View>
@@ -225,8 +227,8 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
             {grid ? <Canister film={film} format={lot.format} cover /> : <Canister film={film} format={lot.format} thumb={[64, 40]} />}
             <View style={{ flex: grid ? undefined : 1, gap: 2, alignSelf: 'stretch' }}>
               {/* 바둑판: 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게, 웹·아이폰과 같음) */}
-              {grid ? <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: c.muted, lineHeight: 15 }}>{film?.brand || ' '}</Text> : null}
-              {title(grid && film?.brand ? film.name : filmDisplayName(film))}
+              {grid || film?.brand ? <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: c.muted, lineHeight: 15 }}>{film?.brand || ' '}</Text> : null}
+              {title(film?.brand ? film.name : filmDisplayName(film))}
               {sub(`${formatInfo[lot.format].name} · ${storageText(lot)}`, 1)}
               {/* 재고 수량은 크게, 부족·기한 지남은 옆에 둥근 표시. 바둑판은 아래, 목록은 오른쪽 (웹·아이폰과 같음) */}
               {grid ? count : null}
