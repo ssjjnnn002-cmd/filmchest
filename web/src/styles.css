@@ -932,3 +932,13 @@ body:has(.mr-overlay) .sheet-root, body:has(.mr-overlay) .alert-backdrop { z-ind
 .film-pick > span:not(.custom-plus) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 30px; }
 .film-grid.scroll > * { flex: 0 0 108px; }
 .custom-plus { width: 100%; height: auto; aspect-ratio: 1.6; border-radius: 6px; font-size: 28px; }
+
+/* 목록 줄 밀기 (즐겨찾기·삭제) */
+.swipe-row { position: relative; overflow: hidden; touch-action: pan-y; }
+.swipe-body { position: relative; background: var(--cell); }
+.swipe-bg { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 6px; color: #fff; font-size: 13px; font-weight: 600; overflow: hidden; white-space: nowrap; }
+.swipe-bg.fav { left: 0; background: #f5b700; }
+.swipe-bg.del { right: 0; background: #ff3b30; }
+
+/* 촬영 중 카드: 꾹 누를 때 글자 선택·확대 메뉴가 뜨지 않게 */
+.shooting-main { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

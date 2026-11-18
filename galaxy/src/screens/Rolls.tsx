@@ -1,7 +1,7 @@
 // 웹 pages/Rolls.tsx
 import { useMemo, useState } from 'react'
 import { View } from 'react-native'
-import { db, kept } from '../data'
+import { db, deleteRoll, kept } from '../data'
 import { getPref, setPref, useLiveQuery } from '../store'
 import { useNav } from '../App'
 import type { Roll, RollStatus } from '../core/types'
@@ -13,6 +13,8 @@ import { GlassGroup, Page } from '../page'
 import { SettingsButton } from './Settings'
 import { useArchiveChoice } from './Pending'
 import { RollCard, RollRow } from '../RollRow'
+import { SwipeRow } from '../SwipeRow'
+import { Confirm } from '../overlay'
 import { ProjectStrip } from './Projects'
 
 type Grouping = 'month' | 'quarter' | 'half' | 'year' | 'tag'
@@ -43,6 +45,7 @@ export function Rolls() {
   const [grouping, setGrouping] = useState<Grouping>(getPref('rollGrouping', 'month'))
   const [layout, setLayout] = useState<string>(getPref('rollsLayout', 'list'))
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [deleting, setDeleting] = useState<string>()
   const [filmId, setFilmId] = useState('')
   const [cameraId, setCameraId] = useState('')
   const [status, setStatus] = useState<RollStatus | ''>('')
@@ -141,12 +144,19 @@ export function Rolls() {
             // 구분선 없이 촘촘하게 (웹과 같음)
             <Group plain style={{ paddingVertical: 12 }}>
               {g.rolls.map((r) => (
-                <Row key={r.id} chev onPress={() => nav.push({ type: 'roll', id: r.id })} style={{ minHeight: 0, paddingVertical: 5, paddingLeft: 14 }}><RollRow roll={r} /></Row>
+                // 왼쪽→오른쪽 밀면 즐겨찾기, 오른쪽→왼쪽 밀면 삭제 (웹·아이폰과 같음)
+                <SwipeRow key={r.id} favorite={!!r.favorite} onFavorite={() => void db.rolls.update(r.id, { favorite: !r.favorite })} onDelete={() => setDeleting(r.id)}>
+                  <Row chev onPress={() => nav.push({ type: 'roll', id: r.id })} style={{ minHeight: 0, paddingVertical: 5, paddingLeft: 14 }}><RollRow roll={r} /></Row>
+                </SwipeRow>
               ))}
             </Group>
           )}
         </Section>
       ))}
+      {deleting ? (
+        <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. 갤러리에 저장한 사진은 그대로 남아요." onCancel={() => setDeleting(undefined)}
+          onConfirm={async () => { const id = deleting; setDeleting(undefined); await deleteRoll(id) }} />
+      ) : null}
     </Page>
   )
 }

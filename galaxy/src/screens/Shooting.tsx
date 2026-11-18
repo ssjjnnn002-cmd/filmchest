@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { Text } from '../text'
-import { db, kept } from '../data'
+import { db, deleteRoll, kept } from '../data'
 import { useLiveQuery } from '../store'
 import { useNav } from '../App'
 import type { Roll } from '../core/types'
@@ -12,6 +12,7 @@ import { Icon } from '../icons'
 import { GlassBtn, Page } from '../page'
 import { useTheme } from '../theme'
 import { LabDropOff, PlaceEdit } from './Editors'
+import { Confirm } from '../overlay'
 import { ManualRecord } from './ManualRecord'
 import { SettingsButton } from './Settings'
 
@@ -34,6 +35,7 @@ export function Shooting() {
 }
 
 function LoadedCard({ roll }: { roll: Roll }) {
+  const [deleting, setDeleting] = useState(false)
   const c = useTheme()
   const nav = useNav()
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
@@ -44,7 +46,8 @@ function LoadedCard({ roll }: { roll: Roll }) {
   return (
     <View style={{ backgroundColor: c.card, borderRadius: 22, overflow: 'hidden',
       boxShadow: c.shadow }}>
-      <Pressable onPress={() => nav.push({ type: 'roll', id: roll.id })} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, opacity: pressed ? 0.85 : 1 })}>
+      {/* 꾹 누르면 삭제 (웹·아이폰과 같음) */}
+      <Pressable onPress={() => nav.push({ type: 'roll', id: roll.id })} onLongPress={() => setDeleting(true)} delayLongPress={450} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, opacity: pressed ? 0.85 : 1 })}>
         <View style={{ width: 96 }}>
           {camera ? <CameraCover camera={camera} height={72} /> : <View style={{ height: 72 }} />}
           <View style={{ position: 'absolute', right: 2, bottom: -8 }}><Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={44} /></View>
@@ -64,6 +67,10 @@ function LoadedCard({ roll }: { roll: Roll }) {
         <View style={{ flex: 1 }}><Btn label="촬영 끝내기" kind="primary" block onPress={() => setDropOff(true)} /></View>
       </View>
       {placing ? <PlaceEdit roll={roll} onClose={() => setPlacing(false)} /> : null}
+      {deleting ? (
+        <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요." onCancel={() => setDeleting(false)}
+          onConfirm={async () => { setDeleting(false); await deleteRoll(roll.id) }} />
+      ) : null}
       {dropOff ? <LabDropOff roll={roll} onClose={(ended) => { setDropOff(false); if (ended) nav.toPending(roll.id) }} /> : null}
       {meter ? <ManualRecord roll={roll} onClose={() => setMeter(false)} /> : null}
     </View>

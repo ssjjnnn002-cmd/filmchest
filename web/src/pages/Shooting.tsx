@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, kept } from '../db'
+import { db, deleteRoll, kept } from '../db'
 import { useNav } from '../App'
 import type { Roll } from '../core/types'
-import { CameraCover, cameraName, Canister, Icon, PageHeader, fmtDay, rollCameraFormat, rollFilm, rollFilmName, sortedLocations } from '../ui/common'
+import { CameraCover, cameraName, Canister, Confirm, Icon, PageHeader, fmtDay, rollCameraFormat, rollFilm, rollFilmName, sortedLocations } from '../ui/common'
 import { LabDropOff, PlaceEdit } from './Editors'
 import { ManualRecord } from './ManualRecord'
 import { SettingsButton } from './Settings'
@@ -38,10 +38,18 @@ function LoadedCard({ roll }: { roll: Roll }) {
   const [placing, setPlacing] = useState(false)
   const [dropOff, setDropOff] = useState(false)
   const [meter, setMeter] = useState(false)
+  // 꾹 누르면 삭제 (아이폰과 같음): 0.5초 누르고 있으면 묻는다
+  const [deleting, setDeleting] = useState(false)
+  const press = useRef<number>()
+  const held = useRef(false)
+  const startPress = () => { held.current = false; window.clearTimeout(press.current); press.current = window.setTimeout(() => { held.current = true; navigator.vibrate?.(15); setDeleting(true) }, 500) }
+  const stopPress = () => window.clearTimeout(press.current)
   const places = sortedLocations(roll).map((l) => l.name).filter(Boolean).join(' → ')
   return (
     <div className="card shooting-card">
-      <button className="shooting-main" onClick={() => nav.push({ type: 'roll', id: roll.id })}>
+      <button className="shooting-main" onClick={() => { if (!held.current) nav.push({ type: 'roll', id: roll.id }) }}
+        onPointerDown={startPress} onPointerUp={stopPress} onPointerLeave={stopPress} onPointerCancel={stopPress}
+        onContextMenu={(e) => { e.preventDefault(); setDeleting(true) }}>
         <div className="shooting-art">
           {camera && <CameraCover camera={camera} height={72} />}
           <div className="shooting-can"><Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={44} /></div>
@@ -59,6 +67,10 @@ function LoadedCard({ roll }: { roll: Roll }) {
         <button className="btn soft" onClick={() => setMeter(true)}>상세 기록</button>
         <button className="btn primary" onClick={() => setDropOff(true)}>촬영 끝내기</button>
       </div>
+      {deleting && (
+        <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요." onCancel={() => setDeleting(false)}
+          onConfirm={async () => { setDeleting(false); await deleteRoll(roll.id) }} />
+      )}
       {placing && <PlaceEdit roll={roll} onClose={() => setPlacing(false)} />}
       {dropOff && <LabDropOff roll={roll} onClose={(ended) => { setDropOff(false); if (ended) nav.toPending(roll.id) }} />}
       {/* 상세 기록: 노출계 없이 다이얼로 셔터·조리개를 골라 컷마다 기록 (장소·시간 포함) */}

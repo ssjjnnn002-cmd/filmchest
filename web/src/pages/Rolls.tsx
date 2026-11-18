@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, kept } from '../db'
+import { db, deleteRoll, kept } from '../db'
 import { useNav } from '../App'
 import type { Roll, RollStatus } from '../core/types'
 import { statusName } from '../core/types'
-import { GlassGroup, Icon, PageHeader, dateUnknown, rollFilmName, rollStart } from '../ui/common'
+import { Confirm, GlassGroup, Icon, PageHeader, dateUnknown, rollFilmName, rollStart } from '../ui/common'
+import { SwipeRow } from '../ui/SwipeRow'
 import { SettingsButton } from './Settings'
 import { ArchiveImportButton } from './Pending'
 import { RollCard, RollRow } from '../ui/RollRow'
@@ -39,6 +40,7 @@ export function Rolls() {
   const cameras = useLiveQuery(() => db.cameras.toArray(), []) ?? []
   const [grouping, setGrouping] = useState<Grouping>(getPref('rollGrouping', 'month'))
   const [layout, setLayout] = useState<string>(getPref('rollsLayout', 'list'))
+  const [deleting, setDeleting] = useState<string>()
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [filmId, setFilmId] = useState('')
   const [cameraId, setCameraId] = useState('')
@@ -144,12 +146,19 @@ export function Rolls() {
           ) : (
             <div className="group rolls-list">
               {g.rolls.map((r) => (
-                <button key={r.id} className="row" onClick={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /><Icon name="chev" size={18} /></button>
+                // 왼쪽→오른쪽 밀면 즐겨찾기, 오른쪽→왼쪽 밀면 삭제 (아이폰과 같음)
+                <SwipeRow key={r.id} favorite={!!r.favorite} onFavorite={() => void db.rolls.update(r.id, { favorite: !r.favorite })} onDelete={() => setDeleting(r.id)}>
+                  <button className="row" onClick={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /><Icon name="chev" size={18} /></button>
+                </SwipeRow>
               ))}
             </div>
           )}
         </div>
       ))}
+      {deleting && (
+        <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. 사진 앱에 저장한 사진은 그대로 남아요." onCancel={() => setDeleting(undefined)}
+          onConfirm={async () => { await deleteRoll(deleting); setDeleting(undefined) }} />
+      )}
     </>
   )
 }

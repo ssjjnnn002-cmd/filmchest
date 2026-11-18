@@ -16,6 +16,8 @@ struct ShootingView: View {
     /// 상세 기록 (노출계로 컷마다 기록). 목록 줄 안에 두면 목록이 다시 그려질 때 노출계가 새로 만들어져 값이 풀린다
     @State private var meterRoll: RollItem?
     @State private var dropOffAfterMeter: RollItem?
+    /// 길게 누르거나 밀어서 지우기 (롤 보관함과 같은 확인)
+    @State private var deleting: RollItem?
     /// 노출계는 아직 개발자 모드에서만 (설정 > 버전 > 개발자 모드)
     @AppStorage("devMode") private var devMode = false
 
@@ -34,6 +36,20 @@ struct ShootingView: View {
             ForEach(visible) { roll in
                 Section {
                     NavigationLink(value: roll) { LoadedRollCard(roll: roll) }
+                        // 롤 보관함과 같게: 길게 누르면 메뉴, 왼쪽→오른쪽 밀면 즐겨찾기, 오른쪽→왼쪽 밀면 삭제
+                        .contextMenu {
+                            Button(roll.isFavorite ? "즐겨찾기 해제" : "즐겨찾기", systemImage: "star") { roll.isFavorite.toggle() }
+                            Button("삭제", systemImage: "trash", role: .destructive) { deleting = roll }
+                        }
+                        .swipeActions(edge: .leading) {
+                            Button { roll.isFavorite.toggle() } label: {
+                                Label(roll.isFavorite ? "해제" : "즐겨찾기", systemImage: roll.isFavorite ? "star.slash" : "star.fill")
+                            }
+                            .tint(.yellow)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button("삭제", systemImage: "trash", role: .destructive) { deleting = roll }
+                        }
                     RollQuickActions(roll: roll, onMeter: { meterRoll = roll }) { openDropOff(roll) }
                 }
             }
@@ -41,6 +57,15 @@ struct ShootingView: View {
         .scrollContentBackground(.hidden)
         .background(Theme.paper)
         .navigationTitle("촬영 중")
+        .confirmationDialog("이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요.",
+                            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+                            titleVisibility: .visible) {
+            Button("삭제", role: .destructive) {
+                // 카메라에서 빼고 휴지통으로 (롤 보관함 삭제와 같음)
+                deleting?.deletedAt = Date()
+                deleting = nil
+            }
+        }
         .navigationDestination(for: RollItem.self) { RollDetailView(roll: $0) }
         .toolbar {
             #if os(iOS)
