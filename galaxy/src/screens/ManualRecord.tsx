@@ -12,12 +12,13 @@ import { useLiveQuery } from '../store'
 import { framesPerRoll, lensIdAt, type Camera, type GeoPoint, type Lens as GearLens, type MeterShot, type Roll } from '../core/types'
 import { filmDisplayName } from '../core/films'
 import { catalogMatch } from '../core/cameras'
-import { formatAperture, formatComp, formatShutter } from '../core/meter'
+import { exposureText, formatAperture, formatComp, formatShutter, meterFrameTitle, shotRowMeta } from '../core/meter'
 import { cameraName, rollCameraFormat, rollFilm } from '../core/display'
 import { currentPlace } from '../platform'
-import { Chip, Chips, DateInput, Group, Row, RowText } from '../kit'
+import { Canister as FilmBox, Chip, Chips, DateInput, Group, Row, RowText } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { PlacePicker } from './Editors'
+import { useTheme } from '../theme'
 
 type Lens = { id: string; name: string; min: number; max: number; open: number; close: number; fixed?: boolean }
 
@@ -177,7 +178,7 @@ function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: C
   const [locating, setLocating] = useState(true)
   const [useNow, setUseNow] = useState(true)
   const [time, setTime] = useState(() => Date.now())
-  const [sheet, setSheet] = useState<'place' | 'time' | 'filter' | 'lens' | 'iso'>()
+  const [sheet, setSheet] = useState<'place' | 'time' | 'filter' | 'lens' | 'iso' | 'roll'>()
   const [editing, setEditing] = useState<number>()
   const [toast, setToast] = useState<string>()
   const [leverOut, setLeverOut] = useState(false)
@@ -298,7 +299,7 @@ function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: C
             </Svg>
             <View style={{ width: Math.max(0, width / 2 - 52 - 232) }} />
           </ScrollView>
-          <Canister iso={iso} frames={frames} colors={film ? filmBoxColors[film.id] ?? [film.style.body, film.style.band] : undefined} />
+          <Canister iso={iso} frames={frames} colors={film ? filmBoxColors[film.id] ?? [film.style.body, film.style.band] : undefined} onPress={() => setSheet('roll')} />
         </View>
       </View>
 
@@ -322,6 +323,20 @@ function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: C
         </Sheet>
       ) : null}
       {sheet === 'iso' ? <IsoSheet value={camIso} box={box} onChange={setCamIso} onClose={() => setSheet(undefined)} /> : null}
+      {/* 필름통을 누르면: 필름 정보 + 지금까지 기록한 컷 전부 (번호순, 누르면 고치기. 웹·아이폰과 같음) */}
+      {sheet === 'roll' ? (
+        <Sheet title="필름 · 컷 기록" onClose={() => setSheet(undefined)} right={<SheetBtn label="완료" accent onPress={() => setSheet(undefined)} />}>
+          <RollSheetHead film={film} format={rollCameraFormat(camera, roll)} line1={`ISO ${box} · ${cameraName(camera, roll)}`} line2={lens.name} count={`${shots.length} / ${frames}컷`} />
+          <Group>
+            {shots.length === 0 ? <Row static><RowText sub="">아직 기록한 컷이 없어요.</RowText></Row> : null}
+            {[...shots].sort((a, b) => a.pos - b.pos).map((s) => (
+              <Row key={s.pos} onPress={() => { setSheet(undefined); setEditing(s.pos) }} value={exposureText(s)}>
+                <RowText sub={shotRowMeta(s)}>{meterFrameTitle(s.pos, !!roll.meterPrewind)}</RowText>
+              </Row>
+            ))}
+          </Group>
+        </Sheet>
+      ) : null}
       {sheet === 'lens' ? <LensSheet lenses={lensList} current={lens} onClose={() => setSheet(undefined)} onPick={pickLens} /> : null}
       {editShot ? (
         <ShotEdit shot={editShot} like={dial} lenses={lensList.length ? lensList : [lens]} current={lens} iso={camIso} box={box}
@@ -614,13 +629,35 @@ function Cell({ p, shot, next, onPress }: { p: number; shot?: MeterShot; next: b
 }
 
 /** 화면 왼쪽 끝에 걸친 135 필름통 */
-function Canister({ iso, frames, colors }: { iso: number; frames: number; colors?: [string, string] }) {
+/** 필름·컷 기록 시트 위쪽: 상자 그림 + 브랜드(작게)·이름 + 감도·카메라·렌즈 (앱 밝기에 맞는 색) */
+function RollSheetHead({ film, format, line1, line2, count }: { film?: ReturnType<typeof rollFilm>; format: ReturnType<typeof rollCameraFormat>; line1: string; line2: string; count: string }) {
+  const c = useTheme()
+  return (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, paddingVertical: 12 }}>
+        {film ? <FilmBox film={film} format={format} thumb={[96, 60]} /> : null}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          {film?.brand ? <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: c.muted }}>{film.brand}</Text> : null}
+          <Text numberOfLines={1} style={{ fontSize: 17, fontWeight: '700', color: c.ink }}>{film ? (film.brand ? film.name : filmDisplayName(film)) : '필름'}</Text>
+          <Text numberOfLines={1} style={{ fontSize: 13, color: c.muted }}>{line1}</Text>
+          <Text numberOfLines={1} style={{ fontSize: 13, color: c.muted }}>{line2}</Text>
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 10, paddingBottom: 6 }}>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted }}>컷 기록</Text>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted }}>{count}</Text>
+      </View>
+    </>
+  )
+}
+
+function Canister({ iso, frames, colors, onPress }: { iso: number; frames: number; colors?: [string, string]; onPress?: () => void }) {
   const lum = (h?: string) => { const n = parseInt(String(h ?? '#888').replace('#', ''), 16); return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 }
   // 라벨은 상자처럼 위 바탕색 · 아래 띠색 (웹·아이폰과 같음)
   const label = colors?.[0] ?? '#f0b43a', band = colors?.[1] ?? label
   const numColor = lum(label) < 0.25 ? (lum(band) < 0.25 ? '#f0b43a' : band) : label
   return (
-    <View pointerEvents="none" style={{ position: 'absolute', left: -18, top: -10, width: 80, height: 132, opacity: 0.85 }}>
+    <Pressable onPress={onPress} disabled={!onPress} accessibilityLabel="필름 정보와 컷 기록" style={{ position: 'absolute', left: -18, top: -10, width: 80, height: 132, opacity: 0.85 }}>
       <Svg width={80} height={132} viewBox="0 0 80 132">
         <Defs>
           <LinearGradient id="cap" x1="0" x2="1" y1="0" y2="0"><Stop offset="0" stopColor="#050505" /><Stop offset="0.55" stopColor="#262628" /><Stop offset="0.78" stopColor="#3a3a3d" /><Stop offset="1" stopColor="#0b0b0c" /></LinearGradient>
@@ -637,7 +674,7 @@ function Canister({ iso, frames, colors }: { iso: number; frames: number; colors
         <Rect x={16} y={128} width={16} height={4} fill="#0a0a0a" />
         <Rect x={0} y={0} width={80} height={132} fill="url(#vig)" />
       </Svg>
-    </View>
+    </Pressable>
   )
 }
 

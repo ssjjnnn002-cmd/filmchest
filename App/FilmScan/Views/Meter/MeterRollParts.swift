@@ -154,6 +154,8 @@ struct MeterFilmStrip: View {
     var showFocal: (MeterShot) -> Bool
     var effISO: (Double) -> Double
     var film: FilmStock?
+    /// 왼쪽 아래 필름통을 누르면 (필름 정보·컷 기록 목록)
+    var onCanister: (() -> Void)? = nil
     var onTap: (Int) -> Void
 
     private static let print = Color(meterHex: "#f3a256")
@@ -201,7 +203,10 @@ struct MeterFilmStrip: View {
                 .colorMultiply(Color(white: 0.8))
                 .shadow(color: .black.opacity(0.55), radius: 3, x: 4)
                 .offset(x: -18, y: -10)
-                .allowsHitTesting(false)
+                .contentShape(Rectangle())
+                .onTapGesture { onCanister?() }
+                .allowsHitTesting(onCanister != nil)
+                .accessibilityLabel("필름 정보와 컷 기록")
         }
     }
 

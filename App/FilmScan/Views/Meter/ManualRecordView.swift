@@ -31,6 +31,8 @@ struct ManualRecordView: View {
     @State private var sheet: Sheet?
     @State private var editing: EditTarget?
     @State private var toast: String?
+    /// 필름통을 누르면 필름 정보·컷 기록 목록
+    @State private var rollSheet = false
     struct EditTarget: Identifiable { var pos: Int; var id: Int { pos } }
     enum Sheet: String, Identifiable { case filter, lens, iso; var id: String { rawValue } }
     /// 장착한 필름 감도 (카메라 ISO를 이와 다르게 맞추면 오버·언더로 기록)
@@ -103,6 +105,14 @@ struct ManualRecordView: View {
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("완료") { sheet = nil } } }
             }
             .presentationDetents([.medium]).preferredColorScheme(.dark)
+        }
+        .sheet(isPresented: $rollSheet) {
+            RollShotsSheet(m: m, box: box) { pos in
+                rollSheet = false
+                // 목록을 닫은 뒤 그 컷 고치기
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { editing = EditTarget(pos: pos) }
+            }
+            .presentationDetents([.medium, .large]).preferredColorScheme(.dark)
         }
         .sheet(item: $editing) { t in
             if let shot = m.shots.first(where: { $0.pos == t.pos }) {
@@ -220,7 +230,7 @@ struct ManualRecordView: View {
                 .padding(.bottom, -w * 58 / 360 + 30)
                 .zIndex(1)
             MeterFilmStrip(shots: m.shots, frames: m.gear.frames, prewind: false, ended: false, nextPos: frame,
-                           showFocal: m.showFocal, effISO: m.effISO, film: m.gear.film) { p in
+                           showFocal: m.showFocal, effISO: m.effISO, film: m.gear.film, onCanister: { rollSheet = true }) { p in
                 if m.shots.contains(where: { $0.pos == p }) { editing = EditTarget(pos: p) } else { frame = p }
             }
             .padding(.horizontal, -16)
@@ -836,6 +846,61 @@ struct RollManualRecordView: View {
                          iso: roll.shotISO.map(Double.init) ?? roll.film.map { Double($0.iso) },
                          onSave: { shots, prewind in roll.meterShots = shots; roll.meterPrewind = roll.meterPrewind ?? prewind },
                          onClose: { dismiss() })
+    }
+}
+
+/// 상세 기록에서 필름통을 누르면: 필름 정보 + 지금까지 기록한 컷 전부 (번호순). 컷을 누르면 고치기
+private struct RollShotsSheet: View {
+    @ObservedObject var m: MeterModel
+    var box: Double
+    var onPick: (Int) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    HStack(spacing: 14) {
+                        FilmCanisterView(stock: m.gear.film, format: .f135, fill: true)
+                            .frame(width: 96, height: 60)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let brand = m.gear.film?.brand.nilIfBlank {
+                                Text(brand).font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                            }
+                            Text(m.gear.film.map { $0.brand.isEmpty ? $0.displayName : $0.name } ?? "필름").font(.headline)
+                            Text("ISO \(MeterMath.trim(box)) · \(m.gear.cameraName)").font(.caption).foregroundStyle(.secondary)
+                            Text(m.lens.name).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .listRowBackground(Color.clear)
+                }
+                Section {
+                    let shots = m.shots.sorted { $0.pos < $1.pos }
+                    if shots.isEmpty {
+                        Text("아직 기록한 컷이 없어요.").foregroundStyle(.secondary)
+                    }
+                    ForEach(shots, id: \.pos) { shot in
+                        Button { onPick(shot.pos) } label: {
+                            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(MeterShot.frameTitle(shot.pos, prewind: m.prewind))
+                                    if !shot.rowMeta.isEmpty { Text(shot.rowMeta).font(.caption).foregroundStyle(.secondary) }
+                                }
+                                Spacer(minLength: 8)
+                                Text(shot.exposureLine).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text("컷 기록 · \(m.shots.count) / \(m.gear.frames)컷")
+                }
+            }
+            .navigationTitle("필름 · 컷 기록").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("완료") { dismiss() } } }
+        }
     }
 }
 #endif

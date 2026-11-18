@@ -6,8 +6,8 @@ import { db } from '../db'
 import { framesPerRoll, lensIdAt, type GeoPoint, type MeterShot, type Roll } from '../core/types'
 import { filmDisplayName } from '../core/films'
 import { catalogMatch } from '../core/cameras'
-import { formatAperture, formatComp, formatShutter } from '../core/meter'
-import { cameraName, rollCameraFormat, rollFilm, Confirm, Sheet } from '../ui/common'
+import { exposureText, formatAperture, formatComp, formatShutter, meterFrameTitle, shotRowMeta } from '../core/meter'
+import { cameraName, rollCameraFormat, rollFilm, Confirm, Sheet, Canister as UiCanister } from '../ui/common'
 import { currentPlace } from '../platform'
 import { PlacePicker } from './Editors'
 import { fixedLens, meterLens } from './Meter'
@@ -159,7 +159,7 @@ function Recorder({ roll, camera, allLenses, onClose }: {
   const [locating, setLocating] = useState(true)
   const [useNow, setUseNow] = useState(true)
   const [time, setTime] = useState(() => new Date())
-  const [sheet, setSheet] = useState<'place' | 'time' | 'filter' | 'lens' | 'iso'>()
+  const [sheet, setSheet] = useState<'place' | 'time' | 'filter' | 'lens' | 'iso' | 'roll'>()
   const [editing, setEditing] = useState<number>()
   const [toast, setToast] = useState<string>()
   const [leverOut, setLeverOut] = useState(false)
@@ -300,7 +300,7 @@ function Recorder({ roll, camera, allLenses, onClose }: {
             {/* 아주 넓은 화면에서도 1번 칸이 가운데로 올 수 있게 */}
             <span className="mr-strip-end" aria-hidden="true" />
           </div>
-          <Canister iso={iso} frames={frames} colors={film ? boxPalette(film) : undefined} />
+          <Canister iso={iso} frames={frames} colors={film ? boxPalette(film) : undefined} onClick={() => setSheet('roll')} />
         </div>
       </div>
 
@@ -320,6 +320,34 @@ function Recorder({ roll, camera, allLenses, onClose }: {
         </Sheet>
       )}
       {sheet === 'iso' && <IsoSheet value={camIso} box={box} onChange={setCamIso} onClose={() => setSheet(undefined)} />}
+      {/* 필름통을 누르면: 필름 정보 + 지금까지 기록한 컷 전부 (번호순, 누르면 고치기. 아이폰과 같음) */}
+      {sheet === 'roll' && (
+        <Sheet title="필름 · 컷 기록" onClose={() => setSheet(undefined)} right={<button className="btn ghost" onClick={() => setSheet(undefined)}><b>완료</b></button>}>
+          <div className="section">
+            <div className="row static" style={{ gap: 14 }}>
+              {film && <UiCanister film={film} format={rollCameraFormat(camera as never, roll)} thumb={[96, 60]} />}
+              <span className="grow">
+                {film?.brand && <small className="lot-brand">{film.brand}</small>}
+                <b>{film ? (film.brand ? film.name : filmDisplayName(film)) : '필름'}</b>
+                <span className="sub">ISO {box} · {cameraName(camera as never, roll)}</span>
+                <span className="sub">{lens.name}</span>
+              </span>
+            </div>
+          </div>
+          <div className="section">
+            <h2 className="section-title"><span>컷 기록</span><span className="sub" style={{ fontWeight: 600 }}>{shots.length} / {frames}컷</span></h2>
+            <div className="group">
+              {shots.length === 0 && <div className="row static sub">아직 기록한 컷이 없어요.</div>}
+              {[...shots].sort((a, b) => a.pos - b.pos).map((s) => (
+                <button key={s.pos} className="row" onClick={() => { setSheet(undefined); setEditing(s.pos) }}>
+                  <span className="grow">{meterFrameTitle(s.pos, !!roll.meterPrewind)}<div className="sub">{shotRowMeta(s)}</div></span>
+                  <span className="value">{exposureText(s)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </Sheet>
+      )}
       {sheet === 'lens' && (
         <LensSheet lenses={lensList} current={lens} onClose={() => setSheet(undefined)} onPick={(l) => {
           setLens(l)
@@ -556,13 +584,13 @@ function Controls({ counter, flash, leverOut, rewind, down, onFlash, onShutter }
 }
 
 /** 화면 왼쪽 끝에 걸친 135 필름통 (노출계와 같음) */
-function Canister({ iso, frames, colors }: { iso: number; frames: number; colors?: [string, string] }) {
+function Canister({ iso, frames, colors, onClick }: { iso: number; frames: number; colors?: [string, string]; onClick?: () => void }) {
   const lum = (h?: string) => { const n = parseInt(String(h ?? '#888').replace('#', ''), 16); return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 }
   // 라벨은 상자처럼 위 바탕색 · 아래 띠색 (아이폰·갤럭시와 같음)
   const label = colors?.[0] ?? '#f0b43a', band = colors?.[1] ?? label
   const num = lum(label) < 0.25 ? (lum(band) < 0.25 ? '#f0b43a' : band) : label
   return (
-    <div className="mr-canister" aria-hidden="true">
+    <div className="mr-canister" role="button" aria-label="필름 정보와 컷 기록" onClick={onClick} style={{ pointerEvents: onClick ? 'auto' : 'none', cursor: 'pointer' }}>
       <svg viewBox="0 0 80 132">
         <defs>
           <linearGradient id="mrCap" x1="0" x2="1"><stop offset="0" stopColor="#050505" /><stop offset=".55" stopColor="#262628" /><stop offset=".78" stopColor="#3a3a3d" /><stop offset="1" stopColor="#0b0b0c" /></linearGradient>
