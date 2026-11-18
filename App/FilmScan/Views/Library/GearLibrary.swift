@@ -239,7 +239,8 @@ struct GearBrowser: View {
                 else if lots.isEmpty { noMatch }
                 else {
                     // 브랜드·ISO·종류·규격으로 묶고, 묶음 안은 알파벳·재고량·자주 사용 순 (오름/내림)
-                    let secs = groupSections(sortedLots) { $0.groupKey(filmGroup) }
+                    // 내림차순이면 묶음 순서까지 통째로 반대
+                    let secs = filmSortDesc ? Array(groupSections(sortedLots) { $0.groupKey(filmGroup) }.reversed()) : groupSections(sortedLots) { $0.groupKey(filmGroup) }
                     sections(secs) { items in
                         if layout == .grid {
                             grid(items) { lot in Button { lotEdit = lot } label: { FilmGearCard(lot: lot) }.buttonStyle(.plain) }

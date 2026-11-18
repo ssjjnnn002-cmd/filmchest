@@ -209,7 +209,7 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
         : [...new Set(filters.map(kindOf))].sort((a, b) => kindOrder(a) - kindOrder(b)).map((k) => ({ title: k, items: filters.filter((f) => kindOf(f) === k) })))}
       {/* 필름 재고: 브랜드·ISO·흑백/컬러·35mm/120으로 묶어 볼 수 있다 (묶음 안은 이름순, 웹과 같음) */}
       {/* 필름 재고: 브랜드·ISO·종류·규격으로 묶고, 묶음 안은 알파벳·재고량·자주 사용 순 (오름/내림, 웹과 같음) */}
-      {kind === 'film' && lots.length > 0 && (groupSections(sortLots(lots, filmSort, filmSortDesc, used), (l) => lotKey(l, filmGroup)) as { title?: string; items: FilmLot[] }[])
+      {kind === 'film' && lots.length > 0 && ((s) => (filmSortDesc ? s.reverse() : s))(groupSections(sortLots(lots, filmSort, filmSortDesc, used), (l) => lotKey(l, filmGroup)) as { title?: string; items: FilmLot[] }[])
         .map((sec, n) => <View key={sec.title ?? n} style={{ gap: 8 }}>{sec.title ? <GroupTitle>{`${sec.title} · ${sec.items.length}`}</GroupTitle> : null}{box(sec.items.map((lot) => {
         const film = filmById(lot.filmId)
         const late = !!lot.expiresAt && lot.expiresAt < Date.now()

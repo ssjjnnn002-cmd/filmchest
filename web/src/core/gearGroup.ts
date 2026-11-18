@@ -77,9 +77,12 @@ export function filmPickSections(list: FilmStock[], g: GearGroup, by: FilmLotSor
         if (!seen.has(t)) { seen.add(t); items.push({ film, format: f }) }
       }
     }
-    return groupSections(items, (x) => formatFamily(x.format!))
+    const secs = groupSections(items, (x) => formatFamily(x.format!))
+    return desc ? secs.reverse() : secs
   }
-  return groupSections(sorted.map((film) => ({ film })), (x) => filmKey(x.film, g))
+  // 내림차순이면 묶음 순서까지 통째로 반대 (아이폰과 같음)
+  const secs = groupSections(sorted.map((film) => ({ film })), (x) => filmKey(x.film, g))
+  return desc ? secs.reverse() : secs
 }
 
 export function lotKey(l: FilmLot, g: GearGroup): Key {

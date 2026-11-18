@@ -113,7 +113,7 @@ export function FilmPicker({ format, anyFormat, filmId, onPick, onAddCustom, onE
               {sec.items.map((x) => { const f = x.film; return (
                 <button key={`${f.id}|${x.format ?? ''}`} type="button" className={`film-pick ${isOn(x) ? 'on' : ''}`}
                   onClick={() => onPick(f.id, x.format ?? (filmFits(f.formats, format) ? undefined : f.formats[0]))}>
-                  <Canister film={f} format={fmtOf(x)} size={84} />
+                  <Canister film={f} format={fmtOf(x)} cover />
                   <span>{filmDisplayName(f)}</span>
                   <small className="film-stock">
                     {(stock[f.id] ?? 0) > 0 ? `재고 ${stock[f.id]}롤` : isDiscontinued(f.id) ? '단종' : ''}

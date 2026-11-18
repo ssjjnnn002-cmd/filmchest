@@ -92,9 +92,12 @@ struct FilmPickSection<Footer: View>: View {
                 var seen = Set<String>()
                 for f in st.formats where seen.insert(f.family.title).inserted { items.append(PickItem(stock: st, format: f)) }
             }
-            return groupSections(items) { $0.format!.family }
+            let secs = groupSections(items) { $0.format!.family }
+            return descending ? secs.reversed() : secs
         }
-        return groupSections(sorted.map { PickItem(stock: $0) }) { $0.stock.groupKey(g) }
+        // 내림차순이면 묶음 순서까지 통째로 반대
+        let secs = groupSections(sorted.map { PickItem(stock: $0) }) { $0.stock.groupKey(g) }
+        return descending ? secs.reversed() : secs
     }
 
     var body: some View {
@@ -132,7 +135,7 @@ struct FilmPickSection<Footer: View>: View {
                         if let t = sec.title {
                             Text("\(t) · \(sec.items.count)").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                         }
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 6)], spacing: 10) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 98), spacing: 8)], spacing: 8) {
                             ForEach(sec.items) { cell($0) }
                             if i == sections.count - 1 { customCell }
                         }
@@ -143,8 +146,8 @@ struct FilmPickSection<Footer: View>: View {
                 // 추천 6개는 가로로 넘겨 본다 (아래 칸이 바로 보이게)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 6) {
-                        ForEach(visible) { cell(PickItem(stock: $0)).frame(width: 96) }
-                        customCell.frame(width: 96)
+                        ForEach(visible) { cell(PickItem(stock: $0)).frame(width: 108) }
+                        customCell.frame(width: 108)
                     }
                     .padding(.vertical, 4)
                 }
@@ -193,9 +196,12 @@ struct FilmPickSection<Footer: View>: View {
             filmID = stock.id
             if let onFormat, shown.family.title != format.family.title || item.format != nil { onFormat(shown) }
         } label: {
-            VStack(spacing: 2) {
-                FilmCanisterView(stock: stock, format: shown).frame(height: 84)
-                VStack(spacing: 1) {
+            VStack(spacing: 4) {
+                // 상자 그림을 칸 너비에 꽉 (여백 없이 크게)
+                Color.clear.aspectRatio(1.6, contentMode: .fit)
+                    .overlay { FilmCanisterView(stock: stock, format: shown, fill: true) }
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                VStack(spacing: 0) {
                     Text(stock.displayName).font(.caption2).lineLimit(2).multilineTextAlignment(.center)
                     if count > 0 {
                         Text("재고 \(count)롤").font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
@@ -203,9 +209,9 @@ struct FilmPickSection<Footer: View>: View {
                         Text("단종").font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                 }
-                .frame(height: 42, alignment: .top)
+                .frame(height: 38, alignment: .top)
             }
-            .padding(4)
+            .padding(3)
             .background(RoundedRectangle(cornerRadius: 10).fill(on ? Theme.safelight.opacity(0.15) : .clear))
             .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(on ? Theme.safelight : .clear, lineWidth: 2))
         }
@@ -214,16 +220,15 @@ struct FilmPickSection<Footer: View>: View {
 
     private var customCell: some View {
         Button { customEdit = .new } label: {
-            VStack(spacing: 2) {
-                RoundedRectangle(cornerRadius: 16)
+            VStack(spacing: 4) {
+                RoundedRectangle(cornerRadius: 6)
                     .strokeBorder(Theme.safelight.opacity(0.55), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
                     .overlay(Image(systemName: "plus").font(.title2.weight(.light)).foregroundStyle(Theme.safelight))
-                    .frame(width: 76, height: 76)
-                    .frame(height: 84)
+                    .aspectRatio(1.6, contentMode: .fit)
                 Text("직접 추가").font(.caption2.weight(.semibold)).foregroundStyle(Theme.safelight)
-                    .frame(height: 42, alignment: .top)
+                    .frame(height: 38, alignment: .top)
             }
-            .padding(4)
+            .padding(3)
         }
         .buttonStyle(.plain)
     }

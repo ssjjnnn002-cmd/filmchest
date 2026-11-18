@@ -924,3 +924,11 @@ body:has(.mr-overlay) .sheet-root, body:has(.mr-overlay) .alert-backdrop { z-ind
 
 /* 목록형 필름 재고: 수량은 오른쪽 (아이폰과 같음) */
 .row > .lot-count { flex-shrink: 0; margin: 0; }
+
+/* 필름 고르기 칸: 상자 그림을 칸 너비에 꽉, 여백은 작게 (아이폰과 같음) */
+.film-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; padding: 8px 10px; }
+.film-pick { padding: 3px; gap: 4px; align-content: start; }
+.film-pick img { width: 100%; height: auto; }
+.film-pick > span:not(.custom-plus) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 30px; }
+.film-grid.scroll > * { flex: 0 0 108px; }
+.custom-plus { width: 100%; height: auto; aspect-ratio: 1.6; border-radius: 6px; font-size: 28px; }

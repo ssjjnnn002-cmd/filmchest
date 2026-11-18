@@ -80,8 +80,8 @@ export function FilmPicker({ format, anyFormat, filmId, onPick, onAddCustom, onE
   const [sortOpen, setSortOpen] = useState(false)
 
   const [gridW, setGridW] = useState(0)
-  const cols = Math.max(1, Math.floor((gridW - 20 + 6) / (96 + 6)))
-  const cellW = !showAll ? 96 : gridW ? (gridW - 20 - 6 * (cols - 1)) / cols : 96
+  const cols = Math.max(1, Math.floor((gridW - 20 + 8) / (100 + 8)))
+  const cellW = !showAll ? 108 : gridW ? (gridW - 20 - 8 * (cols - 1)) / cols : 100
   const note = (f: FilmStock) => ((stock[f.id] ?? 0) > 0 ? `재고 ${stock[f.id]}롤` : isDiscontinued(f.id) ? '단종' : '')
   const cell = (x: FilmPickItem) => {
     const f = x.film
@@ -89,17 +89,17 @@ export function FilmPicker({ format, anyFormat, filmId, onPick, onAddCustom, onE
     return (
       <Pressable key={`${f.id}|${x.format ?? ''}`} onPress={() => onPick(f.id, x.format ?? (filmFits(f.formats, format) ? undefined : f.formats[0]))} style={({ pressed }) => ({
         width: cellW, borderWidth: 2, borderColor: on ? c.safelight : 'transparent', backgroundColor: on ? c.soft : 'transparent',
-        borderRadius: 16, paddingVertical: 6, paddingHorizontal: 4, alignItems: 'center', gap: 2, transform: [{ scale: pressed ? 0.975 : 1 }],
+        borderRadius: 10, padding: 3, alignItems: 'center', gap: 4, transform: [{ scale: pressed ? 0.975 : 1 }],
       })}>
-        <Canister film={f} format={fmtOf(x)} size={84} />
-        <Text style={{ fontSize: 12, lineHeight: 15, textAlign: 'center', color: c.ink }}>{filmDisplayName(f)}</Text>
+        <Canister film={f} format={fmtOf(x)} cover />
+        <Text numberOfLines={2} style={{ fontSize: 12, lineHeight: 15, minHeight: 30, textAlign: 'center', color: c.ink }}>{filmDisplayName(f)}</Text>
         <Text style={{ fontSize: 11, lineHeight: 14, minHeight: 14, color: c.muted, fontVariant: ['tabular-nums'] }}>{note(f)}</Text>
       </Pressable>
     )
   }
   const custom = (
-    <Pressable onPress={onAddCustom} style={{ width: cellW, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 4, alignItems: 'center', gap: 2 }}>
-      <View style={{ width: 84, height: 84, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', borderColor: `${c.safelight}8C`, alignItems: 'center', justifyContent: 'center' }}>
+    <Pressable onPress={onAddCustom} style={{ width: cellW, borderRadius: 10, padding: 3, alignItems: 'center', gap: 4 }}>
+      <View style={{ width: '100%', aspectRatio: 1.6, borderRadius: 6, borderWidth: 1.5, borderStyle: 'dashed', borderColor: `${c.safelight}8C`, alignItems: 'center', justifyContent: 'center' }}>
         <Text style={{ fontSize: 34, fontWeight: '300', color: c.safelight }}>+</Text>
       </View>
       <Text style={{ fontSize: 12, fontWeight: '600', color: c.safelight }}>직접 추가</Text>
@@ -126,14 +126,14 @@ export function FilmPicker({ format, anyFormat, filmId, onPick, onAddCustom, onE
         {showAll ? sections.map((sec, i, all) => (
           <View key={sec.title ?? i}>
             {sec.title ? <View style={{ marginTop: 10, marginHorizontal: 12 }}><GroupTitle>{`${sec.title} · ${sec.items.length}`}</GroupTitle></View> : null}
-            <View onLayout={(e) => setGridW(e.nativeEvent.layout.width)} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, padding: 10 }}>
+            <View onLayout={(e) => setGridW(e.nativeEvent.layout.width)} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8, paddingHorizontal: 10 }}>
               {sec.items.map(cell)}
               {i === all.length - 1 ? custom : null}
             </View>
           </View>
         )) : (
           // 추천 6개는 가로로 넘겨 본다 (아래 칸이 바로 보이게)
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, padding: 10 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, padding: 10 }}>
             {visible.map((film) => cell({ film }))}
             {custom}
           </ScrollView>
