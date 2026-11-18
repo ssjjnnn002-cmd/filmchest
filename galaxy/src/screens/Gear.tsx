@@ -211,23 +211,27 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
         .map((sec, n) => <View key={sec.title ?? n} style={{ gap: 8 }}>{sec.title ? <GroupTitle>{`${sec.title} · ${sec.items.length}`}</GroupTitle> : null}{box(sec.items.map((lot) => {
         const film = filmById(lot.filmId)
         const late = !!lot.expiresAt && lot.expiresAt < Date.now()
-        return (
-          <Pressable key={lot.id} onPress={() => setEdit(lot.id)} style={grid ? { ...card, alignItems: 'flex-start' } : row}>
-            {grid ? <Canister film={film} format={lot.format} cover /> : <Canister film={film} format={lot.format} size={52} />}
-            <View style={{ flex: grid ? undefined : 1, gap: 2, alignSelf: 'stretch' }}>
-              {/* 바둑판: 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게, 웹·아이폰과 같음) */}
-              {grid ? <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: c.muted, lineHeight: 15 }}>{film?.brand || ' '}</Text> : null}
-              {title(grid && film?.brand ? film.name : filmDisplayName(film))}
-              {sub(`${formatInfo[lot.format].name} · ${storageText(lot)}`, 1)}
-              {/* 재고 수량은 크게, 부족·기한 지남은 옆에 둥근 표시 (웹·아이폰과 같음) */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+        const count = (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: grid ? 2 : 0 }}>
                 <Text style={{ fontSize: 16, fontWeight: '700', color: c.ink, fontVariant: ['tabular-nums'] }}>{lot.count}롤</Text>
                 {late || lot.count <= lot.lowAt ? (
                   <Text style={{ fontSize: 12, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, overflow: 'hidden',
                     backgroundColor: late ? '#ff453a' : '#fce08a', color: late ? '#fff' : '#7a5a00' }} numberOfLines={1}>{late ? '기한 지남' : '재고 부족'}</Text>
                 ) : null}
               </View>
+        )
+        return (
+          <Pressable key={lot.id} onPress={() => setEdit(lot.id)} style={grid ? { ...card, alignItems: 'flex-start' } : row}>
+            {grid ? <Canister film={film} format={lot.format} cover /> : <Canister film={film} format={lot.format} thumb={[64, 40]} />}
+            <View style={{ flex: grid ? undefined : 1, gap: 2, alignSelf: 'stretch' }}>
+              {/* 바둑판: 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게, 웹·아이폰과 같음) */}
+              {grid ? <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: c.muted, lineHeight: 15 }}>{film?.brand || ' '}</Text> : null}
+              {title(grid && film?.brand ? film.name : filmDisplayName(film))}
+              {sub(`${formatInfo[lot.format].name} · ${storageText(lot)}`, 1)}
+              {/* 재고 수량은 크게, 부족·기한 지남은 옆에 둥근 표시. 바둑판은 아래, 목록은 오른쪽 (웹·아이폰과 같음) */}
+              {grid ? count : null}
             </View>
+            {grid ? null : count}
           </Pressable>
         )
       }))}</View>)}

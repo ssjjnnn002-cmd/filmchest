@@ -921,3 +921,6 @@ body:has(.mr-overlay) .sheet-root, body:has(.mr-overlay) .alert-backdrop { z-ind
 /* 필름 상자 그림 글꼴 (Archivo, OFL — public/fonts/Archivo-OFL.txt). 폭 62~125 · 굵기 100~900 */
 @font-face { font-family: 'FilmBox Archivo'; src: url('/fonts/Archivo.ttf') format('truetype'); font-weight: 100 900; font-stretch: 62% 125%; font-style: normal; font-display: block; }
 @font-face { font-family: 'FilmBox Archivo'; src: url('/fonts/Archivo-Italic.ttf') format('truetype'); font-weight: 100 900; font-stretch: 62% 125%; font-style: italic; font-display: block; }
+
+/* 목록형 필름 재고: 수량은 오른쪽 (아이폰과 같음) */
+.row > .lot-count { flex-shrink: 0; margin: 0; }

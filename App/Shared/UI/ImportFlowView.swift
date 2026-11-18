@@ -369,7 +369,9 @@ struct RollRow: View {
                         .frame(width: 90, height: 60)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 } else {
-                    FilmCanisterView(stock: roll.film, format: roll.format).frame(width: 56, height: 56)
+                    FilmCanisterView(stock: roll.film, format: roll.format, fill: true)
+                        .frame(width: 90, height: 60)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
             }
             .frame(width: 90, height: 60)

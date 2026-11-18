@@ -487,13 +487,16 @@ export function WorkBanner() {
 
 // --- 그림
 
-export function Canister({ film, format = '135', size = 48, className, cover }: {
+export function Canister({ film, format = '135', size = 48, className, cover, thumb }: {
   film?: FilmStock; format?: FilmFormat; size?: number; className?: string
   /** 썸네일처럼 칸 너비에 꽉 채운다 (상자 비율 1.6 : 1) */
   cover?: boolean
+  /** 목록 썸네일 [너비, 높이]: 그 칸을 꽉 채운다 */
+  thumb?: [number, number]
 }) {
   const url = useMemo(() => (film ? canisterURL(film, format) : undefined), [film, format])
   if (url && cover) return <img src={url} alt={filmDisplayName(film)} className={className} style={{ display: 'block', width: '100%', aspectRatio: '1.6', objectFit: 'cover', borderRadius: 8 }} />
+  if (url && thumb) return <img src={url} alt={filmDisplayName(film)} className={className} style={{ display: 'block', width: thumb[0], height: thumb[1], flexShrink: 0, objectFit: 'cover', borderRadius: thumb[0] > 70 ? 10 : 6 }} />
   if (!url) return <div style={{ width: size, height: size, display: 'grid', placeItems: 'center', color: 'var(--muted)' }}><Icon name="film" size={size * 0.6} /></div>
   return <img src={url} width={size} height={size} alt={filmDisplayName(film)} className={className} style={{ objectFit: 'contain' }} />
 }

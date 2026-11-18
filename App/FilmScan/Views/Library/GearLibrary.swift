@@ -430,8 +430,9 @@ private struct FilmGearRow: View {
     let lot: FilmLotItem
     var body: some View {
         HStack(spacing: 14) {
-            FilmCanisterView(stock: FilmStockCatalog.stock(id: lot.filmStockID), format: lot.format)
-                .frame(width: 52, height: 52)
+            FilmCanisterView(stock: FilmStockCatalog.stock(id: lot.filmStockID), format: lot.format, fill: true)
+                .frame(width: 64, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 3) {
                 Text(lot.title).font(.subheadline.weight(.semibold)).lineLimit(1)
                 Text(lot.metaLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)

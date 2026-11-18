@@ -20,7 +20,7 @@ export function RollRow({ roll }: { roll: Roll }) {
       {/* 바둑판형 표지와 같은 가로 비율. 필름통도 같은 폭 칸에 두어 글 시작이 맞는다 */}
       <View style={{ width: 90, height: 60, alignItems: 'center', justifyContent: 'center' }}>
         {cover?.thumb ? <Image source={{ uri: cover.thumb }} style={{ width: 90, height: 60, borderRadius: 10, backgroundColor: c.filmBase }} resizeMode="cover" />
-          : <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={52} />}
+          : <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} thumb={[90, 60]} />}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>

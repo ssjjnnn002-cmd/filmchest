@@ -12,7 +12,7 @@ export function RollRow({ roll }: { roll: Roll }) {
   const url = useObjectURL(cover?.thumb)
   return (
     <div className="roll-row">
-      {url ? <img className="roll-row-thumb" src={url} alt="" /> : <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={48} className="can" />}
+      {url ? <img className="roll-row-thumb" src={url} alt="" /> : <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} thumb={[90, 60]} />}
       <div style={{ minWidth: 0, flex: 1 }}>
         <div className="roll-title">
           <b className="truncate">{rollName(roll)}</b>
@@ -36,7 +36,7 @@ export function RollCard({ roll, onClick }: { roll: Roll; onClick: () => void })
   return (
     <button className="roll-card" onClick={onClick}>
       <div className="thumb">
-        {url ? <img src={url} alt="" /> : <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={84} className="can" />}
+        {url ? <img src={url} alt="" /> : <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} cover className="can" />}
         {roll.favorite && <span className="heart star">★</span>}
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', minWidth: 0 }}>
