@@ -438,7 +438,7 @@ function CameraRow({ camera, roll }: { camera: Camera; roll?: Roll }) {
         </div>
       </button>
       {roll
-        ? <Canister film={filmById(roll.filmId)} size={34} />
+        ? <Canister film={filmById(roll.filmId)} thumb={[56, 35]} />
         : <button className="btn soft small" onClick={() => nav.loadFilm(camera.id)}>필름 장착</button>}
     </div>
   )

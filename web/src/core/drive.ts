@@ -161,6 +161,8 @@ export async function backupToDrive(force = false) {
   }
   if (!res.ok) throw new Error(`드라이브에 올리지 못했어요 (${res.status})`)
   setPref('driveFileId', id)
+  const mod = await modifiedTime(t, id)
+  if (mod) setPref('driveModified', mod)
   setPref('driveKey', key)
   setPref('drivePulledAt', String(Date.now()))
   setPref('driveLast', String(Date.now())); notifyBackup()
@@ -229,6 +231,14 @@ export function syncPhotosToDrive(onProgress?: Progress): Promise<number> {
   return syncing
 }
 
+/** 드라이브 파일이 마지막으로 바뀐 시각 (내용은 받지 않는다) */
+async function modifiedTime(t: string, id: string): Promise<string | undefined> {
+  try {
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=modifiedTime`, { headers: { Authorization: `Bearer ${t}` } })
+    return r.ok ? (await r.json())?.modifiedTime : undefined
+  } catch { return undefined }
+}
+
 /** 다른 기기(아이폰·갤럭시)가 올린 최신 기록이면 받아서 합친다. force면 늘 받는다 */
 export async function pullFromDrive(force = false) {
   const t = await driveToken()
@@ -236,8 +246,12 @@ export async function pullFromDrive(force = false) {
   const id = getPref('driveFileId', '' as string) || await findByName(t, backupFileName, root)
   if (!id) return undefined
   setPref('driveFileId', id)
+  // 파일이 바뀌지 않았으면 받지 않는다 (몇 초마다 확인해도 가볍게, 아이폰과 같음)
+  const mod = await modifiedTime(t, id)
+  if (!force && mod && mod === getPref('driveModified', '' as string)) return undefined
   const res = await fetch(downloadUrl(id), { headers: { Authorization: `Bearer ${t}` } })
   if (!res.ok) return undefined
+  if (mod) setPref('driveModified', mod)
   const blob = await res.blob()
   const saved = Date.parse(JSON.parse(await blob.text())?.savedAt ?? '') || 0
   if (!force && saved <= Number(getPref('drivePulledAt', '0'))) return undefined
@@ -306,13 +320,19 @@ export function startDriveAutoBackup() {
   const live = () => driveConnected() && hasDriveToken()
   const pull = () => { if (live() && document.visibilityState === 'visible') void pullFromDrive().catch(() => {}).then(() => pullPhotosFromDrive()).catch(() => {}) }
   pull()
-  // 보고 있는 동안 1분마다 다른 기기(아이폰·갤럭시)에서 고친 기록을 받아 온다
+  // 보고 있는 동안 5초마다 다른 기기(아이폰·갤럭시)에서 고친 기록을 받아 온다 (파일이 바뀌었을 때만), 사진은 1분마다
+  let quick = false
+  window.setInterval(() => {
+    if (quick || !live() || document.visibilityState !== 'visible') return
+    quick = true
+    void pullFromDrive().catch(() => {}).finally(() => { quick = false })
+  }, 5_000)
   window.setInterval(pull, 60_000)
   // 기록이 바뀌면 잠깐 기다렸다가 기록과 사진을 올린다 (바뀐 게 없으면 건너뛴다)
   let timer: number | undefined
   Dexie.on('storagemutated', () => {
     window.clearTimeout(timer)
-    timer = window.setTimeout(() => { if (live()) void backupToDrive().catch(() => {}) }, 4000)
+    timer = window.setTimeout(() => { if (live()) void backupToDrive().catch(() => {}) }, 1500)
   })
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') pull()

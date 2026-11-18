@@ -547,7 +547,10 @@ private struct CameraListRow: View {
             .disabled(placeholder)
 
             if let roll = camera.loadedRoll {
-                FilmCanisterView(stock: roll.film, format: roll.format).frame(width: 34, height: 34)
+                // 장착된 필름 상자를 잘 보이게 크게 (웹·갤럭시와 같음)
+                FilmCanisterView(stock: roll.film, format: roll.format, fill: true)
+                    .frame(width: 56, height: 35)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
             } else {
                 Button(action: onLoadFilm) {
                     Label("필름 장착", systemImage: "plus").font(.caption.weight(.semibold))

@@ -8,7 +8,7 @@ import { GroupTitle } from './gearExtras'
 import { db } from './data'
 import { getPref, setPref, useLiveQuery } from './store'
 import { filmLotSortTitle, filmPickSections, filmStockGroupOf, filmStockGroups, groupTitle, type FilmLotSort, type FilmPickItem, type GearGroup } from './core/gearGroup'
-import { allFilms, filmById, filmDisplayName, isDiscontinued, popularFilms, type FilmStock } from './core/films'
+import { allFilms, filmById, filmDisplayName, popularFilms, type FilmStock } from './core/films'
 import { stockCount } from './core/filmStock'
 import { filmFits } from './core/optics'
 import { formatFamily, type FilmFormat } from './core/types'
@@ -82,7 +82,7 @@ export function FilmPicker({ format, anyFormat, filmId, onPick, onAddCustom, onE
   const [gridW, setGridW] = useState(0)
   const cols = Math.max(1, Math.floor((gridW - 20 + 8) / (100 + 8)))
   const cellW = !showAll ? 108 : gridW ? (gridW - 20 - 8 * (cols - 1)) / cols : 100
-  const note = (f: FilmStock) => ((stock[f.id] ?? 0) > 0 ? `재고 ${stock[f.id]}롤` : isDiscontinued(f.id) ? '단종' : '')
+  const note = (f: FilmStock) => ((stock[f.id] ?? 0) > 0 ? `재고 ${stock[f.id]}롤` : '')
   const cell = (x: FilmPickItem) => {
     const f = x.film
     const on = isOn(x)

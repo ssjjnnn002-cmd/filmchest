@@ -202,6 +202,11 @@ enum DriveClient {
     }
 
     static func download(_ id: String) async throws -> Data { try await call("\(api)/\(id)?alt=media") }
+    /// 파일이 마지막으로 바뀐 시각 (내용을 받지 않고 바뀌었는지만 본다)
+    static func modifiedTime(_ id: String) async throws -> String? {
+        let d = try await call("\(api)/\(id)?fields=modifiedTime")
+        return (try? JSONSerialization.jsonObject(with: d) as? [String: Any])?["modifiedTime"] as? String
+    }
 
     /// 그 id의 파일·폴더가 드라이브에 아직 있는지 (휴지통에 있으면 없음). 인터넷이 안 되면 오류
     static func exists(_ id: String) async throws -> Bool {
@@ -515,6 +520,8 @@ enum DriveSync {
     private static let fileKey = "filmscan.driveFileId"
     private static let pushedKey = "filmscan.drivePushedKey"
     private static let pulledKey = "filmscan.drivePulledAt"
+    /// 드라이브 파일의 마지막 수정 시각 (같으면 받지 않는다 — 몇 초마다 확인해도 가볍게)
+    private static let modifiedKey = "filmscan.driveModified"
     static var lastSync: Date? { UserDefaults.standard.object(forKey: "filmscan.driveLast") as? Date }
 
     private static func fileID(create: Bool) async throws -> String? {
@@ -553,6 +560,7 @@ enum DriveSync {
             try await DriveClient.upload(id, data, mime: "application/json")
         }
         UserDefaults.standard.set(key, forKey: pushedKey)
+        if let m = try? await DriveClient.modifiedTime(id) { UserDefaults.standard.set(m, forKey: modifiedKey) }
         UserDefaults.standard.set(Date(), forKey: "filmscan.driveLast")
         UserDefaults.standard.set(Date(), forKey: pulledKey)   // 방금 올린 것은 다시 받지 않는다
     }
@@ -562,7 +570,10 @@ enum DriveSync {
     @discardableResult
     static func pull(_ context: ModelContext, force: Bool = false) async throws -> (cameras: Int, rolls: Int)? {
         guard let id = try await fileID(create: false) else { return nil }
+        let modified = try? await DriveClient.modifiedTime(id)
+        if !force, let modified, modified == UserDefaults.standard.string(forKey: modifiedKey) { return nil }
         let data = try await DriveClient.download(id)
+        if let modified { UserDefaults.standard.set(modified, forKey: modifiedKey) }
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         let saved = (json["savedAt"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantPast
         let pulled = UserDefaults.standard.object(forKey: pulledKey) as? Date ?? .distantPast
@@ -640,6 +651,17 @@ enum DriveSync {
             await DrivePhotos.pull(context)
         }
     }
+
+    /// 보고 있는 동안 몇 초마다: 다른 기기(웹·갤럭시)에서 고친 기록만 빨리 받는다 (사진은 onActive에서)
+    static func quickPull(_ context: ModelContext) {
+        guard GoogleAuth.isConnected, !busy else { return }
+        busy = true
+        Task { @MainActor in
+            defer { busy = false }
+            _ = try? await pull(context)
+        }
+    }
+    nonisolated(unsafe) private static var busy = false
 
     @MainActor
     static func onBackground(_ context: ModelContext) {

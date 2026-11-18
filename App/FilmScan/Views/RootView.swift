@@ -15,6 +15,8 @@ struct RootView: View {
     @State private var syncTask: Task<Void, Never>?
     /// 앱을 보고 있는 동안 다른 기기(웹·갤럭시)에서 고친 기록을 가끔 받아 온다
     @State private var pullTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+    /// 다른 기기에서 고친 기록을 거의 바로 받도록 5초마다 확인 (드라이브 파일이 바뀌었을 때만 받는다)
+    @State private var quickTimer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
 
     private var loadedCount: Int { rolls.filter { $0.deletedAt == nil && $0.status == .loaded }.count }
     private var pendingCount: Int { rolls.filter { $0.deletedAt == nil && ($0.status == .finished || $0.status == .atLab) }.count }
@@ -123,11 +125,12 @@ struct RootView: View {
                 router.receiveFiles(Store.takeAllFromInbox())
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in syncNow(delay: 4) }
+        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in syncNow(delay: 1.5) }
         .sheet(isPresented: $showWelcome) { WelcomeView() }
         // 로그아웃하면 시작 화면으로 (기록은 기기에 남아 있다)
         .onReceive(NotificationCenter.default.publisher(for: DriveSync.signedOut)) { _ in showWelcome = true }
         .onReceive(pullTimer) { _ in if scenePhase == .active { DriveSync.onActive(context) } }
+        .onReceive(quickTimer) { _ in if scenePhase == .active { DriveSync.quickPull(context) } }
         .overlay {
             if showIntro {
                 IntroView {

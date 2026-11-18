@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import type { FilmFormat } from '../core/types'
-import { allFilms, filmById, filmDisplayName, isDiscontinued, popularFilms, type FilmStock } from '../core/films'
+import { allFilms, filmById, filmDisplayName, popularFilms, type FilmStock } from '../core/films'
 import { stockCount } from '../core/filmStock'
 import { filmFits } from '../core/optics'
 import { filmLotSortTitle, filmPickSections, filmStockGroupOf, filmStockGroups, groupTitle, type FilmLotSort, type FilmPickItem, type GearGroup } from '../core/gearGroup'
@@ -116,7 +116,7 @@ export function FilmPicker({ format, anyFormat, filmId, onPick, onAddCustom, onE
                   <Canister film={f} format={fmtOf(x)} cover />
                   <span>{filmDisplayName(f)}</span>
                   <small className="film-stock">
-                    {(stock[f.id] ?? 0) > 0 ? `재고 ${stock[f.id]}롤` : isDiscontinued(f.id) ? '단종' : ''}
+                    {(stock[f.id] ?? 0) > 0 ? `재고 ${stock[f.id]}롤` : ''}
                   </small>
                 </button>
               ) })}

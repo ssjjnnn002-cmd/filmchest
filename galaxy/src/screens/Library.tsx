@@ -360,7 +360,7 @@ function CameraRow({ camera, roll, editing }: { camera: Camera; roll?: Roll; edi
         </View>
       </Pressable>
       {editing ? <View style={{ width: 34 }} /> : roll
-        ? <Canister film={filmById(roll.filmId)} size={34} />
+        ? <Canister film={filmById(roll.filmId)} thumb={[56, 35]} />
         : <Btn label="필름 장착" kind="soft" size="small" onPress={() => nav.loadFilm(camera.id)} />}
     </View>
   )

@@ -205,8 +205,6 @@ struct FilmPickSection<Footer: View>: View {
                     Text(stock.displayName).font(.caption2).lineLimit(2).multilineTextAlignment(.center)
                     if count > 0 {
                         Text("재고 \(count)롤").font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
-                    } else if stock.isDiscontinued {
-                        Text("단종").font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                 }
                 .frame(height: 38, alignment: .top)
