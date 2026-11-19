@@ -35,6 +35,15 @@
         "site/public"
       ],
       "port": 5300
+    },
+    {
+      "name": "tumblbug-assets",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "marketing/tumblbug/serve.py",
+        "5310"
+      ],
+      "port": 5310
     }
   ]
 }

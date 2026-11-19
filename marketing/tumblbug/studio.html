@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>필름함 텀블벅 이미지·영상</title>
+<style>
+  @font-face { font-family: P; src: url("file:///Users/biomac_02/Library/Fonts/Pretendard-Bold.otf"); font-weight: 700; }
+  @font-face { font-family: P; src: url("file:///Users/biomac_02/Library/Fonts/Pretendard-ExtraBold.otf"); font-weight: 800; }
+  @font-face { font-family: P; src: url("file:///Users/biomac_02/Library/Fonts/Pretendard-SemiBold.otf"); font-weight: 600; }
+  @font-face { font-family: P; src: url("file:///Users/biomac_02/Library/Fonts/Pretendard-Medium.otf"); font-weight: 500; }
+  :root { --bg: #141211; --ink: #f5f1ec; --ink2: #b9b1a8; --accent: #F0701E; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: var(--bg); }
+  body { font-family: P, sans-serif; color: var(--ink); letter-spacing: -0.02em; word-break: keep-all; -webkit-font-smoothing: antialiased; overflow: hidden; }
+  .stage { position: relative; overflow: hidden; background:
+      radial-gradient(120% 80% at 50% 110%, rgb(240 112 30 / .22), transparent 60%),
+      radial-gradient(90% 60% at 0% 0%, rgb(255 255 255 / .05), transparent 60%), var(--bg); }
+  /* 필름 구멍 띠 (위·아래 가장자리) */
+  .perf { position: absolute; left: 0; right: 0; height: var(--ph); display: flex; gap: var(--pg); justify-content: center; opacity: .16; }
+  .perf i { flex: 0 0 var(--pw); height: 100%; border-radius: calc(var(--pw) * .18); background: #fff; }
+
+  /* 폰 틀 (소개 페이지와 같은 비율) */
+  .phone { --w: 280px; position: absolute; width: var(--w); padding: calc(var(--w) * .011); border-radius: calc(var(--w) * .175);
+    background: linear-gradient(150deg, #6b6d72 0%, #2b2c2f 22%, #4a4c50 52%, #222326 78%, #55575c 100%);
+    box-shadow: 0 calc(var(--w) * .14) calc(var(--w) * .26) calc(var(--w) * -.06) rgb(0 0 0 / .7), inset 0 0 0 1px rgb(255 255 255 / .12); }
+  .phone .bezel { background: #050505; padding: calc(var(--w) * .032); border-radius: calc(var(--w) * .165); }
+  .phone .display { position: relative; overflow: hidden; background: var(--sb, #141211); border-radius: calc(var(--w) * .135); }
+  .phone .sb { display: grid; grid-template-columns: 1fr calc(var(--w) * .3) 1fr; align-items: center; height: calc(var(--w) * .115); color: #fff;
+    font: 600 calc(var(--w) * .041)/1 -apple-system, "SF Pro Text", sans-serif; }
+  .phone .sb .t { justify-self: center; padding-left: calc(var(--w) * .02); }
+  .phone .sb .island { height: calc(var(--w) * .082); border-radius: 999px; background: #000; }
+  .phone .sb .ic { justify-self: center; display: flex; gap: calc(var(--w) * .012); padding-right: calc(var(--w) * .02); }
+  .phone .sb svg { height: calc(var(--w) * .033); width: auto; fill: #fff; }
+  .phone .shot { position: relative; aspect-ratio: 390 / 844; }
+  .phone .shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+
+  .eyebrow { color: var(--accent); font-weight: 700; }
+  h1, h2 { font-weight: 800; line-height: 1.18; letter-spacing: -0.04em; }
+  .sub { color: var(--ink2); font-weight: 500; line-height: 1.45; }
+  .brand { display: flex; align-items: center; font-weight: 800; letter-spacing: -0.03em; }
+  .brand svg { display: block; }
+  .chip { display: inline-block; padding: .35em .8em; border-radius: 999px; background: rgb(240 112 30 / .16); color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const IMG = '../../site/public/img/'
+const SB = { picker: '#0c0c0c', load: '#0c0c0c', record: '#000000', frame: '#000000', stats: '#0a0804' }
+const ICONS = `<svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .3 10.6 10.6 0 0 0 .5 3.4l1.3 1.3A8.7 8.7 0 0 1 8 2.2Zm0 3.7c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c1-.9 2.2-1.4 3.6-1.4Zm0 3.6c.5 0 1 .2 1.3.5L8 11.3 6.7 10c.3-.3.8-.5 1.3-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="#fff" stroke-opacity=".45"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M25 4v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2Z" fill-opacity=".45"/></svg>`
+const LOGO = (s) => `<svg width="${s}" height="${s}" viewBox="0 0 1024 1024" style="border-radius:${s * .225}px"><rect width="1024" height="1024" fill="#1d1b1a"/><g transform="translate(512,512) scale(1.18) translate(-499,-508)"><g fill="none" stroke="#F0701E" stroke-width="33" stroke-linejoin="round" stroke-linecap="round"><rect x="292" y="356" width="232" height="360" rx="40"/><path d="M364 356V316Q364 292 388 292H428Q452 292 452 316V356"/><path d="M524 420H708Q732 420 732 444V548Q732 572 708 572H676Q652 572 652 596V628Q652 652 628 652H524"/></g><rect x="563" y="463" width="30" height="30" rx="7" fill="#F0701E"/><rect x="613" y="463" width="30" height="30" rx="7" fill="#F0701E"/><rect x="663" y="463" width="30" height="30" rx="7" fill="#F0701E"/><rect x="563" y="577" width="30" height="30" rx="7" fill="#F0701E"/></g></svg>`
+
+/** 폰 하나. shots: [이름, 투명도] 여러 장 겹치기 (영상 화면 전환용) */
+function phone(w, x, y, rot, shots, extra = '') {
+  const list = Array.isArray(shots) ? shots : [[shots, 1]]
+  const top = list.reduce((a, b) => (b[1] > a[1] ? b : a))[0]
+  return `<div class="phone" style="--w:${w}px; left:${x}px; top:${y}px; transform: rotate(${rot}deg); --sb:${SB[top] ?? '#141211'}; ${extra}">
+    <div class="bezel"><div class="display"><div class="sb"><span class="t">9:41</span><span class="island"></span><span class="ic">${ICONS}</span></div>
+    <div class="shot">${list.map(([n, o]) => `<img src="${IMG}${n}.webp" style="opacity:${o}">`).join('')}</div></div></div></div>`
+}
+function perf(W, H, side) {
+  const ph = Math.round(H * .024), pw = Math.round(ph * 1.45), pg = Math.round(pw * .9)
+  const n = Math.ceil(W / (pw + pg)) + 2
+  return `<div class="perf" style="--ph:${ph}px; --pw:${pw}px; --pg:${pg}px; ${side}:${Math.round(ph * .7)}px">${'<i></i>'.repeat(n)}</div>`
+}
+
+// ───────── 대표 이미지 (600×600 css, 2배로 찍어 1200×1200) ─────────
+const S = 600
+const stills = {
+  1: () => `
+    ${perf(S, S, 'top')}
+    <div style="position:absolute; left:0; right:0; top:58px; text-align:center">
+      <div class="brand" style="justify-content:center; gap:10px; font-size:22px">${LOGO(34)}필름함</div>
+      <h1 style="font-size:52px; margin-top:18px">찍은 롤,<br>하나도 잊지 않게</h1>
+    </div>
+    ${phone(170, 92, 312, -8, 'picker')}
+    ${phone(170, 338, 312, 8, 'record')}
+    ${phone(196, 202, 268, 0, 'library', 'z-index:2')}`,
+  2: () => feature('필름 고르기', '필름은<br>상자 그대로', '100종 넘는 필름, 한글로 찾기', ['picker', 'load']),
+  3: () => feature('상세 기록', '컷마다 셔터와<br>조리개까지', '장소와 시간도 컷마다 남아요', ['record', 'shooting']),
+  4: () => feature('현상·스캔', '스캔한 사진도<br>롤 안에', '현상소 zip을 폰에서 바로 정리', ['roll', 'contact']),
+  5: () => `
+    ${perf(S, S, 'top')}
+    <div style="position:absolute; left:44px; top:62px">
+      <span class="chip" style="font-size:15px">내 장비 · 재고 · 통계</span>
+      <h2 style="font-size:44px; margin-top:16px">내 필름 생활,<br>한눈에</h2>
+    </div>
+    ${phone(160, 44, 300, 0, 'library')}
+    ${phone(160, 220, 256, 0, 'stock')}
+    ${phone(160, 396, 300, 0, 'stats')}`,
+}
+// 텀블벅 대표 이미지용: 얹은 글자 없이 앱 화면만 (가이드: 글자 없는 창작물 이미지)
+const bare = {
+  1: () => `
+    ${perf(S, S, 'top')}${perf(S, S, 'bottom')}
+    ${phone(182, 52, 94, -8, 'picker')}
+    ${phone(182, 366, 94, 8, 'record')}
+    ${phone(210, 195, 54, 0, 'library', 'z-index:2')}`,
+  2: () => pair(['picker', 'load']),
+  3: () => pair(['record', 'shooting']),
+  4: () => pair(['roll', 'contact']),
+  5: () => `
+    ${perf(S, S, 'top')}${perf(S, S, 'bottom')}
+    ${phone(176, 22, 100, 0, 'library')}
+    ${phone(176, 212, 70, 0, 'stock', 'z-index:2')}
+    ${phone(176, 402, 100, 0, 'stats')}`,
+}
+function pair([a, b]) {
+  return `
+    ${perf(S, S, 'top')}${perf(S, S, 'bottom')}
+    ${phone(202, 322, 50, 6, b)}
+    ${phone(202, 78, 92, -4, a, 'z-index:2')}`
+}
+function feature(tag, title, sub, [a, b]) {
+  return `
+    ${perf(S, S, 'top')}
+    <div style="position:absolute; left:44px; top:62px; width:250px">
+      <span class="chip" style="font-size:15px">${tag}</span>
+      <h2 style="font-size:44px; margin-top:16px">${title}</h2>
+      <p class="sub" style="font-size:18px; margin-top:16px">${sub}</p>
+    </div>
+    ${phone(190, 300, 150, 0, b)}
+    ${phone(190, 168, 300, 0, a, 'z-index:2')}`
+}
+
+// ───────── 대표 영상 (1920×1080, 시간 t초로 한 장면을 그린다) ─────────
+const VW = 1920, VH = 1080
+const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : 1 - Math.pow(1 - x, 3))
+const clamp = (x) => Math.max(0, Math.min(1, x))
+const SCENES = [
+  { d: 4.5, draw: introScene },
+  { d: 6.5, draw: (t) => featScene(t, '내 장비', '카메라와 렌즈,<br>필름 재고까지', '마운트와 포맷은 알아서 채워져요', ['library', 'stock']) },
+  { d: 6.5, draw: (t) => featScene(t, '필름 고르기', '필름은<br>상자 그대로', '100종 넘는 필름을 한글로 찾아요', ['picker', 'load'], true) },
+  { d: 6.5, draw: (t) => featScene(t, '상세 기록', '컷마다 셔터와<br>조리개까지', '장소와 시간도 컷마다 남아요', ['shooting', 'record']) },
+  { d: 6.5, draw: (t) => featScene(t, '현상·스캔', '스캔한 사진도<br>롤 안에', '현상소 zip을 폰에서 바로 정리해요', ['roll', 'frame'], true) },
+  { d: 6.5, draw: (t) => featScene(t, '롤 보관함', '찍은 롤을<br>한곳에', '밀어서 즐겨찾기, 태그로 묶기', ['rolls', 'contact']) },
+  { d: 6.5, draw: (t) => featScene(t, '통계', '내 필름 생활,<br>한눈에', '많이 쓴 필름과 카메라, 달마다 찍은 롤', ['stats', 'library'], true) },
+  { d: 6.5, draw: outroScene },
+]
+const TOTAL = SCENES.reduce((s, x) => s + x.d, 0)
+
+function introScene(t, d) {
+  const a = ease(t / 1.1), b = ease((t - .6) / 1.1), out = 1 - clamp((t - (d - .5)) / .5)
+  return `<div style="position:absolute; inset:0; opacity:${out}">
+    ${perf(VW, VH, 'top')}${perf(VW, VH, 'bottom')}
+    <div style="position:absolute; left:0; right:0; top:${330 - 20 * a}px; text-align:center; opacity:${a}">
+      <div class="brand" style="justify-content:center; gap:22px; font-size:56px">${LOGO(96)}필름함</div>
+    </div>
+    <div style="position:absolute; left:0; right:0; top:${520 - 24 * b}px; text-align:center; opacity:${b}">
+      <h1 style="font-size:96px">찍은 롤, 하나도 잊지 않게</h1>
+      <p class="sub" style="font-size:36px; margin-top:22px">필름 카메라 기록 앱</p>
+    </div></div>`
+}
+function featScene(t, tag, title, sub, [a, b], flip) {
+  const d = 6.5
+  const tin = ease(t / .9), pin = ease((t - .15) / 1), out = 1 - clamp((t - (d - .45)) / .45)
+  const swap = clamp((t - 3.1) / .6) // 3초쯤 두 번째 화면으로
+  const textX = flip ? 1040 : 200, phoneX = flip ? 360 : 1180
+  const w = 400
+  return `<div style="position:absolute; inset:0; opacity:${out}">
+    ${perf(VW, VH, 'top')}
+    <div style="position:absolute; left:${textX + (1 - tin) * (flip ? 40 : -40)}px; top:330px; width:640px; opacity:${tin}">
+      <span class="chip" style="font-size:30px">${tag}</span>
+      <h2 style="font-size:92px; margin-top:28px">${title}</h2>
+      <p class="sub" style="font-size:38px; margin-top:28px">${sub}</p>
+    </div>
+    ${phone(w, phoneX, 150 + (1 - pin) * 260, 0, [[a, 1 - swap], [b, swap]], `opacity:${pin}`)}
+  </div>`
+}
+function outroScene(t, d) {
+  const a = ease(t / 1), b = ease((t - .7) / 1), c = ease((t - 1.4) / 1)
+  return `<div style="position:absolute; inset:0">
+    ${perf(VW, VH, 'top')}${perf(VW, VH, 'bottom')}
+    <div style="position:absolute; left:0; right:0; top:${300 - 20 * a}px; text-align:center; opacity:${a}">
+      <span class="chip" style="font-size:32px">정식 출시 준비 중</span>
+    </div>
+    <div style="position:absolute; left:0; right:0; top:${400 - 24 * b}px; text-align:center; opacity:${b}">
+      <h1 style="font-size:92px">아이폰 · 갤럭시 앱,<br>함께 만들어 주세요</h1>
+    </div>
+    <div style="position:absolute; left:0; right:0; top:${720 - 16 * c}px; opacity:${c}">
+      <div class="brand" style="justify-content:center; gap:18px; font-size:44px">${LOGO(72)}필름함</div>
+    </div></div>`
+}
+function drawVideo(time) {
+  let t = time
+  for (const s of SCENES) {
+    if (t < s.d) return s.draw(t, s.d)
+    t -= s.d
+  }
+  return SCENES.at(-1).draw(SCENES.at(-1).d, SCENES.at(-1).d)
+}
+
+// ───────── 주소로 고른다: ?still=1 · ?video ─────────
+const q = new URLSearchParams(location.search)
+const root = document.getElementById('root')
+if (q.has('bare')) {
+  root.innerHTML = `<div class="stage" style="width:${S}px; height:${S}px">${bare[q.get('bare')]()}</div>`
+} else if (q.has('still')) {
+  root.innerHTML = `<div class="stage" style="width:${S}px; height:${S}px">${stills[q.get('still')]()}</div>`
+} else {
+  root.innerHTML = `<div class="stage" id="v" style="width:${VW}px; height:${VH}px"></div>`
+  window.TOTAL = TOTAL
+  window.frame = (t) => { document.getElementById('v').innerHTML = drawVideo(t) }
+  window.frame(Number(q.get('t') ?? 2))
+}
+</script>
+</body>
+</html>

@@ -24,6 +24,8 @@ const themes: [string, string][] = [['system', '기기 설정'], ['light', '라�
 /** 기기 밖에 남긴 마지막 백업 */
 export const lastBackupText = () => { const t = lastBackupAt(); return t ? `마지막 백업 ${formatDateTime(t)}.` : '아직 기기 밖에 백업하지 않았어요.' }
 
+const SHOW_APK = false
+
 export function Settings({ onClose, openBackup = false }: { onClose: () => void; openBackup?: boolean }) {
   useBackupRefresh()
   const [theme, setTheme] = useState<string>(getPref('theme', 'system'))
@@ -51,6 +53,8 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
     // 아이폰, 클로드 화면, 이미 설치된 앱 안에서는 숨긴다
     const installed = matchMedia('(display-mode: standalone)').matches || document.referrer.startsWith('android-app://')
     if (inClaudeHost() || installed || /iPhone|iPad|iPod/.test(navigator.userAgent)) return
+    // 정식 출시(플레이스토어) 준비 중이라 내려받기는 숨긴다. 파일은 남겨 둬서 이미 설치한 앱의 업데이트는 그대로
+    if (!SHOW_APK) return
     setApk(true)
   }, [])
 
