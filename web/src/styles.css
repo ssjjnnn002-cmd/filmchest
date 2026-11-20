@@ -942,3 +942,24 @@ body:has(.mr-overlay) .sheet-root, body:has(.mr-overlay) .alert-backdrop { z-ind
 
 /* 촬영 중 카드: 꾹 누를 때 글자 선택·확대 메뉴가 뜨지 않게 */
 .shooting-main { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/* 촬영일·장소 고칠 때 컷 범위 고르기 (필름 띠) */
+.range-strip { display: flex; gap: 4px; overflow-x: auto; padding: 6px; border-radius: 12px; background: var(--film-base); scrollbar-width: none; }
+.range-strip::-webkit-scrollbar { display: none; }
+.range-strip button { flex: 0 0 64px; display: grid; justify-items: center; gap: 3px; padding: 0; border: 0; background: none; cursor: pointer; color: rgb(255 255 255 / .7); opacity: .55; }
+.range-strip button.on { opacity: 1; color: var(--safelight); }
+.range-strip .cell { width: 64px; height: 44px; border-radius: 5px; overflow: hidden; display: grid; place-items: center; background: rgb(0 0 0 / .35); box-sizing: border-box; border: 3px solid transparent; }
+.range-strip button.on .cell { border-color: var(--safelight); }
+.range-strip .cell img { width: 100%; height: 100%; object-fit: cover; }
+.range-strip .cell b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.range-strip .num { font-size: 11px; font-variant-numeric: tabular-nums; }
+.range-strip .cap { font-size: 9px; color: rgb(255 255 255 / .6); width: 64px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.range-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 4px 0; white-space: nowrap; }
+
+/* 고르는 메뉴 (보기 방식): 왼쪽 체크 · 아이콘 · 이름, 줄 사이 선 없이 (아이폰 메뉴와 같은 모양) */
+.pick-menu .row { gap: 10px; border-top: 0 !important; white-space: nowrap; }
+.pick-menu .pick-check { width: 18px; display: grid; }
+.pick-menu .pick-section { position: relative; padding-top: 6px; margin-top: 6px; }
+.pick-menu .pick-section::after { content: ''; position: absolute; top: 0; left: 16px; right: 16px; height: 1px; background: var(--sep); }
+.pick-trigger { border: 0; background: none; color: var(--safelight); font: inherit; font-size: 17px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; padding: 0; }
+.pick-menu .row::before { display: none; }

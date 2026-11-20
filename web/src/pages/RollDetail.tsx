@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll } from '../db'
 import { useNav } from '../App'
-import { weatherText, type Camera, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
+import { formatInfo, weatherText, type Camera, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
 import { exposureText, meterFrameTitle, meterProgress, meterShotsByOrder, shotRowMeta } from '../core/meter'
 import { ManualRecord, RollShotEdit } from './ManualRecord'
 import { features } from '../core/features'
 import { RollGalleryButton } from '../ui/GallerySave'
-import { CameraCover, Canister, cameraName, Confirm, Sheet, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedDays, sortedLocations } from '../ui/common'
+import { CameraCover, Canister, cameraName, Confirm, Sheet, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedLocations } from '../ui/common'
 import { DayEdit, LabDropOff, LabField, LensChangeEdit, PlaceEdit, rememberLab } from './Editors'
 import { RollProjects } from './Projects'
 import { TagField } from '../ui/gearExtras'
@@ -16,6 +16,8 @@ import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
 import { ScanButton } from './Pending'
 import { driveConnected, hasDriveToken, syncPhotosToDrive } from '../core/drive'
 import { refreshRollPhotoMeta, reverseRollFrames } from '../core/importer'
+import { resolvedDays, span } from '../core/rangeEdit'
+import { orderedDays } from '../core/timeline'
 
 export function RollDetail({ id }: { id: string }) {
   const nav = useNav()
@@ -49,9 +51,19 @@ export function RollDetail({ id }: { id: string }) {
   // 상세 기록이 있으면 컷마다 시간·장소가 있어 촬영일·장소 칸은 따로 두지 않는다
   const noShots = !(roll.meterShots?.length)
   const locs = sortedLocations(roll)
+  // 컷 수: 스캔 장 수, 없으면 필름 규격 (범위 표시에)
+  const total = roll.frameCount ?? formatInfo[rollCameraFormat(camera, roll)].count
+  const days = resolvedDays(roll.days, total)
+  const dayRange = (d: ShootingDay) => {
+    const i = days.findIndex((x) => x.id === d.id)
+    if (i < 0) return ''
+    const [a, b] = span(days[i].startFrame ?? 1, days[i + 1]?.startFrame, total)
+    const text = a === b ? `${a}번` : `${a}–${b}번`
+    return d.startFrame === undefined && i > 0 ? `약 ${text}` : text
+  }
   const rangeOf = (i: number) => {
     const s = locs[i].startFrame
-    const end = i + 1 < locs.length ? locs[i + 1].startFrame - 1 : roll.frameCount
+    const end = i + 1 < locs.length ? locs[i + 1].startFrame - 1 : total
     if (end && end > s) return `${s}–${end}번`
     if (end === s) return `${s}번`
     return `${s}번부터`
@@ -123,10 +135,10 @@ export function RollDetail({ id }: { id: string }) {
       {noShots && <div className="section">
         <h2>촬영일</h2>
         <div className="group">
-          {sortedDays(roll).map((d) => (
+          {orderedDays(roll.days).map((d) => (
             <button key={d.id} className="row" onClick={() => setDay(d)}>
               <span className="grow">{fmtDayTime(d.startedAt)}</span>
-              <span className="value">{d.startFrame ? `${d.startFrame}번부터` : '컷 미확인'}</span>
+              <span className="value">{dayRange(d)}</span>
             </button>
           ))}
           {roll.isArchive && roll.days.length === 0 && <div className="row static sub">알 수 없음 (원본 날짜 유지)</div>}
@@ -160,19 +172,20 @@ export function RollDetail({ id }: { id: string }) {
         <div className="group">
           {locs.map((l, i) => (
             <button key={l.id} className="row" onClick={() => setPlace(l)}>
-              <span style={{ color: l.point ? 'var(--safelight)' : 'var(--warn)' }}><Icon name="pin" /></span>
+              {/* 이름만 있고 좌표가 없으면 주황, 장소 미상은 회색 */}
+              <span style={{ color: l.point ? 'var(--safelight)' : l.name ? 'var(--warn)' : 'var(--muted)' }}><Icon name="pin" /></span>
               <span className="grow">
-                {l.name || '장소 없음'}
+                {l.name || '장소 미상'}
                 {l.memo && <div className="sub">{l.memo}</div>}
                 {l.weather && <div className="sub">{weatherText(l.weather)}</div>}
-                {!l.point && <div className="sub" style={{ color: 'var(--warn)' }}>좌표 없음</div>}
+                {!l.point && l.name && <div className="sub" style={{ color: 'var(--warn)' }}>좌표 없음</div>}
               </span>
               <span className="value">{rangeOf(i)}</span>
             </button>
           ))}
           <button className="row accent" onClick={() => setPlace('new')}><Icon name="plus" /> 장소 추가</button>
         </div>
-        {locs.some((l) => !l.point) && <p className="footnote warn">주황색 장소는 좌표가 없어 사진에 위치가 기록되지 않아요. 눌러서 좌표를 넣어 주세요.</p>}
+        {locs.some((l) => !l.point && l.name) && <p className="footnote warn">주황색 장소는 좌표가 없어 사진에 위치가 기록되지 않아요. 눌러서 좌표를 넣어 주세요.</p>}
       </div>}
 
       {(roll.status === 'atLab' || roll.status === 'imported' || roll.lab || roll.droppedAt || roll.scanner || resolutionText(roll.scanW, roll.scanH) || roll.frameCount || roll.importedAt) && (

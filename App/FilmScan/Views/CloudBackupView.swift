@@ -42,6 +42,10 @@ struct CloudBackupView: View {
             Section {
                 if GoogleAuth.isConnected {
                     LabeledContent("연결됨", value: GoogleAuth.account ?? "구글 드라이브")
+                    if GoogleAuth.missingScope {
+                        Label(GoogleAuth.scopeMessage, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote).foregroundStyle(.orange)
+                    }
                     if let last = DriveSync.lastSync {
                         LabeledContent("마지막으로 맞춤", value: last.formatted(date: .abbreviated, time: .shortened))
                     }
@@ -87,9 +91,13 @@ struct CloudBackupView: View {
                                 #endif
                                 // 다른 앱으로 넘어가도 이어서 올린다
                                 BackgroundUpload.begin()
-                                let error = await DrivePhotos.sync(context) { done, total, step in
+                                // 기록도 지금 앱과 똑같이 맞춘다
+                                var pushError: String?
+                                do { try await DriveSync.push(context) } catch { pushError = "기록을 올리지 못했어요. \(error.localizedDescription)" }
+                                let photoError = await DrivePhotos.sync(context) { done, total, step in
                                     photoProgress = (done, total, step.isEmpty ? (photoProgress?.step ?? "") : step)
                                 }
+                                let error = [pushError, photoError].compactMap { $0 }.first
                                 BackgroundUpload.end()
                                 photoProgress = nil
                                 if let error {

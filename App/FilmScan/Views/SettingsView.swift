@@ -66,7 +66,7 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    NavigationLink("통계") { StatsView() }
+                    NavigationLink("통계와 기록") { StatsView() }
                 }
 
                 if Features.meter { meterSection }

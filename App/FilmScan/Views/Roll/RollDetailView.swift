@@ -150,10 +150,10 @@ struct RollDetailView: View {
             // 상세 기록이 있으면 컷마다 시간·장소가 있어 촬영일·장소 칸은 따로 두지 않는다
             if roll.meterShots.isEmpty {
             Section {
-                ForEach(roll.sortedDays) { day in
+                ForEach(roll.daysInFrameOrder) { day in
                     Button { editingDay = day } label: {
                         LabeledContent(Fmt.dayTime.string(from: day.startedAt),
-                                       value: day.startFrame.map { "\($0)번부터" } ?? "컷 미확인")
+                                       value: dayRange(day))
                     }
                     .buttonStyle(.plain)
                     .contextMenu {
@@ -214,7 +214,7 @@ struct RollDetailView: View {
             } header: {
                 Text("장소")
             } footer: {
-                if roll.locations.contains(where: { $0.point == nil }) {
+                if roll.locations.contains(where: { $0.point == nil && !$0.name.isEmpty }) {
                     Text("주황색 장소는 좌표가 없어 사진에 위치가 기록되지 않아요. 눌러서 장소를 검색해 주세요.")
                 }
             }
@@ -455,13 +455,15 @@ struct RollDetailView: View {
 
     private func placeRow(_ seg: LocationSegment, range: String) -> some View {
         HStack(alignment: .top) {
-            Image(systemName: seg.point == nil ? "mappin.slash" : "mappin.circle.fill")
-                .foregroundStyle(seg.point == nil ? .orange : Theme.safelight)
+            // 이름만 있고 좌표가 없으면 주황(검색해 달라는 뜻), 장소 미상은 회색
+            let unknown = seg.name.isEmpty && seg.point == nil
+            Image(systemName: unknown ? "questionmark.circle" : seg.point == nil ? "mappin.slash" : "mappin.circle.fill")
+                .foregroundStyle(unknown ? .secondary : seg.point == nil ? Color.orange : Theme.safelight)
             VStack(alignment: .leading, spacing: 2) {
-                Text(seg.name.isEmpty ? "장소 없음" : seg.name)
+                Text(seg.name.isEmpty ? "장소 미상" : seg.name)
                 if let memo = seg.memo { Text(memo).font(.caption).foregroundStyle(.secondary) }
                 if let w = seg.weather { Text(w.summary).font(.caption).foregroundStyle(.secondary) }
-                if seg.point == nil { Text("좌표 없음").font(.caption2).foregroundStyle(.orange) }
+                if seg.point == nil, !unknown { Text("좌표 없음").font(.caption2).foregroundStyle(.orange) }
             }
             Spacer()
             Text(range).foregroundStyle(.secondary)
@@ -554,10 +556,20 @@ struct RollDetailView: View {
         roll.locations.removeAll { $0.id == seg.id }
     }
 
+    /// 촬영일이 덮는 컷 "1–18번" (시작 컷을 모르는 날은 고르게 나눈 값이라 "약")
+    private func dayRange(_ day: ShootingDay) -> String {
+        let total = roll.frameCount ?? (roll.frames ?? []).map(\.index).max() ?? roll.format.nominalFrameCount
+        let resolved = RangeEdit.resolvedDays(roll.shootingDays, frameCount: total)
+        guard let i = resolved.firstIndex(where: { $0.id == day.id }), let start = resolved[i].startFrame else { return "" }
+        let r = RangeEdit.span(start: start, nextStart: i + 1 < resolved.count ? resolved[i + 1].startFrame : nil, frameCount: total)
+        let text = r.count == 1 ? "\(r.lowerBound)번" : "\(r.lowerBound)–\(r.upperBound)번"
+        return day.startFrame == nil && i > 0 ? "약 \(text)" : text
+    }
+
     /// "1–12번" 같은 구간 표시
     private var placeRanges: [(segment: LocationSegment, range: String)] {
         let list = roll.sortedLocations
-        let total = roll.frameCount
+        let total: Int? = roll.frameCount ?? (roll.frames ?? []).map(\.index).max() ?? roll.format.nominalFrameCount
         return list.enumerated().map { i, seg in
             let end = i + 1 < list.count ? list[i + 1].startFrame - 1 : total
             if let end, end > seg.startFrame { return (seg, "\(seg.startFrame)–\(end)번") }

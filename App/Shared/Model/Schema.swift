@@ -319,6 +319,8 @@ final class RollItem {
 
     /// 보관함 썸네일 컷: 정해 둔 컷, 없으면 첫 장
     /// 대표 사진 작은 이미지. 돌려 둔 사진이면 돌린 방향 그대로 (가로 원본을 세로로 세운 경우 등)
+    /// 롤 기록은 화면(메인)에서만 읽는다. 다른 작업에서 읽으면 앱이 꺼진다
+    @MainActor
     func coverImage(maxPixel: Int) async -> CGImage? {
         guard let frame = coverFrame, let data = frame.thumbnail else { return nil }
         let turns = frame.turns
@@ -331,7 +333,10 @@ final class RollItem {
         let frames = sortedFrames
         return frames.first { $0.index == coverFrameIndex } ?? frames.first
     }
+    /// 날짜 순서 (가장 이른 날·늦은 날을 볼 때)
     var sortedDays: [ShootingDay] { shootingDays.sorted { $0.startedAt < $1.startedAt } }
+    /// 컷 순서 (롤 화면 촬영일 목록: 범위로 고친 기록도 컷 순서대로)
+    var daysInFrameOrder: [ShootingDay] { FrameTimeline.orderedDays(shootingDays) }
     var sortedLocations: [LocationSegment] { locations.sorted { $0.startFrame < $1.startFrame } }
 
     /// 예: "2026.09.27 – 10.03"

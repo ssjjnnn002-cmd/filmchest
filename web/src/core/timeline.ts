@@ -6,6 +6,14 @@ export interface FrameInfo {
   location?: LocationSegment
 }
 
+/** 촬영일 순서. 모두 시작 컷이 있으면 컷 순서로 (범위로 고친 기록: 뒤 컷에 앞 날짜를 넣어도 그대로), 아니면 날짜 순서로. 아이폰과 같음 */
+export function orderedDays(days: ShootingDay[]): ShootingDay[] {
+  if (days.length > 1 && days.slice(1).every((d) => d.startFrame !== undefined)) {
+    return [...days].sort((a, b) => (a.startFrame ?? 1) - (b.startFrame ?? 1) || a.startedAt - b.startedAt)
+  }
+  return [...days].sort((a, b) => a.startedAt - b.startedAt)
+}
+
 /** 촬영일별 시작 컷. 모르는 날은 앞뒤 기준점 사이를 고르게 나눈다. 첫 값은 항상 1. */
 export function startFrames(days: ShootingDay[], frameCount: number): number[] {
   if (days.length === 0) return []
@@ -58,7 +66,7 @@ export function buildTimeline(roll: Pick<Roll, 'days' | 'locations' | 'loadedAt'
 
 function spreadTimeline(roll: Pick<Roll, 'days' | 'locations' | 'loadedAt'>, frameCount: number): FrameInfo[] {
   if (frameCount <= 0) return []
-  const days = [...roll.days].sort((a, b) => a.startedAt - b.startedAt)
+  const days = orderedDays(roll.days)
   const starts = startFrames(days, frameCount)
   const locations = [...roll.locations].sort((a, b) => a.startFrame - b.startFrame)
   const out: FrameInfo[] = []

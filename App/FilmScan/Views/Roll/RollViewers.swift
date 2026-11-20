@@ -165,7 +165,7 @@ struct FrameViewer: View {
 }
 
 /// 한 장: 먼저 미리보기, 이어서 사진 앱 원본을 크게 불러와 확대할 수 있게
-private struct FramePage: View {
+struct FramePage: View {
     let frame: FrameItem
     @State private var thumb: CGImage?
     @State private var full: CGImage?

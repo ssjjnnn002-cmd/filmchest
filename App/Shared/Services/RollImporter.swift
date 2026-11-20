@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import CoreLocation
 import Photos
 import SwiftData
@@ -343,6 +344,14 @@ extension RollImporter {
         }
         let removed = await PhotoLibrary.delete(assetIDs: old)
         return (replaced.count, removed)
+    }
+
+    /// 사진에 쓰는 롤 정보의 짧은 지문. 바뀌면 드라이브 사진을 다시 올린다
+    @MainActor
+    static func infoStamp(frame: FrameItem, roll: RollItem) -> String {
+        guard let meta = metadata(for: frame, roll: roll) else { return "0" }
+        let text = String(describing: meta) + "|\(frame.turns)"
+        return String(SHA256.hash(data: Data(text.utf8)).prefix(6).map { String(format: "%02x", $0) }.joined())
     }
 
     /// 사진 파일 속 날짜·위치·카메라 정보를 지금 롤 기록으로 다시 쓴 사본 (드라이브에 올릴 때). 못 쓰면 nil

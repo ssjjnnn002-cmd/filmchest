@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { fieldFocusListeners } from './fieldFocus'
 import { ActivityIndicator, Animated, findNodeHandle, Keyboard, Modal, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native'
 import { Text } from './text'
+import { Icon } from './icons'
 import { Glass } from './glass'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from './theme'
@@ -269,7 +270,23 @@ export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onC
 }
 
 /** 오른쪽 위 버튼에서 내려오는 메뉴 (.menu) */
-export function Menu({ items, onClose }: { items: { label: string; danger?: boolean; onPress: () => void }[]; onClose: () => void }) {
+export interface MenuAnchor { x: number; y: number; w: number; h: number }
+/** 누른 것의 화면 위치 (Menu를 그 바로 아래에 띄울 때) */
+export function measureAnchor(ref: RefObject<View | null>): Promise<MenuAnchor | undefined> {
+  return new Promise((done) => {
+    if (!ref.current) return done(undefined)
+    ref.current.measureInWindow((x, y, w, h) => done({ x, y, w, h }))
+  })
+}
+
+export function Menu({ items, onClose, anchor }: {
+  /** section: 이 줄부터 새 칸 (칸 사이는 굵은 선, 아이폰 메뉴처럼) */
+  items: { label: string; danger?: boolean; icon?: string; checked?: boolean; section?: boolean; onPress: () => void }[]; onClose: () => void
+  /** 있으면 그 바로 아래, 없으면 오른쪽 위 */
+  anchor?: MenuAnchor
+}) {
+  const marks = items.some((it) => it.checked !== undefined)
+  const { width: screenW } = useWindowDimensions()
   const c = useTheme()
   const insets = useSafeAreaInsets()
   const nested = !!useContext(HostContext)
@@ -278,15 +295,22 @@ export function Menu({ items, onClose }: { items: { label: string; danger?: bool
   useEffect(() => { Animated.timing(scale, { toValue: 1, duration: 180, useNativeDriver: true }).start() }, [scale])
   const inner = (
     <Pressable onPress={onClose} style={{ flex: 1 }}>
-      <Animated.View style={{ position: 'absolute', right: 16, top: insets.top + 10 + 52, minWidth: 200, borderRadius: 18, overflow: 'hidden', boxShadow: '0px 12px 40px rgba(0,0,0,0.2)', transform: [{ scale }] }}>
+      <Animated.View style={{ position: 'absolute', ...(anchor
+        ? (anchor.x + anchor.w / 2 < screenW / 2 ? { left: Math.max(8, anchor.x) } : { right: Math.max(8, screenW - anchor.x - anchor.w) })
+        : { right: 16 }), top: anchor ? anchor.y + anchor.h + 6 : insets.top + 10 + 52, minWidth: 200, borderRadius: 18, overflow: 'hidden', boxShadow: '0px 12px 40px rgba(0,0,0,0.2)', transform: [{ scale }] }}>
         <Glass intensity={40} tint={c.dark ? 'dark' : 'light'} style={{ backgroundColor: c.glass }}>
-          {items.map((it, i) => (
-            <Pressable key={it.label} onPress={() => { onClose(); it.onPress() }}
-              style={({ pressed }) => ({ minHeight: 46, paddingVertical: 10, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: pressed ? c.fill : 'transparent',
-                borderTopWidth: i ? 0.5 : 0, borderTopColor: c.sep })}>
+          {items.map((it, i) => [
+            // 칸 사이는 얇은 선 (아이폰 메뉴와 같음)
+            it.section ? <View key={`sep-${i}`} style={{ height: 1, marginHorizontal: 16, marginVertical: 6, backgroundColor: c.sep }} /> : null,
+            <Pressable key={`${i}-${it.label}`} onPress={() => { onClose(); it.onPress() }}
+              style={({ pressed }) => ({ minHeight: 46, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: pressed ? c.fill : 'transparent',
+                borderTopWidth: i && !marks && !it.section ? 0.5 : 0, borderTopColor: c.sep })}>
+              {/* 고르는 메뉴(보기 방식 등): 왼쪽 체크 · 아이콘 · 이름 (아이폰 메뉴와 같은 모양) */}
+              {marks ? <View style={{ width: 18 }}>{it.checked ? <Icon name="check" size={18} color={c.ink} /> : null}</View> : null}
+              {it.icon ? <Icon name={it.icon} size={20} color={c.safelight} /> : null}
               <Text style={{ fontSize: 17, color: it.danger ? c.danger : c.ink }}>{it.label}</Text>
-            </Pressable>
-          ))}
+            </Pressable>,
+          ])}
         </Glass>
       </Animated.View>
     </Pressable>

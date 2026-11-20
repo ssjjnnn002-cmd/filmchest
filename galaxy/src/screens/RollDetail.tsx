@@ -7,10 +7,12 @@ import Svg, { Path } from 'react-native-svg'
 import { db, deleteRoll } from '../data'
 import { useLiveQuery } from '../store'
 import { useNav } from '../App'
-import { weatherText, type Camera, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
+import { formatInfo, weatherText, type Camera, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
 import { exposureText, meterFrameTitle, meterProgress, meterShotsByOrder, shotRowMeta } from '../core/meter'
 import { ManualRecord, RollShotEdit } from './ManualRecord'
-import { bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedDays, sortedLocations } from '../core/display'
+import { bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedLocations } from '../core/display'
+import { resolvedDays, span } from '../core/rangeEdit'
+import { orderedDays } from '../core/timeline'
 import { Btn, CameraCover, Canister, Field, Group, Progress, Row, RowText, Section, Segmented, StatusBadge, Sub } from '../kit'
 import { Icon } from '../icons'
 import { Page } from '../page'
@@ -62,9 +64,19 @@ export function RollDetail({ id }: { id: string }) {
   // 상세 기록이 있으면 컷마다 시간·장소가 있어 촬영일·장소 칸은 따로 두지 않는다
   const noShots = !(roll.meterShots?.length)
   const locs = sortedLocations(roll)
+  // 컷 수: 스캔 장 수, 없으면 필름 규격 (범위 표시에. 웹과 같음)
+  const total = roll.frameCount ?? formatInfo[rollCameraFormat(camera, roll)].count
+  const days = resolvedDays(roll.days, total)
+  const dayRange = (d: ShootingDay) => {
+    const i = days.findIndex((x) => x.id === d.id)
+    if (i < 0) return ''
+    const [a, b] = span(days[i].startFrame ?? 1, days[i + 1]?.startFrame, total)
+    const text = a === b ? `${a}번` : `${a}–${b}번`
+    return d.startFrame === undefined && i > 0 ? `약 ${text}` : text
+  }
   const rangeOf = (i: number) => {
     const s = locs[i].startFrame
-    const end = i + 1 < locs.length ? locs[i + 1].startFrame - 1 : roll.frameCount
+    const end = i + 1 < locs.length ? locs[i + 1].startFrame - 1 : total
     if (end && end > s) return `${s}–${end}번`
     if (end === s) return `${s}번`
     return `${s}번부터`
@@ -133,8 +145,8 @@ export function RollDetail({ id }: { id: string }) {
 
       {noShots ? <Section title="촬영일" foot={roll.days.length > 0 ? '눌러서 수정하거나 삭제할 수 있어요.' : undefined}>
         <Group>
-          {sortedDays(roll).map((d) => (
-            <Row key={d.id} onPress={() => setDay(d)} value={d.startFrame ? `${d.startFrame}번부터` : '컷 미확인'}>
+          {orderedDays(roll.days).map((d) => (
+            <Row key={d.id} onPress={() => setDay(d)} value={dayRange(d)}>
               <RowText>{fmtDayTime(d.startedAt)}</RowText>
             </Row>
           ))}
@@ -155,16 +167,17 @@ export function RollDetail({ id }: { id: string }) {
         </Section>
       ) : null}
 
-      {noShots ? <Section title="장소" warn foot={locs.some((l) => !l.point) ? '주황색 장소는 좌표가 없어 사진에 위치가 기록되지 않아요. 눌러서 좌표를 넣어 주세요.' : undefined}>
+      {noShots ? <Section title="장소" warn foot={locs.some((l) => !l.point && l.name) ? '주황색 장소는 좌표가 없어 사진에 위치가 기록되지 않아요. 눌러서 좌표를 넣어 주세요.' : undefined}>
         <Group>
           {locs.map((l, i) => (
             <Row key={l.id} onPress={() => setPlace(l)} value={rangeOf(i)}>
-              <Icon name="pin" size={20} color={l.point ? c.safelight : c.warn} />
+              {/* 이름만 있고 좌표가 없으면 주황, 장소 미상은 회색 (웹과 같음) */}
+              <Icon name="pin" size={20} color={l.point ? c.safelight : l.name ? c.warn : c.muted} />
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 17, color: c.ink }}>{l.name || '장소 없음'}</Text>
+                <Text style={{ fontSize: 17, color: c.ink }}>{l.name || '장소 미상'}</Text>
                 {l.memo ? <Sub>{l.memo}</Sub> : null}
                 {l.weather ? <Sub>{weatherText(l.weather)}</Sub> : null}
-                {!l.point ? <Text style={{ fontSize: 14, color: c.warn }}>좌표 없음</Text> : null}
+                {!l.point && l.name ? <Text style={{ fontSize: 14, color: c.warn }}>좌표 없음</Text> : null}
               </View>
             </Row>
           ))}

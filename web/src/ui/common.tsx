@@ -62,6 +62,7 @@ const icons: Record<string, IconDef> = {
   /** 칩 펼침 (갤럭시 칩에서 씀, 웹 ChipSelect의 CSS 화살표와 같은 모양) */
   chevDown: { d: 'M6 9l6 6 6-6', width: 2.6 },
   star: { d: 'M12 3.4l2.6 5.3 5.8.85-4.2 4.1 1 5.8L12 16.7l-5.2 2.75 1-5.8-4.2-4.1 5.8-.85z' },
+  info: { d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 11v5.5 M12 7.6h.01', width: 2 },
   heart: { d: 'M12 20.2s-7.8-4.6-7.8-10.4A4.4 4.4 0 0 1 12 7a4.4 4.4 0 0 1 7.8 2.8c0 5.8-7.8 10.4-7.8 10.4z' },
   heartFill: { d: 'M12 20.2s-7.8-4.6-7.8-10.4A4.4 4.4 0 0 1 12 7a4.4 4.4 0 0 1 7.8 2.8c0 5.8-7.8 10.4-7.8 10.4z', fill: true },
   pin: { d: 'M12 21.2s-6.6-6-6.6-11.4a6.6 6.6 0 0 1 13.2 0c0 5.4-6.6 11.4-6.6 11.4z M12 12.3a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8z' },
@@ -556,6 +557,52 @@ export function StatusBadge({ status }: { status: RollStatus }) {
 
 export function Progress({ done, total }: { done: number; total: number }) {
   return <div className="progress" role="progressbar" aria-valuenow={done} aria-valuemax={total}><i style={{ width: `${(done / Math.max(total, 1)) * 100}%` }} /></div>
+}
+
+/** 아이폰 메뉴 모양의 고르기 메뉴: 칸마다 하나씩 고르고 칸 사이에 선, 고른 것에 체크 (정렬·그룹·통계 기간) */
+export interface PickSection { value: string; options: [string, string][]; onPick: (v: string) => void }
+export function PickMenu({ label, trigger, sections, className, align = 'left' }: {
+  label: string; trigger: ReactNode; sections: PickSection[]; className?: string; align?: 'left' | 'right'
+}) {
+  const [at, setAt] = useState<{ x: number; y: number; right: number }>()
+  const btn = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!at) return
+    const close = (e: Event) => { if (!menu.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setAt(undefined) }
+    const away = () => setAt(undefined)
+    document.addEventListener('pointerdown', close)
+    window.addEventListener('scroll', away)
+    return () => { document.removeEventListener('pointerdown', close); window.removeEventListener('scroll', away) }
+  }, [at])
+  const toggle = () => {
+    if (at) { setAt(undefined); return }
+    const r = btn.current!.getBoundingClientRect()
+    setAt({ x: r.left, y: r.bottom + 6, right: window.innerWidth - r.right })
+  }
+  return (
+    <>
+      <button ref={btn} type="button" className={className} aria-label={label} aria-expanded={!!at} onClick={toggle}>{trigger}</button>
+      {at && createPortal(
+        // 칩 줄처럼 잘리는 곳 밖으로: 화면 맨 위층에 띄운다
+        <div ref={menu} className="menu pick-menu" role="menu"
+          style={{ position: 'fixed', top: at.y, ...(align === 'left' ? { left: Math.max(8, at.x), right: 'auto', transformOrigin: 'top left' } : { right: Math.max(8, at.right), left: 'auto' }), zIndex: 200 }}>
+          {sections.map((sec, i) => (
+            <div key={i} className={i ? 'pick-section' : undefined}>
+              {sec.options.map(([v, name]) => (
+                <button key={v} type="button" role="menuitemradio" aria-checked={v === sec.value} className="row"
+                  onClick={() => { setAt(undefined); sec.onPick(v) }}>
+                  <span className="pick-check">{v === sec.value ? <Icon name="check" size={18} /> : null}</span>
+                  <span className="grow">{name}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </>
+  )
 }
 
 // --- 표시용 도우미

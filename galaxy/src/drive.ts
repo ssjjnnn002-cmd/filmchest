@@ -177,9 +177,11 @@ export async function pullFromDrive(force = false, interactive = true) {
   const text = await FS.readAsStringAsync(r.uri)
   const saved = Date.parse(JSON.parse(text)?.savedAt ?? '') || 0
   if (!force && saved <= Number(getPref('drivePulledAt', '0'))) return undefined
+  // 받기 전에 이 기기에 아직 안 올린 수정이 있었으면, 합친 뒤에도 올려야 한다 (올렸다고 표시하지 않는다. 웹·아이폰과 같음)
+  const localUnpushed = key(await exportAll()) !== getPref('driveKey', '' as string)
   const counts = await importAll(r.uri, { sync: true })
   setPref('drivePulledAt', String(saved))
-  setPref('driveKey', key(await exportAll()))
+  if (!localUnpushed) setPref('driveKey', key(await exportAll()))
   return counts
 }
 

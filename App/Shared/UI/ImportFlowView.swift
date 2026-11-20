@@ -200,7 +200,7 @@ struct ImportFlowView: View {
                     }
                 }
             }
-            if let noPoint = roll.locations.first(where: { $0.point == nil }) {
+            if let noPoint = roll.locations.first(where: { $0.point == nil && !$0.name.isEmpty }) {
                 Section {
                     Label("'\(noPoint.name.isEmpty ? "장소" : noPoint.name)'는 좌표가 없어 사진에 위치가 기록되지 않아요. 롤 화면에서 장소를 검색해 지정할 수 있어요.",
                           systemImage: "mappin.slash")

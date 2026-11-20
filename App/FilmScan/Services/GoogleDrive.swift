@@ -20,6 +20,9 @@ enum GoogleAuth {
     private static var access: (token: String, until: Date)?
 
     static var isConnected: Bool { Keychain.get("googleRefresh") != nil }
+    /// 연결은 됐는데 드라이브 권한이 빠진 상태 (설정 화면에 알린다)
+    static let missingScopeKey = "filmscan.driveMissingScope"
+    static var missingScope: Bool { UserDefaults.standard.bool(forKey: missingScopeKey) }
     static var account: String? { UserDefaults.standard.string(forKey: "filmscan.googleAccount") }
 
     /// 처음 연결: 구글 로그인 창 (버튼에서)
@@ -46,12 +49,21 @@ enum GoogleAuth {
         else { throw DriveError.message("구글 로그인을 마치지 않았어요") }
         let json = try await tokenRequest(["code": code, "code_verifier": verifier, "grant_type": "authorization_code", "redirect_uri": redirect])
         guard let refresh = json["refresh_token"] as? String else { throw DriveError.message("구글 연결 정보를 받지 못했어요") }
+        // 로그인 창에서 드라이브 항목 체크를 끄면 로그인만 되고 드라이브는 못 쓴다
+        if let granted = json["scope"] as? String, !granted.contains("drive.file") {
+            throw DriveError.message(scopeMessage)
+        }
         Keychain.set("googleRefresh", refresh)
+        UserDefaults.standard.removeObject(forKey: missingScopeKey)
         remember(json)
         if let idToken = json["id_token"] as? String, let email = emailFrom(idToken) {
             UserDefaults.standard.set(email, forKey: "filmscan.googleAccount")
         }
     }
+
+    static func dropAccess() { access = nil }
+
+    static let scopeMessage = "드라이브 권한이 꺼져 있어요. '연결 끊기' 후 다시 연결할 때 구글 화면에서 드라이브 항목에 체크해 주세요."
 
     static func signOut() {
         Keychain.delete("googleRefresh")
@@ -84,9 +96,12 @@ enum GoogleAuth {
             .joined(separator: "&").data(using: .utf8)
         let (data, res) = try await URLSession.shared.data(for: req)
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
-        if (res as? HTTPURLResponse)?.statusCode != 200 {
+        let status = (res as? HTTPURLResponse)?.statusCode ?? 0
+        if status != 200 {
+            let reason = [json["error"] as? String, json["error_description"] as? String].compactMap { $0 }.joined(separator: " · ")
+            DriveLog.note("구글 로그인 \(status) \(reason)")
             if json["error"] as? String == "invalid_grant" { signOut() }
-            throw DriveError.message("구글 연결이 끊겼어요. 다시 연결해 주세요.")
+            throw DriveError.message("구글 연결이 끊겼어요. 다시 연결해 주세요. (\(status) \(reason))")
         }
         return json
     }
@@ -166,8 +181,29 @@ enum DriveClient {
         }
         let (data, res) = try await URLSession.shared.data(for: req)
         let status = (res as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200..<300).contains(status) else { throw DriveError.message("드라이브 요청 실패 (\(status))") }
+        guard (200..<300).contains(status) else {
+            let err = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? [String: Any]
+            let reason = (err?["message"] as? String) ?? String(decoding: data.prefix(200), as: UTF8.self)
+            DriveLog.note("드라이브 \(method) \(status) \(reason)")
+            // 받은 토큰이 막혔으면 다음엔 새로 받는다
+            if status == 401 { GoogleAuth.dropAccess() }
+            if status == 403, reason.localizedCaseInsensitiveContains("insufficient authentication scopes") {
+                UserDefaults.standard.set(true, forKey: GoogleAuth.missingScopeKey)
+                throw DriveError.message(GoogleAuth.scopeMessage)
+            }
+            throw DriveError.message("드라이브 요청 실패 (\(status) \(reason))")
+        }
         return data
+    }
+
+    /// 이름 바꾸기 (롤 이름이 바뀌었을 때 폴더도)
+    static func rename(_ id: String, to name: String) async throws {
+        _ = try await call("\(api)/\(id)", method: "PATCH", json: ["name": name])
+    }
+
+    /// 드라이브 휴지통으로 (30일 안에는 드라이브에서 되살릴 수 있다)
+    static func trash(_ id: String) async throws {
+        _ = try await call("\(api)/\(id)", method: "PATCH", json: ["trashed": true])
     }
 
     private static func q(_ s: String) -> String { s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'") }
@@ -560,6 +596,7 @@ enum DriveSync {
             try await DriveClient.upload(id, data, mime: "application/json")
         }
         UserDefaults.standard.set(key, forKey: pushedKey)
+        DriveLog.note("기록 올림")
         if let m = try? await DriveClient.modifiedTime(id) { UserDefaults.standard.set(m, forKey: modifiedKey) }
         UserDefaults.standard.set(Date(), forKey: "filmscan.driveLast")
         UserDefaults.standard.set(Date(), forKey: pulledKey)   // 방금 올린 것은 다시 받지 않는다
@@ -578,9 +615,11 @@ enum DriveSync {
         let saved = (json["savedAt"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) } ?? .distantPast
         let pulled = UserDefaults.standard.object(forKey: pulledKey) as? Date ?? .distantPast
         if !force, saved <= pulled { return nil }
+        // 받기 전에 이 기기에 아직 안 올린 수정이 있었는지 (있으면 합친 뒤에도 올려야 한다)
+        let localUnpushed = (try? contentKey(WebFormat.export(from: context))) != UserDefaults.standard.string(forKey: pushedKey)
         let counts = try WebFormat.merge(data, into: context, sync: true)
         UserDefaults.standard.set(saved, forKey: pulledKey)
-        UserDefaults.standard.set(contentKey(try WebFormat.export(from: context)), forKey: pushedKey)
+        if !localUnpushed { UserDefaults.standard.set(contentKey(try WebFormat.export(from: context)), forKey: pushedKey) }
         return counts
     }
 
@@ -772,7 +811,23 @@ enum DrivePhotos {
         let rolls = ((try? context.fetch(FetchDescriptor<RollItem>())) ?? []).filter { $0.deletedAt == nil && $0.status == .imported }
         let all = rolls.reduce(0) { $0 + ($1.frames ?? []).filter { $0.assetIdentifier != nil }.count }
         guard all > 0 else { return "올릴 스캔 사진이 없어요." }
-        guard let root = try? await DriveClient.rootFolder() else { return "드라이브에 연결하지 못했어요. 인터넷 연결을 확인해 주세요." }
+        let root: String
+        do { root = try await DriveClient.rootFolder() } catch {
+            return "드라이브에 연결하지 못했어요. \(error.localizedDescription)"
+        }
+        // 지운 롤의 폴더는 드라이브 휴지통으로 (앱 휴지통에서 되돌리면 다시 올린다)
+        let live = Set(((try? context.fetch(FetchDescriptor<RollItem>())) ?? []).filter { $0.deletedAt == nil }.map { $0.id.uuidString })
+        for (rollID, folderID) in folders where !live.contains(rollID) {
+            var gone = (try? await DriveClient.trash(folderID)) != nil
+            if !gone { gone = (try? await DriveClient.exists(folderID)) == false }
+            if gone {
+                folders[rollID] = nil
+                var sentNow = UserDefaults.standard.dictionary(forKey: sentKey) as? [String: String] ?? [:]
+                sentNow = sentNow.filter { !$0.key.hasPrefix(rollID.lowercased() + "-") }
+                UserDefaults.standard.set(sentNow, forKey: sentKey)
+            }
+        }
+        UserDefaults.standard.set(folders, forKey: folderKey)
         let day = DateFormatter()
         day.dateFormat = "yyyy-MM-dd"
         var onDrive = 0, total = 0, done = 0, queued = 0, gone = 0, unreadable = 0
@@ -796,12 +851,24 @@ enum DrivePhotos {
                 if let f = folder, try await !DriveClient.exists(f) { folder = nil }
                 if folder == nil { folder = try await DriveClient.find(folderName, parent: root, folder: true) }
                 if let f = folder {
-                    for c in try await DriveClient.children(f) where c.mime != DriveClient.folderMime && c.size > 0 { files[c.name] = c.id }
-                    // 만들기만 하고 아직 안 채운 빈 파일: 다시 만들지 않고 그 파일에 올린다
-                    for c in try await DriveClient.children(f) where c.mime != DriveClient.folderMime && c.size == 0 { empties[c.name] = c.id }
+                    // 롤 이름이 바뀌었으면 폴더 이름도 (앱과 같게)
+                    if folders[roll.id.uuidString] == f, UserDefaults.standard.string(forKey: "filmscan.driveFolderName.\(f)") != folderName {
+                        if (try? await DriveClient.rename(f, to: folderName)) != nil {
+                            UserDefaults.standard.set(folderName, forKey: "filmscan.driveFolderName.\(f)")
+                        }
+                    }
+                    let wanted = Set(frames.map { String(format: "%02d.jpg", $0.index) })
+                    for c in try await DriveClient.children(f) where c.mime != DriveClient.folderMime {
+                        // 앱에 없는 컷 사진(지웠거나 컷 수가 줄어든 것)은 드라이브 휴지통으로
+                        if !wanted.contains(c.name), c.name.range(of: #"^\d{2,3}\.jpg$"#, options: .regularExpression) != nil {
+                            try? await DriveClient.trash(c.id)
+                            continue
+                        }
+                        if c.size > 0 { files[c.name] = c.id } else { empties[c.name] = c.id }   // 빈 파일: 다시 만들지 않고 그 파일에 올린다
+                    }
                 }
             } catch {
-                return "드라이브 폴더를 확인하지 못했어요. 잠시 뒤 다시 눌러 주세요."
+                return "드라이브 폴더를 확인하지 못했어요. \(error.localizedDescription)"
             }
             for frame in frames {
                 defer { done += 1; progress?(done, all, "") }
@@ -813,7 +880,9 @@ enum DrivePhotos {
                     gone += 1; goneRolls.insert(roll.albumTitle); continue
                 }
                 let modified = asset.modificationDate
-                let stamp = String(Int(modified?.timeIntervalSince1970 ?? 0))
+                // 사진 앱 사진이 바뀌었거나, 사진에 쓰는 롤 정보(날짜·장소·카메라·필름·현상소…)가 바뀌면 다시 올린다
+                let info = RollImporter.infoStamp(frame: frame, roll: roll)
+                let stamp = "\(Int(modified?.timeIntervalSince1970 ?? 0))-\(info)"
                 let prev = sent[key]?.components(separatedBy: "|")
                 if let onFile = files[name] {
                     // 드라이브에 이미 있는 사진은 다시 올리지 않는다. 올린 뒤 사진 앱에서 돌리거나 정보를 고친 것만 다시 올린다
@@ -843,10 +912,11 @@ enum DrivePhotos {
                     try await DriveUploader.shared.enqueue(data, fileID: id, key: key, stamp: stamp)
                     queued += 1
                 } catch {
-                    return "사진을 보낼 준비를 하다 멈췄어요 (\(done) / \(all)장 확인). 잠시 뒤 다시 눌러 주세요."
+                    return "사진을 보낼 준비를 하다 멈췄어요 (\(done) / \(all)장 확인). \(error.localizedDescription)"
                 }
             }
         }
+        DriveLog.note("사진 확인: 드라이브 \(onDrive) / \(total), 보냄 \(queued)")
         UserDefaults.standard.set([onDrive, total], forKey: countKey)
         UserDefaults.standard.set(["gone": gone, "unreadable": unreadable, "rolls": Array(goneRolls.sorted().prefix(3))] as [String: Any], forKey: missingKey)
         lastQueued = queued
@@ -867,4 +937,17 @@ enum DrivePhotos {
         UserDefaults.standard.removeObject(forKey: missingKey)
         UserDefaults.standard.removeObject(forKey: failedKey)
     }
+}
+
+/// 드라이브 맞추기 기록 (마지막 몇 줄). 실패 이유를 화면과 기기 기록에 남긴다
+enum DriveLog {
+    static let key = "filmscan.driveLog"
+    static func note(_ line: String) {
+        let f = DateFormatter()
+        f.dateFormat = "MM.dd HH:mm:ss"
+        var lines = UserDefaults.standard.stringArray(forKey: key) ?? []
+        lines.append("\(f.string(from: Date())) \(line)")
+        UserDefaults.standard.set(Array(lines.suffix(40)), forKey: key)
+    }
+    static var lines: [String] { UserDefaults.standard.stringArray(forKey: key) ?? [] }
 }

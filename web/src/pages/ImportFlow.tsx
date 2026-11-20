@@ -171,7 +171,7 @@ function Confirmation({ roll, sets, setIndex, onSetIndex, scanner, onChangeRoll,
   const count = sets[setIndex].files.length
   const unknownDate = roll.isArchive && roll.days.length === 0
   const timeline = buildTimeline(roll, count)
-  const noPoint = roll.locations.find((l) => !l.point)
+  const noPoint = roll.locations.find((l) => !l.point && l.name)
   const outOfRange = roll.locations.find((l) => l.startFrame > count)
   return (
     <>

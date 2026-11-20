@@ -233,7 +233,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
 
         <Section>
           <Group>
-            <Row chev onPress={() => setSpending(true)}><RowText>통계</RowText></Row>
+            <Row chev onPress={() => setSpending(true)}><RowText>통계와 기록</RowText></Row>
           </Group>
         </Section>
 

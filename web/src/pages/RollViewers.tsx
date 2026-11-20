@@ -8,7 +8,7 @@ import { exposureText, meterShotAt } from '../core/meter'
 import { edgeMarking } from '../core/films'
 import { renderContactSheet } from '../core/contactSheet'
 import { ZoomView } from '../ui/Viewers'
-import { Icon, Sheet, bytesText, cameraName, dateRangeText, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollTitle, sortedLocations, useObjectURL } from '../ui/common'
+import { Icon, Sheet, bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedLocations, useObjectURL } from '../ui/common'
 import { inClaudeHost, saveFile, saveFileNow, saveToGallery } from '../platform'
 import { rotatedBlob } from '../core/importer'
 
@@ -64,7 +64,7 @@ function Thumb({ blob, turns, box }: { blob?: Blob; turns?: number; box?: [numbe
 }
 
 /** 한 장씩 보기: 좌우로 넘기기, 확대, 하트 */
-export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start: number; onClose: () => void }) {
+export function FrameViewer({ frames, start, onClose, showInfo }: { frames: Frame[]; start: number; onClose: () => void; showInfo?: boolean }) {
   const nav = useNav()
   const [i, setI] = useState(start)
   const frame = frames[i]
@@ -95,6 +95,9 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
 
   // 훅은 return보다 먼저 (사진이 없다가 생기면 훅 수가 달라져 화면이 멈춘다)
   const roll = useLiveQuery(() => (frame ? db.rolls.get(frame.rollId) : undefined), [frame?.rollId])
+  const infoCamera = useLiveQuery(() => (showInfo && roll?.cameraId ? db.cameras.get(roll.cameraId) : undefined), [showInfo, roll?.cameraId])
+  const infoLens = useLiveQuery(() => (showInfo && roll?.lensId ? db.lenses.get(roll.lensId) : undefined), [showInfo, roll?.lensId])
+  const [infoOpen, setInfoOpen] = useState(false)
   if (!frame) return null
   const fav = live?.favorite ?? frame.favorite
   const shot = meterShotAt(roll?.meterShots, frame.index, roll?.meterOffset ?? 0)
@@ -103,8 +106,13 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
     <div className="fullscreen dark" role="dialog" aria-label="사진 보기">
       <div className="fs-bar">
         <button className="btn ghost" onClick={onClose}>닫기</button>
-        <h2 style={{ fontVariantNumeric: 'tabular-nums' }}>{i + 1} / {frames.length}</h2>
+        <h2 style={{ fontVariantNumeric: 'tabular-nums' }}>{showInfo && roll ? <>{frame.takenAt ? fmtDay(frame.takenAt) : ''}<div style={{ fontSize: 12, fontWeight: 400 }}>{rollName(roll)} · {frame.index}번</div></> : `${i + 1} / ${frames.length}`}</h2>
         <div style={{ display: 'flex', gap: 4 }}>
+          {showInfo && (
+            <button className="btn ghost icon-btn" aria-label="정보" style={{ color: '#fff' }} onClick={() => setInfoOpen(!infoOpen)}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill={infoOpen ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.01" stroke={infoOpen ? '#000' : 'currentColor'} strokeLinecap="round" /></svg>
+            </button>
+          )}
           <button className="btn ghost icon-btn" aria-label={fav ? '즐겨찾기 해제' : '즐겨찾기'}
             style={{ color: fav ? 'var(--safelight)' : '#fff' }} onClick={() => db.frames.update(frame.id, { favorite: !fav })}>
             <Icon name={fav ? 'heartFill' : 'heart'} />
@@ -123,6 +131,23 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
         </div>
       </div>
       <div style={{ position: 'relative', minHeight: 0 }}>
+        {showInfo && infoOpen && roll && (
+          <div style={{ position: 'absolute', left: 12, right: 12, bottom: 12, zIndex: 3, padding: 16, borderRadius: 16, background: 'rgb(0 0 0 / .78)', color: '#fff', fontSize: 14, display: 'grid', gap: 6 }}>
+            {([
+              ['날짜', frame.takenAt ? fmtDayTime(frame.takenAt) : undefined],
+              ['장소', sortedLocations(roll).filter((l) => l.startFrame <= frame.index).at(-1)?.name || (roll.locations.length ? '장소 미상' : undefined)],
+              ['카메라', cameraName(infoCamera, roll)],
+              ['렌즈', infoLens ? `${infoLens.brand} ${infoLens.model}` : infoCamera?.fixedLens],
+              ['필름', rollFilmName(roll)],
+              ['노출', shot ? exposureText(shot) : undefined],
+              ['현상소', roll.lab],
+            ] as [string, string | undefined][]).filter(([, v]) => v && v.trim()).map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', gap: 12 }}><span style={{ width: 52, opacity: 0.6 }}>{k}</span><span>{v}</span></div>
+            ))}
+            <button className="btn ghost" style={{ justifySelf: 'start', color: 'var(--safelight)', padding: 0 }}
+              onClick={() => { onClose(); nav.showRoll(roll.id) }}><b>이 롤 보기</b></button>
+          </div>
+        )}
         {url && <ZoomView key={`${frame.id}-${turns}`} src={url} background="#000" onSwipe={step} />}
         <button className="btn ghost icon-btn" aria-label="이전" onClick={() => step(-1)} disabled={i === 0}
           style={{ position: 'absolute', left: 8, top: '50%', color: '#fff', background: 'rgb(0 0 0 / 0.4)' }}><Icon name="left" /></button>

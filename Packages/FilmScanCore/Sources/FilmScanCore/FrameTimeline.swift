@@ -20,7 +20,7 @@ public struct FrameInfo: Sendable, Hashable {
 public enum FrameTimeline {
     public static func build(roll: Roll, frameCount: Int) -> [FrameInfo] {
         guard frameCount > 0 else { return [] }
-        let days = roll.shootingDays.sorted { $0.startedAt < $1.startedAt }
+        let days = orderedDays(roll.shootingDays)
         let starts = startFrames(for: days, frameCount: frameCount)
         let locations = roll.locations.sorted { $0.startFrame < $1.startFrame }
 
@@ -51,8 +51,16 @@ public enum FrameTimeline {
         return result
     }
 
+    /// 촬영일 순서. 모두 시작 컷이 있으면 컷 순서로 (범위로 고친 기록: 뒤 컷에 앞 날짜를 넣어도 그대로), 아니면 날짜 순서로
+    public static func orderedDays(_ days: [ShootingDay]) -> [ShootingDay] {
+        if days.count > 1, days.dropFirst().allSatisfy({ $0.startFrame != nil }) {
+            return days.sorted { ($0.startFrame ?? 1, $0.startedAt) < ($1.startFrame ?? 1, $1.startedAt) }
+        }
+        return days.sorted { $0.startedAt < $1.startedAt }
+    }
+
     /// 촬영일별 시작 컷을 정한다. 결과는 항상 증가하는 순서이며 첫 값은 1.
-    static func startFrames(for days: [ShootingDay], frameCount: Int) -> [Int] {
+    public static func startFrames(for days: [ShootingDay], frameCount: Int) -> [Int] {
         guard !days.isEmpty else { return [] }
         var starts: [Int?] = days.map { $0.startFrame.map { min(max($0, 1), frameCount) } }
         starts[0] = 1

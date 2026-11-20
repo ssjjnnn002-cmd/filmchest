@@ -84,7 +84,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
 
       <div className="section">
         <div className="group">
-          <button className="row" onClick={() => setSpending(true)}><span className="grow">통계</span><Icon name="chev" size={18} /></button>
+          <button className="row" onClick={() => setSpending(true)}><span className="grow">통계와 기록</span><Icon name="chev" size={18} /></button>
         </div>
       </div>
 

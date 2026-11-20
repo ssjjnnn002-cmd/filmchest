@@ -1,5 +1,5 @@
 // 웹 PageHeader + .page: 위에 동그란 유리 버튼, 아래 큰 제목. 스크롤하면 가운데 작은 제목.
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Animated, Pressable, View, type ScrollView } from 'react-native'
 import { Text } from './text'
 import { dismissOnTap, useScrollFocusedField } from './overlay'
@@ -54,13 +54,19 @@ export function GlassGroup({ items }: { items: { icon: string; label: string; on
 }
 
 /** 화면 하나: 머리 + 스크롤 내용. 내용 좌우 16 여백, 아래는 탭바 자리. */
-export function Page({ title, onBack, left, actions, large = true, children, footer }: {
+export function Page({ title, onBack, left, actions, large = true, children, footer, scrollRef, onScrollY, overlay }: {
   title: string; onBack?: () => void; left?: ReactNode; actions?: ReactNode; large?: boolean; children: ReactNode; footer?: ReactNode
+  /** 화면이 직접 스크롤을 옮길 때 (롤 보관함 전체 보기의 날짜 막대) */
+  scrollRef?: RefObject<ScrollView | null>
+  onScrollY?: (y: number) => void
+  /** 스크롤과 상관없이 화면 위에 떠 있는 것 */
+  overlay?: ReactNode
 }) {
   const c = useTheme()
   const insets = useSafeAreaInsets()
   const scroll = useContext(PageScrollContext)
-  const ref = useRef<ScrollView>(null)
+  const own = useRef<ScrollView>(null)
+  const ref = (scrollRef ?? own) as RefObject<ScrollView>
   useScrollFocusedField(ref)
   const y = useRef(new Animated.Value(0)).current
   const [scrolled, setScrolled] = useState(!large)
@@ -86,6 +92,7 @@ export function Page({ title, onBack, left, actions, large = true, children, foo
           listener: (e: { nativeEvent: { contentOffset: { y: number } } }) => {
             const v = e.nativeEvent.contentOffset.y
             if (scroll) scroll.saved.set(scroll.key, v)
+            onScrollY?.(v)
             if (large) setScrolled(v > titleBottom)
           },
         })}
@@ -106,6 +113,7 @@ export function Page({ title, onBack, left, actions, large = true, children, foo
           <View style={{ flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>{actions}</View>
         </View>
       </View>
+      {overlay}
       {footer}
     </View>
   )

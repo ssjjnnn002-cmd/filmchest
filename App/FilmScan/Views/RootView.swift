@@ -146,7 +146,12 @@ struct RootView: View {
         // 로그아웃하면 시작 화면으로 (기록은 기기에 남아 있다)
         .onReceive(NotificationCenter.default.publisher(for: DriveSync.signedOut)) { _ in showWelcome = true }
         .onReceive(pullTimer) { _ in if scenePhase == .active { DriveSync.onActive(context) } }
-        .onReceive(quickTimer) { _ in if scenePhase == .active { DriveSync.quickPull(context) } }
+        .onReceive(quickTimer) { _ in
+            guard scenePhase == .active else { return }
+            // 고친 기록은 저장소가 스스로 저장할 때까지 기다리지 않고 바로 저장한다 → 곧바로 드라이브에 올라간다
+            if context.hasChanges { try? context.save() }
+            DriveSync.quickPull(context)
+        }
         .overlay {
             if showIntro {
                 IntroView {

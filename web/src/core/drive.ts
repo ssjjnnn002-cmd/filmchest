@@ -58,7 +58,7 @@ function remember(access: string, expiresIn?: number) {
 
 async function askServer(body: Record<string, string>) {
   const res = await fetch(TOKEN_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ client_id: clientId, ...body }) })
-  return (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; refresh_token?: string; error?: string }
+  return (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; refresh_token?: string; error?: string; scope?: string }
 }
 
 let renewing: Promise<string | undefined> | undefined
@@ -78,6 +78,8 @@ function renew() {
   return renewing
 }
 
+export const scopeMessage = "드라이브 권한이 꺼져 있어요. 다시 연결할 때 구글 화면에서 드라이브 항목에 체크해 주세요."
+
 /** 로그인 창을 한 번 띄워 오래 쓰는 허가까지 받는다 */
 function signInForRefresh() {
   return new Promise<string>((resolve, reject) => {
@@ -87,6 +89,8 @@ function signInForRefresh() {
         if (!r.code) return reject(new Error(r.error ?? '연결하지 못했어요'))
         void askServer({ code: r.code }).then((j) => {
           if (!j.access_token) return reject(new Error(j.error ?? '연결하지 못했어요'))
+          // 구글 화면에서 드라이브 항목 체크를 끄면 로그인만 되고 드라이브는 못 쓴다 (아이폰과 같음)
+          if (j.scope && !j.scope.includes('drive.file')) return reject(new Error(scopeMessage))
           if (j.refresh_token) setPref('driveRefresh', j.refresh_token)
           resolve(remember(j.access_token, j.expires_in))
         }, reject)
@@ -107,6 +111,7 @@ export async function driveToken(prompt = ''): Promise<string> {
     client = window.google!.accounts.oauth2.initTokenClient({ client_id: clientId, scope: SCOPE, callback: () => {} })
     client.callback = (r) => {
       if (!r.access_token) return reject(new Error(r.error ?? '연결하지 못했어요'))
+      if ((r as { scope?: string }).scope && !(r as { scope?: string }).scope!.includes('drive.file')) return reject(new Error(scopeMessage))
       resolve(remember(r.access_token, r.expires_in))
     }
     client.requestAccessToken({ prompt })
@@ -255,9 +260,11 @@ export async function pullFromDrive(force = false) {
   const blob = await res.blob()
   const saved = Date.parse(JSON.parse(await blob.text())?.savedAt ?? '') || 0
   if (!force && saved <= Number(getPref('drivePulledAt', '0'))) return undefined
+  // 받기 전에 이 기기에 아직 안 올린 수정이 있었으면, 합친 뒤에도 올려야 한다 (올렸다고 표시하지 않는다. 아이폰과 같음)
+  const localUnpushed = (await backupKey(await exportAll())) !== getPref('driveKey', '' as string)
   const counts = await importAll(blob, { sync: true })
   setPref('drivePulledAt', String(saved))
-  setPref('driveKey', await backupKey(await exportAll()))
+  if (!localUnpushed) setPref('driveKey', await backupKey(await exportAll()))
   return counts
 }
 

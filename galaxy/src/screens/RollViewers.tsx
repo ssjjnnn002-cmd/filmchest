@@ -13,7 +13,7 @@ import type { Camera, Frame, Roll } from '../core/types'
 import { formatInfo } from '../core/types'
 import { exposureText, meterShotAt } from '../core/meter'
 import { edgeMarking } from '../core/films'
-import { bytesText, cameraName, dateRangeText, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollTitle, sortedLocations } from '../core/display'
+import { bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedLocations } from '../core/display'
 import { Btn, Field, Group, Section, Toggle } from '../kit'
 import { Icon } from '../icons'
 import { OverlayBoundary, Sheet, SheetBtn } from '../overlay'
@@ -157,7 +157,7 @@ function RoundBtn({ icon, label, onPress, color = '#fff', disabled, bg }: { icon
 }
 
 /** 한 장씩 보기: 좌우로 넘기기, 확대, 하트 */
-export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start: number; onClose: () => void }) {
+export function FrameViewer({ frames, start, onClose, showInfo }: { frames: Frame[]; start: number; onClose: () => void; showInfo?: boolean }) {
   const c = useTheme()
   const nav = useNav()
   const insets = useSafeAreaInsets()
@@ -166,6 +166,9 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
   const original = useLiveQuery(() => (frame ? db.originals.get(frame.id) : undefined), [frame?.id])
   const live = useLiveQuery(() => (frame ? db.frames.get(frame.id) : undefined), [frame?.id])
   const roll = useLiveQuery(() => (frame ? db.rolls.get(frame.rollId) : undefined), [frame?.rollId])
+  const infoCamera = useLiveQuery(() => (showInfo && roll?.cameraId ? db.cameras.get(roll.cameraId) : undefined), [showInfo, roll?.cameraId])
+  const infoLens = useLiveQuery(() => (showInfo && roll?.lensId ? db.lenses.get(roll.lensId) : undefined), [showInfo, roll?.lensId])
+  const [infoOpen, setInfoOpen] = useState(false)
   const step = (d: number) => setI((x) => Math.min(Math.max(x + d, 0), frames.length - 1))
   const turns = ((live?.rotation ?? frame?.rotation ?? 0) % 4 + 4) % 4
   const src = frame ? (original && !/\.tiff?$/i.test(frame.name ?? '') ? original.blob : frame.thumb) : undefined
@@ -190,8 +193,14 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
         <StatusBar style="light" />
         <View style={{ paddingTop: insets.top + 10, paddingBottom: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <Btn label="닫기" kind="ghost" onPress={onClose} />
-          <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{i + 1} / {frames.length}</Text>
+          {showInfo && roll ? (
+            <View style={{ alignItems: 'center', flexShrink: 1 }}>
+              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>{frame.takenAt ? fmtDay(frame.takenAt) : ''}</Text>
+              <Text numberOfLines={1} style={{ color: '#fff', fontSize: 12 }}>{rollName(roll)} · {frame.index}번</Text>
+            </View>
+          ) : <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{i + 1} / {frames.length}</Text>}
           <View style={{ flexDirection: 'row', gap: 4 }}>
+            {showInfo ? <RoundBtn icon="info" label="정보" color={infoOpen ? c.safelight : '#fff'} onPress={() => setInfoOpen(!infoOpen)} /> : null}
             <RoundBtn icon={fav ? 'heartFill' : 'heart'} label={fav ? '즐겨찾기 해제' : '즐겨찾기'} color={fav ? c.safelight : '#fff'} onPress={() => db.frames.update(frame.id, { favorite: !fav })} />
             {original ? (
               <RoundBtn icon="download" label="이 사진 갤러리에 저장" onPress={async () => {
@@ -204,6 +213,27 @@ export function FrameViewer({ frames, start, onClose }: { frames: Frame[]; start
           </View>
         </View>
         <View style={{ flex: 1 }}>
+          {showInfo && infoOpen && roll ? (
+            <View style={{ position: 'absolute', left: 12, right: 12, bottom: 12, zIndex: 3, padding: 16, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.78)', gap: 6 }}>
+              {([
+                ['날짜', frame.takenAt ? fmtDayTime(frame.takenAt) : undefined],
+                ['장소', sortedLocations(roll).filter((l) => l.startFrame <= frame.index).at(-1)?.name || (roll.locations.length ? '장소 미상' : undefined)],
+                ['카메라', cameraName(infoCamera, roll)],
+                ['렌즈', infoLens ? `${infoLens.brand} ${infoLens.model}` : infoCamera?.fixedLens],
+                ['필름', rollFilmName(roll)],
+                ['노출', shot ? exposureText(shot) : undefined],
+                ['현상소', roll.lab],
+              ] as [string, string | undefined][]).filter(([, v]) => v && v.trim()).map(([k, v]) => (
+                <View key={k} style={{ flexDirection: 'row', gap: 12 }}>
+                  <Text style={{ width: 52, color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>{k}</Text>
+                  <Text style={{ flex: 1, color: '#fff', fontSize: 14 }}>{v}</Text>
+                </View>
+              ))}
+              <Pressable onPress={() => { onClose(); nav.showRoll(roll.id) }} hitSlop={8}>
+                <Text style={{ color: c.safelight, fontSize: 15, fontWeight: '700', marginTop: 4 }}>이 롤 보기</Text>
+              </Pressable>
+            </View>
+          ) : null}
           {viewable ? <ZoomView key={`${frame.id}-${turns}`} uri={viewable} background="#000" onSwipe={step} /> : null}
           <View style={{ position: 'absolute', left: 8, top: '50%' }}><RoundBtn icon="left" label="이전" bg="rgba(0,0,0,0.4)" disabled={i === 0} onPress={() => step(-1)} /></View>
           <View style={{ position: 'absolute', right: 8, top: '50%' }}><RoundBtn icon="right" label="다음" bg="rgba(0,0,0,0.4)" disabled={i === frames.length - 1} onPress={() => step(1)} /></View>

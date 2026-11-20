@@ -1,6 +1,6 @@
 // 웹 pages/Editors.tsx
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Keyboard, Modal, Pressable, ScrollView, View } from 'react-native'
+import { ActivityIndicator, Image, Keyboard, Modal, Pressable, ScrollView, View } from 'react-native'
 import { Text } from '../text'
 import { TextInput } from '../textInput'
 import { WebView } from 'react-native-webview'
@@ -8,7 +8,9 @@ import * as Location from 'expo-location'
 import { db } from '../data'
 import { useLiveQuery } from '../store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
-import type { GeoPoint, Lens, LocationSegment, Roll, ShootingDay } from '../core/types'
+import type { Frame, GeoPoint, Lens, LocationSegment, Roll, ShootingDay } from '../core/types'
+import { buildTimeline } from '../core/timeline'
+import { resolvedDays, setDays, setPlace, span } from '../core/rangeEdit'
 import { formatInfo, uid } from '../core/types'
 import { rollCameraFormat, sortedLocations } from '../core/display'
 import { Btn, Chip, DateInput, Field, Group, Row, RowText, Section, Spinner, Sub, Toggle } from '../kit'
@@ -123,59 +125,90 @@ export function PlacePicker({ name, point, onChange }: { name: string; point?: G
   )
 }
 
-export function DayEdit({ roll, day, onClose }: { roll: Roll; day?: ShootingDay; onClose: () => void }) {
+/** 편집 화면이 쓰는 롤의 컷 수와 지금 컷별 촬영 정보 (웹·아이폰과 같음) */
+function useRollFrames(roll: Roll) {
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
-  const lastKnown = Math.max(0, ...roll.days.map((d) => d.startFrame ?? 0), ...roll.locations.map((l) => l.startFrame))
-  const [date, setDate] = useState(day?.startedAt ?? Date.now())
-  const [knows, setKnows] = useState(day ? day.startFrame !== undefined : roll.days.length === 0)
-  const [frame, setFrame] = useState(day?.startFrame ?? (roll.days.length === 0 ? 1 : lastKnown + 1))
-  const [name, setName] = useState('')
-  const [point, setPoint] = useState<GeoPoint>()
-  const [memo, setMemo] = useState('')
-  const [confirm, setConfirm] = useState(false)
+  const frames = useLiveQuery(() => db.frames.where('rollId').equals(roll.id).toArray(), [roll.id]) ?? []
+  const scanned = Math.max(0, ...frames.map((f) => f.index))
+  const count = Math.max(1, roll.frameCount ?? (scanned > 0 ? scanned : formatInfo[rollCameraFormat(camera, roll)].count))
+  const timeline = useMemo(() => buildTimeline(roll, count), [roll, count])
+  return { count, timeline, frames, date: (n: number) => timeline[n - 1]?.date }
+}
 
-  useEffect(() => {
-    if (day || !locationAvailable()) return
-    currentPlace().then((p) => { if (p) { setName((n) => n || p.name); setPoint((x) => x ?? p.point) } })
-  }, [day])
+/** 필름 띠에서 범위 고르기: 처음 누른 컷부터 다음에 누른 컷까지 (웹·아이폰과 같음) */
+function FrameRangeStrip({ count, frames, range, onRange, caption }: {
+  count: number; frames: Frame[]; range: [number, number]; onRange: (r: [number, number]) => void; caption: (n: number) => string | undefined
+}) {
+  const c = useTheme()
+  const [anchor, setAnchor] = useState<number>()
+  const scroll = useRef<ScrollView>(null)
+  const thumbs = useMemo(() => new Map(frames.filter((f) => f.thumb).map((f) => [f.index, { uri: f.thumb!, turns: f.rotation ?? 0 }])), [frames])
+  const tap = (n: number) => {
+    if (anchor === undefined) { onRange([n, n]); setAnchor(n) } else { onRange([Math.min(anchor, n), Math.max(anchor, n)]); setAnchor(undefined) }
+  }
+  return (
+    <View>
+      <ScrollView ref={scroll} horizontal showsHorizontalScrollIndicator={false}
+        onLayout={() => scroll.current?.scrollTo({ x: Math.max(0, (range[0] - 1) * 68), animated: false })}
+        style={{ backgroundColor: c.filmBase, borderRadius: 12 }} contentContainerStyle={{ padding: 6, gap: 4 }}>
+        {Array.from({ length: count }, (_, i) => i + 1).map((n) => {
+          const on = n >= range[0] && n <= range[1]
+          const t = thumbs.get(n)
+          return (
+            <Pressable key={n} onPress={() => tap(n)} accessibilityLabel={`${n}번`} style={{ width: 64, alignItems: 'center', gap: 3, opacity: on ? 1 : 0.55 }}>
+              <View style={{ width: 64, height: 44, borderRadius: 5, overflow: 'hidden', borderWidth: 3, borderColor: on ? c.safelight : 'transparent',
+                backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
+                {t ? <Image source={{ uri: t.uri }} style={{ width: '100%', height: '100%', transform: [{ rotate: `${t.turns * 90}deg` }] }} resizeMode="cover" />
+                  : <Text style={{ fontSize: 17, fontWeight: '700', color: on ? c.safelight : 'rgba(255,255,255,0.8)' }}>{n}</Text>}
+              </View>
+              {t ? <Text style={{ fontSize: 11, color: on ? c.safelight : 'rgba(255,255,255,0.7)' }}>{n}</Text> : null}
+              <Text numberOfLines={1} style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', width: 64, textAlign: 'center' }}>{caption(n) ?? ' '}</Text>
+            </Pressable>
+          )
+        })}
+      </ScrollView>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginHorizontal: 4 }}>
+        <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: '700', color: c.ink }}>
+          {anchor !== undefined ? `${range[0]}번부터 · 끝 컷을 눌러요` : range[0] === range[1] ? `${range[0]}번` : `${range[0]}번 – ${range[1]}번`}
+        </Text>
+        <Pressable onPress={() => { onRange([1, count]); setAnchor(undefined) }} hitSlop={8}><Text style={{ fontSize: 15, color: c.safelight }}>전체</Text></Pressable>
+      </View>
+    </View>
+  )
+}
+
+const md = (t: number) => { const d = new Date(t); return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}` }
+
+/** 촬영일 추가/수정: 필름 띠에서 컷 범위를 고르고 그 컷들의 날짜를 정한다 */
+export function DayEdit({ roll, day, onClose }: { roll: Roll; day?: ShootingDay; onClose: () => void }) {
+  const f = useRollFrames(roll)
+  const init = useMemo(() => {
+    const resolved = resolvedDays(roll.days, f.count)
+    const i = day ? resolved.findIndex((d) => d.id === day.id) : -1
+    if (day && i >= 0) return { range: span(resolved[i].startFrame ?? 1, resolved[i + 1]?.startFrame, f.count), date: day.startedAt }
+    // 새 촬영일: 마지막 촬영일 다음 컷부터 끝까지, 날짜는 그 컷에 지금 기록된 날짜
+    const start = resolved.length ? Math.min(f.count, (resolved.at(-1)!.startFrame ?? 1) + 1) : 1
+    return { range: [start, f.count] as [number, number], date: f.date(start) ?? roll.loadedAt }
+  }, [])
+  const [range, setRange] = useState<[number, number]>(init.range)
+  const [date, setDate] = useState(init.date)
+  const [touched, setTouched] = useState(false)
+  const [confirm, setConfirm] = useState(false)
+  useEffect(() => { if (!touched && !day) { const d = f.date(range[0]); if (d) setDate(d) } }, [range[0]])
 
   const save = async () => {
-    const start = knows ? frame : undefined
-    let days = roll.days
-    let locations = roll.locations
-    if (day) {
-      days = days.map((d) => (d.id === day.id ? { ...d, startedAt: date, startFrame: start } : d))
-    } else {
-      days = [...days, { id: uid(), startedAt: date, startFrame: days.length === 0 ? 1 : start }]
-      if (name.trim() || point || memo.trim()) {
-        const last = sortedLocations(roll).at(-1)
-        if (last?.name !== name.trim() || !last) {
-          const segStart = locations.length === 0 ? 1 : start ?? (last ? last.startFrame + 1 : 1)
-          locations = [...locations, { id: uid(), startFrame: segStart, name: name.trim(), point, memo: memo.trim() || undefined, weather: weatherAt(point) }]
-        }
-      }
-    }
-    await db.rolls.update(roll.id, { days, locations })
+    await db.rolls.update(roll.id, { days: setDays(roll.days, range[0], range[1], date, f.count, day?.id, f.date) })
     onClose()
   }
 
   return (
     <Sheet title={day ? '촬영일 수정' : '촬영일 추가'} onClose={onClose} right={<SheetBtn label="저장" accent onPress={save} />}>
-      <Section foot="카메라 카운터에 보이는 숫자예요. 모르면 끄세요. 스캔을 불러올 때 촬영일끼리 고르게 나눠요.">
-        <Group>
-          <Field label="촬영 시작"><DateInput time value={date} onChange={setDate} /></Field>
-          <Toggle label="카운터 확인" value={knows} onChange={setKnows} />
-          {knows ? <Stepper label="카운터" value={frame} onChange={setFrame} max={frameMax(rollCameraFormat(camera, roll))} /> : null}
-        </Group>
+      <Section title="컷" foot="처음 누른 컷부터 다음에 누른 컷까지 이 날짜로 바꿔요. 컷 아래는 지금 기록된 날짜예요.">
+        <FrameRangeStrip count={f.count} frames={f.frames} range={range} onRange={setRange} caption={(n) => { const d = f.date(n); return d ? md(d) : undefined }} />
       </Section>
-      {!day ? (
-        <>
-          <PlacePicker name={name} point={point} onChange={(n, p) => { setName(n); setPoint(p) }} />
-          <Section title="메모">
-            <Group><MemoInput value={memo} onChange={setMemo} /></Group>
-          </Section>
-        </>
-      ) : null}
+      <Section><Group>
+        <Field label="날짜·시각"><DateInput time value={date} onChange={(v) => { setDate(v); setTouched(true) }} /></Field>
+      </Group></Section>
       {day ? <Group><Row onPress={() => setConfirm(true)}><Icon name="trash" size={20} color="#c0392b" /><RowText color="#c0392b">촬영일 삭제</RowText></Row></Group> : null}
       {confirm && day ? (
         <Confirm message="이 촬영일을 삭제할까요?" onCancel={() => setConfirm(false)}
@@ -196,10 +229,17 @@ export function MemoInput({ value, onChange }: { value: string; onChange: (v: st
   )
 }
 
+/** 장소 추가/수정: 필름 띠에서 컷 범위를 고르고 그 컷들의 장소를 정한다 (장소 미상도) */
 export function PlaceEdit({ roll, segment, onClose }: { roll: Roll; segment?: LocationSegment; onClose: () => void }) {
-  const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
-  const last = sortedLocations(roll).at(-1)
-  const [frame, setFrame] = useState(segment?.startFrame ?? (last ? last.startFrame + 1 : 1))
+  const f = useRollFrames(roll)
+  const init = useMemo((): [number, number] => {
+    const list = sortedLocations(roll)
+    const i = segment ? list.findIndex((l) => l.id === segment.id) : -1
+    if (segment && i >= 0) return span(segment.startFrame, list[i + 1]?.startFrame, f.count)
+    return [list.length ? Math.min(f.count, list.at(-1)!.startFrame + 1) : 1, f.count]
+  }, [])
+  const [range, setRange] = useState<[number, number]>(init)
+  const [unknown, setUnknown] = useState(!!segment && !segment.name && !segment.point)
   const [name, setName] = useState(segment?.name ?? '')
   const [point, setPoint] = useState<GeoPoint | undefined>(segment?.point)
   const [memo, setMemo] = useState(segment?.memo ?? '')
@@ -207,22 +247,23 @@ export function PlaceEdit({ roll, segment, onClose }: { roll: Roll; segment?: Lo
 
   const save = async () => {
     const value: LocationSegment = {
-      id: segment?.id ?? uid(), startFrame: frame, name: name.trim(), point, memo: memo.trim() || undefined,
+      id: segment?.id ?? uid(), startFrame: range[0], name: unknown ? '' : name.trim(), point: unknown ? undefined : point, memo: memo.trim() || undefined,
       // 장소를 그대로 두면 예전 날씨를, 방금 현재 위치로 바꿨으면 지금 날씨를
-      weather: weatherAt(point) ?? (point && segment?.point && point.latitude === segment.point.latitude && point.longitude === segment.point.longitude ? segment.weather : undefined),
+      weather: unknown ? undefined : weatherAt(point) ?? (point && segment?.point && point.latitude === segment.point.latitude && point.longitude === segment.point.longitude ? segment.weather : undefined),
     }
-    const locations = segment ? roll.locations.map((l) => (l.id === segment.id ? value : l)) : [...roll.locations, value]
-    await db.rolls.update(roll.id, { locations })
+    await db.rolls.update(roll.id, { locations: setPlace(roll.locations, range[0], range[1], value, f.count, segment?.id) })
     onClose()
   }
 
   return (
     <Sheet title={segment ? '장소 수정' : '장소 추가'} onClose={onClose}
-      right={<SheetBtn label="저장" accent disabled={!name.trim() && !point && !memo.trim()} onPress={save} />}>
-      <Section><Group>
-        <Stepper label="시작 컷" value={frame} onChange={setFrame} max={frameMax(rollCameraFormat(camera, roll))} />
-      </Group></Section>
-      <PlacePicker name={name} point={point} onChange={(n, p) => { setName(n); setPoint(p) }} />
+      right={<SheetBtn label="저장" accent disabled={!unknown && !name.trim() && !point && !memo.trim()} onPress={save} />}>
+      <Section title="컷" foot="처음 누른 컷부터 다음에 누른 컷까지 이 장소로 바꿔요. 컷 아래는 지금 기록된 장소예요.">
+        <FrameRangeStrip count={f.count} frames={f.frames} range={range} onRange={setRange}
+          caption={(n) => { const l = f.timeline[n - 1]?.location; return l ? (l.name || '미상') : undefined }} />
+      </Section>
+      <Section><Group><Toggle label="장소 미상" value={unknown} onChange={setUnknown} /></Group></Section>
+      {!unknown ? <PlacePicker name={name} point={point} onChange={(n, p) => { setName(n); setPoint(p) }} /> : null}
       <Section title="메모">
         <Group><MemoInput value={memo} onChange={setMemo} /></Group>
       </Section>

@@ -383,78 +383,116 @@ struct RollsView: View {
     @Environment(\.modelContext) private var context
     @Environment(Router.self) private var router
     @Query(sort: \RollItem.loadedAt, order: .reverse) private var rolls: [RollItem]
+    @Query private var projects: [ProjectItem]
     @State private var search = ""
     @State private var favoritesOnly = false
-    @State private var filmID: String?
-    @State private var cameraID: UUID?
-    @State private var tagFilter: String?
-    @AppStorage("rollGrouping") private var grouping: RollGrouping = .month
-    @State private var status: RollStatus?
+    @AppStorage("rollStatusTab") private var statusTab: RollStatusTab = .all
+    @AppStorage("rollViewMode") private var mode: RollViewMode = .list
+    @AppStorage("rollSortField") private var sort: RollSort = .time
+    @AppStorage("rollSortAscending") private var ascending = false
+    @AppStorage("rollGroupBy") private var groupBy: RollGroupBy = .period
+    @AppStorage("rollGrouping") private var period: RollGrouping = .month
     @State private var deleting: RollItem?
     @State private var filing: RollItem?
     @State private var showChoice = false
     @State private var showArchive = false
     @State private var showMultiZip = false
-    @AppStorage("rollsLayout") private var layout: LayoutMode = .list
 
     private var filtered: [RollItem] {
         rolls.filter { r in
             if r.deletedAt != nil { return false }
             if favoritesOnly && !r.isFavorite { return false }
-            if let filmID, r.filmStockID != filmID { return false }
-            if let cameraID, r.camera?.id != cameraID { return false }
-            if let status, r.status != status { return false }
-            if let tagFilter, !r.tags.contains(tagFilter) { return false }
+            if !statusTab.includes(r.status) { return false }
             if !search.isEmpty {
-                let text = [r.filmName, r.cameraName, r.labName ?? "", r.note ?? "",
+                // 태그도 검색된다 (#를 붙여도 된다)
+                let q = search.hasPrefix("#") ? String(search.dropFirst()) : search
+                let text = [r.displayTitle, r.filmName, r.cameraName, r.labName ?? "", r.note ?? "",
                             r.locations.map { "\($0.name) \($0.memo ?? "")" }.joined(separator: " "), r.tags.joined(separator: " ")]
-                if !SearchAlias.matches(search, text) { return false }
+                if !SearchAlias.matches(q, text) { return false }
             }
             return true
         }
     }
 
-    private var isFiltering: Bool {
-        favoritesOnly || filmID != nil || cameraID != nil || status != nil || tagFilter != nil
-    }
-
-    /// 보기 단위(월/분기/반기/년)로 묶기. 최근 기간이 위로.
-    private var groups: [(key: String, title: String, rolls: [RollItem])] {
-        let newest: ([RollItem]) -> [RollItem] = { $0.sorted { ($0.sortedDays.first?.startedAt ?? $0.loadedAt) > ($1.sortedDays.first?.startedAt ?? $1.loadedAt) } }
-        if grouping == .tag {
-            // 태그마다 한 묶음 (태그가 여럿이면 여러 묶음에 보인다), 태그 없는 롤은 맨 아래
-            var out = Set(filtered.flatMap(\.tags)).sorted().map { t in
-                (key: "t:\(t)", title: "#\(t)", rolls: newest(filtered.filter { $0.tags.contains(t) }))
+    /// 정렬 기준 + 오름·내림차순. 기준 값이 같으면 시간 순
+    private func sorted(_ list: [RollItem]) -> [RollItem] {
+        let time: (RollItem) -> Date = { $0.sortedDays.first?.startedAt ?? $0.loadedAt }
+        func text(_ r: RollItem) -> String {
+            switch sort {
+            case .name: r.displayTitle
+            case .tag: r.tags.sorted().first ?? ""
+            case .film: r.filmName
+            case .time: ""
             }
-            let none = filtered.filter { $0.tags.isEmpty }
-            if !none.isEmpty { out.append((key: "t:", title: "태그 없음", rolls: newest(none))) }
-            return out
         }
-        // 촬영일을 모르는 롤은 맨 아래 '날짜 알 수 없음'으로 (키 0)
-        return Dictionary(grouping: filtered) { $0.dateUnknown ? 0 : grouping.key(for: $0.sortedDays.first?.startedAt ?? $0.loadedAt) }
-            .sorted { $0.key > $1.key }
-            .map { (String($0.key), $0.key == 0 ? "날짜 알 수 없음" : grouping.title(for: $0.key), newest($0.value)) }
+        return list.sorted { a, b in
+            if sort != .time {
+                let x = text(a), y = text(b)
+                // 태그가 없는 롤은 늘 맨 아래
+                if x.isEmpty != y.isEmpty { return y.isEmpty }
+                let c = x.localizedStandardCompare(y)
+                if c != .orderedSame { return ascending ? c == .orderedAscending : c == .orderedDescending }
+            }
+            return ascending ? time(a) < time(b) : time(a) > time(b)
+        }
     }
 
-    private var allTags: [String] { Set(rolls.filter { $0.deletedAt == nil }.flatMap(\.tags)).sorted() }
-
-    // 필터 선택지 (기록에 있는 것만)
-    private var films: [(id: String, name: String)] {
-        Dictionary(grouping: rolls, by: \.filmStockID).compactMap { id, list in list.first.map { (id, $0.filmName) } }
-            .sorted { $0.name < $1.name }
-    }
-    private var cameras: [(id: UUID, name: String)] {
-        Dictionary(grouping: rolls.compactMap(\.camera), by: \.id).compactMap { id, list in list.first.map { (id, $0.displayName) } }
-            .sorted { $0.name < $1.name }
+    /// 그룹화 기준대로 묶기
+    private var groups: [(key: String, title: String, rolls: [RollItem])] {
+        let list = filtered
+        switch groupBy {
+        case .period:
+            // 촬영일을 모르는 롤은 맨 아래 '날짜 알 수 없음'으로 (키 0)
+            let older = sort == .time && ascending
+            let byKey: [Int: [RollItem]] = Dictionary(grouping: list) { r -> Int in
+                r.dateUnknown ? 0 : period.key(for: r.sortedDays.first?.startedAt ?? r.loadedAt)
+            }
+            let keys: [Int] = byKey.keys.sorted { a, b in
+                if (a == 0) != (b == 0) { return b == 0 }
+                return older ? a < b : a > b
+            }
+            return keys.map { k in
+                (key: String(k), title: k == 0 ? "날짜 알 수 없음" : period.title(for: k), rolls: sorted(byKey[k] ?? []))
+            }
+        case .project:
+            let live = projects.filter { !$0.isArchived }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            var out = live.compactMap { p -> (key: String, title: String, rolls: [RollItem])? in
+                let ids = Set(p.rollIDs)
+                let inP = list.filter { ids.contains($0.id) }
+                return inP.isEmpty ? nil : (key: "p:\(p.id)", title: p.name.isEmpty ? "이름 없는 프로젝트" : p.name, rolls: sorted(inP))
+            }
+            let filed = Set(live.flatMap(\.rollIDs))
+            let none = list.filter { !filed.contains($0.id) }
+            if !none.isEmpty { out.append((key: "p:none", title: "프로젝트 없음", rolls: sorted(none))) }
+            return out
+        case .camera:
+            let byCam: [String: [RollItem]] = Dictionary(grouping: list) { r -> String in r.cameraLabel ?? "" }
+            let names: [String] = byCam.keys.sorted { a, b in
+                if a.isEmpty != b.isEmpty { return b.isEmpty }
+                return a.localizedStandardCompare(b) == .orderedAscending
+            }
+            return names.map { n in
+                (key: "c:\(n)", title: n.isEmpty ? "카메라 알 수 없음" : n, rolls: sorted(byCam[n] ?? []))
+            }
+        case .film:
+            return Dictionary(grouping: list, by: \.filmName)
+                .sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
+                .map { (key: "f:\($0.key)", title: $0.key, rolls: sorted($0.value)) }
+        }
     }
 
     var body: some View {
         content
             .toolbar {
                 ToolbarItem {
-                    Button(layout.toggled.displayName, systemImage: layout.toggled.symbol) {
-                        withAnimation { layout = layout.toggled }
+                    Menu {
+                        Picker("보기", selection: $mode) {
+                            ForEach(RollViewMode.allCases) { Label($0.displayName, systemImage: $0.symbol).tag($0) }
+                        }
+                    } label: {
+                        Image(systemName: mode.symbol)
                     }
+                    .accessibilityLabel("보기 방식")
                 }
                 // 현상 스캔과 같은 '기존 롤 가져오기'
                 ToolbarItem {
@@ -485,7 +523,7 @@ struct RollsView: View {
             .fileImporter(isPresented: $showMultiZip, allowedContentTypes: [.zip, .folder], allowsMultipleSelection: true) { result in
                 if case .success(let urls) = result { router.enqueueArchive(urls) }
             }
-            .searchable(text: $search, prompt: "필름, 카메라, 장소, 현상소, 메모, 태그")
+            .searchable(text: $search, prompt: "필름, 카메라, 장소, 현상소, 메모, #태그")
             .background(Theme.paper)
             .navigationTitle("롤 보관함")
             .navigationDestination(for: RollItem.self) { RollDetailView(roll: $0) }
@@ -509,16 +547,16 @@ struct RollsView: View {
 
     @ViewBuilder
     private var content: some View {
-        if layout == .grid {
-            // 그리드: List의 화살표 없이 카드만
+        switch mode {
+        case .gallery:
+            // 갤러리: 목록의 화살표 없이 카드만
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     controls
                     emptyState
                     ForEach(groups, id: \.key) { group in
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("\(group.title) · \(group.rolls.count)롤")
-                                .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                            groupTitle(group)
                                 .padding(.horizontal, 20)
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 240), spacing: 10)], spacing: 10) {
                                 ForEach(group.rolls) { roll in
@@ -533,47 +571,55 @@ struct RollsView: View {
                 }
                 .padding(.vertical, 8)
             }
-        } else {
+        case .list:
             List {
                 Section { controls }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
                 emptyState.listRowBackground(Color.clear)
                 ForEach(groups, id: \.key) { group in
-                    Section("\(group.title) · \(group.rolls.count)롤") {
-                        ForEach(group.rolls) { roll in
-                            NavigationLink(value: roll) { RollRow(roll: roll) }
-                                .swipeActions(edge: .leading) {
-                                    Button {
-                                        roll.isFavorite.toggle()
-                                    } label: {
-                                        Label(roll.isFavorite ? "해제" : "즐겨찾기", systemImage: roll.isFavorite ? "star.slash" : "star.fill")
-                                    }
-                                    .tint(.yellow)
-                                }
-                                .swipeActions(edge: .trailing) {
-                                    Button("삭제", systemImage: "trash", role: .destructive) { deleting = roll }
-                                }
-                                .contextMenu { rollMenu(roll) }
-                                // 구분선 없이 촘촘하게 (사진이 줄을 나눈다)
-                                .listRowSeparator(.hidden)
-                                // 카드 맨 위·맨 아래는 여유 있게
-                                .listRowInsets(EdgeInsets(top: roll.id == group.rolls.first?.id ? 14 : 5, leading: 14,
-                                                          bottom: roll.id == group.rolls.last?.id ? 14 : 5, trailing: 16))
-                        }
-                    }
+                    Section { groupRows(group) } header: { groupTitle(group) }
                 }
             }
             .scrollContentBackground(.hidden)
         }
     }
 
-    /// 보기 단위 + 필터
+    private func groupTitle(_ group: (key: String, title: String, rolls: [RollItem])) -> some View {
+        Text("\(group.title) · \(group.rolls.count)롤")
+            .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private func groupRows(_ group: (key: String, title: String, rolls: [RollItem])) -> some View {
+        ForEach(group.rolls) { roll in
+            NavigationLink(value: roll) { RollRow(roll: roll) }
+                .swipeActions(edge: .leading) {
+                    Button {
+                        roll.isFavorite.toggle()
+                    } label: {
+                        Label(roll.isFavorite ? "해제" : "즐겨찾기", systemImage: roll.isFavorite ? "star.slash" : "star.fill")
+                    }
+                    .tint(.yellow)
+                }
+                .swipeActions(edge: .trailing) {
+                    Button("삭제", systemImage: "trash", role: .destructive) { deleting = roll }
+                }
+                .contextMenu { rollMenu(roll) }
+                // 구분선 없이 촘촘하게 (사진이 줄을 나눈다)
+                .listRowSeparator(.hidden)
+                // 카드 맨 위·맨 아래는 여유 있게
+                .listRowInsets(EdgeInsets(top: roll.id == group.rolls.first?.id ? 14 : 5, leading: 14,
+                                          bottom: roll.id == group.rolls.last?.id ? 14 : 5, trailing: 16))
+        }
+    }
+
+    /// 상태 탭 + 정렬·그룹화·즐겨찾기
     private var controls: some View {
         VStack(spacing: 10) {
             ProjectStrip(rolls: rolls)
-            Picker("보기 단위", selection: $grouping) {
-                ForEach(RollGrouping.allCases) { Text($0.displayName).tag($0) }
+            Picker("상태", selection: $statusTab) {
+                ForEach(RollStatusTab.allCases) { Text($0.displayName).tag($0) }
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 16)
@@ -590,7 +636,7 @@ struct RollsView: View {
             ContentUnavailableView {
                 Label("조건에 맞는 롤이 없어요", systemImage: "line.3.horizontal.decrease.circle")
             } actions: {
-                Button("필터 초기화") { resetFilters() }
+                Button("처음으로") { favoritesOnly = false; statusTab = .all; search = "" }
             }
         }
     }
@@ -605,67 +651,53 @@ struct RollsView: View {
     private var filterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                // 정렬: 기준 하나 + 선 아래 오름·내림차순
+                Menu {
+                    Picker("정렬 기준", selection: $sort) {
+                        ForEach(RollSort.allCases) { Text($0.displayName).tag($0) }
+                    }
+                    Divider()
+                    Picker("순서", selection: $ascending) {
+                        Text("오름차순").tag(true)
+                        Text("내림차순").tag(false)
+                    }
+                } label: {
+                    chipLabel("\(sort.displayName) \(ascending ? "↑" : "↓")", icon: "arrow.up.arrow.down")
+                }
+                .buttonStyle(FilterChipStyle(active: false))
+
+                // 그룹화: 네 가지 중 하나 + 기간이면 선 아래 단위
+                Menu {
+                    Picker("그룹화 기준", selection: $groupBy) {
+                        ForEach(RollGroupBy.allCases) { Text($0.displayName).tag($0) }
+                    }
+                    if groupBy == .period {
+                        Divider()
+                        Picker("기간 단위", selection: $period) {
+                            ForEach(RollGrouping.allCases) { Text($0.displayName).tag($0) }
+                        }
+                    }
+                } label: {
+                    chipLabel(groupBy == .period ? period.groupName : groupBy.groupName, icon: "square.stack.3d.up")
+                }
+                .buttonStyle(FilterChipStyle(active: false))
+
                 Button { favoritesOnly.toggle() } label: {
                     Label("즐겨찾기", systemImage: favoritesOnly ? "star.fill" : "star")
                 }
                 .buttonStyle(FilterChipStyle(active: favoritesOnly))
 
-                Menu {
-                    Button("전체") { filmID = nil }
-                    ForEach(films, id: \.id) { f in Button(f.name) { filmID = f.id } }
-                } label: {
-                    chipLabel(films.first { $0.id == filmID }?.name ?? "필름", active: filmID != nil)
-                }
-                .buttonStyle(FilterChipStyle(active: filmID != nil))
-
-                Menu {
-                    Button("전체") { cameraID = nil }
-                    ForEach(cameras, id: \.id) { c in Button(c.name) { cameraID = c.id } }
-                } label: {
-                    chipLabel(cameras.first { $0.id == cameraID }?.name ?? "카메라", active: cameraID != nil)
-                }
-                .buttonStyle(FilterChipStyle(active: cameraID != nil))
-
-                if !allTags.isEmpty {
-                    Menu {
-                        Button("전체") { tagFilter = nil }
-                        ForEach(allTags, id: \.self) { t in Button("#\(t)") { tagFilter = t } }
-                    } label: {
-                        chipLabel(tagFilter.map { "#\($0)" } ?? "태그", active: tagFilter != nil)
-                    }
-                    .buttonStyle(FilterChipStyle(active: tagFilter != nil))
-                }
-
-                Menu {
-                    Button("전체") { status = nil }
-                    ForEach(RollStatus.allCases, id: \.self) { s in Button(s.displayName) { status = s } }
-                } label: {
-                    chipLabel(status?.displayName ?? "진행 상태", active: status != nil)
-                }
-                .buttonStyle(FilterChipStyle(active: status != nil))
-
-                if isFiltering {
-                    Button("초기화", systemImage: "xmark") { resetFilters() }
-                        .buttonStyle(FilterChipStyle(active: false))
-                }
             }
             .padding(.horizontal, 16)
         }
     }
 
-    private func chipLabel(_ text: String, active: Bool) -> some View {
+    private func chipLabel(_ text: String, icon: String) -> some View {
         HStack(spacing: 4) {
+            Image(systemName: icon).font(.caption.weight(.semibold))
             Text(text).lineLimit(1)
             Image(systemName: "chevron.down").font(.caption2.weight(.bold))
         }
-    }
-
-    private func resetFilters() {
-        favoritesOnly = false
-        filmID = nil
-        cameraID = nil
-        status = nil
-        tagFilter = nil
     }
 }
 
@@ -675,6 +707,7 @@ struct FilterChipStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.medium))
+            .lineLimit(1)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(Capsule().fill(active ? Theme.safelight : Theme.card))
@@ -684,9 +717,86 @@ struct FilterChipStyle: ButtonStyle {
     }
 }
 
-/// 롤 보관함 보기 단위
+/// 롤 보관함 보기 방식
+enum RollViewMode: String, CaseIterable, Identifiable {
+    case gallery, list
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .gallery: "갤러리 보기"
+        case .list: "목록 보기"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .gallery: "square.grid.2x2"
+        case .list: "list.bullet"
+        }
+    }
+}
+
+/// 롤 보관함 상태 탭
+enum RollStatusTab: String, CaseIterable, Identifiable {
+    case all, loaded, waiting, done
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .all: "전체"
+        case .loaded: "장착 중"
+        case .waiting: "스캔 대기"
+        case .done: "완료"
+        }
+    }
+    /// 스캔 대기: 다 찍은 롤과 현상 맡긴 롤
+    func includes(_ s: RollStatus) -> Bool {
+        switch self {
+        case .all: true
+        case .loaded: s == .loaded
+        case .waiting: s == .finished || s == .atLab
+        case .done: s == .imported
+        }
+    }
+}
+
+/// 정렬 기준 (오름·내림차순은 따로)
+enum RollSort: String, CaseIterable, Identifiable {
+    case name, time, tag, film
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .name: "이름"
+        case .time: "시간"
+        case .tag: "태그"
+        case .film: "종류"
+        }
+    }
+}
+
+/// 그룹화 기준
+enum RollGroupBy: String, CaseIterable, Identifiable {
+    case period, project, camera, film
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .period: "기간"
+        case .project: "프로젝트"
+        case .camera: "카메라"
+        case .film: "필름 종류"
+        }
+    }
+    var groupName: String {
+        switch self {
+        case .period: "기간별"
+        case .project: "프로젝트별"
+        case .camera: "카메라별"
+        case .film: "필름별"
+        }
+    }
+}
+
+/// 기간 단위
 enum RollGrouping: String, CaseIterable, Identifiable {
-    case month, quarter, half, year, tag
+    case month, quarter, half, year
 
     var id: String { rawValue }
 
@@ -696,7 +806,14 @@ enum RollGrouping: String, CaseIterable, Identifiable {
         case .quarter: "분기"
         case .half: "반기"
         case .year: "년"
-        case .tag: "태그"
+        }
+    }
+    var groupName: String {
+        switch self {
+        case .month: "월별"
+        case .quarter: "분기별"
+        case .half: "반기별"
+        case .year: "연도별"
         }
     }
 
@@ -708,7 +825,7 @@ enum RollGrouping: String, CaseIterable, Identifiable {
         case .month: return y * 100 + m
         case .quarter: return y * 100 + (m - 1) / 3 + 1
         case .half: return y * 100 + (m <= 6 ? 1 : 2)
-        case .year, .tag: return y * 100
+        case .year: return y * 100
         }
     }
 
@@ -718,7 +835,7 @@ enum RollGrouping: String, CaseIterable, Identifiable {
         case .month: return "\(y)년 \(n)월"
         case .quarter: return "\(y)년 \(n)분기"
         case .half: return "\(y)년 \(n == 1 ? "상반기" : "하반기")"
-        case .year, .tag: return "\(y)년"
+        case .year: return "\(y)년"
         }
     }
 }
