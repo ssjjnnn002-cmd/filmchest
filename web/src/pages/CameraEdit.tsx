@@ -14,12 +14,10 @@ import { TagField } from '../ui/gearExtras'
 import { PhotoActions } from '../ui/PhotoActions'
 import { groupPrice } from '../core/optics'
 import { AccessoryLinkFields, PurchaseFields, rememberSeller, useUsedSellers } from './Gear'
-import { useMeterOn } from '../core/devMode'
 
 const BODY_COLOR = '#1C1C1E'
 
 export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () => void }) {
-  const meterOn = useMeterOn()
   const [brand, setBrand] = useState(camera?.brand ?? '')
   const [model, setModel] = useState(camera?.model ?? '')
   const [nickname, setNickname] = useState(camera?.nickname ?? '')
@@ -324,16 +322,14 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
         used={usedSellers} />
       <AccessoryLinkFields ids={accessoryIds} setIds={setAccessoryIds} bodyPrice={price} />
 
-      {meterOn && <div className="section">
+      <div className="section">
         <h2>필름 감기</h2>
         <div className="segmented" role="group" aria-label="필름 감기">
           <button type="button" className={prewind === false ? 'on' : ''} onClick={() => setPrewind(false)}>정순 · 1→끝</button>
           <button type="button" className={prewind === true ? 'on' : ''} onClick={() => setPrewind(true)}>프리와인딩 · 끝→1</button>
         </div>
-        <p className="footnote">{prewind == null
-          ? '아직 고르지 않았어요. 노출계를 열면 한 번 묻고, 고른 쪽이 이 카메라에 저장돼요.'
-          : '프리와인딩은 필름을 먼저 끝까지 감아 두고 카운트가 거꾸로 줄어드는 카메라예요.'}</p>
-      </div>}
+        <p className="footnote">프리와인딩은 필름을 먼저 끝까지 감아 두고 카운트가 거꾸로 줄어드는 카메라예요. 스캔을 가져올 때 마지막 사진을 1번 컷으로 거꾸로 넣어요.</p>
+      </div>
 
       {showCatalog && <CatalogPicker onPick={(c) => { apply(c); setShowCatalog(false) }} onClose={() => setShowCatalog(false)} />}
     </Sheet>

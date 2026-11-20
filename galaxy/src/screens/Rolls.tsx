@@ -15,6 +15,8 @@ import { useArchiveChoice } from './Pending'
 import { RollCard, RollRow } from '../RollRow'
 import { SwipeRow } from '../SwipeRow'
 import { Confirm } from '../overlay'
+import { useRollInGallery } from '../GallerySave'
+import { deleteRollFromGallery } from '../gallery'
 import { ProjectStrip } from './Projects'
 import { searchMatch } from '../core/searchAlias'
 
@@ -47,6 +49,7 @@ export function Rolls() {
   const [layout, setLayout] = useState<string>(getPref('rollsLayout', 'list'))
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [deleting, setDeleting] = useState<string>()
+  const inGallery = useRollInGallery(deleting)
   const [filmId, setFilmId] = useState('')
   const [cameraId, setCameraId] = useState('')
   const [status, setStatus] = useState<RollStatus | ''>('')
@@ -155,7 +158,9 @@ export function Rolls() {
         </Section>
       ))}
       {deleting ? (
-        <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. 갤러리에 저장한 사진은 그대로 남아요." onCancel={() => setDeleting(undefined)}
+        <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. '기록만 삭제'는 갤러리 사진을 남겨요." onCancel={() => setDeleting(undefined)}
+          action={inGallery ? '기록만 삭제' : '삭제'}
+          extra={inGallery ? { label: '갤러리 사진까지 삭제', onPress: async () => { const id = deleting; setDeleting(undefined); if (await deleteRollFromGallery(id)) await deleteRoll(id) } } : undefined}
           onConfirm={async () => { const id = deleting; setDeleting(undefined); await deleteRoll(id) }} />
       ) : null}
     </Page>

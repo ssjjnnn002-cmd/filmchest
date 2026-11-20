@@ -34,6 +34,21 @@ struct RootView: View {
         }
     }
 
+    /// 예전 버전에서 한 앨범에 섞인 롤들을 롤마다 앨범으로 나눈다 (한 번 나누면 다음부터는 할 일이 없다)
+    private func splitMergedAlbums() async {
+        guard AppSettings.albumMode == .perRoll else { return }
+        let items = rolls.filter { $0.deletedAt == nil && $0.albumIdentifier != nil }
+            .sorted { ($0.importedAt ?? $0.loadedAt) < ($1.importedAt ?? $1.loadedAt) }
+            .map { r in
+                PhotoLibrary.RollAlbum(rollID: r.id, albumID: r.albumIdentifier!, title: r.albumTitle,
+                                       assetIDs: (r.frames ?? []).sorted { $0.index < $1.index }.compactMap(\.assetIdentifier))
+            }
+        let moved = await PhotoLibrary.splitMergedAlbums(items)
+        guard !moved.isEmpty else { return }
+        for r in rolls { if let id = moved[r.id] { r.albumIdentifier = id } }
+        try? context.save()
+    }
+
     var body: some View {
         @Bindable var router = router
         TabView(selection: $router.tab) {
@@ -97,6 +112,7 @@ struct RootView: View {
         }
         .task {
             Trash.purge(in: context)
+            await splitMergedAlbums()
             if Subscriptions.subscriptionEnabled { await Subscriptions.shared.listen() }
         }
         #if DEBUG

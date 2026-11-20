@@ -45,6 +45,8 @@ struct RollDetailView: View {
     @State private var confirmDelete = false
     @State private var recording = false
     @State private var pickingCamera = false
+    @State private var editingLab = false
+    @State private var confirmReverse = false
     /// 목록 가장자리 여백 (필름을 화면 끝까지 늘이려고 잰다)
     @State private var stripInset: CGFloat = 16
 
@@ -220,7 +222,15 @@ struct RollDetailView: View {
 
             if showsScanSection {
             Section("현상 · 스캔") {
-                if let lab = roll.labName?.nilIfBlank { LabeledContent("현상소", value: lab) }
+                Button { editingLab = true } label: {
+                    LabeledContent("현상소") {
+                        HStack(spacing: 6) {
+                            Text(roll.labName?.nilIfBlank ?? "없음")
+                            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+                .tint(.primary)
                 if let d = roll.droppedOffAt { LabeledContent("맡긴 날", value: Fmt.day.string(from: d)) }
                 if let s = roll.scannerName { LabeledContent("스캐너", value: s) }
                 if let r = Resolution.text(width: roll.scanPixelWidth, height: roll.scanPixelHeight) {
@@ -292,6 +302,10 @@ struct RollDetailView: View {
             ToolbarItem {
                 Menu("더 보기", systemImage: "ellipsis.circle") {
                     Button("카메라 바꾸기", systemImage: "camera") { pickingCamera = true }
+                    Button("현상소 수정", systemImage: "building.2") { editingLab = true }
+                    if (roll.frames ?? []).count > 1 {
+                        Button("컷 순서 뒤집기", systemImage: "arrow.up.arrow.down") { confirmReverse = true }
+                    }
                     Button("롤 삭제", systemImage: "trash", role: .destructive) { confirmDelete = true }
                 }
             }
@@ -299,14 +313,21 @@ struct RollDetailView: View {
         .sheet(isPresented: $pickingCamera) {
             RollCameraPicker(roll: roll) { changed in
                 // 사진 앱에 저장한 사진도 새 카메라 정보로 다시 쓴다
-                guard changed, (roll.frames ?? []).contains(where: { $0.assetIdentifier != nil }) else { return }
+                guard changed else { return }
+                rewritePhotos()
+            }
+        }
+        .sheet(isPresented: $editingLab) {
+            LabEditView(roll: roll) { changed in if changed { rewritePhotos() } }
+        }
+        .confirmationDialog("컷 순서를 거꾸로 바꿀까요? 마지막 컷이 1번이 돼요. 사진 앱 사진도 새 순서로 다시 넣어요.",
+                            isPresented: $confirmReverse, titleVisibility: .visible) {
+            Button("뒤집기") {
                 photoTask?.cancel()
                 photoTask = Task {
-                    let r = await RollImporter.rewritePhotos(for: roll)
-                    withAnimation {
-                        photoNote = r.count == 0 ? "사진 앱 사진은 바꾸지 못했어요"
-                            : r.removedOld ? "사진 앱 사진도 바꿨어요 (\(r.count)장)" : "새 정보로 \(r.count)장 넣었어요 · 예전 사진은 남아 있어요"
-                    }
+                    let hasPhotos = (roll.frames ?? []).contains { $0.assetIdentifier != nil }
+                    let r = await RollImporter.reverseOrder(of: roll)
+                    withAnimation { photoNote = !hasPhotos ? "컷 순서를 뒤집었어요" : photoResultText(r) }
                     try? await Task.sleep(for: .seconds(2.5))
                     withAnimation { photoNote = nil }
                 }
@@ -348,16 +369,25 @@ struct RollDetailView: View {
         .sheet(isPresented: $showContactSheet) { ContactSheetView(roll: roll) }
         .sheet(isPresented: $showFramePrint) { FramePrintView(roll: roll) }
         #endif
-        .confirmationDialog("이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. 사진 앱에 저장된 사진은 그대로 남아요.",
+        .confirmationDialog("이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. '기록만 삭제'는 사진 앱 사진을 남겨요.",
                             isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button("삭제", role: .destructive) {
+            Button(roll.photoAssetIDs.isEmpty ? "삭제" : "기록만 삭제", role: .destructive) {
                 roll.deletedAt = Date()
-                // 확인 창이 닫힌 뒤 그 탭 첫 목록으로 (롤 보관함 안쪽에서 열었어도 맨 앞으로)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    router.rollsPath = NavigationPath()
-                    dismiss()
+                leaveAfterDelete()
+            }
+            if !roll.photoAssetIDs.isEmpty {
+                Button("사진 앱 사진까지 삭제", role: .destructive) {
+                    Task { if await roll.deleteWithPhotos() { leaveAfterDelete() } }
                 }
             }
+        }
+    }
+
+    /// 확인 창이 닫힌 뒤 그 탭 첫 목록으로 (롤 보관함 안쪽에서 열었어도 맨 앞으로)
+    private func leaveAfterDelete() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            router.rollsPath = NavigationPath()
+            dismiss()
         }
     }
 
@@ -479,8 +509,26 @@ struct RollDetailView: View {
         }
     }
 
+    /// 롤 정보(카메라·현상소)를 바꾼 뒤 사진 앱 사진도 새 정보로 다시 넣는다
+    private func rewritePhotos() {
+        guard (roll.frames ?? []).contains(where: { $0.assetIdentifier != nil }) else { return }
+        photoTask?.cancel()
+        photoTask = Task {
+            let r = await RollImporter.rewritePhotos(for: roll)
+            withAnimation { photoNote = photoResultText(r) }
+            try? await Task.sleep(for: .seconds(2.5))
+            withAnimation { photoNote = nil }
+        }
+    }
+
+    private func photoResultText(_ r: (count: Int, removedOld: Bool)) -> String {
+        r.count == 0 ? "사진 앱 사진은 바꾸지 못했어요"
+            : r.removedOld ? "사진 앱 사진도 바꿨어요 (\(r.count)장)" : "새 정보로 \(r.count)장 넣었어요 · 예전 사진은 남아 있어요"
+    }
+
     private var showsScanSection: Bool {
-        roll.labName?.nilIfBlank != nil
+        roll.status == .atLab || roll.status == .imported
+            || roll.labName?.nilIfBlank != nil
             || roll.droppedOffAt != nil
             || roll.scannerName?.nilIfBlank != nil
             || Resolution.text(width: roll.scanPixelWidth, height: roll.scanPixelHeight) != nil
@@ -661,3 +709,46 @@ struct RollCameraPicker: View {
     }
 }
 
+
+/// 현상소만 고친다
+private struct LabEditView: View {
+    @Bindable var roll: RollItem
+    var onSave: (_ changed: Bool) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var lab = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    LabField(lab: $lab)
+                } footer: {
+                    if (roll.frames ?? []).contains(where: { $0.assetIdentifier != nil }) {
+                        Text("사진 앱 사진의 현상소 정보도 바꿔요.")
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .filmKeyboard()
+            .navigationTitle("현상소")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("저장") {
+                        let new = lab.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+                        let changed = new != roll.labName?.nilIfBlank
+                        LabMemory.remember(lab)
+                        roll.labName = new
+                        dismiss()
+                        onSave(changed)
+                    }
+                }
+            }
+            .onAppear { lab = roll.labName ?? "" }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}

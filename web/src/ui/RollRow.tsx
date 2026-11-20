@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { rotatedBlob } from '../core/importer'
 import { db } from '../db'
 import type { Roll } from '../core/types'
 import { formatInfo } from '../core/types'
@@ -9,7 +11,7 @@ export function RollRow({ roll }: { roll: Roll }) {
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
   // 스캔이 있으면 대표 사진, 없으면 필름통 (필름 이름은 옆에 있다)
   const cover = useCoverFrame(roll)
-  const url = useObjectURL(cover?.thumb)
+  const url = useObjectURL(useCoverThumb(cover))
   return (
     <div className="roll-row">
       {url ? <img className="roll-row-thumb" src={url} alt="" /> : <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} thumb={[90, 60]} />}
@@ -32,7 +34,7 @@ export function RollRow({ roll }: { roll: Roll }) {
 export function RollCard({ roll, onClick }: { roll: Roll; onClick: () => void }) {
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
   const first = useCoverFrame(roll)
-  const url = useObjectURL(first?.thumb)
+  const url = useObjectURL(useCoverThumb(first))
   return (
     <button className="roll-card" onClick={onClick}>
       <div className="thumb">
@@ -58,6 +60,18 @@ function useCoverFrame(roll: Roll) {
     const list = await db.frames.where('rollId').equals(roll.id).sortBy('index')
     return list.find((f) => f.index === (roll.coverIndex ?? 1)) ?? list.find((f) => f.index >= 1) ?? list[0]
   }, [roll.id, roll.coverIndex])
+}
+
+/** 대표 사진 작은 이미지. 돌려 둔 사진이면 돌린 방향 그대로 (가로 원본을 세로로 세운 경우 등) */
+function useCoverThumb(frame?: { thumb?: Blob; rotation?: number }) {
+  const [blob, setBlob] = useState<Blob>()
+  useEffect(() => {
+    let cancel = false
+    if (!frame?.thumb) { setBlob(undefined); return }
+    void rotatedBlob(frame.thumb, frame.rotation).then((b) => { if (!cancel) setBlob(b) }).catch(() => { if (!cancel) setBlob(frame.thumb) })
+    return () => { cancel = true }
+  }, [frame?.thumb, frame?.rotation])
+  return blob
 }
 
 /** 장소 줄: 장소 · 메모 (목록에서 표시하기를 켠 롤만 메모) */

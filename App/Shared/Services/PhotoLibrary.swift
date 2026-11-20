@@ -26,16 +26,30 @@ enum PhotoLibrary {
         guard status == .authorized || status == .limited else { throw PhotoLibraryError.denied }
     }
 
-    /// "필름" 폴더 안에 앨범을 찾거나 만든다. 같은 이름 앨범이 있으면 재사용.
-    static func album(titled title: String) async throws -> PHAssetCollection {
+    /// "필름함" 폴더 안에 앨범을 찾거나 만든다. 같은 이름 앨범이 있으면 재사용.
+    /// fresh: 롤마다 앨범일 때. 같은 이름이 있어도 새로 만들고 "(2)"처럼 번호를 붙인다
+    /// (같은 날·같은 카메라·같은 필름 롤이 한 앨범에 섞이지 않게)
+    static func album(titled title: String, fresh: Bool = false) async throws -> PHAssetCollection {
         let folder = try await folder()
         let albums = PHAssetCollection.fetchCollections(in: folder, options: nil)
+        var titles = Set<String>()
         var found: PHAssetCollection?
-        albums.enumerateObjects { c, _, stop in
-            if let a = c as? PHAssetCollection, a.localizedTitle == title { found = a; stop.pointee = true }
+        albums.enumerateObjects { c, _, _ in
+            guard let a = c as? PHAssetCollection, let t = a.localizedTitle else { return }
+            titles.insert(t)
+            if t == title, found == nil { found = a }
         }
-        if let found { return found }
+        if let found, !fresh { return found }
+        var title = title
+        if fresh, titles.contains(title) {
+            var n = 2
+            while titles.contains("\(title) (\(n))") { n += 1 }
+            title = "\(title) (\(n))"
+        }
+        return try await createAlbum(title, in: folder)
+    }
 
+    private static func createAlbum(_ title: String, in folder: PHCollectionList) async throws -> PHAssetCollection {
         var id = ""
         try await PHPhotoLibrary.shared().performChanges {
             let req = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: title)
@@ -235,6 +249,61 @@ enum PhotoLibrary {
         } catch { return false }
     }
 
+    /// 롤을 지울 때 사진 앱 사진도 지운다 (사진 앱이 한 번 묻는다. 지운 사진은 사진 앱 '최근 삭제된 항목'에 30일 남는다).
+    /// 그 롤 사진만 들어 있던 앨범이면 앨범도 함께 지운다. 지웠으면 true
+    static func deleteRollPhotos(assetIDs: [String], albumID: String?) async -> Bool {
+        guard (try? await requestAccess()) != nil else { return false }
+        let assets = PHAsset.fetchAssets(withLocalIdentifiers: assetIDs, options: nil)
+        let ids = Set(assetIDs)
+        var emptyAlbum: PHAssetCollection?
+        if let album = existingAlbum(id: albumID) {
+            var others = false
+            PHAsset.fetchAssets(in: album, options: nil).enumerateObjects { a, _, stop in
+                if !ids.contains(a.localIdentifier) { others = true; stop.pointee = true }
+            }
+            if !others { emptyAlbum = album }
+        }
+        guard assets.count > 0 || emptyAlbum != nil else { return true }
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                if assets.count > 0 { PHAssetChangeRequest.deleteAssets(assets) }
+                if let emptyAlbum { PHAssetCollectionChangeRequest.deleteAssetCollections([emptyAlbum] as NSArray) }
+            }
+            return true
+        } catch { return false }
+    }
+
+    struct RollAlbum: Sendable {
+        let rollID: UUID
+        let albumID: String
+        let title: String
+        let assetIDs: [String]
+    }
+
+    /// 예전 버전: 롤마다 앨범인데 이름(날짜·필름·카메라)이 같으면 한 앨범에 섞였다.
+    /// 같은 앨범을 쓰는 롤이 여럿이고 앨범 이름이 그 롤 이름이면, 첫 롤만 남기고 나머지는 새 앨범 "(2)"로 옮긴다.
+    /// 허락 창은 띄우지 않는다 (이미 허락했을 때만). 돌려준 값: 롤 id → 새 앨범 id
+    static func splitMergedAlbums(_ rolls: [RollAlbum]) async -> [UUID: String] {
+        guard PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized else { return [:] }
+        var moved: [UUID: String] = [:]
+        for group in Dictionary(grouping: rolls, by: \.albumID).values where group.count > 1 {
+            guard let album = existingAlbum(id: group[0].albumID),
+                  group.allSatisfy({ $0.title == album.localizedTitle }) else { continue }
+            for roll in group.dropFirst() where !roll.assetIDs.isEmpty {
+                guard let fresh = try? await self.album(titled: roll.title, fresh: true) else { continue }
+                let assets = PHAsset.fetchAssets(withLocalIdentifiers: roll.assetIDs, options: nil)
+                do {
+                    try await PHPhotoLibrary.shared().performChanges {
+                        PHAssetCollectionChangeRequest(for: fresh)?.addAssets(assets)
+                        PHAssetCollectionChangeRequest(for: album)?.removeAssets(assets)
+                    }
+                    moved[roll.rollID] = fresh.localIdentifier
+                } catch { continue }
+            }
+        }
+        return moved
+    }
+
     /// 사진 앱의 하트(즐겨찾기)와 맞춘다
     static func setFavorite(assetID: String, _ value: Bool) async {
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil).firstObject else { return }
@@ -246,5 +315,18 @@ enum PhotoLibrary {
     static func existingAlbum(id: String?) -> PHAssetCollection? {
         guard let id else { return nil }
         return PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [id], options: nil).firstObject
+    }
+}
+
+extension RollItem {
+    /// 사진 앱에 저장된 이 롤 사진
+    var photoAssetIDs: [String] { (frames ?? []).compactMap(\.assetIdentifier) }
+
+    /// 롤 기록을 휴지통으로 보내면서 사진 앱 사진(과 이 롤만의 앨범)도 지운다. 사진 앱에서 거절하면 기록도 그대로
+    @MainActor
+    func deleteWithPhotos() async -> Bool {
+        guard await PhotoLibrary.deleteRollPhotos(assetIDs: photoAssetIDs, albumID: albumIdentifier) else { return false }
+        deletedAt = Date()
+        return true
     }
 }

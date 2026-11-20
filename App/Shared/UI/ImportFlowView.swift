@@ -23,6 +23,9 @@ struct ImportFlowView: View {
     @State private var showQuickRoll = false
     /// 노출계 칸 번호를 스캔 번호에서 몇 칸 밀지. +1이면 1번 기록이 2번 사진
     @State private var meterOffset = 0
+    /// 거꾸로 가져오기. nil이면 롤 카메라 설정(프리와인딩)을 따른다
+    @State private var reversedChoice: Bool?
+    private var reversed: Bool { reversedChoice ?? (roll?.camera?.prewind == true) }
 
     private var candidates: [RollItem] {
         let order: [RollStatus: Int] = [.atLab: 0, .finished: 1, .loaded: 2]
@@ -67,7 +70,7 @@ struct ImportFlowView: View {
         }
         .task { await analyze() }
         .sheet(isPresented: $showQuickRoll) {
-            QuickRollForm { newRoll in roll = newRoll; meterOffset = 0 }
+            QuickRollForm(hints: NameHints.guess([zipURL.lastPathComponent])) { newRoll in roll = newRoll; meterOffset = 0 }
         }
     }
 
@@ -109,6 +112,8 @@ struct ImportFlowView: View {
 
     private func summaryRow(_ preview: ScanPreview) -> some View {
         VStack(alignment: .leading, spacing: 10) {
+            Label(zipURL.lastPathComponent, systemImage: ScanFolder.isFolder(zipURL) ? "folder" : "doc.zipper")
+                .font(.subheadline.weight(.semibold)).lineLimit(1).truncationMode(.middle)
             if !thumbs.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 4) {
@@ -148,14 +153,14 @@ struct ImportFlowView: View {
                     }
                 }
                 if preselectedRoll == nil {
-                    Button("다른 롤 선택") { self.roll = nil }.font(.footnote)
+                    Button("다른 롤 선택") { self.roll = nil; reversedChoice = nil }.font(.footnote)
                 }
             }
 
             // 사진 앱에 저장하기 전에 zip 안의 사진을 모두 미리 본다
             if !sets.isEmpty {
                 Section("사진 \(frames)장") {
-                    ScanFramesStrip(urls: sets[setIndex].frames.map(\.fileURL))
+                    ScanFramesStrip(urls: (reversed ? sets[setIndex].reversedOrder() : sets[setIndex]).frames.map(\.fileURL))
                         .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                 }
             }
@@ -169,6 +174,15 @@ struct ImportFlowView: View {
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()
+                }
+            }
+
+            if frames > 1 {
+                Section {
+                    Toggle("거꾸로 가져오기", isOn: Binding(get: { reversed }, set: { reversedChoice = $0 }))
+                } footer: {
+                    Text(reversed ? "마지막 사진이 1번 컷이 돼요. 프리와인딩 카메라로 찍은 롤이에요."
+                         : roll.camera?.prewind == true ? "이 카메라는 프리와인딩으로 설정돼 있어요." : "프리와인딩 카메라로 찍었으면 켜 주세요.")
                 }
             }
 
@@ -313,7 +327,7 @@ struct ImportFlowView: View {
         let set = sets[setIndex]
         progress = (0, set.frames.count)
         do {
-            let outcome = try await RollImporter.save(preview: preview, using: set, snapshot: snapshot, meterOffset: meterOffset) { done, total in
+            let outcome = try await RollImporter.save(preview: preview, using: set, snapshot: snapshot, reversed: reversed, meterOffset: meterOffset) { done, total in
                 Task { @MainActor in progress = (done, total) }
             }
             roll.apply(outcome)
@@ -375,9 +389,8 @@ struct RollRow: View {
                 }
             }
             .frame(width: 90, height: 60)
-            .task(id: "\(roll.frames?.count ?? 0)|\(roll.coverFrameIndex ?? 0)") {
-                guard let data = roll.coverFrame?.thumbnail else { cover = nil; return }
-                cover = await Task.detached { ImageThumbnail.make(data: data, maxPixel: 160) }.value
+            .task(id: roll.coverKey) {
+                cover = await roll.coverImage(maxPixel: 160)
             }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
@@ -403,6 +416,8 @@ struct RollRow: View {
 
 /// 미리 기록하지 않은 롤을 즉석에서 만든다
 struct QuickRollForm: View {
+    /// 가져올 파일 이름에서 읽은 날짜·필름 (있으면 미리 넣는다)
+    var hints: NameHints.Hints? = nil
     var onCreate: (RollItem) -> Void
 
     @Environment(\.modelContext) private var context
@@ -455,6 +470,10 @@ struct QuickRollForm: View {
                 }
             }
             .task { await Subscriptions.shared.refreshEntitlement() }
+            .onAppear {
+                if let id = hints?.filmID { filmID = id }
+                if let d = hints?.date?.noonDate { date = d }
+            }
         }
     }
 

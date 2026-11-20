@@ -1,7 +1,7 @@
 // 웹 ui/GallerySave.tsx — 롤 사진을 갤러리에 저장. 안 되면 같은 버튼이 파일 저장으로 바뀐다.
 import { useEffect, useState } from 'react'
 import { rollImageFiles, rollZip } from './scan'
-import { saveImagesToGallery } from './gallery'
+import { rollAlbumName, rollGalleryIds, saveImagesToGallery } from './gallery'
 import { saveFileNow } from './platform'
 import { Btn } from './kit'
 
@@ -34,7 +34,7 @@ export function RollGalleryButton({ rollId, title, onToast, block }: {
   const save = async () => {
     if (!files?.length) return
     setBusy(true)
-    const r = await saveImagesToGallery(files, `필름함 ${title}`.replace(/[/\\:]/g, '-').slice(0, 60))
+    const r = await saveImagesToGallery(files, await rollAlbumName(rollId, `필름함 ${title}`.replace(/[/\\:]/g, '-').slice(0, 55)))
     setBusy(false)
     if (r.denied) { onToast('사진 저장을 허용해 주세요'); return }
     if (!r.saved) {
@@ -46,4 +46,16 @@ export function RollGalleryButton({ rollId, title, onToast, block }: {
   }
 
   return <Btn label={busy ? '저장 중…' : '갤러리에 저장'} icon="download" kind="primary" block={block} disabled={!files?.length || busy} onPress={save} />
+}
+
+/** 이 롤 사진을 갤러리에 저장해 둔 게 있는지 (롤 삭제 창에서 '갤러리 사진까지 삭제'를 보일 때) */
+export function useRollInGallery(rollId?: string) {
+  const [has, setHas] = useState(false)
+  useEffect(() => {
+    let cancel = false
+    setHas(false)
+    if (rollId) void rollGalleryIds(rollId).then((ids) => { if (!cancel) setHas(ids.length > 0) })
+    return () => { cancel = true }
+  }, [rollId])
+  return has
 }

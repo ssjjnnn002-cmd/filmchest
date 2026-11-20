@@ -491,12 +491,18 @@ struct RollsView: View {
             .navigationDestination(for: RollItem.self) { RollDetailView(roll: $0) }
             .navigationDestination(for: ProjectRoute.self) { ProjectRouteView(route: $0) }
             .sheet(item: $filing) { RollProjectsPicker(roll: $0) }
-            .confirmationDialog("이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. 사진 앱에 저장된 사진은 그대로 남아요.",
+            .confirmationDialog("이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. '기록만 삭제'는 사진 앱 사진을 남겨요.",
                                 isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                                 titleVisibility: .visible) {
-                Button("삭제", role: .destructive) {
+                Button(deleting?.photoAssetIDs.isEmpty != false ? "삭제" : "기록만 삭제", role: .destructive) {
                     deleting?.deletedAt = Date()
                     deleting = nil
+                }
+                if let roll = deleting, !roll.photoAssetIDs.isEmpty {
+                    Button("사진 앱 사진까지 삭제", role: .destructive) {
+                        deleting = nil
+                        Task { _ = await roll.deleteWithPhotos() }
+                    }
                 }
             }
     }
@@ -757,9 +763,8 @@ struct RollGridCard: View {
         }
         .padding(10)
         .background(Theme.card, in: RoundedRectangle(cornerRadius: 14))
-        .task(id: "\(roll.frames?.count ?? 0)|\(roll.coverFrameIndex ?? 0)") {
-            guard let data = roll.coverFrame?.thumbnail else { cover = nil; return }
-            cover = await Task.detached { ImageThumbnail.make(data: data, maxPixel: 500) }.value
+        .task(id: roll.coverKey) {
+            cover = await roll.coverImage(maxPixel: 500)
         }
     }
 }

@@ -51,6 +51,10 @@ struct ArchiveImportView: View {
     @State private var sources: [PreviewSource] = []
     @State private var viewing: Int?
     @State private var didGuessFilm = false
+    @State private var didGuessDate = false
+    /// 거꾸로 가져오기. nil이면 고른 카메라 설정(프리와인딩)을 따른다
+    @State private var reversedChoice: Bool?
+    private var reversed: Bool { reversedChoice ?? (cameras.first { $0.id == cameraID }?.prewind == true) }
 
     // 롤 정보 (nil/빈 값 = 알 수 없음)
     @State private var cameraID: UUID?
@@ -84,6 +88,11 @@ struct ArchiveImportView: View {
                         Button("사진 또는 zip 고르기", systemImage: "doc") { pickingFolder = false; showFiles = true }
                         Button("폴더 통째로 고르기", systemImage: "folder") { pickingFolder = true; showFiles = true }
                     }
+                    if presetFileURL == nil, photoItems.isEmpty, let name = pickedName {
+                        Label(name, systemImage: fileURLs.count == 1 && fileURLs[0].pathExtension.lowercased() == "zip" ? "doc.zipper"
+                              : fileURLs.count == 1 && ScanFolder.isScopedFolder(fileURLs[0]) ? "folder" : "doc")
+                            .lineLimit(1).truncationMode(.middle)
+                    }
                     if count > 0 {
                         selectionSummary
                     }
@@ -93,17 +102,22 @@ struct ArchiveImportView: View {
                     Text(!presetAssetIDs.isEmpty || !presetFiles.isEmpty
                          ? "사진을 보고 카메라와 필름을 채워 주세요. 고른 순서대로 컷 번호가 붙어요."
                          : presetFileURL != nil
-                         ? "사진을 보고 카메라와 필름을 채워 주세요. 폴더 이름에 필름이 있으면 미리 넣어 둬요. 닫아도 대기열에 남아요."
+                         ? "사진을 보고 카메라와 필름을 채워 주세요. 이름에 날짜나 필름이 있으면 미리 넣어 둬요. 닫아도 대기열에 남아요."
                          : (photoItems.isEmpty
-                            ? "사진 파일, 폴더, zip 모두 돼요. 파일명 순서대로 컷 번호가 붙어요."
+                            ? "사진 파일, 폴더, zip 모두 돼요. 파일명 순서대로 컷 번호가 붙어요. 이름에 날짜나 필름이 있으면 미리 넣어 둬요."
                             : "고른 순서대로 컷 번호가 붙어요. 사진 앱의 사진은 복사하지 않고 그대로 롤에 묶어요."))
                 }
 
-                Section("카메라") {
+                Section {
                     Picker("카메라", selection: $cameraID) {
                         Text("알 수 없음").tag(UUID?.none)
                         ForEach(cameras.filter { $0.deletedAt == nil }) { Text($0.displayName).tag(Optional($0.id)) }
                     }
+                    Toggle("거꾸로 가져오기", isOn: Binding(get: { reversed }, set: { reversedChoice = $0 }))
+                } header: {
+                    Text("카메라")
+                } footer: {
+                    Text(reversed ? "마지막 사진이 1번 컷이 돼요. 프리와인딩 카메라로 찍은 롤이에요." : "프리와인딩 카메라로 찍었으면 켜 주세요.")
                 }
 
                 Section("필름") {
@@ -164,6 +178,7 @@ struct ArchiveImportView: View {
                     fileURLs = urls
                 }
             }
+            .onChange(of: cameraID) { _, _ in reversedChoice = nil }
             .onChange(of: photoItems) { _, items in
                 if !items.isEmpty { fileURLs = [] }
             }
@@ -214,9 +229,33 @@ struct ArchiveImportView: View {
 
     // MARK: 동작
 
+    /// 고른 파일·zip·폴더 이름. 여러 개면 "첫 이름 외 n개"
+    private var pickedName: String? {
+        if let sourceName { return sourceName }
+        guard let first = fileURLs.first?.lastPathComponent else { return nil }
+        return fileURLs.count == 1 ? first : "\(first) 외 \(fileURLs.count - 1)개"
+    }
+
+    /// 이름에 날짜·필름이 있으면 비어 있는 칸에 미리 넣는다 (고친 값은 덮지 않는다)
+    private func applyNameHints() {
+        // 대기열 파일은 복사본 경로가 UUID라 원래 이름(sourceName)만 본다
+        let names = [sourceName].compactMap { $0 } + (presetFileURL == nil ? fileURLs.map(\.lastPathComponent) : [])
+        let hints = NameHints.guess(names)
+        if !didGuessFilm, filmID.isEmpty, let id = hints.filmID {
+            filmID = id
+            didGuessFilm = true
+        }
+        if !didGuessDate, !dateKnown, let d = hints.date?.noonDate {
+            date = d
+            dateKnown = true
+            didGuessDate = true
+        }
+    }
+
     private func loadThumbs() async {
         thumbs = []
         sources = []
+        applyNameHints()
         if !presetAssetIDs.isEmpty {
             await loadAssets(presetAssetIDs)
         } else if !photoItems.isEmpty {
@@ -231,8 +270,7 @@ struct ArchiveImportView: View {
                 let folders = peek.paths.map { ($0 as NSString).deletingLastPathComponent }.filter { !$0.isEmpty }
                 return (peek.samples, FilmStockCatalog.match(in: folders.joined(separator: "\n"))?.id)
             }.value
-            let fromTitle = FilmStockCatalog.match(in: sourceName ?? "")?.id
-            if !didGuessFilm, filmID.isEmpty, let id = fromTitle ?? peek.filmID {
+            if !didGuessFilm, filmID.isEmpty, let id = peek.filmID {
                 filmID = id
                 didGuessFilm = true
             }
@@ -302,15 +340,15 @@ struct ArchiveImportView: View {
             let ids = photoItems.compactMap(\.itemIdentifier)
             if !presetAssetIDs.isEmpty {
                 progress = (0, presetAssetIDs.count)
-                outcome = try await RollImporter.link(assetIDs: presetAssetIDs, snapshot: snapshot, progress: onProgress)
+                outcome = try await RollImporter.link(assetIDs: reversed ? presetAssetIDs.reversed() : presetAssetIDs, snapshot: snapshot, progress: onProgress)
             } else if !photoItems.isEmpty && ids.count == photoItems.count {
                 progress = (0, ids.count)
-                outcome = try await RollImporter.link(assetIDs: ids, snapshot: snapshot, progress: onProgress)
+                outcome = try await RollImporter.link(assetIDs: reversed ? ids.reversed() : ids, snapshot: snapshot, progress: onProgress)
             } else {
                 let urls = try await collectFiles()
                 let preview = try await RollImporter.analyze(files: urls)
                 progress = (0, preview.frameCount)
-                outcome = try await RollImporter.save(preview: preview, snapshot: snapshot, progress: onProgress)
+                outcome = try await RollImporter.save(preview: preview, snapshot: snapshot, reversed: reversed, progress: onProgress)
             }
             roll.apply(outcome)
             try context.save()

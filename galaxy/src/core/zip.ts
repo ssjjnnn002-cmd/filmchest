@@ -17,6 +17,11 @@ export interface ScanSet {
   totalBytes: number
 }
 
+/** 거꾸로 감은 롤(프리와인딩): 마지막 파일이 1번 컷 */
+export function reversedSet(set: ScanSet): ScanSet {
+  return { ...set, files: [...set.files].reverse().map((f, i) => ({ ...f, index: i + 1 })) }
+}
+
 export interface ScanResult {
   primary: ScanSet
   alternatives: ScanSet[]

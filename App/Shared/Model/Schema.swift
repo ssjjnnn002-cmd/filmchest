@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import CoreGraphics
 import FilmScanCore
 
 // SwiftData 저장 모델. 나중에 iCloud(CloudKit) 동기화를 켤 수 있도록
@@ -317,6 +318,15 @@ final class RollItem {
     var sortedFrames: [FrameItem] { (frames ?? []).sorted { $0.index < $1.index } }
 
     /// 보관함 썸네일 컷: 정해 둔 컷, 없으면 첫 장
+    /// 대표 사진 작은 이미지. 돌려 둔 사진이면 돌린 방향 그대로 (가로 원본을 세로로 세운 경우 등)
+    func coverImage(maxPixel: Int) async -> CGImage? {
+        guard let frame = coverFrame, let data = frame.thumbnail else { return nil }
+        let turns = frame.turns
+        return await Task.detached { ImageThumbnail.make(data: data, maxPixel: maxPixel)?.rotated(quarterTurns: turns) }.value
+    }
+    /// 대표 사진이 바뀌면 다시 그리도록 (컷 수·대표 번호·돌린 방향)
+    var coverKey: String { "\(frames?.count ?? 0)|\(coverFrameIndex ?? 0)|\(coverFrame?.turns ?? 0)" }
+
     var coverFrame: FrameItem? {
         let frames = sortedFrames
         return frames.first { $0.index == coverFrameIndex } ?? frames.first

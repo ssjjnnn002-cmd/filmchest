@@ -163,6 +163,17 @@ export async function rotatedForView(uri: string, turns: number, id: string) {
 
 /** 촬영일·장소를 고친 뒤: 저장해 둔 사진 속 날짜·위치 정보를 새 기록으로 다시 쓴다.
  *  드라이브에 올린 사진은 다음 백업 때 새 정보의 사진으로 바뀐다. 바꾼 장 수를 돌려준다. */
+/** 이미 가져온 롤의 컷 순서를 거꾸로 (웹 reverseRollFrames와 같음). 번호만 뒤집고, 사진 속 정보는 부른 쪽에서 다시 쓴다. 뒤집은 장 수 */
+export async function reverseRollFrames(rollId: string): Promise<number> {
+  const roll = await db.rolls.get(rollId)
+  const frames = await db.frames.where('rollId').equals(rollId).toArray()
+  if (!roll || frames.length < 2) return 0
+  const n = Math.max(...frames.map((f) => f.index))
+  for (const f of frames) await db.frames.update(f.id, { index: n + 1 - f.index })
+  if (roll.coverIndex) await db.rolls.update(rollId, { coverIndex: n + 1 - roll.coverIndex })
+  return frames.length
+}
+
 export async function refreshRollPhotoMeta(rollId: string): Promise<number> {
   const roll = await db.rolls.get(rollId)
   if (!roll || roll.status !== 'imported') return 0

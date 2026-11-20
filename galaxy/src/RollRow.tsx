@@ -1,5 +1,7 @@
 // 웹 ui/RollRow.tsx
+import { useEffect, useState } from 'react'
 import { Image, Pressable, View } from 'react-native'
+import { rotatedForView } from './scan'
 import { Text } from './text'
 import { db } from './data'
 import { useLiveQuery } from './store'
@@ -14,12 +16,13 @@ export function RollRow({ roll }: { roll: Roll }) {
   const c = useTheme()
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
   const cover = useCoverFrame(roll)
+  const coverUri = useCoverThumb(cover)
   return (
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14, minWidth: 0 }}>
       {/* 스캔이 있으면 대표 사진, 없으면 필름통 (웹과 같음) */}
       {/* 바둑판형 표지와 같은 가로 비율. 필름통도 같은 폭 칸에 두어 글 시작이 맞는다 */}
       <View style={{ width: 90, height: 60, alignItems: 'center', justifyContent: 'center' }}>
-        {cover?.thumb ? <Image source={{ uri: cover.thumb }} style={{ width: 90, height: 60, borderRadius: 10, backgroundColor: c.filmBase }} resizeMode="cover" />
+        {coverUri ? <Image source={{ uri: coverUri }} style={{ width: 90, height: 60, borderRadius: 10, backgroundColor: c.filmBase }} resizeMode="cover" />
           : <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} thumb={[90, 60]} />}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -42,12 +45,13 @@ export function RollCard({ roll, onPress }: { roll: Roll; onPress: () => void })
   const c = useTheme()
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
   const first = useCoverFrame(roll)
+  const firstUri = useCoverThumb(first)
   const format = rollCameraFormat(camera, roll)
   return (
     <Pressable onPress={onPress} style={({ pressed }) => ({ flex: 1, minWidth: 0, backgroundColor: c.cell, borderRadius: 18, padding: 10, gap: 8,
       boxShadow: c.shadow, transform: [{ scale: pressed ? 0.98 : 1 }] })}>
       <View style={{ height: 110, borderRadius: 12, backgroundColor: c.filmBase, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
-        {first?.thumb ? <Image source={{ uri: first.thumb }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : <Canister film={rollFilm(roll)} format={format} cover />}
+        {firstUri ? <Image source={{ uri: firstUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : <Canister film={rollFilm(roll)} format={format} cover />}
         {roll.favorite ? <Text style={{ position: 'absolute', top: 5, right: 6, color: '#F5B700', fontSize: 13 }}>★</Text> : null}
       </View>
       <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', minWidth: 0 }}>
@@ -69,6 +73,20 @@ function useCoverFrame(roll: Roll) {
     const list = (await db.frames.where('rollId').equals(roll.id).toArray()).sort((a, b) => a.index - b.index)
     return list.find((f) => f.index === (roll.coverIndex ?? 1)) ?? list.find((f) => f.index >= 1) ?? list[0]
   }, [roll.id, roll.coverIndex])
+}
+
+/** 대표 사진 작은 이미지. 돌려 둔 사진이면 돌린 방향 그대로 (웹과 같음) */
+function useCoverThumb(frame?: { id: string; thumb?: string; rotation?: number }) {
+  const turns = (((frame?.rotation ?? 0) % 4) + 4) % 4
+  const [uri, setUri] = useState<string>()
+  useEffect(() => {
+    let cancel = false
+    if (!frame?.thumb) { setUri(undefined); return }
+    if (!turns) { setUri(frame.thumb); return }
+    void rotatedForView(frame.thumb, turns, `${frame.id}-cover`).then((u) => { if (!cancel) setUri(u) }).catch(() => { if (!cancel) setUri(frame.thumb) })
+    return () => { cancel = true }
+  }, [frame?.id, frame?.thumb, turns])
+  return uri
 }
 
 /** 장소 줄: 장소 · 메모 (목록에서 표시하기를 켠 롤만 메모. 웹과 같음) */

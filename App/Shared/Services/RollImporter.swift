@@ -114,15 +114,17 @@ enum RollImporter {
             return try await PhotoLibrary.album(titled: snapshot.cameraAlbumTitle)
         case .perRoll:
             if let existing = PhotoLibrary.existingAlbum(id: snapshot.existingAlbumID) { return existing }
-            return try await PhotoLibrary.album(titled: snapshot.albumTitle)
+            return try await PhotoLibrary.album(titled: snapshot.albumTitle, fresh: true)
         }
     }
 
     /// 메타데이터를 기록하고 사진 앱에 순서대로 저장한다.
-    static func save(preview: ScanPreview, using set: ScanSet? = nil, snapshot: RollSnapshot,
+    /// reversed: 프리와인딩 롤. 마지막 파일을 1번 컷으로 거꾸로 저장한다
+    static func save(preview: ScanPreview, using set: ScanSet? = nil, snapshot: RollSnapshot, reversed: Bool = false,
                      meterOffset: Int = 0, progress: @escaping @Sendable (Int, Int) -> Void) async throws -> ImportOutcome {
         try await PhotoLibrary.requestAccess()
-        let frames = (set ?? preview.result.primary).frames
+        let base = set ?? preview.result.primary
+        let frames = (reversed ? base.reversedOrder() : base).frames
         let album = try await targetAlbum(for: snapshot)
         let timeline = snapshot.frameTimeline(count: frames.count, offset: meterOffset)
         let outDir = preview.result.workingDirectory.appendingPathComponent("out", isDirectory: true)
@@ -290,6 +292,19 @@ extension RollImporter {
                              film: snapshot.film, shotISO: snapshot.iso(at: frame.index, offset: roll.meterOffset),
                              labName: snapshot.roll.labName, scannerName: roll.scannerName,
                              rollID: snapshot.roll.id, exposure: snapshot.exposures[frame.index - roll.meterOffset])
+    }
+
+    /// 이미 가져온 롤의 컷 순서를 거꾸로 (프리와인딩인데 정순으로 가져온 경우 등).
+    /// 앱 안 번호를 뒤집고, 사진 앱 사진도 새 번호의 날짜·정보로 순서대로 다시 넣는다
+    @MainActor
+    static func reverseOrder(of roll: RollItem) async -> (count: Int, removedOld: Bool) {
+        let frames = roll.frames ?? []
+        guard frames.count > 1 else { return (0, true) }
+        let n = frames.map(\.index).max() ?? frames.count
+        for f in frames { f.index = n + 1 - f.index }
+        if let cover = roll.coverFrameIndex { roll.coverFrameIndex = n + 1 - cover }
+        guard frames.contains(where: { $0.assetIdentifier != nil }) else { return (0, true) }
+        return await rewritePhotos(for: roll)
     }
 
     /// 롤 카메라를 바꾼 뒤: 사진 앱 사진을 새 촬영 정보로 다시 넣는다.

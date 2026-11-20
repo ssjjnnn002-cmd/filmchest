@@ -13,6 +13,13 @@ public struct ScanSet: Sendable {
     public let label: String         // 예: "Large/ · JPG"
     public let frames: [ScanFrame]
     public var totalBytes: UInt64 { frames.reduce(0) { $0 + $1.byteSize } }
+
+    /// 거꾸로 감은 롤(프리와인딩): 마지막 파일이 1번 컷
+    public func reversedOrder() -> ScanSet {
+        ScanSet(label: label, frames: frames.reversed().enumerated().map { i, f in
+            ScanFrame(index: i + 1, originalName: f.originalName, fileURL: f.fileURL, byteSize: f.byteSize)
+        })
+    }
 }
 
 public struct ScanImportResult: Sendable {

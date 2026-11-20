@@ -16,17 +16,17 @@ import { Icon } from '../icons'
 import { Page } from '../page'
 import { Confirm, Menu, Sheet, SheetBtn } from '../overlay'
 import { features } from '../core/features'
-import { RollGalleryButton } from '../GallerySave'
+import { RollGalleryButton, useRollInGallery } from '../GallerySave'
 import { useTheme } from '../theme'
-import { DayEdit, LabDropOff, LensChangeEdit, PlaceEdit } from './Editors'
+import { DayEdit, LabDropOff, LabField, LensChangeEdit, PlaceEdit, rememberLab } from './Editors'
 import { RollProjects } from './Projects'
 import { TagField } from '../gearExtras'
 import { FramePrint } from './FramePrint'
 import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
 import { ScanButton } from './Pending'
 import { driveConnected, syncPhotosToDrive } from '../drive'
-import { refreshRollPhotoMeta, rollImageFiles } from '../scan'
-import { replaceInGallery } from '../gallery'
+import { refreshRollPhotoMeta, reverseRollFrames, rollImageFiles } from '../scan'
+import { deleteRollFromGallery, replaceInGallery } from '../gallery'
 
 export function RollDetail({ id }: { id: string }) {
   const c = useTheme()
@@ -47,6 +47,9 @@ export function RollDetail({ id }: { id: string }) {
   const [sheet, setSheet] = useState(false)
   const [framePrint, setFramePrint] = useState(false)
   const [confirm, setConfirm] = useState(false)
+  const [labEdit, setLabEdit] = useState(false)
+  const [confirmReverse, setConfirmReverse] = useState(false)
+  const inGallery = useRollInGallery(confirm ? id : undefined)
   const [recording, setRecording] = useState(false)
   const [moreMenu, setMoreMenu] = useState(false)
   const [pickCamera, setPickCamera] = useState(false)
@@ -169,10 +172,10 @@ export function RollDetail({ id }: { id: string }) {
         </Group>
       </Section> : null}
 
-      {roll.lab || roll.droppedAt || roll.scanner || resolutionText(roll.scanW, roll.scanH) || roll.frameCount || roll.importedAt ? (
+      {roll.status === 'atLab' || roll.status === 'imported' || roll.lab || roll.droppedAt || roll.scanner || resolutionText(roll.scanW, roll.scanH) || roll.frameCount || roll.importedAt ? (
         <Section title="현상 · 스캔">
           <Group>
-            {roll.lab ? info('현상소', roll.lab) : null}
+            <Row onPress={() => setLabEdit(true)} value={roll.lab || '없음'} chev><RowText>현상소</RowText></Row>
             {roll.droppedAt ? info('맡긴 날', fmtDay(roll.droppedAt)) : null}
             {roll.scanner ? info('스캐너', roll.scanner) : null}
             {resolutionText(roll.scanW, roll.scanH) ? info('해상도', resolutionText(roll.scanW, roll.scanH)!) : null}
@@ -215,8 +218,16 @@ export function RollDetail({ id }: { id: string }) {
 
       {moreMenu ? <Menu onClose={() => setMoreMenu(false)} items={[
         { label: '카메라 바꾸기', onPress: () => setPickCamera(true) },
+        { label: '현상소 수정', onPress: () => setLabEdit(true) },
+        ...((roll.frameCount ?? 0) > 1 ? [{ label: '컷 순서 뒤집기', onPress: () => setConfirmReverse(true) }] : []),
         { label: '롤 삭제', danger: true, onPress: () => setConfirm(true) },
       ]} /> : null}
+      {labEdit ? <LabEditSheet roll={roll} onClose={() => setLabEdit(false)} /> : null}
+      {confirmReverse ? (
+        <Confirm message="컷 순서를 거꾸로 바꿀까요? 마지막 컷이 1번이 돼요. 사진 속 날짜·컷 번호도 새 순서로 다시 써요." action="뒤집기" safe
+          onCancel={() => setConfirmReverse(false)}
+          onConfirm={async () => { setConfirmReverse(false); if (await reverseRollFrames(id)) { nav.toast('컷 순서를 뒤집었어요'); void syncPhotoMeta(id, nav.toast) } }} />
+      ) : null}
       {pickCamera ? <RollCameraPick roll={roll} onClose={() => setPickCamera(false)} /> : null}
       {recording ? <ManualRecord roll={roll} onClose={() => setRecording(false)} /> : null}
       {shotEdit !== undefined ? <RollShotEdit roll={roll} pos={shotEdit} onClose={() => setShotEdit(undefined)} onToast={nav.toast} /> : null}
@@ -242,7 +253,9 @@ export function RollDetail({ id }: { id: string }) {
       {framePrint ? <FramePrint roll={roll} frames={frames} onClose={() => setFramePrint(false)} /> : null}
       {sheet ? <ContactSheetView roll={roll} frames={frames} onClose={() => setSheet(false)} /> : null}
       {confirm ? (
-        <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. 사진 앱에 저장한 사진은 그대로 남아요." onCancel={() => setConfirm(false)}
+        <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. '기록만 삭제'는 갤러리 사진을 남겨요." onCancel={() => setConfirm(false)}
+          action={inGallery ? '기록만 삭제' : '삭제'}
+          extra={inGallery ? { label: '갤러리 사진까지 삭제', onPress: async () => { setConfirm(false); if (await deleteRollFromGallery(id)) { await deleteRoll(id); nav.setTab(nav.tab) } } } : undefined}
           onConfirm={async () => { setConfirm(false); await deleteRoll(id); nav.setTab(nav.tab) }} />
       ) : null}
       {lensEdit && camera?.mount ? (
@@ -354,7 +367,7 @@ function AllShots({ roll, format, onEdit }: { roll: Roll; format: FilmFormat; on
 /** 촬영일·장소를 고치면 저장한 사진 속 날짜·위치도 새로 쓴다. 드라이브에 연결돼 있으면 새 정보의 사진으로 다시 올린다 */
 function usePhotoMetaSync(roll: Roll | undefined, toast: (m: string) => void) {
   const key = roll?.status === 'imported'
-    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive, roll.cameraId, roll.cameraBrand, roll.cameraModel, roll.lensId,
+    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive, roll.cameraId, roll.cameraBrand, roll.cameraModel, roll.lensId, roll.lab,
       (roll.meterShots ?? []).map((x) => [x.pos, x.at, x.place, x.lat, x.lon, x.lensId, x.iso])])
     : ''
   const last = useRef<string | undefined>(undefined)
@@ -366,6 +379,23 @@ function usePhotoMetaSync(roll: Roll | undefined, toast: (m: string) => void) {
     const t = setTimeout(() => { void syncPhotoMeta(roll.id, toast) }, 1500)
     return () => clearTimeout(t)
   }, [key])
+}
+
+/** 현상소만 고친다. 사진 속 현상소 정보도 다시 쓴다 (usePhotoMetaSync) */
+function LabEditSheet({ roll, onClose }: { roll: Roll; onClose: () => void }) {
+  const [lab, setLab] = useState(roll.lab ?? '')
+  const save = async () => {
+    rememberLab(lab)
+    await db.rolls.update(roll.id, { lab: lab.trim() || undefined })
+    onClose()
+  }
+  return (
+    <Sheet title="현상소" onClose={onClose} right={<SheetBtn label="저장" accent onPress={save} />}>
+      <Section foot={roll.status === 'imported' ? '사진 속 현상소 정보도 바꿔요.' : undefined}>
+        <Group><LabField value={lab} onChange={setLab} /></Group>
+      </Section>
+    </Sheet>
+  )
 }
 
 async function syncPhotoMeta(rollId: string, toast: (m: string) => void) {

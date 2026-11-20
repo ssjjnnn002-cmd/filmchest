@@ -6,16 +6,19 @@ import { useNav } from '../App'
 import type { GeoPoint, Roll } from '../core/types'
 import { uid } from '../core/types'
 import { allFilms, filmDisplayName, filmFromText } from '../core/films'
-import { isZipFile, previewZip, readFiles } from '../core/zip'
+import { nameHints } from '../core/nameHints'
+import { isZipFile, previewZip, readFiles, reversedSet } from '../core/zip'
 import { LabField, rememberLab } from './Editors'
 import { importScans, thumbnail } from '../core/importer'
 import { Progress, Sheet, toInputDate } from '../ui/common'
 import { PlacePicker } from './Editors'
 
 /** 예전에 찍어 스캔본을 받아 둔 롤을 롤 보관함에 넣는다. 모르는 정보는 '알 수 없음'. */
-export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onSaved }: {
+export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onSaved, sourceName }: {
   onClose: () => void
   presetFile?: File
+  /** 대기열에 보이던 원래 이름 (저장해 둔 복사본은 이름이 uuid) */
+  sourceName?: string
   /** 공유로 받은 사진 묶음 (한 롤) */
   presetFiles?: File[]
   stepLabel?: string
@@ -38,6 +41,22 @@ export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onS
   // 미리보기 칸마다 원본 (눌러서 크게 볼 때)
   const [sources, setSources] = useState<(() => Promise<Blob>)[]>([])
   const [viewing, setViewing] = useState<number>()
+  const guessed = useRef({ film: false, date: false })
+  // 거꾸로 가져오기: 고르지 않았으면 고른 카메라 설정(프리와인딩)을 따른다
+  const [rev, setRev] = useState<boolean>()
+  const reversed = rev ?? !!cameras.find((c) => c.id === cameraId)?.prewind
+  // 고른 파일·zip·폴더 이름. 폴더는 폴더 이름, 여러 개면 "첫 이름 외 n개"
+  const folderName = files[0]?.webkitRelativePath?.split('/')[0]
+  const pickedName = sourceName ?? (folderName || (files.length === 1 ? files[0].name : files.length > 1 ? `${files[0].name} 외 ${files.length - 1}개` : undefined))
+
+  // 이름에 날짜·필름이 있으면 비어 있는 칸에 미리 넣는다 (고친 값은 덮지 않는다)
+  useEffect(() => {
+    const storedCopy = (n: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(n)
+    const names = [sourceName, folderName, ...files.map((f) => f.name)].filter((n): n is string => !!n && !storedCopy(n))
+    const h = nameHints(names)
+    if (h.filmId && !guessed.current.film) { guessed.current.film = true; setFilmId((cur) => cur || h.filmId!) }
+    if (h.date !== undefined && !guessed.current.date) { guessed.current.date = true; setDateKnown((known) => { if (!known) setDate(h.date!); return true }) }
+  }, [files, sourceName, folderName])
 
   useEffect(() => {
     const zipFile = presetFile ?? files.find(isZipFile)
@@ -87,7 +106,7 @@ export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onS
         lab: lab.trim() || undefined, note: memo.trim() || undefined, favorite: false, isArchive: true,
       }
       await db.rolls.add(roll)
-      await importScans(scan.primary, roll, camera, () => undefined, setProgress)
+      await importScans(reversed ? reversedSet(scan.primary) : scan.primary, roll, camera, () => undefined, setProgress)
       nav.toast(`${scan.primary.files.length}장을 롤 보관함에 넣었어요`)
       if (onSaved) onSaved(roll.id)
       else { nav.showRoll(roll.id); onClose() }
@@ -113,7 +132,7 @@ export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onS
             <h2>사진</h2>
             <div className="group">
               {presetFile || presetFiles?.length ? (
-                <div className="row static"><span className="grow">{presetFile ? presetFile.name : `공유한 사진 ${presetFiles!.length}장`}</span></div>
+                <div className="row static"><span className="grow truncate">{presetFile ? (sourceName ?? presetFile.name) : `공유한 사진 ${presetFiles!.length}장`}</span></div>
               ) : (
                 <>
                   <label className="row" style={{ color: 'var(--safelight)' }}>
@@ -124,7 +143,7 @@ export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onS
                     폴더 통째로 고르기
                     <input type="file" multiple hidden {...{ webkitdirectory: '' }} onChange={(e) => setFiles([...(e.target.files ?? [])])} />
                   </label>
-                  {files.length > 0 && <div className="row static sub">파일 {files.length}개 선택함</div>}
+                  {pickedName && <div className="row static"><span className="grow truncate">{pickedName}</span><span className="sub">{files.length}개</span></div>}
                 </>
               )}
             </div>
@@ -141,16 +160,18 @@ export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onS
                 <p className="footnote">사진 {sources.length}장{thumbs.length < sources.length ? ` · 미리보기 ${thumbs.length}장 만드는 중` : ''}</p>
               </>
             )}
-            <p className="footnote">{presetFile ? '사진을 보고 카메라와 필름을 채워 주세요. 폴더 이름에 필름이 있으면 미리 넣어 둬요. 닫아도 대기열에 남아요.' : '파일명 순서대로 컷 번호가 붙어요.'}</p>
+            <p className="footnote">{presetFile ? '사진을 보고 카메라와 필름을 채워 주세요. 이름에 날짜나 필름이 있으면 미리 넣어 둬요. 닫아도 대기열에 남아요.' : '파일명 순서대로 컷 번호가 붙어요. 이름에 날짜나 필름이 있으면 미리 넣어 둬요.'}</p>
             {presetFile && <button className="btn" type="button" onClick={onClose}>나중에 이어하기</button>}
           </div>
 
           <div className="section"><div className="group">
             <div className="field"><label htmlFor="a-cam">카메라</label>
-              <select id="a-cam" className="input" value={cameraId} onChange={(e) => setCameraId(e.target.value)}>
+              <select id="a-cam" className="input" value={cameraId} onChange={(e) => { setCameraId(e.target.value); setRev(undefined) }}>
                 <option value="">알 수 없음</option>
                 {cameras.map((c) => <option key={c.id} value={c.id}>{c.brand} {c.model}</option>)}
               </select></div>
+            <label className="toggle"><span>거꾸로 가져오기</span>
+              <input type="checkbox" className="switch" checked={reversed} onChange={(e) => setRev(e.target.checked)} /></label>
             <div className="field"><label htmlFor="a-film">필름</label>
               <select id="a-film" className="input" value={filmId} onChange={(e) => setFilmId(e.target.value)}>
                 <option value="">알 수 없음</option>
@@ -164,7 +185,7 @@ export function ArchiveImport({ onClose, presetFile, presetFiles, stepLabel, onS
                   onChange={(e) => e.target.value && setDate(new Date(`${e.target.value}T12:00:00`).getTime())} /></div>
             )}
           </div>
-          {!dateKnown && <p className="footnote">알 수 없음으로 두면 사진에 원래 들어 있던 날짜를 그대로 둬요.</p>}
+          <p className="footnote">{reversed ? '마지막 사진이 1번 컷이 돼요. ' : ''}{!dateKnown ? '촬영일을 알 수 없음으로 두면 사진에 원래 들어 있던 날짜를 그대로 둬요.' : ''}</p>
           </div>
 
           <PlacePicker name={place} point={point} onChange={(n, p) => { setPlace(n); setPoint(p) }} />

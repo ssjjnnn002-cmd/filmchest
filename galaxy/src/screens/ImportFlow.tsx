@@ -8,12 +8,12 @@ import { useNav } from '../App'
 import type { Roll } from '../core/types'
 import { uid, lensIdAt } from '../core/types'
 import { allFilms, filmDisplayName } from '../core/films'
-import type { ScanResult } from '../core/zip'
+import { reversedSet, type ScanResult } from '../core/zip'
 import { readScanner } from '../core/exif'
 import { buildTimeline, type FrameInfo } from '../core/timeline'
 import { exposureText, meterAlignLimit, meterAlignText, meterFrameTitle, meterShotsInScan, meterShotAt } from '../core/meter'
 import { bytesText, cameraName, fmtDay, rollCameraFormat, rollFilm, rollFilmName, rollTitle } from '../core/display'
-import { Btn, Canister, DateInput, Empty, EmptyText, Field, Footnote, Group, Progress, Row, RowText, Section, Select, Spinner, Sub } from '../kit'
+import { Btn, Canister, DateInput, Empty, EmptyText, Field, Footnote, Group, Progress, Row, RowText, Section, Select, Spinner, Sub, Toggle } from '../kit'
 import { Sheet, SheetBtn } from '../overlay'
 import { bytesToB64 } from '../files'
 import type { PickedFile } from '../pick'
@@ -23,6 +23,7 @@ import { RollGalleryButton } from '../GallerySave'
 import { useTheme } from '../theme'
 import { LabField, rememberLab } from './Editors'
 import { features } from '../core/features'
+import { nameHints, type NameHints } from '../core/nameHints'
 import { ScanStrip } from './ScanStrip'
 
 type Phase = 'analyzing' | 'pick' | 'confirm' | 'saving' | 'done' | 'error'
@@ -38,6 +39,10 @@ export function ImportFlow({ files, rollId, onClose }: { files: PickedFile[]; ro
   const [setIndex, setSetIndex] = useState(0)
   const [roll, setRoll] = useState<Roll>()
   const [progress, setProgress] = useState({ done: 0, total: 0 })
+  // 가져온 파일 이름 (폴더면 폴더 이름, 여러 개면 "첫 이름 외 n개")
+  const folderName = files[0]?.name.includes('/') ? files[0].name.split('/')[0] : undefined
+  const fileName = folderName || (files.length > 1 ? `${files[0].name} 외 ${files.length - 1}개` : files[0]?.name)
+  const hints = useMemo(() => nameHints([folderName, ...files.map((f) => f.name.split('/').pop() ?? f.name)].filter((n): n is string => !!n)), [files, folderName])
   const [error, setError] = useState<string>()
   const [thumbs, setThumbs] = useState<string[]>([])
   const [quick, setQuick] = useState(false)
@@ -59,7 +64,7 @@ export function ImportFlow({ files, rollId, onClose }: { files: PickedFile[]; ro
   const order: Record<string, number> = { atLab: 0, finished: 1, loaded: 2 }
   const candidates = rolls.filter((r) => !r.deletedAt && r.status !== 'imported').sort((a, b) => order[a.status] - order[b.status] || b.loadedAt - a.loadedAt)
 
-  const save = async (meterOffset = 0) => {
+  const save = async (meterOffset = 0, reversed = false) => {
     if (!roll || !set) return
     setPhase('saving')
     setProgress({ done: 0, total: set.files.length })
@@ -68,7 +73,8 @@ export function ImportFlow({ files, rollId, onClose }: { files: PickedFile[]; ro
       const lensMap = new Map((await db.lenses.toArray()).map((l) => [l.id, l]))
       // 상세 기록한 컷은 그 컷에 끼운 렌즈
       const lensAt = (frame: number) => { const id = meterShotAt(roll.meterShots, frame, meterOffset)?.lensId ?? lensIdAt(roll, frame); return id ? lensMap.get(id) : undefined }
-      const updated = await importScans(set, roll, camera, lensAt, setProgress, meterOffset)
+      // 프리와인딩: 마지막 파일이 1번 컷
+      const updated = await importScans(reversed ? reversedSet(set) : set, roll, camera, lensAt, setProgress, meterOffset)
       setRoll(updated)
       nav.toast('롤 보관함에 기록했어요')
       nav.showRoll(updated.id)
@@ -88,7 +94,7 @@ export function ImportFlow({ files, rollId, onClose }: { files: PickedFile[]; ro
 
       {scan && phase === 'pick' ? (
         <>
-          <Summary thumbs={thumbs} count={scan.primary.files.length} scanner={scanner} />
+          <Summary name={fileName} thumbs={thumbs} count={scan.primary.files.length} scanner={scanner} />
           <Section title="어느 롤인가요?">
             <Group>
               {candidates.length === 0 ? <Row static><Sub>기록해 둔 롤이 없어요. 아래에서 바로 기록할 수 있어요.</Sub></Row> : null}
@@ -126,15 +132,16 @@ export function ImportFlow({ files, rollId, onClose }: { files: PickedFile[]; ro
         </Empty>
       ) : null}
 
-      {quick ? <QuickRoll onClose={() => setQuick(false)} onCreate={(r) => { setQuick(false); setRoll(r); setPhase('confirm') }} /> : null}
+      {quick ? <QuickRoll hints={hints} onClose={() => setQuick(false)} onCreate={(r) => { setQuick(false); setRoll(r); setPhase('confirm') }} /> : null}
     </Sheet>
   )
 }
 
-function Summary({ thumbs, count, scanner }: { thumbs: string[]; count: number; scanner?: string }) {
+function Summary({ name, thumbs, count, scanner }: { name?: string; thumbs: string[]; count: number; scanner?: string }) {
   const c = useTheme()
   return (
     <Section>
+      {name ? <View style={{ paddingHorizontal: 4, marginBottom: 6 }}><RowText>{name}</RowText></View> : null}
       {thumbs.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ backgroundColor: c.filmBase, borderRadius: 14 }} contentContainerStyle={{ padding: 6, gap: 4 }}>
           {thumbs.map((u, i) => <Image key={i} source={{ uri: u }} style={{ width: 66, height: 44 }} resizeMode="cover" />)}
@@ -160,11 +167,14 @@ function ranges(timeline: FrameInfo[], key: (f: FrameInfo) => string) {
 
 function Confirmation({ roll, sets, setIndex, onSetIndex, scanner, onChangeRoll, onSave }: {
   roll: Roll; sets: ScanResult['primary'][]; setIndex: number; onSetIndex: (i: number) => void; scanner?: string
-  onChangeRoll?: () => void; onSave: (meterOffset: number) => void
+  onChangeRoll?: () => void; onSave: (meterOffset: number, reversed: boolean) => void
 }) {
   const c = useTheme()
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
   const [offset, setOffset] = useState(features.frameShift ? roll.meterOffset ?? 0 : 0)
+  // 거꾸로 가져오기: 고르지 않았으면 롤 카메라 설정(프리와인딩)을 따른다
+  const [rev, setRev] = useState<boolean>()
+  const reversed = rev ?? !!camera?.prewind
   const count = sets[setIndex].files.length
   const unknownDate = roll.isArchive && roll.days.length === 0
   const timeline = buildTimeline(roll, count)
@@ -206,8 +216,13 @@ function Confirmation({ roll, sets, setIndex, onSetIndex, scanner, onChangeRoll,
         </Group>
       </Section>
       <Section title={`사진 ${count}장`} foot="눌러서 크게 볼 수 있어요.">
-        <ScanStrip files={sets[setIndex].files} />
+        <ScanStrip files={(reversed ? reversedSet(sets[setIndex]) : sets[setIndex]).files} />
       </Section>
+      {count > 1 ? (
+        <Section foot={reversed ? '마지막 사진이 1번 컷이 돼요. 프리와인딩 카메라로 찍은 롤이에요.' : camera?.prewind ? '이 카메라는 프리와인딩으로 설정돼 있어요.' : '프리와인딩 카메라로 찍었으면 켜 주세요.'}>
+          <Group><Toggle label="거꾸로 가져오기" value={reversed} onChange={setRev} /></Group>
+        </Section>
+      ) : null}
       <ExposureMap roll={roll} count={count} offset={offset} onOffset={setOffset} />
       {roll.locations.length > 0 ? (
         <Section title="장소">
@@ -219,7 +234,7 @@ function Confirmation({ roll, sets, setIndex, onSetIndex, scanner, onChangeRoll,
         </Section>
       ) : null}
       {scanner ? <Footnote>스캐너: {scanner}</Footnote> : null}
-      <View style={{ marginTop: 8 }}><Btn label={`${count}장에 촬영 정보 기록하기`} kind="primary" block onPress={() => onSave(offset)} /></View>
+      <View style={{ marginTop: 8 }}><Btn label={`${count}장에 촬영 정보 기록하기`} kind="primary" block onPress={() => onSave(offset, reversed)} /></View>
       <View style={{ marginTop: 8, alignItems: 'center' }}><Footnote>사진은 이 기기 안에서만 처리돼요. 어디에도 올라가지 않아요.</Footnote></View>
     </>
   )
@@ -254,11 +269,12 @@ function ExposureMap({ roll, count, offset, onOffset }: { roll: Roll; count: num
 }
 
 /** 미리 기록하지 않은 롤을 즉석에서 */
-function QuickRoll({ onClose, onCreate }: { onClose: () => void; onCreate: (r: Roll) => void }) {
+function QuickRoll({ hints, onClose, onCreate }: { hints?: NameHints; onClose: () => void; onCreate: (r: Roll) => void }) {
   const cameras = useLiveQuery(() => db.cameras.orderBy('sortOrder').filter((x) => !x.deletedAt).toArray(), []) ?? []
   const [cameraId, setCameraId] = useState('')
-  const [filmId, setFilmId] = useState(allFilms()[0].id)
-  const [date, setDate] = useState(Date.now())
+  // 파일 이름에 날짜·필름이 있으면 미리 넣는다
+  const [filmId, setFilmId] = useState(hints?.filmId ?? allFilms()[0].id)
+  const [date, setDate] = useState(hints?.date ?? Date.now())
   const [place, setPlace] = useState('')
   const [lab, setLab] = useState('')
   const create = async () => {

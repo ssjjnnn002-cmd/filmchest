@@ -8,14 +8,14 @@ import { ManualRecord, RollShotEdit } from './ManualRecord'
 import { features } from '../core/features'
 import { RollGalleryButton } from '../ui/GallerySave'
 import { CameraCover, Canister, cameraName, Confirm, Sheet, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedDays, sortedLocations } from '../ui/common'
-import { DayEdit, LabDropOff, LensChangeEdit, PlaceEdit } from './Editors'
+import { DayEdit, LabDropOff, LabField, LensChangeEdit, PlaceEdit, rememberLab } from './Editors'
 import { RollProjects } from './Projects'
 import { TagField } from '../ui/gearExtras'
 import { FramePrint } from './FramePrint'
 import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
 import { ScanButton } from './Pending'
 import { driveConnected, hasDriveToken, syncPhotosToDrive } from '../core/drive'
-import { refreshRollPhotoMeta } from '../core/importer'
+import { refreshRollPhotoMeta, reverseRollFrames } from '../core/importer'
 
 export function RollDetail({ id }: { id: string }) {
   const nav = useNav()
@@ -40,6 +40,8 @@ export function RollDetail({ id }: { id: string }) {
   const [pickCamera, setPickCamera] = useState(false)
   const [shotEdit, setShotEdit] = useState<number>()
   const [allShots, setAllShots] = useState(false)
+  const [labEdit, setLabEdit] = useState(false)
+  const [confirmReverse, setConfirmReverse] = useState(false)
 
   if (!roll) return null
   // 컷 기록: 촬영 중이거나 상세 기록을 남긴 롤
@@ -71,6 +73,8 @@ export function RollDetail({ id }: { id: string }) {
               {moreMenu && (
                 <div className="menu">
                   <button className="row" onClick={() => { setMoreMenu(false); setPickCamera(true) }}>카메라 바꾸기</button>
+                  <button className="row" onClick={() => { setMoreMenu(false); setLabEdit(true) }}>현상소 수정</button>
+                  {(roll.frameCount ?? 0) > 1 && <button className="row" onClick={() => { setMoreMenu(false); setConfirmReverse(true) }}>컷 순서 뒤집기</button>}
                   <button className="row danger" onClick={() => { setMoreMenu(false); setConfirm(true) }}>롤 삭제</button>
                 </div>
               )}
@@ -171,11 +175,11 @@ export function RollDetail({ id }: { id: string }) {
         {locs.some((l) => !l.point) && <p className="footnote warn">주황색 장소는 좌표가 없어 사진에 위치가 기록되지 않아요. 눌러서 좌표를 넣어 주세요.</p>}
       </div>}
 
-      {(roll.lab || roll.droppedAt || roll.scanner || resolutionText(roll.scanW, roll.scanH) || roll.frameCount || roll.importedAt) && (
+      {(roll.status === 'atLab' || roll.status === 'imported' || roll.lab || roll.droppedAt || roll.scanner || resolutionText(roll.scanW, roll.scanH) || roll.frameCount || roll.importedAt) && (
         <div className="section">
           <h2>현상 · 스캔</h2>
           <div className="group">
-            {roll.lab && <Info label="현상소" value={roll.lab} />}
+            <button className="row" onClick={() => setLabEdit(true)}><span className="grow">현상소</span><span className="value">{roll.lab || '없음'}</span><Icon name="chev" size={18} /></button>
             {roll.droppedAt && <Info label="맡긴 날" value={fmtDay(roll.droppedAt)} />}
             {roll.scanner && <Info label="스캐너" value={roll.scanner} />}
             {resolutionText(roll.scanW, roll.scanH) && <Info label="해상도" value={resolutionText(roll.scanW, roll.scanH)!} />}
@@ -243,11 +247,34 @@ export function RollDetail({ id }: { id: string }) {
         <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. 사진 앱에 저장한 사진은 그대로 남아요." onCancel={() => setConfirm(false)}
           onConfirm={async () => { await deleteRoll(id); nav.setTab(nav.tab) }} />
       )}
+      {labEdit && <LabEditSheet roll={roll} onClose={() => setLabEdit(false)} />}
+      {confirmReverse && (
+        <Confirm message="컷 순서를 거꾸로 바꿀까요? 마지막 컷이 1번이 돼요. 사진 속 날짜·컷 번호도 새 순서로 다시 써요." action="뒤집기" safe
+          onCancel={() => setConfirmReverse(false)}
+          onConfirm={async () => { setConfirmReverse(false); if (await reverseRollFrames(id)) { nav.toast('컷 순서를 뒤집었어요'); void syncPhotoMeta(id, nav.toast) } }} />
+      )}
       {lensEdit && camera?.mount && (
         <LensChangeEdit roll={roll} mount={camera.mount} brand={camera.brand}
           change={lensEdit === 'new' ? undefined : lensEdit} onClose={() => setLensEdit(null)} />
       )}
     </>
+  )
+}
+
+/** 현상소만 고친다. 사진 속 현상소 정보도 다시 쓴다 (usePhotoMetaSync) */
+function LabEditSheet({ roll, onClose }: { roll: Roll; onClose: () => void }) {
+  const [lab, setLab] = useState(roll.lab ?? '')
+  const save = async () => {
+    rememberLab(lab)
+    await db.rolls.update(roll.id, { lab: lab.trim() || undefined })
+    onClose()
+  }
+  return (
+    <Sheet title="현상소" onClose={onClose} right={<button className="btn ghost" onClick={save}><b>저장</b></button>}>
+      <div className="section"><div className="group"><LabField id="lab-edit" value={lab} onChange={setLab} /></div>
+        {roll.status === 'imported' && <p className="footnote">사진 속 현상소 정보도 바꿔요.</p>}
+      </div>
+    </Sheet>
   )
 }
 
@@ -358,7 +385,7 @@ function AllShots({ roll, format, onEdit }: { roll: Roll; format: FilmFormat; on
 /** 촬영일·장소를 고치면 저장한 사진 속 날짜·위치도 새로 쓴다. 드라이브에 연결돼 있으면 새 정보의 사진으로 다시 올린다 */
 function usePhotoMetaSync(roll: Roll | undefined, toast: (m: string) => void) {
   const key = roll?.status === 'imported'
-    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive, roll.cameraId, roll.cameraBrand, roll.cameraModel, roll.lensId,
+    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive, roll.cameraId, roll.cameraBrand, roll.cameraModel, roll.lensId, roll.lab,
       (roll.meterShots ?? []).map((x) => [x.pos, x.at, x.place, x.lat, x.lon, x.lensId, x.iso])])
     : ''
   const last = useRef<string | undefined>(undefined)

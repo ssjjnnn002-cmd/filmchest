@@ -230,8 +230,10 @@ export function Sheet({ title, onClose, left, right, children, page, scroll = tr
 }
 
 /** 페이지 안 확인 창 (.alert) */
-export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onCancel }: {
+export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onCancel, extra }: {
   message: string; action?: string; safe?: boolean; onConfirm: () => void; onCancel: () => void
+  /** 아래 줄 버튼 하나 더 (예: 갤러리 사진까지 삭제) */
+  extra?: { label: string; onPress: () => void }
   /** 진행 중 알림: 버튼 없이 글만 */
   busy?: boolean
 }) {
@@ -239,8 +241,8 @@ export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onC
   const nested = !!useContext(HostContext)
   useOverlayBack(onCancel)
   const btn = (label: string, color: string, fn: () => void) => (
-    <Pressable onPress={fn} style={({ pressed }) => ({ flex: 1, height: 48, borderRadius: 999, backgroundColor: c.fill, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.96 : 1 }] })}>
-      <Text style={{ color, fontSize: 17, fontWeight: '600' }}>{label}</Text>
+    <Pressable onPress={fn} style={({ pressed }) => ({ flex: 1, minHeight: 48, paddingHorizontal: 12, borderRadius: 999, backgroundColor: c.fill, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.96 : 1 }] })}>
+      <Text numberOfLines={1} adjustsFontSizeToFit style={{ color, fontSize: 17, fontWeight: '600' }}>{label}</Text>
     </Pressable>
   )
   const inner = (
@@ -254,6 +256,7 @@ export function Confirm({ message, action = '삭제', safe, busy, onConfirm, onC
               {btn(action, safe ? c.safelight : c.danger, onConfirm)}
             </View>
           )}
+          {!busy && extra ? <View style={{ flexDirection: 'row', marginTop: 10 }}>{btn(extra.label, c.danger, extra.onPress)}</View> : null}
         </Glass>
       </Pressable>
     </Pressable>
