@@ -91,7 +91,11 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
     await db.rolls.add(roll)
     // 재고가 있으면 1롤 뺀다
     const lot = lotToUse(lots, film.id, camera.format)
-    if (lot) await db.filmLots.update(lot.id, { count: lot.count - 1 })
+    if (lot) {
+      await db.filmLots.update(lot.id, { count: lot.count - 1 })
+      // 빈티지 필름: 그 재고의 유통기한을 롤에 남긴다
+      if (lot.expiresAt) await db.rolls.update(roll.id, { filmExpiresAt: lot.expiresAt })
+    }
     onClose(roll)
     // 위치는 창을 닫은 뒤 채운다
     if (today && isToday && locationAvailable()) {

@@ -51,6 +51,7 @@ enum DataBackup {
         var loadedAt: Date; var finishedAt: Date?; var shootingDays: [ShootingDay]; var locations: [LocationSegment]
         var lensChanges: [LensChange]; var meterShots: [MeterShot]; var meterPrewind: Bool?; var meterOffset: Int
         var labName: String?; var droppedOffAt: Date?; var scannerName: String?; var frameCount: Int?; var note: String?
+        var filmExpiresAt: Date?
         var isFavorite: Bool; var tags: [String]; var isArchive: Bool
         var recordedCameraBrand, recordedCameraModel, recordedCameraFormatRaw, recordedFixedLensName: String
     }
@@ -92,7 +93,7 @@ enum DataBackup {
                  statusRaw: $0.statusRaw, loadedAt: $0.loadedAt, finishedAt: $0.finishedAt, shootingDays: $0.shootingDays,
                  locations: $0.locations, lensChanges: $0.lensChanges, meterShots: $0.meterShots, meterPrewind: $0.meterPrewind,
                  meterOffset: $0.meterOffset, labName: $0.labName, droppedOffAt: $0.droppedOffAt, scannerName: $0.scannerName,
-                 frameCount: $0.frameCount, note: $0.note, isFavorite: $0.isFavorite, tags: $0.tags, isArchive: $0.isArchive,
+                 frameCount: $0.frameCount, note: $0.note, filmExpiresAt: $0.filmExpiresAt, isFavorite: $0.isFavorite, tags: $0.tags, isArchive: $0.isArchive,
                  recordedCameraBrand: $0.recordedCameraBrand, recordedCameraModel: $0.recordedCameraModel,
                  recordedCameraFormatRaw: $0.recordedCameraFormatRaw, recordedFixedLensName: $0.recordedFixedLensName)
         }
@@ -163,7 +164,7 @@ enum DataBackup {
             t.camera = cam; t.lens = lens; t.filmStockID = r.filmStockID; t.shotISO = r.shotISO; t.statusRaw = r.statusRaw
             t.loadedAt = r.loadedAt; t.finishedAt = r.finishedAt; t.shootingDays = r.shootingDays; t.locations = r.locations
             t.lensChanges = r.lensChanges; t.meterShots = r.meterShots; t.meterPrewind = r.meterPrewind; t.meterOffset = r.meterOffset
-            t.labName = r.labName; t.droppedOffAt = r.droppedOffAt; t.scannerName = r.scannerName
+            t.labName = r.labName; t.droppedOffAt = r.droppedOffAt; t.scannerName = r.scannerName; t.filmExpiresAt = r.filmExpiresAt
             if t.frameCount == nil { t.frameCount = r.frameCount }
             t.note = r.note; t.isFavorite = r.isFavorite; t.tags = r.tags; t.isArchive = r.isArchive
             t.recordedCameraBrand = r.recordedCameraBrand; t.recordedCameraModel = r.recordedCameraModel

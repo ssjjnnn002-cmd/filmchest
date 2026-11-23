@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll } from '../db'
 import { useNav } from '../App'
-import { formatInfo, weatherText, type Camera, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
+import { expiredSince, expiryLine, formatInfo, weatherText, type Camera, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
 import { exposureText, meterFrameTitle, meterProgress, meterShotsByOrder, shotRowMeta } from '../core/meter'
 import { ManualRecord, RollShotEdit } from './ManualRecord'
 import { features } from '../core/features'
 import { RollGalleryButton } from '../ui/GallerySave'
-import { CameraCover, Canister, cameraName, Confirm, Sheet, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedLocations } from '../ui/common'
+import { CameraCover, Canister, cameraName, Confirm, Sheet, toInputDate, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedLocations } from '../ui/common'
 import { DayEdit, LabDropOff, LabField, LensChangeEdit, PlaceEdit, rememberLab } from './Editors'
 import { RollProjects } from './Projects'
 import { TagField } from '../ui/gearExtras'
@@ -43,6 +43,7 @@ export function RollDetail({ id }: { id: string }) {
   const [shotEdit, setShotEdit] = useState<number>()
   const [allShots, setAllShots] = useState(false)
   const [labEdit, setLabEdit] = useState(false)
+  const [expiryEdit, setExpiryEdit] = useState(false)
   const [confirmReverse, setConfirmReverse] = useState(false)
 
   if (!roll) return null
@@ -86,6 +87,7 @@ export function RollDetail({ id }: { id: string }) {
                 <div className="menu">
                   <button className="row" onClick={() => { setMoreMenu(false); setPickCamera(true) }}>카메라 바꾸기</button>
                   <button className="row" onClick={() => { setMoreMenu(false); setLabEdit(true) }}>현상소 수정</button>
+                  <button className="row" onClick={() => { setMoreMenu(false); setExpiryEdit(true) }}>필름 유통기한</button>
                   {(roll.frameCount ?? 0) > 1 && <button className="row" onClick={() => { setMoreMenu(false); setConfirmReverse(true) }}>컷 순서 뒤집기</button>}
                   <button className="row danger" onClick={() => { setMoreMenu(false); setConfirm(true) }}>롤 삭제</button>
                 </div>
@@ -110,6 +112,11 @@ export function RollDetail({ id }: { id: string }) {
             </span>
           )}
           <span className="sub">{dateRangeText(roll)}</span>
+          {/* 빈티지 필름: 유통기한이 얼마나 지났는지 */}
+          {roll.filmExpiresAt && (
+            <button className="link-btn" style={{ color: expiredSince(roll.filmExpiresAt) ? 'var(--warn)' : 'var(--muted)', fontWeight: 600, fontSize: 13 }}
+              onClick={() => setExpiryEdit(true)}>{expiryLine(roll.filmExpiresAt)}</button>
+          )}
         </div>
       </div>
 
@@ -261,6 +268,7 @@ export function RollDetail({ id }: { id: string }) {
           onConfirm={async () => { await deleteRoll(id); nav.setTab(nav.tab) }} />
       )}
       {labEdit && <LabEditSheet roll={roll} onClose={() => setLabEdit(false)} />}
+      {expiryEdit && <ExpiryEditSheet roll={roll} onClose={() => setExpiryEdit(false)} />}
       {confirmReverse && (
         <Confirm message="컷 순서를 거꾸로 바꿀까요? 마지막 컷이 1번이 돼요. 사진 속 날짜·컷 번호도 새 순서로 다시 써요." action="뒤집기" safe
           onCancel={() => setConfirmReverse(false)}
@@ -287,6 +295,23 @@ function LabEditSheet({ roll, onClose }: { roll: Roll; onClose: () => void }) {
       <div className="section"><div className="group"><LabField id="lab-edit" value={lab} onChange={setLab} /></div>
         {roll.status === 'imported' && <p className="footnote">사진 속 현상소 정보도 바꿔요.</p>}
       </div>
+    </Sheet>
+  )
+}
+
+/** 롤에 넣은 필름의 유통기한 (빈티지 필름이면 얼마나 지났는지 본다, 아이폰과 같음) */
+function ExpiryEditSheet({ roll, onClose }: { roll: Roll; onClose: () => void }) {
+  const [date, setDate] = useState(roll.filmExpiresAt ?? Date.now())
+  const past = expiredSince(date)
+  return (
+    <Sheet title="필름 유통기한" onClose={onClose} right={<button className="btn ghost" onClick={async () => { await db.rolls.update(roll.id, { filmExpiresAt: date }); onClose() }}><b>저장</b></button>}>
+      <div className="section"><div className="group">
+        <div className="field"><label htmlFor="exp-date">유통기한</label>
+          <input id="exp-date" type="date" className="input" value={toInputDate(date)} onChange={(e) => e.target.value && setDate(new Date(`${e.target.value}T12:00:00`).getTime())} /></div>
+      </div>
+        <p className="footnote">{past ? `장착할 때 ${past} 지난 필름이에요.` : '아직 기한이 남은 필름이에요.'}</p>
+      </div>
+      {roll.filmExpiresAt && <div className="group"><button className="row" style={{ color: '#c0392b' }} onClick={async () => { await db.rolls.update(roll.id, { filmExpiresAt: undefined }); onClose() }}>유통기한 지우기</button></div>}
     </Sheet>
   )
 }

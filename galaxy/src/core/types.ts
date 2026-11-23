@@ -126,6 +126,23 @@ const grouped = (n: number) => {
 }
 /** 로케일 날짜 함수는 일부 안드로이드에서 앱을 종료시킨다. 숫자는 직접 적는다. */
 export const priceText = (n: number) => `${grouped(n)}원`
+
+/** 유통기한이 지난 기간 글자: 지났으면 "12일" / "8개월" / "2년" / "2년 3개월", 안 지났으면 undefined (아이폰 ExpiryText와 같음) */
+export function expiredSince(expires: number, now = Date.now()): string | undefined {
+  if (expires >= now) return undefined
+  const a = new Date(expires), b = new Date(now)
+  let m = (b.getFullYear() - a.getFullYear()) * 12 + b.getMonth() - a.getMonth()
+  if (b.getDate() < a.getDate()) m -= 1
+  if (m < 1) return `${Math.max(1, Math.floor((now - expires) / 86_400_000))}일`
+  if (m < 12) return `${m}개월`
+  return m % 12 === 0 ? `${m / 12}년` : `${Math.floor(m / 12)}년 ${m % 12}개월`
+}
+/** 롤 화면 한 줄: "유통기한 2024.03 · 2년 8개월 지남" */
+export function expiryLine(expires: number, now = Date.now()) {
+  const d = new Date(expires)
+  const past = expiredSince(expires, now)
+  return `유통기한 ${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}${past ? ` · ${past} 지남` : ''}`
+}
 export const groupedNumber = grouped
 const pad2 = (n: number) => String(n).padStart(2, '0')
 export function formatDate(ms: number) {
@@ -208,6 +225,8 @@ export interface Roll {
   days: ShootingDay[]
   locations: LocationSegment[]
   lab?: string
+  /** 장착한 필름의 유통기한 (빈티지 필름이면 얼마나 지났는지 보려고). 재고에서 장착하면 그 재고 값 */
+  filmExpiresAt?: number
   droppedAt?: number
   scanner?: string
   importedAt?: number

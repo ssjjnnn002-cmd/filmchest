@@ -7,13 +7,13 @@ import Svg, { Path } from 'react-native-svg'
 import { db, deleteRoll } from '../data'
 import { useLiveQuery } from '../store'
 import { useNav } from '../App'
-import { formatInfo, weatherText, type Camera, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
+import { expiredSince, expiryLine, formatInfo, weatherText, type Camera, type FilmFormat, type LocationSegment, type MeterShot, type Roll, type ShootingDay } from '../core/types'
 import { exposureText, meterFrameTitle, meterProgress, meterShotsByOrder, shotRowMeta } from '../core/meter'
 import { ManualRecord, RollShotEdit } from './ManualRecord'
 import { bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedLocations } from '../core/display'
 import { resolvedDays, span } from '../core/rangeEdit'
 import { orderedDays } from '../core/timeline'
-import { Btn, CameraCover, Canister, Field, Group, Progress, Row, RowText, Section, Segmented, StatusBadge, Sub } from '../kit'
+import { Btn, CameraCover, Canister, DateInput, Field, Group, Progress, Row, RowText, Section, Segmented, StatusBadge, Sub } from '../kit'
 import { Icon } from '../icons'
 import { Page } from '../page'
 import { Confirm, Menu, Sheet, SheetBtn } from '../overlay'
@@ -50,6 +50,7 @@ export function RollDetail({ id }: { id: string }) {
   const [framePrint, setFramePrint] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const [labEdit, setLabEdit] = useState(false)
+  const [expiryEdit, setExpiryEdit] = useState(false)
   const [confirmReverse, setConfirmReverse] = useState(false)
   const inGallery = useRollInGallery(confirm ? id : undefined)
   const [recording, setRecording] = useState(false)
@@ -122,6 +123,12 @@ export function RollDetail({ id }: { id: string }) {
             </Sub>
           ) : null}
           <Sub>{dateRangeText(roll)}</Sub>
+          {/* 빈티지 필름: 유통기한이 얼마나 지났는지 */}
+          {roll.filmExpiresAt ? (
+            <Pressable onPress={() => setExpiryEdit(true)} hitSlop={6}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: expiredSince(roll.filmExpiresAt) ? c.warn : c.muted }}>{expiryLine(roll.filmExpiresAt)}</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -232,10 +239,12 @@ export function RollDetail({ id }: { id: string }) {
       {moreMenu ? <Menu onClose={() => setMoreMenu(false)} items={[
         { label: '카메라 바꾸기', onPress: () => setPickCamera(true) },
         { label: '현상소 수정', onPress: () => setLabEdit(true) },
+        { label: '필름 유통기한', onPress: () => setExpiryEdit(true) },
         ...((roll.frameCount ?? 0) > 1 ? [{ label: '컷 순서 뒤집기', onPress: () => setConfirmReverse(true) }] : []),
         { label: '롤 삭제', danger: true, onPress: () => setConfirm(true) },
       ]} /> : null}
       {labEdit ? <LabEditSheet roll={roll} onClose={() => setLabEdit(false)} /> : null}
+      {expiryEdit ? <ExpiryEditSheet roll={roll} onClose={() => setExpiryEdit(false)} /> : null}
       {confirmReverse ? (
         <Confirm message="컷 순서를 거꾸로 바꿀까요? 마지막 컷이 1번이 돼요. 사진 속 날짜·컷 번호도 새 순서로 다시 써요." action="뒤집기" safe
           onCancel={() => setConfirmReverse(false)}
@@ -395,6 +404,20 @@ function usePhotoMetaSync(roll: Roll | undefined, toast: (m: string) => void) {
 }
 
 /** 현상소만 고친다. 사진 속 현상소 정보도 다시 쓴다 (usePhotoMetaSync) */
+/** 롤에 넣은 필름의 유통기한 (빈티지 필름이면 얼마나 지났는지 본다, 웹·아이폰과 같음) */
+function ExpiryEditSheet({ roll, onClose }: { roll: Roll; onClose: () => void }) {
+  const [date, setDate] = useState(roll.filmExpiresAt ?? Date.now())
+  const past = expiredSince(date)
+  return (
+    <Sheet title="필름 유통기한" onClose={onClose} right={<SheetBtn label="저장" accent onPress={async () => { await db.rolls.update(roll.id, { filmExpiresAt: date }); onClose() }} />}>
+      <Section foot={past ? `장착할 때 ${past} 지난 필름이에요.` : '아직 기한이 남은 필름이에요.'}>
+        <Group><Field label="유통기한"><DateInput value={date} onChange={setDate} /></Field></Group>
+      </Section>
+      {roll.filmExpiresAt ? <Group><Row onPress={async () => { await db.rolls.update(roll.id, { filmExpiresAt: undefined }); onClose() }}><RowText color="#c0392b">유통기한 지우기</RowText></Row></Group> : null}
+    </Sheet>
+  )
+}
+
 function LabEditSheet({ roll, onClose }: { roll: Roll; onClose: () => void }) {
   const [lab, setLab] = useState(roll.lab ?? '')
   const save = async () => {

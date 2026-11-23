@@ -301,7 +301,12 @@ export function Canister({ film, format = '135', size = 48, cover, thumb }: { fi
   const k = pack === 'roll' ? '120' : format === '110' ? '110' : format === 'sheet-45' ? '45' : format === 'sheet-810' ? '810' : pack === 'instant' ? 'inst' : '135'
   const src = canisterShots[`${film.id}-${k}`]
   if (src && thumb) return <Image source={src} resizeMode="cover" style={{ width: thumb[0], height: thumb[1], borderRadius: thumb[0] > 70 ? 10 : 6 }} accessibilityLabel={film.name} />
-  if (src && cover) return <Image source={src} resizeMode="cover" style={{ width: '100%', aspectRatio: 1.6, borderRadius: 8 }} accessibilityLabel={film.name} />
+  // 칸 너비에 맞춘 틀 안에 꽉 채운다 (그림 크기대로 커져 칸 밖으로 넘치지 않게)
+  if (src && cover) return (
+    <View style={{ alignSelf: 'stretch', aspectRatio: 1.6, borderRadius: 8, overflow: 'hidden' }}>
+      <Image source={src} resizeMode="cover" style={{ width: '100%', height: '100%' }} accessibilityLabel={film.name} />
+    </View>
+  )
   if (src) return <Image source={src} resizeMode="contain" style={{ width: size, height: size }} accessibilityLabel={film.name} />
   return <DrawnCanister film={film} format={format} size={size} />
 }

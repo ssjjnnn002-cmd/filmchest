@@ -12,7 +12,7 @@ import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films
 import { lensesFor } from '../core/lenses'
 import { filmFits, filterDiameters, filterKinds, groupPrice, lensSpec, parseLens } from '../core/optics'
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
-import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
+import { FILTER_KIND, expiredSince, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
 import { groupSections, lotKey, sortLots, type FilmLotSort, type GearGroup } from '../core/gearGroup'
 import { FilmPicker } from '../FilmPickGrid'
 import { deleteCameraPhoto, readBytes, saveCameraPhoto, useCameraPhoto, usePhotoIsCutout } from '../files'
@@ -214,28 +214,35 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
         .map((sec, n) => <View key={sec.title ?? n} style={{ gap: 8 }}>{sec.title ? <GroupTitle>{`${sec.title} · ${sec.items.length}`}</GroupTitle> : null}{box(sec.items.map((lot) => {
         const film = filmById(lot.filmId)
         const late = !!lot.expiresAt && lot.expiresAt < Date.now()
-        const count = (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: grid ? 2 : 0 }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: c.ink, fontVariant: ['tabular-nums'] }}>{lot.count}롤</Text>
-                {late || lot.count <= lot.lowAt ? (
-                  <Text style={{ fontSize: 12, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, overflow: 'hidden',
-                    backgroundColor: late ? '#ff453a' : '#fce08a', color: late ? '#fff' : '#7a5a00' }} numberOfLines={1}>{late ? '기한 지남' : '재고 부족'}</Text>
-                ) : null}
-              </View>
-        )
+        // 부족·기한 지남: 바둑판은 상자 그림 모서리, 목록은 브랜드 줄 끝 (− + 와 겹치지 않게, 웹·아이폰과 같음)
+        const tag = late || lot.count <= lot.lowAt ? (
+          <Text style={{ fontSize: 11, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, overflow: 'hidden',
+            backgroundColor: late ? '#ff453a' : '#fce08a', color: late ? '#fff' : '#7a5a00' }} numberOfLines={1}>{late ? `기한 ${expiredSince(lot.expiresAt!) ?? ''} 지남` : '재고 부족'}</Text>
+        ) : null
         return (
-          <Pressable key={lot.id} onPress={() => setEdit(lot.id)} style={grid ? { ...card, alignItems: 'flex-start' } : row}>
-            {grid ? <Canister film={film} format={lot.format} cover /> : <Canister film={film} format={lot.format} thumb={[64, 40]} />}
-            <View style={{ flex: grid ? undefined : 1, gap: 2, alignSelf: 'stretch' }}>
-              {/* 바둑판: 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게, 웹·아이폰과 같음) */}
-              {grid || film?.brand ? <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: c.muted, lineHeight: 15 }}>{film?.brand || ' '}</Text> : null}
-              {title(film?.brand ? film.name : filmDisplayName(film))}
-              {sub(`${formatInfo[lot.format].name} · ${storageText(lot)}`, 1)}
-              {/* 재고 수량은 크게, 부족·기한 지남은 옆에 둥근 표시. 바둑판은 아래, 목록은 오른쪽 (웹·아이폰과 같음) */}
-              {grid ? count : null}
+          <View key={lot.id} style={grid ? { width: '48%' } : undefined}>
+            <Pressable onPress={() => setEdit(lot.id)} style={grid ? { ...card, width: '100%', alignItems: 'flex-start' } : row}>
+              {grid ? <Canister film={film} format={lot.format} cover /> : <Canister film={film} format={lot.format} thumb={[64, 40]} />}
+              <View style={{ flex: grid ? undefined : 1, gap: 2, alignSelf: 'stretch' }}>
+                {/* 바둑판: 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게, 웹·아이폰과 같음) */}
+                {grid || film?.brand || tag ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 12, fontWeight: '500', color: c.muted, lineHeight: 15 }}>{film?.brand || ' '}</Text>
+                    {grid ? null : tag}
+                  </View>
+                ) : null}
+                {title(film?.brand ? film.name : filmDisplayName(film))}
+                {sub(`${formatInfo[lot.format].name} · ${storageText(lot)}`, 1)}
+                {/* 맨 아래 줄(바둑판)·오른쪽(목록)은 − 수량 + 자리 */}
+                {grid ? <View style={{ height: 40 }} /> : null}
+              </View>
+              {grid ? null : <View style={{ width: 116 }} />}
+            </Pressable>
+            {grid && tag ? <View pointerEvents="none" style={{ position: 'absolute', left: 20, top: 20 }}>{tag}</View> : null}
+            <View style={grid ? { position: 'absolute', bottom: 14, left: 0, right: 0, alignItems: 'center' } : { position: 'absolute', right: 14, top: 0, bottom: 0, justifyContent: 'center' }}>
+              <LotStepper count={lot.count} onChange={(n) => void db.filmLots.update(lot.id, { count: n })} />
             </View>
-            {grid ? null : count}
-          </Pressable>
+          </View>
         )
       }))}</View>)}
       {edit && kind === 'lens' && <LensEdit lens={(allLenses ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
@@ -575,5 +582,23 @@ function GlassPicker({ glass, setGlass }: { name: string; glass?: string; setGla
         </View>
       </Group>
     </Section>
+  )
+}
+
+/** 재고 칸에서 바로 한 롤씩 빼고 더하기: [− 3롤 +] (웹·아이폰과 같음) */
+function LotStepper({ count, onChange }: { count: number; onChange: (n: number) => void }) {
+  const c = useTheme()
+  const btn = (label: string, sign: string, disabled: boolean, onPress: () => void) => (
+    <Pressable accessibilityLabel={label} disabled={disabled} onPress={onPress} hitSlop={4}
+      style={({ pressed }) => ({ width: 36, height: 34, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.3 : pressed ? 0.6 : 1 })}>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: c.safelight }}>{sign}</Text>
+    </Pressable>
+  )
+  return (
+    <View style={{ width: 116, height: 34, borderRadius: 999, backgroundColor: c.fill, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      {btn('한 롤 빼기', '−', count <= 0, () => onChange(Math.max(0, count - 1)))}
+      <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: '700', color: c.ink, fontVariant: ['tabular-nums'] }}>{count}롤</Text>
+      {btn('한 롤 더하기', '+', false, () => onChange(count + 1))}
+    </View>
   )
 }

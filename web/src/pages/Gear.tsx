@@ -10,7 +10,7 @@ import { fallbackLensSnapshot, lensSnapshot } from '../core/model3d'
 import { LensModel3D } from '../ui/Viewers'
 import { filterDiameters, filterKinds, groupPrice, lensSpec, parseLens } from '../core/optics'
 import type { FilmFormat, FilmLot, FilmStorage, GearFilter, Lens } from '../core/types'
-import { FILTER_KIND, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
+import { FILTER_KIND, expiredSince, formatInfo, kindOf, priceText, priceValue, uid } from '../core/types'
 import { glassPresets, isLensFilter } from '../core/filterLook'
 import { FilterRing } from '../ui/FilterRing'
 import { getPref } from '../platform'
@@ -210,19 +210,24 @@ export function GearBoard({ kind, layout, tag, search = '', grouped = false, fil
         .map((sec, n) => <div key={sec.title ?? n}>{sec.title && <h3 className="group-title">{sec.title} · {sec.items.length}</h3>}{box(sec.items.map((lot) => {
         const film = filmById(lot.filmId)
         const late = !!lot.expiresAt && lot.expiresAt < Date.now()
+        // 부족·기한 지남: 바둑판은 상자 그림 모서리, 목록은 브랜드 줄 끝 (− + 와 겹치지 않게, 아이폰과 같음)
+        const tag = late ? <i className="lot-tag late">기한 {expiredSince(lot.expiresAt!) ?? ''} 지남</i> : lot.count <= lot.lowAt ? <i className="lot-tag low">재고 부족</i> : null
         return (
-          <button key={lot.id} className={grid ? 'card' : 'row'} onClick={() => setEdit(lot.id)} style={{ textAlign: 'left' }}>
-            {grid ? <Canister film={film} format={lot.format} cover /> : <Canister film={film} format={lot.format} thumb={[64, 40]} />}
-            <span className="grow">
-              {/* 바둑판: 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게, 아이폰과 같음) */}
-              {(grid || film?.brand) && <small className="lot-brand">{film?.brand || '\u00a0'}</small>}
-              <b className={grid ? 'clamp-2 reserve-2' : 'truncate'}>{film ? (film.brand ? film.name : filmDisplayName(film)) : filmDisplayName(film)}</b>
-              <span className='sub truncate'>{formatInfo[lot.format].name} · {storageText(lot)}</span>
-              {/* 재고 수량은 크게, 부족·기한 지남은 옆에 둥근 표시. 바둑판은 아래, 목록은 오른쪽 (아이폰과 같음) */}
-              {grid && <span className="lot-count">{lot.count}롤{late ? <i className="lot-tag late">기한 지남</i> : lot.count <= lot.lowAt ? <i className="lot-tag low">재고 부족</i> : null}</span>}
-            </span>
-            {!grid && <span className="lot-count">{lot.count}롤{late ? <i className="lot-tag late">기한 지남</i> : lot.count <= lot.lowAt ? <i className="lot-tag low">재고 부족</i> : null}</span>}
-          </button>
+          <div key={lot.id} className={grid ? 'lot-cell grid' : 'lot-cell'}>
+            <button className={grid ? 'card' : 'row'} onClick={() => setEdit(lot.id)} style={{ textAlign: 'left' }}>
+              {grid ? <Canister film={film} format={lot.format} cover /> : <Canister film={film} format={lot.format} thumb={[64, 40]} />}
+              <span className="grow">
+                {/* 바둑판: 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게, 아이폰과 같음) */}
+                {(grid || film?.brand || tag) && <small className="lot-brand">{film?.brand || '\u00a0'}{!grid && tag}</small>}
+                <b className={grid ? 'clamp-2 reserve-2' : 'truncate'}>{film ? (film.brand ? film.name : filmDisplayName(film)) : filmDisplayName(film)}</b>
+                <span className='sub truncate'>{formatInfo[lot.format].name} · {storageText(lot)}</span>
+                {grid && <span className="lot-step-space" />}
+              </span>
+              {!grid && <span className="lot-step-space" />}
+            </button>
+            {grid && tag && <span className="lot-corner">{tag}</span>}
+            <LotStepper count={lot.count} onChange={(n) => void db.filmLots.update(lot.id, { count: n })} />
+          </div>
         )
       }))}</div>)}
       {edit && kind === 'lens' && <LensEdit lens={(allLenses ?? []).find((item) => item.id === edit)} onClose={() => setEdit(null)} />}
@@ -610,5 +615,16 @@ function FilmEdit({ lot, onClose }: { lot?: FilmLot; onClose: () => void }) {
         <CustomFilmEdit row={customEdit === 'new' ? undefined : customEdit} onClose={(id) => { if (id !== undefined) setFilmId(id); setCustomEdit(null) }} />
       )}
     </Sheet>
+  )
+}
+
+/** 재고 칸에서 바로 한 롤씩 빼고 더하기: [− 3롤 +] (아이폰과 같음) */
+function LotStepper({ count, onChange }: { count: number; onChange: (n: number) => void }) {
+  return (
+    <span className="lot-stepper">
+      <button type="button" aria-label="한 롤 빼기" disabled={count <= 0} onClick={() => onChange(Math.max(0, count - 1))}>−</button>
+      <b>{count}롤</b>
+      <button type="button" aria-label="한 롤 더하기" onClick={() => onChange(count + 1)}>+</button>
+    </span>
   )
 }

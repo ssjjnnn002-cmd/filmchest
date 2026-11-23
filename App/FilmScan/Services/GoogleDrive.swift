@@ -369,7 +369,7 @@ enum WebFormat {
             "days": r.shootingDays.map { clean(["id": id($0.id), "startedAt": ms($0.startedAt), "startFrame": $0.startFrame]) },
             "locations": r.locations.map { l in clean(["id": id(l.id), "startFrame": l.startFrame, "name": l.name,
                                                        "point": l.point.flatMap(encodable), "memo": l.memo, "weather": l.weather.flatMap(encodable)]) },
-            "lab": r.labName, "droppedAt": ms(r.droppedOffAt), "scanner": r.scannerName, "importedAt": ms(r.importedAt),
+            "lab": r.labName, "filmExpiresAt": ms(r.filmExpiresAt), "droppedAt": ms(r.droppedOffAt), "scanner": r.scannerName, "importedAt": ms(r.importedAt),
             "frameCount": r.frameCount, "note": r.note, "title": r.customTitle, "noteInList": r.noteInList ? true : nil, "tags": r.tags, "favorite": r.isFavorite, "isArchive": r.isArchive,
             "coverIndex": r.coverFrameIndex, "scanW": r.scanPixelWidth, "scanH": r.scanPixelHeight, "scanFormat": r.scanFormat,
             "scanBytes": r.scanBytes, "deletedAt": ms(r.deletedAt), "updatedAt": ms(r.updatedAt),
@@ -515,7 +515,7 @@ enum WebFormat {
                                        point: decodable(GeoPoint.self, l["point"]), memo: l["memo"] as? String,
                                        weather: decodable(WeatherNote.self, l["weather"]))
             }
-            x.labName = str(r, "lab"); x.droppedOffAt = date(r["droppedAt"]); x.scannerName = str(r, "scanner")
+            x.labName = str(r, "lab"); x.filmExpiresAt = date(r["filmExpiresAt"]); x.droppedOffAt = date(r["droppedAt"]); x.scannerName = str(r, "scanner")
             x.importedAt = date(r["importedAt"]); x.frameCount = int(r, "frameCount") ?? x.frameCount; x.note = str(r, "note"); x.customTitle = str(r, "title"); x.noteInList = r["noteInList"] as? Bool ?? false
             x.tags = r["tags"] as? [String] ?? []; x.isFavorite = r["favorite"] as? Bool ?? false; x.isArchive = r["isArchive"] as? Bool ?? false
             x.coverFrameIndex = int(r, "coverIndex"); x.scanPixelWidth = int(r, "scanW") ?? x.scanPixelWidth

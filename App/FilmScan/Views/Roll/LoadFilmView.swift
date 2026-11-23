@@ -211,6 +211,8 @@ struct LoadFilmView: View {
             return (a.expiresAt ?? .distantFuture) < (b.expiresAt ?? .distantFuture)
         }).first {
             lot.count -= 1
+            // 빈티지 필름: 그 재고의 유통기한을 롤에 남긴다
+            roll.filmExpiresAt = lot.expiresAt
         }
         Subscriptions.shared.noteRollCreated(in: context)
 

@@ -46,6 +46,7 @@ struct RollDetailView: View {
     @State private var recording = false
     @State private var pickingCamera = false
     @State private var editingLab = false
+    @State private var editingExpiry = false
     @State private var confirmReverse = false
     /// 목록 가장자리 여백 (필름을 화면 끝까지 늘이려고 잰다)
     @State private var stripInset: CGFloat = 16
@@ -303,6 +304,7 @@ struct RollDetailView: View {
                 Menu("더 보기", systemImage: "ellipsis.circle") {
                     Button("카메라 바꾸기", systemImage: "camera") { pickingCamera = true }
                     Button("현상소 수정", systemImage: "building.2") { editingLab = true }
+                    Button("필름 유통기한", systemImage: "calendar.badge.exclamationmark") { editingExpiry = true }
                     if (roll.frames ?? []).count > 1 {
                         Button("컷 순서 뒤집기", systemImage: "arrow.up.arrow.down") { confirmReverse = true }
                     }
@@ -317,6 +319,7 @@ struct RollDetailView: View {
                 rewritePhotos()
             }
         }
+        .sheet(isPresented: $editingExpiry) { FilmExpiryEditView(roll: roll) }
         .sheet(isPresented: $editingLab) {
             LabEditView(roll: roll) { changed in if changed { rewritePhotos() } }
         }
@@ -447,6 +450,14 @@ struct RollDetailView: View {
                         Text(lens).font(.caption).foregroundStyle(.secondary)
                     }
                     Text(roll.dateRangeText).font(.caption).foregroundStyle(.secondary)
+                    // 빈티지 필름: 유통기한이 얼마나 지났는지
+                    if let exp = roll.filmExpiresAt {
+                        Button { editingExpiry = true } label: {
+                            Text(ExpiryText.line(exp)).font(.caption.weight(.semibold))
+                                .foregroundStyle(ExpiryText.past(exp) == nil ? Color.secondary : Color.orange)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
             .listRowBackground(Color.clear)
@@ -762,5 +773,40 @@ private struct LabEditView: View {
             .onAppear { lab = roll.labName ?? "" }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+/// 롤에 넣은 필름의 유통기한 (빈티지 필름이면 얼마나 지났는지 본다)
+private struct FilmExpiryEditView: View {
+    @Bindable var roll: RollItem
+    @Environment(\.dismiss) private var dismiss
+    @State private var date = Date()
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    DatePicker("유통기한", selection: $date, displayedComponents: .date)
+                } footer: {
+                    Text(ExpiryText.past(date).map { "장착할 때 \($0) 지난 필름이에요." } ?? "아직 기한이 남은 필름이에요.")
+                }
+                if roll.filmExpiresAt != nil {
+                    Section {
+                        Button("유통기한 지우기", role: .destructive) { roll.filmExpiresAt = nil; dismiss() }
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle("필름 유통기한")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("저장") { roll.filmExpiresAt = date; dismiss() } }
+            }
+            .onAppear { date = roll.filmExpiresAt ?? Date() }
+        }
+        .presentationDetents([.medium])
     }
 }

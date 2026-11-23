@@ -963,3 +963,21 @@ body:has(.mr-overlay) .sheet-root, body:has(.mr-overlay) .alert-backdrop { z-ind
 .pick-menu .pick-section::after { content: ''; position: absolute; top: 0; left: 16px; right: 16px; height: 1px; background: var(--sep); }
 .pick-trigger { border: 0; background: none; color: var(--safelight); font: inherit; font-size: 17px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; padding: 0; }
 .pick-menu .row::before { display: none; }
+
+/* 필름 재고: 칸 위에 얹는 [− 3롤 +] 와 부족·기한 표시 (아이폰과 같은 자리) */
+.lot-cell { position: relative; }
+.lot-cell > .row { padding-right: 16px; }
+.lot-step-space { display: block; flex: 0 0 116px; height: 34px; }
+.lot-cell.grid .lot-step-space { flex: none; width: 100%; margin-top: 6px; }
+.lot-stepper { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 116px; height: 34px; display: flex; align-items: center; justify-content: space-between;
+  border-radius: 999px; background: var(--fill); white-space: nowrap; }
+.lot-cell.grid .lot-stepper { top: auto; bottom: 12px; left: 50%; right: auto; transform: translateX(-50%); }
+.lot-stepper button { width: 36px; height: 34px; border: 0; background: none; color: var(--safelight); font-size: 20px; font-weight: 700; cursor: pointer; }
+.lot-stepper button:disabled { opacity: .3; cursor: default; }
+.lot-stepper b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.lot-brand { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lot-corner { position: absolute; left: 18px; top: 18px; pointer-events: none; }
+.link-btn { border: 0; background: none; padding: 0; cursor: pointer; text-align: left; font: inherit; }
+.lot-cell.grid { display: flex; min-width: 0; }
+.lot-cell.grid > .card { flex: 1; width: 100%; min-width: 0; }
+.lot-cell:not(.grid) > .row { width: 100%; }

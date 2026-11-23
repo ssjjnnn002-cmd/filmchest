@@ -243,9 +243,16 @@ struct GearBrowser: View {
                     let secs = filmSortDesc ? Array(groupSections(sortedLots) { $0.groupKey(filmGroup) }.reversed()) : groupSections(sortedLots) { $0.groupKey(filmGroup) }
                     sections(secs) { items in
                         if layout == .grid {
-                            grid(items) { lot in Button { lotEdit = lot } label: { FilmGearCard(lot: lot) }.buttonStyle(.plain) }
+                            grid(items) { lot in
+                                Button { lotEdit = lot } label: { FilmGearCard(lot: lot) }.buttonStyle(.plain)
+                                    // − + 는 카드 맨 아래 줄 (칸을 눌러 여는 것과 따로)
+                                    .overlay(alignment: .bottom) { LotStepper(lot: lot).padding(.bottom, 12) }
+                            }
                         } else {
-                            rows(items) { lot in Button { lotEdit = lot } label: { FilmGearRow(lot: lot) }.buttonStyle(.plain) }
+                            rows(items) { lot in
+                                Button { lotEdit = lot } label: { FilmGearRow(lot: lot) }.buttonStyle(.plain)
+                                    .overlay(alignment: .trailing) { LotStepper(lot: lot).padding(.trailing, 12) }
+                            }
                         }
                     }
                 }
@@ -416,6 +423,8 @@ private struct FilmGearCard: View {
                 .frame(maxWidth: .infinity)
                 .overlay { FilmCanisterView(stock: FilmStockCatalog.stock(id: lot.filmStockID), format: lot.format, fill: true) }
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                // 부족·기한 지남은 상자 그림 모서리에 (아래 − + 와 겹치지 않게)
+                .overlay(alignment: .topLeading) { lot.statusBadge.padding(6) }
             // 브랜드는 이름 위에 작게 (필름 이름이 먼저 눈에 들어오게)
             VStack(alignment: .leading, spacing: 1) {
                 let stock = FilmStockCatalog.stock(id: lot.filmStockID)
@@ -425,7 +434,8 @@ private struct FilmGearCard: View {
             .frame(maxWidth: .infinity, minHeight: 62, maxHeight: 62, alignment: .topLeading)
             // 칸 높이를 모두 같게: 이름 두 줄 자리, 정보 한 줄, 수량 한 줄
             Text(lot.metaLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            lot.lotBadge.frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+            // 맨 아래 줄은 − 수량 + 자리 (카드 위에 얹는다)
+            Color.clear.frame(height: 34)
         }
         .modifier(GearCardChrome())
     }
@@ -440,14 +450,19 @@ private struct FilmGearRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 2) {
                 let stock = FilmStockCatalog.stock(id: lot.filmStockID)
-                if let brand = stock?.brand.nilIfBlank {
-                    Text(brand).font(.caption2.weight(.medium)).foregroundStyle(.secondary).lineLimit(1)
+                // 짧은 브랜드 줄 끝에 부족·기한 지남 (이름·정보 줄과 겹치지 않게)
+                HStack(spacing: 6) {
+                    if let brand = stock?.brand.nilIfBlank {
+                        Text(brand).font(.caption2.weight(.medium)).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    lot.statusBadge
                 }
                 Text(stock.map { $0.brand.isEmpty ? $0.displayName : $0.name } ?? lot.title).font(.subheadline.weight(.semibold)).lineLimit(1)
                 Text(lot.metaLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)
-            lot.lotBadge
+            // 오른쪽 − 수량 + 자리 (줄 위에 얹는다)
+            Color.clear.frame(width: LotStepper.width, height: 1)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -491,19 +506,45 @@ private extension FilterItem {
 
 private extension FilmLotItem {
     var metaLine: String { "\(format.displayName) · \(storageText)" }
-    /// 재고 수량은 크게, 부족·기한 지남은 옆에 둥근 표시 (웹·갤럭시와 같음)
-    @ViewBuilder var lotBadge: some View {
-        HStack(spacing: 6) {
-            Text("\(count)롤").font(.callout.weight(.bold)).monospacedDigit()
-            if expired {
-                Text("기한 지남").font(.caption.weight(.bold)).foregroundStyle(.white).lineLimit(1).fixedSize()
-                    .padding(.horizontal, 8).padding(.vertical, 3).background(Color.red, in: Capsule())
-            } else if low {
-                // 부드러운 버터색 바탕 + 진한 갈색 글씨 (웹·갤럭시와 같음)
-                Text("재고 부족").font(.caption.weight(.bold)).foregroundStyle(Color(red: 0.48, green: 0.35, blue: 0)).lineLimit(1).fixedSize()
-                    .padding(.horizontal, 8).padding(.vertical, 3).background(Color(red: 0.99, green: 0.88, blue: 0.54), in: Capsule())
-            }
+    /// 부족·기한 지남 둥근 표시 (웹·갤럭시와 같음)
+    @ViewBuilder var statusBadge: some View {
+        if expired {
+            Text(expiredText.map { "기한 \($0) 지남" } ?? "기한 지남").font(.caption2.weight(.bold)).foregroundStyle(.white).lineLimit(1).fixedSize()
+                .padding(.horizontal, 7).padding(.vertical, 3).background(Color.red, in: Capsule())
+        } else if low {
+            // 부드러운 버터색 바탕 + 진한 갈색 글씨 (웹·갤럭시와 같음)
+            Text("재고 부족").font(.caption2.weight(.bold)).foregroundStyle(Color(red: 0.48, green: 0.35, blue: 0)).lineLimit(1).fixedSize()
+                .padding(.horizontal, 7).padding(.vertical, 3).background(Color(red: 0.99, green: 0.88, blue: 0.54), in: Capsule())
         }
+    }
+}
+
+/// 재고 칸에서 바로 한 롤씩 빼고 더하기: [− 3롤 +]
+struct LotStepper: View {
+    @Bindable var lot: FilmLotItem
+    static let width: CGFloat = 116
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button { if lot.count > 0 { lot.count -= 1 } } label: {
+                Image(systemName: "minus").font(.subheadline.weight(.bold)).frame(width: 36, height: 34).contentShape(Rectangle())
+            }
+            .disabled(lot.count <= 0)
+            .accessibilityLabel("한 롤 빼기")
+            Text("\(lot.count)롤").font(.callout.weight(.bold)).monospacedDigit().lineLimit(1).fixedSize()
+                .frame(minWidth: 44)
+                .contentTransition(.numericText())
+            Button { lot.count += 1 } label: {
+                Image(systemName: "plus").font(.subheadline.weight(.bold)).frame(width: 36, height: 34).contentShape(Rectangle())
+            }
+            .accessibilityLabel("한 롤 더하기")
+        }
+        .buttonStyle(.borderless)
+        .tint(Theme.safelight)
+        .frame(width: Self.width, height: 34)
+        .background(Capsule().fill(Color(.tertiarySystemFill)))
+        .sensoryFeedback(.selection, trigger: lot.count)
+        .animation(.snappy, value: lot.count)
     }
 }
 

@@ -231,6 +231,8 @@ final class RollItem {
     /// 스캔에 붙일 때 노출 기록을 몇 칸 밀었는지. +1이면 1번 기록이 2번 사진
     var meterOffset: Int = 0
     var labName: String?
+    /// 장착한 필름의 유통기한 (빈티지 필름이면 얼마나 지났는지 보려고). 재고에서 장착하면 그 재고 값
+    var filmExpiresAt: Date?
     var droppedOffAt: Date?
     var scannerName: String?
     var importedAt: Date?
@@ -741,6 +743,25 @@ enum AccessoryKinds {
     }
 }
 
+/// 유통기한이 지난 기간 글자 (웹·갤럭시 expiredSince와 같음)
+enum ExpiryText {
+    /// 지났으면 "12일" / "8개월" / "2년" / "2년 3개월", 안 지났으면 nil
+    static func past(_ expires: Date, now: Date = Date()) -> String? {
+        guard expires < now else { return nil }
+        let cal = Calendar.current
+        let m = cal.dateComponents([.month], from: expires, to: now).month ?? 0
+        if m < 1 { return "\(max(1, cal.dateComponents([.day], from: expires, to: now).day ?? 1))일" }
+        if m < 12 { return "\(m)개월" }
+        return m % 12 == 0 ? "\(m / 12)년" : "\(m / 12)년 \(m % 12)개월"
+    }
+    /// 롤 화면 한 줄: "유통기한 2024.03 · 2년 8개월 지남"
+    static func line(_ expires: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy.MM"
+        return "유통기한 \(f.string(from: expires))" + (past(expires).map { " · \($0) 지남" } ?? "")
+    }
+}
+
 enum PriceSum {
     static func value(_ text: String?) -> Int { Int((text ?? "").filter(\.isNumber)) ?? 0 }
     static func text(_ n: Int) -> String {
@@ -835,6 +856,8 @@ final class FilmLotItem {
         return customName.isEmpty ? "필름" : customName
     }
     var expired: Bool { expiresAt.map { $0 < Date() } ?? false }
+    /// "2년 3개월" (유통기한이 얼마나 지났는지)
+    var expiredText: String? { expiresAt.flatMap { ExpiryText.past($0) } }
     var low: Bool { count <= lowAt }
     /// 보관 장소 글자 (직접 입력이면 적은 글자)
     var storageText: String { storage == .custom ? (storagePlace?.nilIfBlank ?? "직접 입력") : storage.displayName }
