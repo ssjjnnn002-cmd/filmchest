@@ -4,10 +4,10 @@
 <meta charset="utf-8" />
 <title>필름함 텀블벅 이미지·영상</title>
 <style>
-  @font-face { font-family: P; src: url("file:///Users/biomac_02/Library/Fonts/Pretendard-Bold.otf"); font-weight: 700; }
-  @font-face { font-family: P; src: url("file:///Users/biomac_02/Library/Fonts/Pretendard-ExtraBold.otf"); font-weight: 800; }
-  @font-face { font-family: P; src: url("file:///Users/biomac_02/Library/Fonts/Pretendard-SemiBold.otf"); font-weight: 600; }
-  @font-face { font-family: P; src: url("file:///Users/biomac_02/Library/Fonts/Pretendard-Medium.otf"); font-weight: 500; }
+  @font-face { font-family: P; src: url("file:///Users/biomac_02/Library/Fonts/Pretendard-Bold.otf"), url("../../galaxy/assets/fonts/Pretendard-Bold.otf"); font-weight: 700; }
+  @font-face { font-family: P; src: url("file:///Users/biomac_02/Library/Fonts/Pretendard-ExtraBold.otf"), url("../../galaxy/assets/fonts/Pretendard-ExtraBold.otf"); font-weight: 800; }
+  @font-face { font-family: P; src: url("file:///Users/biomac_02/Library/Fonts/Pretendard-SemiBold.otf"), url("../../galaxy/assets/fonts/Pretendard-SemiBold.otf"); font-weight: 600; }
+  @font-face { font-family: P; src: url("file:///Users/biomac_02/Library/Fonts/Pretendard-Medium.otf"), url("../../galaxy/assets/fonts/Pretendard-Medium.otf"); font-weight: 500; }
   :root { --bg: #141211; --ink: #f5f1ec; --ink2: #b9b1a8; --accent: #F0701E; }
   * { box-sizing: border-box; margin: 0; }
   html, body { background: var(--bg); }
@@ -123,6 +123,57 @@ function feature(tag, title, sub, [a, b]) {
     ${phone(190, 168, 300, 0, a, 'z-index:2')}`
 }
 
+// ───────── 선물(아이템) 이미지 (600×600 css, 2배로 찍어 1200×1200) ─────────
+function giftHead(tag, title, sub) {
+  return `${perf(S, S, 'top')}
+    <div style="position:absolute; left:44px; top:62px; width:520px">
+      <span class="chip" style="font-size:15px">${tag}</span>
+      <h2 style="font-size:40px; margin-top:16px">${title}</h2>
+      <p class="sub" style="font-size:17px; margin-top:12px">${sub}</p>
+    </div>`
+}
+/** 사용권 카드 (실제 코드가 아닌 예시) */
+function codeCard(x, y, rot, label, z = 1) {
+  return `<div style="position:absolute; left:${x}px; top:${y}px; width:330px; height:200px; transform:rotate(${rot}deg); z-index:${z};
+      border-radius:22px; padding:24px; background:linear-gradient(140deg, #2a2522, #1b1817 60%, #3a2516); box-shadow:0 30px 60px -20px rgb(0 0 0 / .8), inset 0 0 0 1px rgb(255 255 255 / .1)">
+    <div class="brand" style="gap:10px; font-size:18px">${LOGO(30)}필름함 프리미엄</div>
+    <div style="margin-top:22px; font-size:15px; color:var(--ink2); font-weight:600">${label}</div>
+    <div style="margin-top:8px; font:700 26px/1 ui-monospace, Menlo, monospace; letter-spacing:.08em; color:var(--ink)">XXXX-XXXX-XXXX</div>
+    <div style="position:absolute; right:24px; bottom:22px; font-size:28px; font-weight:800; color:var(--accent)">1년</div>
+  </div>`
+}
+const perks = (items, x, y) => `<div style="position:absolute; left:${x}px; top:${y}px; display:grid; gap:12px">
+  ${items.map((t) => `<div style="display:flex; align-items:center; gap:10px; font-size:17px; font-weight:600"><span style="width:22px; height:22px; border-radius:50%; background:var(--accent); display:grid; place-items:center; color:#141211; font-size:14px; font-weight:800">✓</span>${t}</div>`).join('')}
+</div>`
+const gifts = {
+  // 1. 앱 안 후원자 명단
+  1: () => `${giftHead('아이템 1 · 모든 선물', '앱 안 후원자 명단에<br>이름을 올려요', '정식 출시 버전 설정 화면의 ‘함께 만든 분들’에 적어 드려요')}
+    <div style="position:absolute; left:150px; top:262px; width:300px; border-radius:26px; padding:18px 22px 6px; background:#1f1c1b; box-shadow:0 30px 60px -20px rgb(0 0 0 / .8), inset 0 0 0 1px rgb(255 255 255 / .08)">
+      <div style="font-size:14px; color:var(--ink2); font-weight:600">설정 › 함께 만든 분들</div>
+      <div style="font-size:22px; font-weight:800; margin-top:8px">고마운 후원자</div>
+      ${['필름좋아', 'Portra400', '롤 하나 더', '(후원자님 이름)'].map((n, i) => `<div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-top:${i ? '1px solid rgb(255 255 255 / .08)' : '0'}; margin-top:${i ? 0 : 8}px; font-size:17px; font-weight:600; color:${i === 3 ? 'var(--accent)' : 'var(--ink)'}"><span style="width:26px; height:26px; border-radius:50%; background:rgb(240 112 30 / ${i === 3 ? .9 : .18})"></span>${n}</div>`).join('')}
+    </div>
+    <div style="position:absolute; left:0; right:0; bottom:26px; text-align:center; font-size:13px; color:var(--ink2)">이미지는 예시 화면이에요 · 이름은 후원할 때 직접 적어 주세요</div>`,
+  // 2. 베타 먼저 쓰기
+  2: () => `${giftHead('아이템 2', '정식 출시 전에<br>베타로 먼저 써요', '2027년 2월, 공개 테스트 링크를 메시지로 보내 드려요')}
+    ${phone(168, 330, 296, 6, 'shooting')}
+    ${phone(168, 140, 326, -4, 'library', 'z-index:2')}
+    <div style="position:absolute; left:44px; top:240px; display:flex; gap:10px; z-index:3">
+      <span class="chip" style="font-size:14px; background:#1f1c1b; box-shadow:inset 0 0 0 1px rgb(255 255 255 / .1); color:var(--ink)">아이폰 · TestFlight</span>
+      <span class="chip" style="font-size:14px; background:#1f1c1b; box-shadow:inset 0 0 0 1px rgb(255 255 255 / .1); color:var(--ink)">갤럭시 · Play 공개 테스트</span>
+    </div>`,
+  // 3. 프리미엄 1년 이용 코드
+  3: () => `${giftHead('아이템 3', '필름함 프리미엄<br>1년 이용 코드', '정식 출시 때 앱스토어·플레이스토어 공식 코드로 보내 드려요')}
+    ${codeCard(56, 300, -4, '1년 이용 코드 · 아이폰 또는 갤럭시')}
+    ${perks(['롤 무제한', '컷별 상세 기록', '노출계', '끝나도 기록은 그대로'], 410, 318)}
+    <div style="position:absolute; left:0; right:0; bottom:26px; text-align:center; font-size:13px; color:var(--ink2)">코드 모양은 예시예요 · 현금이나 다른 상품으로 바꿀 수 없어요</div>`,
+  // 4. 친구에게 줄 프리미엄 코드
+  4: () => `${giftHead('아이템 4', '친구에게 줄<br>프리미엄 1년 코드', '내 코드와 별도로 한 장 더, 필름 친구에게 선물하세요')}
+    ${codeCard(64, 288, -6, '내 코드')}
+    ${codeCard(214, 330, 5, '친구에게 줄 코드', 2)}
+    <div style="position:absolute; left:0; right:0; bottom:26px; text-align:center; font-size:13px; color:var(--ink2)">코드 모양은 예시예요 · 아이폰·갤럭시 중 고를 수 있어요</div>`,
+}
+
 // ───────── 대표 영상 (1920×1080, 시간 t초로 한 장면을 그린다) ─────────
 const VW = 1920, VH = 1080
 const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : 1 - Math.pow(1 - x, 3))
@@ -190,10 +241,12 @@ function drawVideo(time) {
   return SCENES.at(-1).draw(SCENES.at(-1).d, SCENES.at(-1).d)
 }
 
-// ───────── 주소로 고른다: ?still=1 · ?video ─────────
+// ───────── 주소로 고른다: ?still=1 · ?bare=1 · ?gift=1 · ?video ─────────
 const q = new URLSearchParams(location.search)
 const root = document.getElementById('root')
-if (q.has('bare')) {
+if (q.has('gift')) {
+  root.innerHTML = `<div class="stage" style="width:${S}px; height:${S}px">${gifts[q.get('gift')]()}</div>`
+} else if (q.has('bare')) {
   root.innerHTML = `<div class="stage" style="width:${S}px; height:${S}px">${bare[q.get('bare')]()}</div>`
 } else if (q.has('still')) {
   root.innerHTML = `<div class="stage" style="width:${S}px; height:${S}px">${stills[q.get('still')]()}</div>`
