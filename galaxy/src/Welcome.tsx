@@ -65,11 +65,8 @@ export function Welcome({ onDone, loginOnly = false }: { onDone: () => void; log
           ? <Row onPress={finish}><RowText color={c.safelight}>{result}</RowText><Text style={{ color: c.safelight, fontWeight: '700', fontSize: 17 }}>{loginOnly ? '완료' : '시작'}</Text></Row>
           : step
             ? <Row static><Text style={{ color: c.safelight, fontWeight: '700', fontSize: 17 }}>{step}</Text></Row>
-            // 둘 다 같은 구글 로그인 (드라이브에 기록이 있으면 받아 오고, 없으면 새로 시작)
-            : [
-              <Row key="new" onPress={start}><RowText color={c.muted}>처음이에요</RowText><Text style={{ color: c.safelight, fontWeight: '700', fontSize: 17 }}>구글로 시작하기</Text></Row>,
-              <Row key="has" onPress={start}><RowText color={c.muted}>계정이 있어요</RowText><Text style={{ color: c.safelight, fontWeight: '700', fontSize: 17 }}>구글로 로그인하기</Text></Row>,
-            ]}
+            // 처음이든 쓰던 계정이든 같은 로그인 (드라이브에 기록이 있으면 받아 온다)
+            : <Row onPress={start}><Text style={{ color: c.safelight, fontWeight: '700', fontSize: 17 }}>구글로 시작하기</Text></Row>}
         {!result && !loginOnly ? <Row onPress={() => {
           if (step) return
           if (!kept) { finish(); return }

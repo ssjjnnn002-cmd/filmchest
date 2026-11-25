@@ -15,6 +15,7 @@ struct LoadFilmView: View {
     @Query private var lots: [FilmLotItem]
     @State private var loading = false
     @State private var confirmExpired = false
+    @State private var addingCamera = false
 
     @State private var cameraID: UUID?
     @State private var filmID: String?
@@ -54,15 +55,16 @@ struct LoadFilmView: View {
             Form {
                 Section("카메라") {
                     if available.isEmpty {
-                        Text("먼저 내 장비에서 카메라를 추가해 주세요.").foregroundStyle(.secondary)
-                    }
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(pickOrder) { c in
-                                cameraChip(c)
+                        Button("카메라 추가", systemImage: "plus") { addingCamera = true }
+                    } else {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(pickOrder) { c in
+                                    cameraChip(c)
+                                }
                             }
+                            .padding(.vertical, 4)
                         }
-                        .padding(.vertical, 4)
                     }
                     if let loaded = camera?.loadedRoll {
                         Label("지금 장착된 \(loaded.filmName)은(는) 촬영을 끝낸 롤로 옮겨져요.", systemImage: "info.circle")
@@ -77,8 +79,8 @@ struct LoadFilmView: View {
                             ForEach(mountLenses) { Text($0.displayName).tag(Optional($0.id)) }
                         }
                         if addingLens {
-                            TextField("제조사", text: $newLensBrand)
-                            TextField("렌즈", text: $newLensModel)
+                            LabeledField("제조사", text: $newLensBrand)
+                            LabeledField("렌즈", text: $newLensModel)
                             LensSuggestions(mount: camera.mount, text: $newLensModel)
                         } else {
                             Button("새 렌즈 추가", systemImage: "plus") { addingLens = true }
@@ -119,7 +121,7 @@ struct LoadFilmView: View {
                 }
 
             }
-            .formStyle(.grouped)
+            .filmForm()
             .filmKeyboard()
             .rollPaywall()
             .navigationTitle("필름 장착하기")
@@ -131,7 +133,7 @@ struct LoadFilmView: View {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("장착") {
-                        if let film, lots.contains(where: { $0.filmStockID == film.id && $0.expired }) {
+                        if let film, lots.contains(where: { $0.filmStockID == film.id && $0.count > 0 && $0.expired }) {
                             confirmExpired = true
                         } else {
                             Task { await load() }
@@ -145,6 +147,9 @@ struct LoadFilmView: View {
                 selectLastLens()
             }
             .onChange(of: cameraID) { _, _ in selectLastLens() }
+            // 카메라가 없어서 여기서 추가했으면 바로 고른다
+            .onChange(of: available.count) { old, new in if old == 0, new > 0 { cameraID = pickOrder.first?.id } }
+            .sheet(isPresented: $addingCamera) { CameraEditView(camera: nil) }
         }
         #if os(macOS)
         .frame(minWidth: 560, minHeight: 680)

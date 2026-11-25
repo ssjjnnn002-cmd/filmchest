@@ -1,12 +1,13 @@
 // 웹 ui/gearExtras.tsx와 같은 구성: 태그, 태그 거르기, 악세서리, 비워 둘 수 있는 날짜
 import { useMemo, useRef, useState } from 'react'
-import { Dimensions, Modal, Pressable, View } from 'react-native'
+import { Dimensions, Pressable, View } from 'react-native'
+import { FullModal } from './overlay'
 import { Text } from './text'
 import { TextInput } from './textInput'
 import { DateTimePickerAndroid as Picker } from '@react-native-community/datetimepicker'
 import { db } from './data'
 import { defaultAccessoryKinds, uid } from './core/types'
-import { Chip, Chips, Group, Row, Section, Segmented } from './kit'
+import { TagPill, Chip, Chips, Group, Row, Section, Segmented } from './kit'
 import { filmLotSortTitle, filmStockGroups, groupTitle, type FilmLotSort, type GearGroup } from './core/gearGroup'
 import { getPref, setPref, useLiveQuery } from './store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from './suggest'
@@ -60,13 +61,10 @@ export function TagField({ tags, setTags }: { tags: string[]; setTags: (t: strin
     setText('')
   }
   return (
-    <Section title="태그" foot="검색과 목록 정리에 써요.">
+    <Section title="태그" foot="검색과 목록 정리에 써요. 입력하고 완료를 누르면 붙어요.">
       <Group>
         {tags.length > 0 && <Chips>{tags.map((t) => (
-          <View key={t} style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Chip label={`#${t}`} active flat onPress={() => setTags(tags.filter((x) => x !== t))} />
-            <X label={`${t} 빼기`} onPress={() => setTags(tags.filter((x) => x !== t))} />
-          </View>
+          <TagPill key={t} label={`#${t}`} active removeLabel={`${t} 빼기`} onPress={() => setTags(tags.filter((x) => x !== t))} onRemove={() => setTags(tags.filter((x) => x !== t))} />
         ))}</Chips>}
         <Row>
           <TextInput value={text} onChangeText={setText} placeholder="태그 추가" placeholderTextColor={c.faint}
@@ -75,10 +73,7 @@ export function TagField({ tags, setTags }: { tags: string[]; setTags: (t: strin
           {text.trim() ? <Pressable onPress={() => add(text)} hitSlop={8}><Text style={{ color: c.safelight, fontSize: 17 }}>추가</Text></Pressable> : null}
         </Row>
         {hits.length > 0 && <Chips>{hits.map((t) => (
-          <View key={t} style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Chip label={`#${t}`} flat onPress={() => add(t)} />
-            <X label={`${t} 추천 지우기`} onPress={() => { forgetSuggestion('tags', t); setRev((n) => n + 1) }} />
-          </View>
+          <TagPill key={t} label={`#${t}`} removeLabel={`${t} 추천 지우기`} onPress={() => add(t)} onRemove={() => { forgetSuggestion('tags', t); setRev((n) => n + 1) }} />
         ))}</Chips>}
       </Group>
     </Section>
@@ -94,7 +89,7 @@ export function TagFilter({ tags, value, onChange }: { tags: string[]; value?: s
   const list = useMemo(() => {
     const count = new Map<string, number>()
     tags.forEach((t) => count.set(t, (count.get(t) ?? 0) + 1))
-    return [...count.keys()].sort((a, b) => (count.get(b)! - count.get(a)!) || a.localeCompare(b))
+    return [...count.keys()].sort((a, b) => (count.get(b)! - count.get(a)!) || (a < b ? -1 : a > b ? 1 : 0))
   }, [tags])
   if (!list.length) return null
   return <Chips>{list.map((t) => <Chip key={t} label={`#${t}`} flat active={value === t} onPress={() => onChange(value === t ? undefined : t)} />)}</Chips>
@@ -170,7 +165,7 @@ export function OptionalDate({ label, value, onChange, max }: { label: string; v
     <Row>
       <Text style={{ flex: 1, fontSize: 17, color: c.ink }}>{label}</Text>
       <Pressable onPress={open} hitSlop={8}>
-        <Text style={{ fontSize: 17, color: d ? c.ink : c.muted }}>{d ? `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.` : '기록 안 함'}</Text>
+        <Text numberOfLines={1} style={d ? { fontSize: 17, color: c.ink, backgroundColor: c.fill, borderRadius: 999, overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 6 } : { fontSize: 17, color: c.muted }}>{d ? `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.` : '기록 안 함'}</Text>
       </Pressable>
       {d ? <Pressable onPress={() => onChange(undefined)} hitSlop={8} accessibilityLabel={`${label} 지우기`}><Text style={{ fontSize: 18, color: c.muted, marginLeft: 10 }}>×</Text></Pressable> : null}
     </Row>
@@ -211,7 +206,7 @@ export function GroupMenu({ value, options, onChange }: { value: GearGroup; opti
         <Icon name="group" size={20} color={on ? '#fff' : c.safelight} />
       </Pressable>
       {at ? (
-        <Modal transparent visible animationType="fade" onRequestClose={() => setAt(undefined)} statusBarTranslucent>
+        <FullModal transparent visible animationType="fade" onRequestClose={() => setAt(undefined)} statusBarTranslucent>
           <Pressable style={{ flex: 1 }} onPress={() => setAt(undefined)}>
             <View style={{ position: 'absolute', right: Dimensions.get('window').width - at.x, top: at.y, minWidth: 200, borderRadius: 18, overflow: 'hidden',
               backgroundColor: c.glass, boxShadow: '0px 12px 40px rgba(0,0,0,0.2)' }}>
@@ -225,7 +220,7 @@ export function GroupMenu({ value, options, onChange }: { value: GearGroup; opti
               ))}
             </View>
           </Pressable>
-        </Modal>
+        </FullModal>
       ) : null}
     </>
   )
@@ -256,7 +251,7 @@ export function FilmLotMenu({ group, sort, desc, onGroup, onSort, onDesc }: {
         <Icon name="sort" size={20} color="#fff" />
       </Pressable>
       {at ? (
-        <Modal transparent visible animationType="fade" onRequestClose={() => setAt(undefined)} statusBarTranslucent>
+        <FullModal transparent visible animationType="fade" onRequestClose={() => setAt(undefined)} statusBarTranslucent>
           <Pressable style={{ flex: 1 }} onPress={() => setAt(undefined)}>
             <View style={{ position: 'absolute', right: Dimensions.get('window').width - at.x, top: at.y, minWidth: 200, borderRadius: 18, overflow: 'hidden',
               backgroundColor: c.glass, boxShadow: '0px 12px 40px rgba(0,0,0,0.2)' }}>
@@ -268,7 +263,7 @@ export function FilmLotMenu({ group, sort, desc, onGroup, onSort, onDesc }: {
               {filmStockGroups.map((g) => item(g === group, groupTitle[g], () => onGroup(g)))}
             </View>
           </Pressable>
-        </Modal>
+        </FullModal>
       ) : null}
     </>
   )

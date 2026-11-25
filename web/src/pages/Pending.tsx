@@ -71,47 +71,51 @@ export function Pending() {
 
       <DropZone />
 
-      <div className="section">
-        <h2>현상 맡김 · {atLab.length}</h2>
-        {atLab.length > 0 && (
+      {atLab.length > 0 && (
+        <div className="section">
+          <h2>현상 맡김 · {atLab.length}</h2>
           <div className="group">
             {atLab.map((r) => (
-              <div key={r.id} className="row static">
-                <button className="grow" style={{ border: 0, background: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', minWidth: 0 }}
+              // 옆에 두면 이름이 잘려서 버튼은 아래에 넓게 (아이폰과 같음)
+              <div key={r.id} className="row static" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+                <button style={{ border: 0, background: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', minWidth: 0 }}
                   onClick={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /></button>
-                <ScanButton rollId={r.id} label="불러오기" />
+                <ScanButton rollId={r.id} label="불러오기" block />
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="section">
-        <h2>촬영 완료 · {finished.length}</h2>
-        {finished.length > 0 && (
+      {finished.length > 0 && (
+        <div className="section">
+          <h2>촬영 완료 · {finished.length}</h2>
           <div className="group">
             {finished.map((r) => (
-              <div key={r.id} className="row static">
-                <button className="grow" style={{ border: 0, background: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', minWidth: 0 }}
+              // 옆에 두면 이름이 잘려서 버튼은 아래에 넓게 (아이폰과 같음)
+              <div key={r.id} className="row static" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+                <button style={{ border: 0, background: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', minWidth: 0 }}
                   onClick={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /></button>
-                <button className="btn soft small" onClick={() => setDropOff(r)}>현상소 고르기</button>
+                <button className="btn soft small" style={{ width: '100%' }} onClick={() => setDropOff(r)}>현상소 고르기</button>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {atLab.length + finished.length + nav.zipQueue.length === 0 && <div className="empty"><Icon name="stack" size={40} /><b>현상할 롤이 없어요</b></div>}
 
       {dropOff && <LabDropOff roll={dropOff} onClose={() => setDropOff(undefined)} />}
     </>
   )
 }
 
-export function ScanButton({ rollId, label = '스캔 불러오기' }: { rollId: string; label?: string }) {
+export function ScanButton({ rollId, label = '스캔 불러오기', block, row }: { rollId: string; label?: string; block?: boolean; row?: boolean }) {
   const nav = useNav()
   const input = useRef<HTMLInputElement>(null)
   return (
     <>
-      <button className="btn primary small" onClick={() => input.current?.click()}>{label}</button>
+      <button className={row ? 'row accent' : 'btn primary small'} style={block ? { width: '100%' } : undefined} onClick={() => input.current?.click()}>{label}</button>
       <input ref={input} type="file" accept=".zip,application/zip,image/*" multiple hidden
         onChange={(e) => { const f = [...(e.target.files ?? [])]; if (f.length) nav.importScans(f, rollId); e.target.value = '' }} />
     </>

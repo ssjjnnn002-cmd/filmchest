@@ -41,7 +41,7 @@ export function IncomingImport({ files, onClose }: { files: PickedFile[]; onClos
         <Group>{files.map((f, i) => <ZipPreviewRow key={i} name={f.name} thumbs={samples[i]} />)}</Group>
       </Section>
       <Group>
-        {choice('스캔 대기 중인 롤에 넣기',
+        {choice('기록해 둔 롤에 넣기',
           rolls.length === 0 ? '현상 맡긴 롤이 없으면 새 롤로 만들 수 있어요' : many ? '파일마다 롤을 골라 한 번에 가져와요' : '현상 맡긴 롤 중에서 골라요',
           () => setStep(many ? 'multi' : 'pending'))}
         {choice('기존 롤로 가져오기', many ? '대기열에 넣고 차례로 입력해요' : '예전에 찍은 롤을 롤 보관함에 넣어요',
@@ -148,7 +148,7 @@ function MultiRollImport({ files, samples, onClose }: { files: PickedFile[]; sam
           </Group>
         </Section>
       ))}
-      {all && rolls.length === 0 ? <Footnote>스캔 대기 중인 롤이 없어요. 하나씩 가져오면 새 롤로 만들 수 있어요.</Footnote> : null}
+      {all && rolls.length === 0 ? <Footnote>기록해 둔 롤이 없어요. 하나씩 가져오면 새 롤로 만들 수 있어요.</Footnote> : null}
       {error ? <Footnote warn>{error}</Footnote> : null}
     </Sheet>
   )

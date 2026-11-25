@@ -5,7 +5,7 @@ import { defaultAccessoryKinds, uid } from '../core/types'
 import { getPref, setPref } from '../platform'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
 import { filmLotSortTitle, filmStockGroups, groupTitle, type FilmLotSort, type GearGroup } from '../core/gearGroup'
-import { Icon } from './common'
+import { Icon, toInputDate } from './common'
 
 const cleanTag = (raw: string) => raw.trim().replace(/^#+/, '').trim()
 
@@ -79,7 +79,7 @@ export function TagField({ tags, setTags }: { tags: string[]; setTags: (t: strin
           </div>
         )}
       </div>
-      <p className="footnote">검색과 목록 정리에 써요.</p>
+      <p className="footnote">검색과 목록 정리에 써요. 입력하고 완료를 누르면 붙어요.</p>
     </div>
   )
 }
@@ -99,11 +99,11 @@ export function TagFilter({ tags, value, onChange }: { tags: string[]; value?: s
   const list = useMemo(() => {
     const count = new Map<string, number>()
     tags.forEach((t) => count.set(t, (count.get(t) ?? 0) + 1))
-    return [...count.keys()].sort((a, b) => (count.get(b)! - count.get(a)!) || a.localeCompare(b))
+    return [...count.keys()].sort((a, b) => (count.get(b)! - count.get(a)!) || (a < b ? -1 : a > b ? 1 : 0))
   }, [tags])
   if (!list.length) return null
   return (
-    <div className="chips" style={{ padding: '0 16px 6px' }}>
+    <div className="chips tag-chips">
       {list.map((t) => (
         <button key={t} className={`chip ${value === t ? 'active' : ''}`} style={{ height: 32, fontSize: 14 }} onClick={() => onChange(value === t ? undefined : t)}>#{t}</button>
       ))}
@@ -219,3 +219,18 @@ export function FilmLotMenu({ group, sort, desc, onGroup, onSort, onDesc }: {
   )
 }
 
+
+/** 안 적어도 되는 날짜: 적기 전에는 '기록 안 함', 누르면 오늘로 채우고 고친다 (아이폰·갤럭시와 같음) */
+export function OptionalDate({ label, value, onChange }: { label: string; value?: number; onChange: (v?: number) => void }) {
+  return (
+    <div className="field">
+      <label>{label}</label>
+      {value === undefined
+        ? <button type="button" className="plain-value" onClick={() => { const d = new Date(); d.setHours(12, 0, 0, 0); onChange(d.getTime()) }}>기록 안 함</button>
+        : <span className="date-clear">
+          <input type="date" className="input" aria-label={label} value={toInputDate(value)} onChange={(e) => onChange(e.target.value ? new Date(`${e.target.value}T12:00:00`).getTime() : undefined)} />
+          <button type="button" className="chip-x" aria-label={`${label} 지우기`} onClick={() => onChange(undefined)}>×</button>
+        </span>}
+    </div>
+  )
+}

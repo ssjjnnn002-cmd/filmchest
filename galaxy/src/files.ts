@@ -17,8 +17,34 @@ export function writeBytes(dir: string, name: string, bytes: Uint8Array) {
   return file.uri
 }
 
-export async function readBytes(uri: string) {
-  return new File(uri).bytes()
+export function clearFolder(name: string) {
+  try { const dir = new Directory(Paths.document, name); if (dir.exists) dir.delete() } catch { /* 다음에 다시 */ }
+}
+
+// 가져오다 남은 임시 사진은 앱을 켤 때 비운다
+clearFolder('scan-tmp')
+clearFolder('zip-preview')
+
+const CHUNK = 8 * 1024 * 1024
+
+/** 큰 파일(현상소 zip)은 나눠 읽는다. 한 번에 읽으면 앱 메모리 한도(기기마다 200~500MB)를 넘어 열리지 않는다 */
+export async function readBytes(uri: string): Promise<Uint8Array<ArrayBuffer>> {
+  const file = new File(uri)
+  const size = file.size ?? 0
+  if (size <= CHUNK) return file.bytes()
+  const out = new Uint8Array(size)
+  const handle = file.open()
+  try {
+    let at = 0
+    while (at < size) {
+      const part = handle.readBytes(Math.min(CHUNK, size - at))
+      if (!part.length) throw new Error('파일을 끝까지 읽지 못했어요.')
+      out.set(part, at)
+      at += part.length
+      await new Promise((r) => setTimeout(r, 0))
+    }
+  } finally { handle.close() }
+  return out
 }
 
 export function removeFile(uri?: string) {
@@ -35,7 +61,7 @@ export function fileSize(uri?: string) {
 export async function copyIn(uri: string, dir: string, name: string) {
   const out = new File(folder(dir), name)
   if (out.exists) out.delete()
-  new File(uri).copy(out)
+  await new File(uri).copy(out)
   return out.uri
 }
 

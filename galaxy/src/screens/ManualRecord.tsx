@@ -2,7 +2,7 @@ import { filmBoxColors } from '../filmBoxColors'
 // 웹 pages/ManualRecord.tsx — 상세 기록 (노출계 없이): 카메라 윗면 다이얼로 셔터 · 노출 보정 · 조리개(맨 끝 ⚡)를 맞추고,
 // 셔터를 누르면 레버가 감기며 그 칸에 장소·시간과 함께 남는다. 배치·규칙은 아이폰·웹과 같다 (소리만 없음)
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Modal, PanResponder, Pressable, ScrollView, TextInput, Vibration, View, useWindowDimensions } from 'react-native'
+import { PanResponder, Pressable, ScrollView, TextInput, Vibration, View, useWindowDimensions } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, RadialGradient, Rect, Stop, Text as SvgText, TSpan } from 'react-native-svg'
@@ -16,7 +16,7 @@ import { exposureText, formatAperture, formatComp, formatShutter, meterFrameTitl
 import { cameraName, rollCameraFormat, rollFilm } from '../core/display'
 import { currentPlace } from '../platform'
 import { Canister as FilmBox, Chip, Chips, DateInput, Group, Row, RowText } from '../kit'
-import { Confirm, Sheet, SheetBtn } from '../overlay'
+import { FullModal, Confirm, Sheet, SheetBtn } from '../overlay'
 import { PlacePicker } from './Editors'
 import { useTheme } from '../theme'
 
@@ -113,12 +113,12 @@ export function ManualRecord({ roll, onClose }: { roll: Roll; onClose: () => voi
   const allLenses = useLiveQuery(() => db.lenses.toArray(), [], null)
   const ready = (camera !== null || !roll.cameraId) && allLenses !== null
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <FullModal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <StatusBar style="light" />
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         {ready ? <Recorder roll={roll} camera={camera ?? undefined} allLenses={allLenses ?? []} onClose={onClose} /> : null}
       </View>
-    </Modal>
+    </FullModal>
   )
 }
 
@@ -163,7 +163,7 @@ function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: C
   // 이어서: 마지막에 찍은 컷의 렌즈·필터·다이얼 값에서 다시 시작
   const last = useMemo(() => [...(roll.meterShots ?? [])].sort((a, b) => b.order - a.order)[0], [])
   const [lens, setLens] = useState<Lens>(() =>
-    (last?.lensId ? setup.lensById(last.lensId) : undefined) ?? setup.lensById(lensIdAt(roll, shots.length + 1) ?? roll.lensId) ?? GENERIC)
+    (last?.lensId ? setup.lensById(last.lensId) : undefined) ?? setup.lensById(lensIdAt(roll, Math.max(0, ...shots.map((s) => s.pos)) + 1) ?? roll.lensId) ?? GENERIC)
   const [dial, setDial] = useState<Dial>(() => {
     const base = setup.baseDial(lens)
     return last ? dialOf.fromShot(last, base, base.aps) : base
@@ -278,13 +278,13 @@ function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: C
         onPlace={() => setSheet('place')} onTime={() => { if (useNow) setTime(Date.now()); setSheet('time') }} />
       <View style={{ flex: 1, minHeight: 6 }} />
 
-      {/* 셔터 줄 · 필름 (노출계와 같은 모양) */}
+      {/* 셔터 줄 · 필름 (노출계와 같은 모양). 레버는 필름 위에 겹치되 zIndex는 쓰지 않는다.
+          안드로이드는 zIndex를 elevation으로 그려서, 장소·ISO 시트보다 위에 레버가 남는다. */}
       <View style={{ paddingBottom: insets.bottom + 70 }}>
-        <Controls counter={String(frame)} flash={dialOf.flash(dial)} leverOut={leverOut} rewind={rewind} down={down}
-          onFlash={() => { setDial((d) => (dialOf.flash(d) ? { ...d, a: d.lastA } : { ...d, lastA: d.a, a: dialOf.flashIndex(d) })); buzz(15) }}
-          onShutter={fire} />
-        <View style={{ marginHorizontal: -16, marginTop: 8 }}>
-          <ScrollView ref={stripRef} horizontal showsHorizontalScrollIndicator={false} style={{ opacity: 0.86 }}>
+        <View>
+          <View style={{ height: Math.min(width - 32, 318) * 104 / 360 + 38 }} />
+          <View style={{ marginHorizontal: -16 }}>
+            <ScrollView ref={stripRef} horizontal showsHorizontalScrollIndicator={false} style={{ opacity: 0.86 }}>
             {/* 필름통까지 이어지는 필름 (칸·번호 없이). 맨 끝에서 마지막 컷이 딱 가운데에 오는 길이 (웹·아이폰과 같음) */}
             <LeadFilm width={Math.max(60, width / 2 - 52)} />
             {cells.map((p) => {
@@ -297,9 +297,15 @@ function Recorder({ roll, camera, allLenses, onClose }: { roll: Roll; camera?: C
               {Array.from({ length: 12 }, (_, i) => <Rect key={i} x={6 + i * 17.33} y={4} width={7} height={8} rx={1.5} fill="#0b0b0c" />)}
               <Rect x={6} y={100} width={7} height={8} rx={1.5} fill="#0b0b0c" />
             </Svg>
-            <View style={{ width: Math.max(0, width / 2 - 52 - 232) }} />
-          </ScrollView>
-          <Canister iso={iso} frames={frames} colors={film ? filmBoxColors[film.id] ?? [film.style.body, film.style.band] : undefined} onPress={() => setSheet('roll')} />
+              <View style={{ width: Math.max(0, width / 2 - 52 - 232) }} />
+            </ScrollView>
+            <Canister iso={iso} frames={frames} colors={film ? filmBoxColors[film.id] ?? [film.style.body, film.style.band] : undefined} onPress={() => setSheet('roll')} />
+          </View>
+          <View pointerEvents="box-none" style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
+            <Controls counter={String(frame)} flash={dialOf.flash(dial)} leverOut={leverOut} rewind={rewind} down={down}
+              onFlash={() => { setDial((d) => (dialOf.flash(d) ? { ...d, a: d.lastA } : { ...d, lastA: d.a, a: dialOf.flashIndex(d) })); buzz(15) }}
+              onShutter={fire} />
+          </View>
         </View>
       </View>
 
@@ -547,7 +553,7 @@ function Controls({ counter, flash, leverOut, rewind, down, onFlash, onShutter }
   const lever = useTween(leverOut ? -105 : -14, 340)
   const knob = useTween(rewind, 600)
   return (
-    <View style={{ width: W, height: H, alignSelf: 'center', marginBottom: -W * 58 / 360 + 30, zIndex: 2 }}>
+    <View style={{ width: W, height: H, alignSelf: 'center' }}>
       <Svg width={W} height={H} viewBox="0 0 360 162">
         <Defs>
           <RadialGradient id="chrome" cx="38%" cy="35%" r="80%"><Stop offset="0" stopColor="#fafafa" /><Stop offset="0.6" stopColor="#a5a5a8" /><Stop offset="1" stopColor="#5d5d60" /></RadialGradient>
@@ -705,7 +711,7 @@ function ShotEdit({ shot, like, lenses, current, box, onClose, onSave, onDelete 
     })
   }
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <FullModal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: '#000', paddingTop: insets.top + 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 8 }}>
           <Pressable onPress={onClose} style={{ backgroundColor: PANEL, height: 36, paddingHorizontal: 16, borderRadius: 18, justifyContent: 'center' }}><Text style={{ color: ORANGE, fontSize: 16 }}>취소</Text></Pressable>
@@ -749,15 +755,16 @@ function ShotEdit({ shot, like, lenses, current, box, onClose, onSave, onDelete 
         {sheet === 'iso' ? <IsoSheet value={camIso} box={box} onChange={setCamIso} onClose={() => setSheet(undefined)} /> : null}
         {ask ? <Confirm message="이 칸 기록을 지울까요?" action="지우기" onCancel={() => setAsk(false)} onConfirm={onDelete} /> : null}
       </View>
-    </Modal>
+    </FullModal>
   )
 }
 
 /** 롤 화면에서 여는 컷 고치기 (상세 기록과 같은 화면) */
-export function RollShotEdit({ roll, pos, onClose, onToast }: { roll: Roll; pos: number; onClose: () => void; onToast: (t: string) => void }) {
+export function RollShotEdit({ roll, pos, create, onClose, onToast }: { roll: Roll; pos: number; /** 기록이 없는 컷이면 새로 */ create?: boolean; onClose: () => void; onToast: (t: string) => void }) {
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId], null)
   const allLenses = useLiveQuery(() => db.lenses.toArray(), [], null)
-  const shot = roll.meterShots?.find((s) => s.pos === pos)
+  const found = roll.meterShots?.find((s) => s.pos === pos)
+  const shot: MeterShot | undefined = found ?? (create ? { pos, order: (roll.meterShots?.length ?? 0) + 1, mode: 'M', aperture: null, shutter: null, comp: 0, flash: false, ev: 0, focal: null, at: null, edited: true } : undefined)
   if ((camera === null && roll.cameraId) || !allLenses || !shot) return null
   const setup = setupOf(roll, camera ?? undefined, allLenses)
   const current = setup.lensById(shot.lensId ?? lensIdAt(roll, pos) ?? roll.lensId) ?? GENERIC
@@ -765,7 +772,7 @@ export function RollShotEdit({ roll, pos, onClose, onToast }: { roll: Roll; pos:
   return (
     <ShotEdit shot={shot} like={setup.baseDial(current)} lenses={setup.lensList.length ? setup.lensList : [current]} current={current} iso={setup.iso} box={setup.film?.iso ?? setup.iso}
       onClose={onClose}
-      onSave={(s) => { void save((roll.meterShots ?? []).map((x) => (x.pos === s.pos ? { ...s, edited: true } : x))); onClose(); onToast(`${s.pos}번을 고쳤어요`) }}
+      onSave={(s) => { void save(found ? (roll.meterShots ?? []).map((x) => (x.pos === s.pos ? { ...s, edited: true } : x)) : [...(roll.meterShots ?? []), { ...s, edited: true }]); onClose(); onToast(`${s.pos}번을 고쳤어요`) }}
       onDelete={() => { void save((roll.meterShots ?? []).filter((x) => x.pos !== pos)); onClose(); onToast(`${pos}번 기록을 지웠어요`) }} />
   )
 }

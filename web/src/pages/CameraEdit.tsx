@@ -9,8 +9,8 @@ import { formatInfo, styleName, uid } from '../core/types'
 import { brandsMatching, catalog, catalogMatch, catalogName, inferStyle, kindText, modelsMatching, type CatalogCamera } from '../core/cameras'
 import { profileFor } from '../core/profiles'
 import { Model3D } from '../ui/Viewers'
-import { Sheet, toInputDate, useObjectURL } from '../ui/common'
-import { TagField } from '../ui/gearExtras'
+import { Sheet, useObjectURL } from '../ui/common'
+import { OptionalDate, TagField } from '../ui/gearExtras'
 import { PhotoActions } from '../ui/PhotoActions'
 import { groupPrice } from '../core/optics'
 import { AccessoryLinkFields, PurchaseFields, rememberSeller, useUsedSellers } from './Gear'
@@ -184,6 +184,54 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
       right={<button className="btn ghost" disabled={!brand.trim() || !model.trim() || !photoReady} onClick={save}><b>저장</b></button>}>
 
       <div className="section">
+        <div className="section-title">
+          카메라
+          <button className="btn ghost small" onClick={() => setShowCatalog(true)}>목록에서 고르기</button>
+        </div>
+        <div className="group">
+          <div className="field">
+            <label htmlFor="cam-brand">제조사</label>
+            <input id="cam-brand" className="input" value={brand} autoComplete="off"
+              onFocus={() => setFocus('brand')} onChange={(e) => setBrand(e.target.value)} />
+          </div>
+          {focus === 'brand' && brandList.length > 0 && (
+            <div className="suggest">
+              {brandList.map((b) => (
+                <button key={b} className="chip" onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { setBrand(b); setFocus('model'); document.getElementById('cam-model')?.focus() }}>{b}</button>
+              ))}
+            </div>
+          )}
+          <div className="field">
+            <label htmlFor="cam-model">모델</label>
+            <input id="cam-model" className="input" value={model} autoComplete="off"
+              onFocus={() => setFocus('model')} onChange={(e) => onModelChange(e.target.value)} />
+          </div>
+          {focus === 'model' && modelList.length > 0 && (
+            <div className="suggest">
+              {modelList.map((c) => (
+                <button key={catalogName(c)} type="button" className={`chip ${c === known ? 'active' : ''}`}
+                  onMouseDown={(e) => e.preventDefault()} onClick={() => apply(c)}>
+                  {brand ? c.model : catalogName(c)}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="field">
+            <label htmlFor="cam-nick">별명 (선택)</label>
+            <input id="cam-nick" className="input" value={nickname} onChange={(e) => setNickname(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="cam-format">포맷</label>
+            <select id="cam-format" className="input" value={format} onChange={(e) => setFormat(e.target.value as FilmFormat)}>
+              {Object.entries(formatInfo).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
+            </select>
+          </div>
+        </div>
+        {known && <p className="footnote">✓ {kindText(known)}로 자동 설정했어요.</p>}
+      </div>
+
+      <div className="section">
         <h2>외관</h2>
         <div className="group" style={{ padding: 12, display: 'grid', gap: 12 }}>
           {photoURL
@@ -235,54 +283,6 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
         <p className="footnote">{photo ? '사진은 그대로 써요. 배경을 지우려면 배경 지우기를 켜 주세요.' : '사진이 없으면 고른 형태의 기본 모형으로 보여요.'}</p>
       </div>
 
-      <div className="section">
-        <div className="section-title">
-          카메라
-          <button className="btn ghost small" onClick={() => setShowCatalog(true)}>목록에서 고르기</button>
-        </div>
-        <div className="group">
-          <div className="field">
-            <label htmlFor="cam-brand">제조사</label>
-            <input id="cam-brand" className="input" value={brand} autoComplete="off"
-              onFocus={() => setFocus('brand')} onChange={(e) => setBrand(e.target.value)} />
-          </div>
-          {focus === 'brand' && brandList.length > 0 && (
-            <div className="suggest">
-              {brandList.map((b) => (
-                <button key={b} className="chip" onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => { setBrand(b); setFocus('model'); document.getElementById('cam-model')?.focus() }}>{b}</button>
-              ))}
-            </div>
-          )}
-          <div className="field">
-            <label htmlFor="cam-model">모델</label>
-            <input id="cam-model" className="input" value={model} autoComplete="off"
-              onFocus={() => setFocus('model')} onChange={(e) => onModelChange(e.target.value)} />
-          </div>
-          {focus === 'model' && modelList.length > 0 && (
-            <div className="suggest">
-              {modelList.map((c) => (
-                <button key={catalogName(c)} type="button" className={`chip ${c === known ? 'active' : ''}`}
-                  onMouseDown={(e) => e.preventDefault()} onClick={() => apply(c)}>
-                  {brand ? c.model : catalogName(c)}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="field">
-            <label htmlFor="cam-nick">별명 (선택)</label>
-            <input id="cam-nick" className="input" value={nickname} onChange={(e) => setNickname(e.target.value)} />
-          </div>
-          <div className="field">
-            <label htmlFor="cam-format">포맷</label>
-            <select id="cam-format" className="input" value={format} onChange={(e) => setFormat(e.target.value as FilmFormat)}>
-              {Object.entries(formatInfo).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
-            </select>
-          </div>
-        </div>
-        {known && <p className="footnote">✓ {kindText(known)}로 자동 설정했어요.</p>}
-      </div>
-
       <TagField tags={tags} setTags={setTags} />
 
       <div className="section">
@@ -308,12 +308,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
             <label htmlFor="cam-battery">배터리 종류</label>
             <input id="cam-battery" className="input" value={battery} onChange={(e) => setBattery(e.target.value)} />
           </div>
-          <div className="field">
-            <label htmlFor="cam-bdate">마지막 교체</label>
-            <input id="cam-bdate" type="date" className="input" value={batteryAt !== undefined ? toInputDate(batteryAt) : ''}
-              onChange={(e) => setBatteryAt(e.target.value ? new Date(`${e.target.value}T12:00:00`).getTime() : undefined)} />
-            {batteryAt !== undefined && <button type="button" className="chip-x" aria-label="교체일 지우기" onClick={() => setBatteryAt(undefined)}>×</button>}
-          </div>
+          <OptionalDate label="마지막 교체" value={batteryAt} onChange={setBatteryAt} />
         </div>
         <p className="footnote">교체한 지 1년이 지나면 내 장비에서 알려 드려요.</p>
       </div>

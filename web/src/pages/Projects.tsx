@@ -47,19 +47,20 @@ export function ProjectStrip({ rolls }: { rolls: Roll[] }) {
         {active.map((p) => (
           <button key={p.id} className="project-card" onClick={() => setOpened(p.id)}>
             <Folder color={colorOf(p)} />
+            <i className="dot" style={{ background: colorOf(p) }} />
             <b className="truncate">{p.name}</b>
             <span>{p.rollIds.filter((id) => live.has(id)).length}롤</span>
           </button>
         ))}
         <button className="project-card add" onClick={() => setEditing('new')}>
-          <Icon name="plus" size={22} />
+          <Icon name="folderPlus" size={26} />
           <b>새 프로젝트</b>
         </button>
       </div>
       {editing && <ProjectEdit project={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />}
       {opened && <ProjectDetail id={opened} onClose={() => setOpened(null)} />}
       {archivedOpen && (
-        <Sheet title="보관된 프로젝트" onClose={() => setArchivedOpen(false)}>
+        <Sheet push page title="보관된 프로젝트" onClose={() => setArchivedOpen(false)}>
           <div className="group">
             {archived.map((p) => (
               <button key={p.id} className="row" onClick={() => { setArchivedOpen(false); setOpened(p.id) }}>
@@ -126,7 +127,7 @@ function ProjectDetail({ id, onClose }: { id: string; onClose: () => void }) {
   if (!project) return null
   const mine = rolls.filter((r) => kept(r) && project.rollIds.includes(r.id)).sort((a, b) => rollStart(b) - rollStart(a))
   return (
-    <Sheet title={project.name} onClose={onClose}
+    <Sheet push page title={project.name} onClose={onClose}
       right={<button className="btn ghost" onClick={() => setEditing(true)}><b>수정</b></button>}>
       <div className="project-hero">
         <Folder color={colorOf(project)} size={44} />
@@ -178,9 +179,7 @@ function ProjectDetail({ id, onClose }: { id: string; onClose: () => void }) {
 export function RollProjects({ roll }: { roll: Roll }) {
   const projects = useLiveQuery(() => db.projects.orderBy('createdAt').reverse().toArray(), []) ?? []
   const [picking, setPicking] = useState(false)
-  const [creating, setCreating] = useState(false)
   const mine = projects.filter((p) => p.rollIds.includes(roll.id))
-  const toggle = (p: Project) => setInProject(p.id, roll.id)
   return (
     <div className="section">
       <h2>프로젝트</h2>
@@ -192,8 +191,19 @@ export function RollProjects({ roll }: { roll: Roll }) {
         )}
         <button className="row accent" onClick={() => setPicking(true)}><Icon name="plus" /> {mine.length ? '프로젝트 바꾸기' : '프로젝트에 담기'}</button>
       </div>
-      {picking && (
-        <Sheet title="프로젝트에 담기" onClose={() => setPicking(false)} left={<span />} right={<button className="btn ghost" onClick={() => setPicking(false)}><b>완료</b></button>}>
+      {picking && <RollProjectsPicker roll={roll} onClose={() => setPicking(false)} />}
+    </div>
+  )
+}
+
+/** 그 롤을 담을 프로젝트 고르기 (롤 화면·목록의 길게 누르기 메뉴) */
+export function RollProjectsPicker({ roll, onClose }: { roll: Roll; onClose: () => void }) {
+  const projects = useLiveQuery(() => db.projects.orderBy('createdAt').reverse().toArray(), []) ?? []
+  const [creating, setCreating] = useState(false)
+  const toggle = (p: Project) => setInProject(p.id, roll.id)
+  return (
+    <>
+        <Sheet title="프로젝트에 담기" onClose={onClose} left={<span />} right={<button className="btn ghost" onClick={onClose}><b>완료</b></button>}>
           <div className="group">
             {projects.map((p) => {
               const on = p.rollIds.includes(roll.id)
@@ -208,9 +218,8 @@ export function RollProjects({ roll }: { roll: Roll }) {
             <button className="row accent" onClick={() => setCreating(true)}><Icon name="plus" /> 새 프로젝트</button>
           </div>
         </Sheet>
-      )}
       {creating && <ProjectEdit onClose={() => setCreating(false)}
         onSaved={(p) => setInProject(p.id, roll.id, true)} />}
-    </div>
+    </>
   )
 }

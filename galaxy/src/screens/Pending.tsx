@@ -6,7 +6,7 @@ import { db, kept } from '../data'
 import { useLiveQuery } from '../store'
 import { useNav } from '../App'
 import type { Roll } from '../core/types'
-import { Btn, Footnote, Group, Row, RowText, Section, Sub } from '../kit'
+import { Btn, Empty, Footnote, Group, Row, RowText, Section, Sub } from '../kit'
 import { Icon } from '../icons'
 import { GlassBtn, Page } from '../page'
 import { Confirm, Sheet } from '../overlay'
@@ -65,31 +65,39 @@ export function Pending() {
       </Group>
       <View style={{ marginTop: 8 }}><Footnote>현상소에서 받은 zip을 고르세요. 사진 여러 장을 골라도 돼요.</Footnote></View>
 
-      <Section title={`현상 맡김 · ${atLab.length}`}>
-        {atLab.length > 0 ? (
+      {atLab.length > 0 ? (
+        <Section title={`현상 맡김 · ${atLab.length}`}>
           <Group>
             {atLab.map((r) => (
+              // 옆에 두면 이름이 잘려서 버튼은 아래에 넓게 (아이폰·웹과 같음)
               <Row key={r.id} static>
-                <Pressable style={{ flex: 1, minWidth: 0 }} onPress={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /></Pressable>
-                <ScanButton rollId={r.id} label="불러오기" />
+                <View style={{ flex: 1, minWidth: 0, gap: 10 }}>
+                  <Pressable onPress={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /></Pressable>
+                  <ScanButton rollId={r.id} label="불러오기" wide />
+                </View>
               </Row>
             ))}
           </Group>
-        ) : null}
-      </Section>
+        </Section>
+      ) : null}
 
-      <Section title={`촬영 완료 · ${finished.length}`}>
-        {finished.length > 0 ? (
+      {finished.length > 0 ? (
+        <Section title={`촬영 완료 · ${finished.length}`}>
           <Group>
             {finished.map((r) => (
+              // 옆에 두면 이름이 잘려서 버튼은 아래에 넓게 (아이폰·웹과 같음)
               <Row key={r.id} static>
-                <Pressable style={{ flex: 1, minWidth: 0 }} onPress={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /></Pressable>
-                <Btn label="현상소 고르기" kind="soft" size="small" onPress={() => setDropOff(r)} />
+                <View style={{ flex: 1, minWidth: 0, gap: 10 }}>
+                  <Pressable onPress={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /></Pressable>
+                  <Btn label="현상소 고르기" kind="soft" size="small" block onPress={() => setDropOff(r)} />
+                </View>
               </Row>
             ))}
           </Group>
-        ) : null}
-      </Section>
+        </Section>
+      ) : null}
+
+      {atLab.length + finished.length + nav.zipQueue.length === 0 ? <Empty icon="stack" title="현상할 롤이 없어요" /> : null}
 
       {dropOff ? <LabDropOff roll={dropOff} onClose={() => setDropOff(undefined)} /> : null}
       {archiveChoice.sheets}
@@ -104,13 +112,15 @@ async function keepZips(files: { uri: string; name: string; size?: number; mimeT
   return Promise.all(files.map(async (f) => ({ ...f, uri: await copyIn(f.uri, 'zip-queue', `${uid()}.zip`) })))
 }
 
-export function ScanButton({ rollId, label = '스캔 불러오기', big }: { rollId: string; label?: string; big?: boolean }) {
+export function ScanButton({ rollId, label = '스캔 불러오기', big, wide, row }: { rollId: string; label?: string; big?: boolean; wide?: boolean; row?: boolean }) {
   const nav = useNav()
+  const pick = async () => {
+    const f = await pickFiles(scanTypes)
+    if (f.length) nav.importScans(f, rollId)
+  }
+  if (row) return <Row accent onPress={() => { void pick() }}>{label}</Row>
   return (
-    <Btn label={label} kind="primary" size={big ? 'stack' : 'small'} block={big} onPress={async () => {
-      const f = await pickFiles(scanTypes)
-      if (f.length) nav.importScans(f, rollId)
-    }} />
+    <Btn label={label} kind="primary" size={big ? 'stack' : 'small'} block={big || wide} onPress={() => { void pick() }} />
   )
 }
 

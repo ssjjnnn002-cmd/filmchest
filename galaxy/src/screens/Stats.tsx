@@ -212,14 +212,14 @@ function BarChart({ bars, selected, onPick }: { bars: Bucket[]; selected?: strin
           return (
             <Pressable key={m.key} onPress={() => onPick(m.key)} style={{ flex: 1, height: '100%', justifyContent: 'flex-end', alignItems: 'center' }}>
               <Text style={{ fontSize: 12, fontWeight: '600', color: c.ink, minHeight: 16 }}>{(on || (!selected && m === peak)) && m.rolls.length > 0 ? String(m.rolls.length) : ''}</Text>
-              <View style={{ width: '100%', maxWidth: 18, minHeight: 2, height: `${(m.rolls.length / max) * 82}%`, backgroundColor: c.safelight, opacity: selected && !on ? 0.35 : 1, borderTopLeftRadius: 4, borderTopRightRadius: 4 }} />
+              <View style={{ width: '100%', maxWidth: 18, minHeight: m.rolls.length ? 4 : 0, height: `${(m.rolls.length / max) * 82}%`, backgroundColor: c.safelight, opacity: selected && !on ? 0.35 : 1, borderTopLeftRadius: 4, borderTopRightRadius: 4 }} />
             </Pressable>
           )
         })}
       </View>
       <View style={{ flexDirection: 'row', gap: 4, marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: c.sep }}>
         {bars.map((m, i) => (
-          <Text key={m.key} numberOfLines={1} style={{ flex: 1, fontSize: 11, color: c.muted, textAlign: 'center' }}>{(bars.length - 1 - i) % every === 0 ? m.label : ''}</Text>
+          <Text key={m.key} numberOfLines={1} style={{ flex: 1, fontSize: 11, color: c.muted, textAlign: 'center' }}>{i % every === 0 ? m.label : ''}</Text>
         ))}
       </View>
     </View>

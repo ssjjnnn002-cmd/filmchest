@@ -28,6 +28,62 @@ extension Color {
     }
 }
 
+/// 입력 줄: 왼쪽 이름, 오른쪽 값 (값을 넣어도 무엇인지 보이게. 웹·갤럭시와 같은 모양)
+struct LabeledField: View {
+    let label: String
+    @Binding var text: String
+    var prompt = ""
+    @FocusState private var focused: Bool
+
+    init(_ label: String, text: Binding<String>, prompt: String = "") {
+        self.label = label
+        _text = text
+        self.prompt = prompt
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(label).lineLimit(1).fixedSize()
+            TextField(prompt, text: $text).multilineTextAlignment(.trailing).focused($focused)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { focused = true }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label)
+    }
+}
+
+/// 안 적어도 되는 날짜: 적기 전에는 '기록 안 함', 누르면 달력으로 고른다 (웹·갤럭시와 같음)
+struct OptionalDateRow: View {
+    let label: String
+    @Binding var isSet: Bool
+    @Binding var date: Date
+
+    var body: some View {
+        HStack {
+            if isSet {
+                DatePicker(label, selection: $date, displayedComponents: .date)
+                Button { isSet = false } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("\(label) 지우기")
+            } else {
+                Text(label)
+                Spacer()
+                Button("기록 안 함") { date = Date(); isSet = true }
+                    .buttonStyle(.borderless)
+                    .tint(.secondary)
+            }
+        }
+    }
+}
+
+extension View {
+    /// 입력 창도 앱과 같은 종이색 바탕 (시스템 회색 대신)
+    func filmForm() -> some View {
+        formStyle(.grouped).scrollContentBackground(.hidden).background(Theme.paper)
+    }
+}
+
 extension Image {
     init(cgImage: CGImage) {
         self.init(decorative: cgImage, scale: 1)
@@ -147,6 +203,8 @@ struct StatusBadge: View {
     var body: some View {
         Text(status.displayName)
             .font(.caption2.weight(.semibold))
+            .lineLimit(1)
+            .fixedSize()
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(color.opacity(0.15), in: Capsule())

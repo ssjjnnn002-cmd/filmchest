@@ -132,7 +132,7 @@ struct FramePrintView: View {
                 }
             }
             if showPhotographer {
-                TextField("찍은 사람", text: $photographer)
+                LabeledField("찍은 사람", text: $photographer)
                     .textFieldStyle(.roundedBorder)
             }
             HStack {
@@ -271,7 +271,7 @@ private struct FramePrintExportView: View {
                     if let message { Text(message) }
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .navigationTitle("프레임 만들기")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

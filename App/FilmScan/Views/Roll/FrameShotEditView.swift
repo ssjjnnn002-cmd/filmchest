@@ -34,21 +34,21 @@ struct FrameShotEditView: View {
                 } header: {
                     Text("노출")
                 } footer: {
-                    Text("비워 두면 그 줄은 프레임에 안 써요.")
+                    Text("비워 두면 기록하지 않아요.")
                 }
                 Section("이 롤 ISO") {
-                    TextField("ISO", text: $iso)
+                    LabeledField("ISO", text: $iso)
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
                 }
                 Section("추가") {
-                    TextField("초점 거리 mm", text: $focal)
+                    LabeledField("초점 거리 mm", text: $focal)
                         #if os(iOS)
                         .keyboardType(.numberPad)
                         #endif
-                    TextField("필터", text: $filters)
-                    TextField("메모", text: $memo)
+                    LabeledField("필터", text: $filters)
+                    LabeledField("메모", text: $memo)
                 }
                 Section {
                     Button("저장") { save(); dismiss() }
@@ -100,7 +100,7 @@ struct FrameShotEditView: View {
         let previous = shots.first { $0.pos == pos }
         let order = previous?.order ?? (shots.map(\.order).max() ?? 0) + 1
         let names = filters.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        let shot = MeterShot(
+        var shot = MeterShot(
             pos: pos, order: order, mode: previous?.mode ?? "M",
             aperture: aperture, shutter: shutter, comp: (comp * 3).rounded() / 3, flash: flash,
             ev: previous?.ev ?? 0,
@@ -108,6 +108,12 @@ struct FrameShotEditView: View {
             at: previous?.at ?? ISO8601DateFormatter().string(from: Date()), edited: true,
             filters: names.isEmpty ? nil : names, tags: previous?.tags, memo: memo.nilIfBlank
         )
+        // 이 화면에 없는 값(장소·렌즈·카메라 ISO)은 그대로 둔다
+        shot.place = previous?.place
+        shot.lat = previous?.lat
+        shot.lon = previous?.lon
+        shot.lensId = previous?.lensId
+        shot.iso = previous?.iso
         if let i = shots.firstIndex(where: { $0.pos == pos }) { shots[i] = shot } else { shots.append(shot) }
         roll.meterShots = shots
     }

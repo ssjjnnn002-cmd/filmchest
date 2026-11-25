@@ -152,7 +152,7 @@ struct ArchiveImportView: View {
                     Section { Text(errorMessage).foregroundStyle(.red).font(.footnote) }
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .filmKeyboard()
             .rollPaywall()
             .navigationTitle(stepTitle.map { "기존 롤 \($0)" } ?? "기존 롤 가져오기")

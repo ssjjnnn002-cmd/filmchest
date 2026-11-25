@@ -55,10 +55,8 @@ export function Welcome({ onDone, loginOnly = false }: { onDone: () => void; log
             ? <button className="row accent" onClick={finish}><span className="grow">{result}</span><b>{loginOnly ? '완료' : '시작'}</b></button>
             : step
               ? <div className="row static"><span className="grow"><b>{step}</b></span></div>
-              : <>
-                <button className="row accent" onClick={start}><span className="grow sub">처음이에요</span><b>구글로 시작하기</b></button>
-                <button className="row accent" onClick={start}><span className="grow sub">계정이 있어요</span><b>구글로 로그인하기</b></button>
-              </>}
+              // 처음이든 쓰던 계정이든 같은 로그인 (드라이브에 기록이 있으면 받아 온다)
+              : <button className="row accent" onClick={start}><b>구글로 시작하기</b></button>}
           {!result && !loginOnly && <button className="row" disabled={!!step} onClick={() => {
             if (!kept) { finish(); return }
             void askOnce(`이 기기에 남은 ${kept} 계정 기록을 지우고 로그인 없이 새로 시작할까요? 기록은 그 계정 드라이브에 있어요.`, '지우고 시작')

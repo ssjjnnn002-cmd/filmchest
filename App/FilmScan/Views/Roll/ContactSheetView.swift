@@ -66,9 +66,9 @@ struct ContactSheetView: View {
                                                          includeInfo: includeInfo)
             }
             .onAppear {
-                // 메모가 있으면 그걸 제목으로
-                if let memo = roll.note?.nilIfBlank {
-                    title = memo
+                // 롤 제목이 있으면 그걸, 없으면 메모를 제목으로
+                if let name = (roll.hasCustomTitle ? roll.displayTitle : nil) ?? roll.note?.nilIfBlank {
+                    title = name
                     useTitle = true
                 }
             }
@@ -99,7 +99,7 @@ private struct ContactSheetExportView: View {
                 Section {
                     Toggle("제목 넣기", isOn: $useTitle)
                     if useTitle {
-                        TextField("제목", text: $title)
+                        LabeledField("제목", text: $title)
                     }
                 } footer: {
                     if roll.note?.nilIfBlank != nil {
@@ -133,7 +133,7 @@ private struct ContactSheetExportView: View {
                     if let message { Text(message) }
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .navigationTitle("밀착 인화지로 만들기")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

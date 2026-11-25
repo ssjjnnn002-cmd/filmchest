@@ -90,8 +90,10 @@ export function Model3D({ profile, color, height = 240 }: { profile: ModelProfil
  * 확대/이동 보기: 두 손가락 확대, 끌어서 이동, 휠 확대, 두 번 눌러 확대/원래대로.
  * onSwipe가 있으면 원래 크기에서 좌우로 밀 때 호출한다.
  */
-export function ZoomView({ src, onSwipe, background = 'transparent' }: {
+export function ZoomView({ src, onSwipe, onDrag, background = 'transparent' }: {
   src: string; onSwipe?: (dir: 1 | -1) => void; background?: string
+  /** 원래 크기에서 옆으로 끄는 동안 (px). 놓았는데 넘기지 않으면 0 */
+  onDrag?: (dx: number, done: boolean) => void
 }) {
   const box = useRef<HTMLDivElement>(null)
   const img = useRef<HTMLImageElement>(null)
@@ -170,6 +172,7 @@ export function ZoomView({ src, onSwipe, background = 'transparent' }: {
       clamp()
       apply()
     }
+    else if (onDrag && g.dist === 0 && Math.abs(p.x - g.startX) > 6) onDrag(p.x - g.startX, false)
     if (Math.abs(p.x - g.startX) > 6) g.moved = true
   }
 
@@ -180,6 +183,7 @@ export function ZoomView({ src, onSwipe, background = 'transparent' }: {
     if (g && pointers.current.size === 0 && onSwipe && g.dist === 0 && t.current.s <= t.current.fit * 1.01) {
       const dx = p.x - g.startX
       if (Math.abs(dx) > 50) onSwipe(dx < 0 ? 1 : -1)
+      else onDrag?.(0, true)
     }
     if (pointers.current.size === 0) gesture.current = null
   }

@@ -9,7 +9,8 @@ import { SettingsButton } from './Settings'
 import { ArchiveImportButton } from './Pending'
 import { RollCard, RollRow } from '../ui/RollRow'
 import { getPref, setPref } from '../platform'
-import { ProjectStrip } from './Projects'
+import { ProjectStrip, RollProjectsPicker } from './Projects'
+import { PressMenu } from '../ui/PressMenu'
 import { searchMatch } from '../core/searchAlias'
 
 type Period = 'month' | 'quarter' | 'half' | 'year'
@@ -25,8 +26,8 @@ type Mode = 'gallery' | 'list'
 const modeName: Record<Mode, string> = { gallery: '갤러리 보기', list: '목록 보기' }
 const modeIcon: Record<Mode, string> = { gallery: 'grid', list: 'list' }
 type StatusTab = 'all' | 'loaded' | 'waiting' | 'done'
-const statusTabName: Record<StatusTab, string> = { all: '전체', loaded: '장착 중', waiting: '스캔 대기', done: '완료' }
-/** 스캔 대기: 다 찍은 롤과 현상 맡긴 롤 (아이폰과 같음) */
+const statusTabName: Record<StatusTab, string> = { all: '전체', loaded: '촬영 중', waiting: '현상 스캔', done: '완료' }
+/** 현상 스캔(탭과 같은 이름): 다 찍은 롤과 현상 맡긴 롤 (아이폰과 같음) */
 const inTab = (t: StatusTab, s: RollStatus) => t === 'all' || (t === 'loaded' && s === 'loaded') || (t === 'waiting' && (s === 'finished' || s === 'atLab')) || (t === 'done' && s === 'imported')
 
 function periodKey(g: Period, ms: number) {
@@ -129,6 +130,12 @@ export function Rolls() {
       .map(([k, rs]) => ({ key: String(k), title: periodTitle(period, k), rolls: sorted(rs) }))
   }, [filtered, groupBy, period, sort, ascending, projects, cameras])
 
+  const [filing, setFiling] = useState<Roll>()
+  const pressItems = (r: Roll) => [
+    { label: r.favorite ? '즐겨찾기 해제' : '즐겨찾기', icon: 'star', onPress: () => void db.rolls.update(r.id, { favorite: !r.favorite }) },
+    { label: '프로젝트에 담기', icon: 'folderPlus', onPress: () => setFiling(r) },
+    { label: '삭제', icon: 'trash', danger: true, onPress: () => setDeleting(r.id) },
+  ]
   return (
     <>
       <PageHeader title="롤 보관함"
@@ -161,25 +168,25 @@ export function Rolls() {
           <Icon name="search" size={18} />
           <input type="search" placeholder="필름, 카메라, 장소, 메모, #태그" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="검색" />
         </label>
-        <div className="segmented slide" role="tablist" aria-label="상태"
+        {rolls && rolls.length > 0 && <div className="segmented slide" role="tablist" aria-label="상태"
           style={{ '--i': (Object.keys(statusTabName) as StatusTab[]).indexOf(tab), '--n': 4 } as React.CSSProperties}>
           {(Object.keys(statusTabName) as StatusTab[]).map((t) => (
             <button key={t} className={t === tab ? 'on' : ''} onClick={() => setTab(t)}>{statusTabName[t]}</button>
           ))}
-        </div>
-        <div className="chips">
+        </div>}
+        {rolls && rolls.length > 0 && <div className="chips">
           {/* 정렬: 기준 하나 + 선 아래 오름·내림차순 (아이폰 메뉴와 같은 모양) */}
           <PickMenu label="정렬" className="chip" trigger={<><Icon name="sort" size={15} /> {sortName[sort]} {ascending ? '↑' : '↓'} <Chevron /></>} sections={[
             { value: sort, options: (Object.keys(sortName) as Sort[]).map((k) => [k, sortName[k]]), onPick: (v) => setSort(v as Sort) },
             { value: ascending ? 'asc' : 'desc', options: [['asc', '오름차순'], ['desc', '내림차순']], onPick: (v) => setAscending(v === 'asc') },
           ]} />
           {/* 그룹화: 네 가지 중 하나 + 기간이면 선 아래 단위 */}
-          <PickMenu label="그룹화" className="chip" trigger={<><Icon name="group" size={15} /> {groupBy === 'period' ? periodGroupName[period] : groupByShort[groupBy]} <Chevron /></>} sections={[
+          <PickMenu label="그룹화" className="chip" trigger={<><Icon name="layers" size={15} /> {groupBy === 'period' ? periodGroupName[period] : groupByShort[groupBy]} <Chevron /></>} sections={[
             { value: groupBy, options: (Object.keys(groupByName) as GroupBy[]).map((g) => [g, groupByName[g]]), onPick: (v) => setGroupBy(v as GroupBy) },
             ...(groupBy === 'period' ? [{ value: period, options: (Object.keys(periodName) as Period[]).map((p): [string, string] => [p, periodName[p]]), onPick: (v: string) => setPeriod(v as Period) }] : []),
           ]} />
           <button className={`chip ${favoritesOnly ? 'active' : ''}`} onClick={() => setFavoritesOnly(!favoritesOnly)}><Icon name="star" size={16} /> 즐겨찾기</button>
-        </div>
+        </div>}
       </div>
 
       {rolls?.length === 0 && <div className="empty"><Icon name="stack" size={40} /><b>아직 롤이 없어요</b></div>}
@@ -192,20 +199,21 @@ export function Rolls() {
           <h2>{g.title} · {g.rolls.length}롤</h2>
           {mode === 'gallery' ? (
             <div className="grid rolls-grid">
-              {g.rolls.map((r) => <RollCard key={r.id} roll={r} onClick={() => nav.push({ type: 'roll', id: r.id })} />)}
+              {g.rolls.map((r) => <PressMenu key={r.id} items={pressItems(r)}><RollCard roll={r} onClick={() => nav.push({ type: 'roll', id: r.id })} /></PressMenu>)}
             </div>
           ) : (
             <div className="group rolls-list">
               {g.rolls.map((r) => (
                 // 왼쪽→오른쪽 밀면 즐겨찾기, 오른쪽→왼쪽 밀면 삭제 (아이폰과 같음)
                 <SwipeRow key={r.id} favorite={!!r.favorite} onFavorite={() => void db.rolls.update(r.id, { favorite: !r.favorite })} onDelete={() => setDeleting(r.id)}>
-                  <button className="row" onClick={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /><Icon name="chev" size={18} /></button>
+                  <PressMenu items={pressItems(r)}><button className="row" onClick={() => nav.push({ type: 'roll', id: r.id })}><RollRow roll={r} /><Icon name="chev" size={18} /></button></PressMenu>
                 </SwipeRow>
               ))}
             </div>
           )}
         </div>
       ))}
+      {filing && <RollProjectsPicker roll={filing} onClose={() => setFiling(undefined)} />}
       {deleting && (
         <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. 사진 앱에 저장한 사진은 그대로 남아요." onCancel={() => setDeleting(undefined)}
           onConfirm={async () => { await deleteRoll(deleting); setDeleting(undefined) }} />

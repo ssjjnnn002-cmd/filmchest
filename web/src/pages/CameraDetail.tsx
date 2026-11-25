@@ -13,6 +13,8 @@ import { useCameraPhoto } from '../photoStore'
 import { Confirm, Icon, PageHeader, Sheet, rollFilmName, toInputDate } from '../ui/common'
 import { RollRow } from '../ui/RollRow'
 import { CameraEdit } from './CameraEdit'
+import { PressMenu } from '../ui/PressMenu'
+import { SwipeRow } from '../ui/SwipeRow'
 import { batteryDue } from './Library'
 
 function lensesOnCamera(camera: Camera, all: Lens[]) {
@@ -162,13 +164,15 @@ export function CameraDetail({ id }: { id: string }) {
           <h2>렌즈 · {camera.mount}</h2>
           <div className="group">
             {lenses.map((l) => (
-              <div key={l.id} className="row">
-                <button className="row" style={{ padding: 0, minHeight: 0, flex: 1 }} onClick={() => setLensEdit(l)}>
-                  <span className="grow">{l.brand} {l.model}{lensSpec(l) ? ` · ${lensSpec(l)}` : ''}</span>
+              // 밀거나 길게 눌러 이 카메라에서 빼기 (아이폰과 같음)
+              <SwipeRow key={l.id} onDelete={() => detachLens(camera, l, lenses)}>
+              <PressMenu items={[{ label: '수정', icon: 'pencil', onPress: () => setLensEdit(l) }, { label: '이 카메라에서 빼기', icon: 'trash', danger: true, onPress: () => detachLens(camera, l, lenses) }]}>
+                <button className="row" onClick={() => setLensEdit(l)}>
+                  <span className="grow">{l.brand} {l.model}{lensSpec(l) && <span className="sub" style={{ fontSize: 12 }}>{lensSpec(l)}</span>}</span>
                   <span className="value">{rolls.filter((r) => r.lensId === l.id || r.lensChanges?.some((c) => c.lensId === l.id)).length}롤</span>
                 </button>
-                <button type="button" className="btn small ghost" onClick={() => detachLens(camera, l, lenses)}>빼기</button>
-              </div>
+              </PressMenu>
+              </SwipeRow>
             ))}
             <button className="row accent" onClick={() => setLensEdit('pick')}><Icon name="plus" /> 렌즈 추가</button>
           </div>

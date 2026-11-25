@@ -4,13 +4,13 @@ import { db } from './data'
 import type { Camera, Frame, Lens, Original, Roll } from './core/types'
 import { lensIdAt, uid } from './core/types'
 import { buildTimeline } from './core/timeline'
-import { formatFamily, isScanImage, isZipFile, readZip, type ScanResult, type ScanSet } from './core/zip'
+import { formatFamily, group, isScanImage, isZipFile, readZip, type ScanResult, type ScanSet } from './core/zip'
 import { readScanner, withRotation, writeMeta } from './core/exif'
 import { webTool } from './webTools'
 import { b64ToBytes, bytesToB64 } from './files'
 import { filmById } from './core/films'
 import { meterShotAt } from './core/meter'
-import { readBytes, removeFile, writeBytes } from './files'
+import { clearFolder, readBytes, removeFile, writeBytes } from './files'
 import type { PickedFile } from './pick'
 import { thumbOf } from './restore'
 
@@ -29,12 +29,9 @@ export async function readFiles(list: PickedFile[]): Promise<ScanResult> {
   )
   if (zip) return readZip(await readBytes(zip.uri))
   const images = list.filter((f) => isScanImage(f.name) || (f.mimeType ?? '').startsWith('image/'))
-  const files = await Promise.all(images.map(async (f) => ({ name: f.name, data: await readBytes(f.uri) })))
+  const files = await Promise.all(images.map(async (f) => ({ name: f.name, uri: f.uri, ...(await readBytes(f.uri).then((d) => ({ head: d.slice(0, 256 * 1024), size: d.byteLength }))) })))
   if (files.length === 0) throw new Error('사진 파일이 없어요.')
-  // 웹 group()과 같은 묶음 (zip.ts readZip이 쓰는 것을 그대로 쓰려고 작은 zip으로 감싸지 않고 바로 묶는다)
-  const z = new JSZip()
-  for (const f of files) z.file(f.name, f.data)
-  return readZip(await z.generateAsync({ type: 'uint8array', compression: 'STORE' }))
+  return group(files)
 }
 
 /**
@@ -54,7 +51,7 @@ export async function importScans(
   // 상세 기록한 컷은 그 컷의 시간·장소로 (번호 맞추기 값은 지금 고른 값)
   const timeline = buildTimeline({ ...roll, meterOffset }, files.length)
   const dateUnknown = roll.isArchive && roll.days.length === 0
-  const scanner = roll.scanner ?? readScanner(files[0].data).name
+  const scanner = roll.scanner ?? readScanner(files[0].head).name
   const film = filmById(roll.filmId)
 
   const frames: Frame[] = []
@@ -64,7 +61,7 @@ export async function importScans(
 
   for (const f of files) {
     const info = timeline[f.index - 1]
-    const data = writeMeta(f.data, {
+    const data = writeMeta(await readBytes(f.uri), {
       frame: f.index,
       frameCount: files.length,
       date: dateUnknown ? undefined : info.date,
@@ -83,7 +80,7 @@ export async function importScans(
     })
     const id = uid()
     const blob = writeBytes('originals', `${id}.${f.type || 'jpg'}`, data)
-    const { thumb, w, h } = await thumbOf(data, mime(f.type), id)
+    const { thumb, w, h } = await thumbOf(data, mime(f.type), id, blob)
     frames.push({
       id, rollId: roll.id, index: f.index, thumb, takenAt: dateUnknown ? undefined : info.date,
       locationName: info.location?.name, favorite: false, w, h, bytes: data.byteLength,
@@ -117,6 +114,7 @@ export async function importScans(
   await db.frames.bulkAdd(frames)
   await db.originals.bulkAdd(originals)
   await db.rolls.put(updated)
+  clearFolder('scan-tmp')
   return updated
 }
 

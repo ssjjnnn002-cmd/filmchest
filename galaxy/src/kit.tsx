@@ -1,9 +1,10 @@
 // 웹 styles.css의 기본 부품을 그대로 옮긴 것 (.section, .group, .row, .field, .toggle, .btn, .chip, .segmented, .search, .status ...)
-import { Children, createContext, Fragment, isValidElement, useContext, useEffect, useState, type ReactNode } from 'react'
+import { Children, createContext, Fragment, isValidElement, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import Slider from '@react-native-community/slider'
 import { notifyFieldFocus } from './fieldFocus'
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Switch, View, type TextInputProps, type ViewStyle } from 'react-native'
+import { ActivityIndicator, Animated, Image, Pressable, ScrollView, View, type TextInputProps, type ViewStyle } from 'react-native'
+import { FullModal } from './overlay'
 import { Text } from './text'
 import { TextInput } from './textInput'
 import { Icon } from './icons'
@@ -26,8 +27,8 @@ export function Section({ title, right, foot, warn, children, style }: {
   return (
     <View style={[{ gap: 8, marginVertical: 11 }, style]}>
       {title || right ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, gap: 8 }}>
-          <Text style={{ color: c.muted, fontSize: 15, fontWeight: '600', flexShrink: 1 }}>{title}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, gap: 8 }}>
+          <Text style={{ color: c.muted, fontSize: 17, fontWeight: '600', flexShrink: 1 }}>{title}</Text>
           {right}
         </View>
       ) : null}
@@ -39,7 +40,7 @@ export function Section({ title, right, foot, warn, children, style }: {
 
 export function Footnote({ children, warn }: { children: ReactNode; warn?: boolean }) {
   const c = useTheme()
-  return <Text style={{ color: warn ? c.warn : c.muted, fontSize: 13, lineHeight: 18, paddingHorizontal: 18 }}>{children}</Text>
+  return <Text style={{ color: warn ? c.warn : c.muted, fontSize: 13, lineHeight: 18, paddingHorizontal: 16 }}>{children}</Text>
 }
 
 /** .group: 흰 둥근 묶음. 줄 사이에 왼쪽 18 띄운 구분선 */
@@ -51,11 +52,11 @@ export function Group({ children, style, plain }: { children: ReactNode; style?:
   const items = Children.toArray(children).filter((x) => isValidElement(x) || typeof x === 'string')
   return (
     <InGroup.Provider value>
-      <View style={[{ backgroundColor: c.cell, borderRadius: 22, overflow: 'hidden' }, style]}>
+      <View style={[{ backgroundColor: c.cell, borderRadius: 26, overflow: 'hidden' }, style]}>
         {items.map((child, i) => (
           <Fragment key={i}>
             {/* 웹처럼 칩 줄 앞뒤에는 선을 긋지 않는다 (칩은 위 칸에 딸린 것) */}
-            {i > 0 && !plain && !isChips(child) && !isChips(items[i - 1]) ? <View style={{ height: 0.5, marginLeft: 18, backgroundColor: c.sep }} /> : null}
+            {i > 0 && !plain && !isChips(child) && !isChips(items[i - 1]) ? <View style={{ height: 0.5, marginHorizontal: 16, backgroundColor: c.sep }} /> : null}
             {child}
           </Fragment>
         ))}
@@ -65,13 +66,13 @@ export function Group({ children, style, plain }: { children: ReactNode; style?:
 }
 
 /** .row: 누를 수 있는 한 줄 */
-export function Row({ children, onPress, accent, danger, chev, value, static: isStatic, style }: {
-  children: ReactNode; onPress?: () => void; accent?: boolean; danger?: boolean; chev?: boolean; value?: string; static?: boolean; style?: ViewStyle
+export function Row({ children, onPress, onLongPress, accent, danger, chev, value, static: isStatic, style }: {
+  children: ReactNode; onPress?: () => void; onLongPress?: () => void; accent?: boolean; danger?: boolean; chev?: boolean; value?: string; static?: boolean; style?: ViewStyle
 }) {
   const c = useTheme()
   const color = danger ? c.danger : accent ? c.safelight : c.ink
   const body = (pressed: boolean) => (
-    <View style={[{ minHeight: 52, paddingVertical: 12, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 12,
+    <View style={[{ minHeight: 52, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12,
       backgroundColor: pressed ? c.fill : 'transparent' }, style]}>
       {typeof children === 'string' ? <Text style={{ flex: 1, fontSize: 17, color }}>{children}</Text> : children}
       {value ? <Text style={{ color: c.muted, fontSize: 17, textAlign: 'right', flexShrink: 1 }} numberOfLines={1}>{value}</Text> : null}
@@ -79,7 +80,7 @@ export function Row({ children, onPress, accent, danger, chev, value, static: is
     </View>
   )
   if (!onPress || isStatic) return body(false)
-  return <Pressable onPress={() => watchWork(onPress())}>{({ pressed }) => body(pressed)}</Pressable>
+  return <Pressable onPress={() => watchWork(onPress())} onLongPress={onLongPress} delayLongPress={450}>{({ pressed }) => body(pressed)}</Pressable>
 }
 
 /** 줄 안 글자 (웹 .row 안의 기본 글자) */
@@ -99,7 +100,7 @@ export function Field({ label, children, stack, suffix, ...input }: { label: str
   const stacked = stack || input.multiline
   if (stacked) {
     return (
-      <View style={{ minHeight: 52, paddingVertical: 8, paddingHorizontal: 18, gap: 4 }}>
+      <View style={{ minHeight: 52, paddingVertical: 8, paddingHorizontal: 16, gap: 4 }}>
         <Text style={{ fontSize: 13, color: c.muted }}>{label}</Text>
         {children ?? (
           <TextInput placeholderTextColor={c.faint} {...input} onFocus={(e) => { notifyFieldFocus(); input.onFocus?.(e) }}
@@ -109,7 +110,7 @@ export function Field({ label, children, stack, suffix, ...input }: { label: str
     )
   }
   return (
-    <View style={{ minHeight: 52, paddingVertical: 8, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+    <View style={{ minHeight: 52, paddingVertical: 8, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <Text style={{ fontSize: 17, color: c.ink, minWidth: 72, maxWidth: '45%' }} numberOfLines={1}>{label}</Text>
       <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end', flexDirection: suffix ? 'row' : 'column', justifyContent: 'flex-end', gap: 4 }}>
         {children ?? (
@@ -127,13 +128,27 @@ export function Field({ label, children, stack, suffix, ...input }: { label: str
 export function Toggle({ label, value, onChange, sub }: { label: string; value: boolean; onChange: (v: boolean) => void; sub?: string }) {
   const c = useTheme()
   return (
-    <View style={{ minHeight: 52, paddingVertical: 10, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+    <View style={{ minHeight: 52, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 17, color: c.ink }}>{label}</Text>
         {sub ? <Text style={{ fontSize: 14, color: c.muted }}>{sub}</Text> : null}
       </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: '#34C759', false: c.fill }} thumbColor="#FFFFFF" />
+      <IosSwitch value={value} onChange={onChange} />
     </View>
+  )
+}
+
+/** 아이폰 모양 스위치 */
+export function IosSwitch({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  const c = useTheme()
+  const v = useRef(new Animated.Value(value ? 1 : 0)).current
+  useEffect(() => { Animated.spring(v, { toValue: value ? 1 : 0, stiffness: 320, damping: 24, mass: 0.7, useNativeDriver: false }).start() }, [value, v])
+  return (
+    <Pressable accessibilityRole="switch" accessibilityState={{ checked: value }} onPress={() => onChange(!value)}>
+      <Animated.View style={{ width: 62, height: 28, borderRadius: 14, backgroundColor: v.interpolate({ inputRange: [0, 1], outputRange: [c.dark ? 'rgb(70,66,62)' : 'rgb(200,198,194)', c.safelight], extrapolate: 'clamp' }) }}>
+        <Animated.View style={{ position: 'absolute', top: 2, left: 2, width: 38, height: 24, borderRadius: 12, backgroundColor: '#fff', boxShadow: '0px 2px 6px rgba(0,0,0,0.15)', transform: [{ translateX: Animated.multiply(v, 20) }] }} />
+      </Animated.View>
+    </Pressable>
   )
 }
 
@@ -168,14 +183,26 @@ export function Chip({ label, active, icon, chevron, onPress, flat: flatProp }: 
   const color = active ? '#fff' : c.ink
   return (
     <Pressable onPress={onPress} style={({ pressed }) => ({
-      height: flat ? 32 : 36, paddingHorizontal: 14, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 5,
+      height: 32, paddingHorizontal: 12, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 5,
       backgroundColor: active ? c.safelight : flat ? c.fill : c.cell, opacity: pressed ? 0.8 : 1,
       boxShadow: flat || active ? undefined : c.shadow,
     })}>
       {icon ? <Icon name={icon} size={16} color={color} /> : null}
-      <Text style={{ color, fontSize: flat ? 14 : 15, fontWeight: '500' }} numberOfLines={1}>{label}</Text>
+      <Text style={{ color, fontSize: flat ? 14 : 15, fontWeight: flat ? '500' : '600' }} numberOfLines={1}>{label}</Text>
       {chevron ? <Icon name="chevDown" size={12} color={color} /> : null}
     </Pressable>
+  )
+}
+
+/** 이름 + × 를 한 알약에 (추천·붙인 태그. 웹 .chip-row) */
+export function TagPill({ label, active, onPress, onRemove, removeLabel }: { label: string; active?: boolean; onPress: () => void; onRemove: () => void; removeLabel: string }) {
+  const c = useTheme()
+  const color = active ? c.safelight : c.ink
+  return (
+    <View style={{ height: 28, borderRadius: 999, flexDirection: 'row', alignItems: 'center', backgroundColor: active ? c.soft : c.fill }}>
+      <Pressable onPress={onPress} style={{ height: 28, justifyContent: 'center', paddingLeft: 12 }}><Text numberOfLines={1} style={{ color, fontSize: 15 }}>{label}</Text></Pressable>
+      <Pressable onPress={onRemove} hitSlop={6} accessibilityLabel={removeLabel} style={{ height: 28, width: 28, alignItems: 'center', justifyContent: 'center' }}><Icon name="close" size={12} color={active ? c.safelight : c.muted} /></Pressable>
+    </View>
   )
 }
 
@@ -183,7 +210,7 @@ export function Chips({ children }: { children: ReactNode }) {
   const inGroup = useContext(InGroup)
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}
-      contentContainerStyle={inGroup ? { gap: 6, paddingHorizontal: 18, paddingBottom: 12 } : { gap: 8, paddingHorizontal: 2, paddingTop: 2, paddingBottom: 4 }}>
+      contentContainerStyle={inGroup ? { gap: 6, paddingHorizontal: 16, paddingBottom: 12 } : { gap: 8, paddingHorizontal: 2, paddingTop: 2, paddingBottom: 4 }}>
       <ChipsFlat.Provider value={inGroup}>{children}</ChipsFlat.Provider>
     </ScrollView>
   )
@@ -191,23 +218,22 @@ export function Chips({ children }: { children: ReactNode }) {
 /** 묶음 안 칩 줄의 칩은 웹 .suggest .chip처럼 낮고 회색 */
 const ChipsFlat = createContext(false)
 
-/** .segmented */
+/** .segmented: 선택 표시가 미끄러진다 */
 export function Segmented<T extends string>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
   const c = useTheme()
+  const index = Math.max(0, options.findIndex(([id]) => id === value))
+  const slide = useRef(new Animated.Value(index)).current
+  const [w, setW] = useState(0)
+  useEffect(() => { Animated.spring(slide, { toValue: index, stiffness: 280, damping: 24, mass: 0.8, useNativeDriver: true }).start() }, [index, slide])
+  const cell = w ? (w - 4) / options.length : 0
   return (
-    <View style={{ flexDirection: 'row', backgroundColor: c.fill, borderRadius: 999, padding: 3 }}>
-      {options.map(([id, name]) => {
-        const on = id === value
-        return (
-          <Pressable key={id} onPress={() => onChange(id)} style={{
-            flex: 1, minWidth: 0, height: 34, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: on ? c.cell : 'transparent',
-            boxShadow: on ? '0px 2px 8px rgba(0,0,0,0.1)' : undefined,
-          }}>
-            <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: on ? '600' : '500', color: c.ink }}>{name}</Text>
-          </Pressable>
-        )
-      })}
+    <View onLayout={(e) => setW(e.nativeEvent.layout.width)} style={{ flexDirection: 'row', backgroundColor: c.fill, borderRadius: 999, padding: 2 }}>
+      {cell ? <Animated.View style={{ position: 'absolute', top: 2, bottom: 2, left: 2, width: cell, borderRadius: 999, backgroundColor: c.cell, boxShadow: '0px 1px 5px rgba(0,0,0,0.08)', transform: [{ translateX: Animated.multiply(slide, cell) }] }} /> : null}
+      {options.map(([id, name]) => (
+        <Pressable key={id} onPress={() => onChange(id)} style={{ flex: 1, minWidth: 0, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+          <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: id === value ? '600' : '500', color: c.ink }}>{name}</Text>
+        </Pressable>
+      ))}
     </View>
   )
 }
@@ -216,7 +242,7 @@ export function Segmented<T extends string>({ value, options, onChange }: { valu
 export function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   const c = useTheme()
   return (
-    <View style={{ height: 44, borderRadius: 22, backgroundColor: c.fill, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 8 }}>
+    <View style={{ height: 38, borderRadius: 12, backgroundColor: c.card, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 6 }}>
       <Icon name="search" size={18} color={c.muted} />
       <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.muted}
         style={{ flex: 1, minWidth: 0, fontSize: 17, color: c.ink, padding: 0 }} returnKeyType="search" />
@@ -232,8 +258,8 @@ export function StatusBadge({ status }: { status: RollStatus }) {
   const c = useTheme()
   const color = c[statusTone[status]]
   return (
-    <View style={{ borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: `${color}26` }}>
-      <Text style={{ color, fontSize: 12, fontWeight: '600' }}>{statusName[status]}</Text>
+    <View style={{ borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: `${color}26` }}>
+      <Text numberOfLines={1} style={{ color, fontSize: 11, fontWeight: '600' }}>{statusName[status]}</Text>
     </View>
   )
 }
@@ -248,9 +274,9 @@ export function Progress({ done, total }: { done: number; total: number }) {
   )
 }
 
-export function Sub({ children, lines }: { children: ReactNode; lines?: number }) {
+export function Sub({ children, lines, small }: { children: ReactNode; lines?: number; small?: boolean }) {
   const c = useTheme()
-  return <Text style={{ fontSize: 14, color: c.muted }} numberOfLines={lines}>{children}</Text>
+  return <Text style={{ fontSize: small ? 12 : 14, color: c.muted }} numberOfLines={lines}>{children}</Text>
 }
 
 /** .empty */
@@ -285,7 +311,7 @@ export function Spinner() {
 export function Card({ children, style }: { children: ReactNode; style?: ViewStyle }) {
   const c = useTheme()
   return (
-    <View style={[{ backgroundColor: c.card, borderRadius: 22, padding: 16, gap: 10, minWidth: 0,
+    <View style={[{ backgroundColor: c.card, borderRadius: 22, padding: 14, gap: 10, minWidth: 0,
       boxShadow: c.shadow }, style]}>
       {children}
     </View>
@@ -293,7 +319,7 @@ export function Card({ children, style }: { children: ReactNode; style?: ViewSty
 }
 
 /** 필름 통 그림 (웹 canister.ts를 미리 그려 둔 것). 목록에 없는 필름은 색 상자. */
-export function Canister({ film, format = '135', size = 48, cover, thumb }: { film?: FilmStock; format?: FilmFormat; size?: number; /** 썸네일처럼 칸 너비에 꽉 채운다 (웹과 같음) */ cover?: boolean; /** 목록 썸네일 [너비, 높이]: 그 칸을 꽉 채운다 */ thumb?: [number, number] }) {
+export function Canister({ film, format = '135', size = 48, cover, fill, thumb }: { film?: FilmStock; format?: FilmFormat; size?: number; /** 썸네일처럼 칸 너비에 꽉 채운다 (웹과 같음) */ cover?: boolean; /** 부모가 정한 칸을 빈틈 없이 채운다 (롤 카드 썸네일) */ fill?: boolean; /** 목록 썸네일 [너비, 높이]: 그 칸을 꽉 채운다 */ thumb?: [number, number] }) {
   const c = useTheme()
   if (!film) return <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}><Icon name="film" size={size * 0.6} color={c.muted} /></View>
   // 목록에 있는 필름은 미리 그려 둔 상자 그림 (웹과 같은 그림), 직접 만든 필름은 웹 그림을 그 자리에서 그린다
@@ -301,9 +327,12 @@ export function Canister({ film, format = '135', size = 48, cover, thumb }: { fi
   const k = pack === 'roll' ? '120' : format === '110' ? '110' : format === 'sheet-45' ? '45' : format === 'sheet-810' ? '810' : pack === 'instant' ? 'inst' : '135'
   const src = canisterShots[`${film.id}-${k}`]
   if (src && thumb) return <Image source={src} resizeMode="cover" style={{ width: thumb[0], height: thumb[1], borderRadius: thumb[0] > 70 ? 10 : 6 }} accessibilityLabel={film.name} />
-  // 칸 너비에 맞춘 틀 안에 꽉 채운다 (그림 크기대로 커져 칸 밖으로 넘치지 않게)
-  if (src && cover) return (
-    <View style={{ alignSelf: 'stretch', aspectRatio: 1.6, borderRadius: 8, overflow: 'hidden' }}>
+  // 칸 너비에 맞춘 틀 안에 꽉 채운다 (그림 크기대로 커져 칸 밖으로 넘치지 않게).
+  // 흰 상자(HP5 등)가 흰 카드에 묻혀 칸보다 작아 보이지 않게 테두리를 둔다.
+  if (src && (cover || fill)) return (
+    <View style={fill
+      ? { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }
+      : { alignSelf: 'stretch', aspectRatio: 1.6, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(0,0,0,0.14)' }}>
       <Image source={src} resizeMode="cover" style={{ width: '100%', height: '100%' }} accessibilityLabel={film.name} />
     </View>
   )
@@ -406,8 +435,8 @@ export function DateInput({ value, onChange, time, min, max }: { value: number; 
     })
   }
   return (
-    <Pressable onPress={open} hitSlop={8} style={{ alignSelf: 'stretch', alignItems: 'flex-end', minHeight: 28, justifyContent: 'center' }}>
-      <Text style={{ fontSize: 17, color: c.ink }}>{text}</Text>
+    <Pressable onPress={open} hitSlop={8} style={{ alignSelf: 'flex-end', minHeight: 34, paddingHorizontal: 12, borderRadius: 999, backgroundColor: c.fill, justifyContent: 'center' }}>
+      <Text numberOfLines={1} style={{ fontSize: 17, color: c.ink }}>{text}</Text>
     </Pressable>
   )
 }
@@ -425,14 +454,14 @@ export function OptionsModal<T extends string>({ title, value, options, onPick, 
 }) {
   const c = useTheme()
   return (
-    <Modal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <FullModal transparent visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <Pressable onPress={onClose} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', padding: 32 }}>
         <View style={{ backgroundColor: c.cell, borderRadius: 22, overflow: 'hidden', maxHeight: '80%' }}>
-          {title ? <Text style={{ fontSize: 15, fontWeight: '600', color: c.muted, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 6 }}>{title}</Text> : null}
+          {title ? <Text style={{ fontSize: 15, fontWeight: '600', color: c.muted, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 6 }}>{title}</Text> : null}
           <ScrollView>
             {options.map(([k, label], i) => (
               <Pressable key={k || '_'} onPress={() => onPick(k)}
-                style={({ pressed }) => ({ minHeight: 52, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 12,
+                style={({ pressed }) => ({ minHeight: 52, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12,
                   backgroundColor: pressed ? c.fill : 'transparent', borderTopWidth: i ? 0.5 : 0, borderTopColor: c.sep })}>
                 <Text style={{ flex: 1, fontSize: 17, color: c.ink }}>{label}</Text>
                 {k === value ? <Icon name="check" size={20} color={c.safelight} /> : null}
@@ -441,6 +470,6 @@ export function OptionsModal<T extends string>({ title, value, options, onPick, 
           </ScrollView>
         </View>
       </Pressable>
-    </Modal>
+    </FullModal>
   )
 }

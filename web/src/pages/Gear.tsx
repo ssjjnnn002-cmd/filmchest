@@ -20,7 +20,7 @@ import { Canister, Confirm, Icon, Sheet } from '../ui/common'
 import { CustomFilmEdit } from './CustomFilmEdit'
 import { FilmPicker } from '../ui/FilmPicker'
 import { PhotoActions } from '../ui/PhotoActions'
-import { TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../ui/gearExtras'
+import { OptionalDate, TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../ui/gearExtras'
 import { searchMatch } from '../core/searchAlias'
 
 export type GearKind = 'lens' | 'filter' | 'film'
@@ -64,12 +64,7 @@ export function PurchaseFields({ date, setDate, price, setPrice, seller, setSell
     <div className="section">
       <h2>구입</h2>
       <div className="group">
-        <div className="field">
-          <label htmlFor="buy-date">구입 날짜</label>
-          <input id="buy-date" type="date" className="input" value={date !== undefined ? new Date(date).toISOString().slice(0, 10) : ''}
-            onChange={(e) => setDate(e.target.value ? new Date(`${e.target.value}T12:00:00`).getTime() : undefined)} />
-          {date !== undefined && <button type="button" className="chip-x" aria-label="구입 날짜 지우기" onClick={() => setDate(undefined)}>×</button>}
-        </div>
+        <OptionalDate label="구입 날짜" value={date} onChange={setDate} />
         <div className="field">
           <label htmlFor="buy-price">구입 금액</label>
           <input id="buy-price" className="input" inputMode="numeric" value={price} onChange={(e) => setPrice(groupPrice(e.target.value))} />

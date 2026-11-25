@@ -305,9 +305,9 @@ export function formatFamily(f: FilmFormat): { sort: string; title: string } {
 }
 
 export const statusName: Record<RollStatus, string> = {
-  loaded: '장착 중',
+  loaded: '촬영 중',
   finished: '촬영 완료',
-  atLab: '스캔 대기',
+  atLab: '현상 맡김',
   imported: '완료',
 }
 

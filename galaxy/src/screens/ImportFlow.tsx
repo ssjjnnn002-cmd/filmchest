@@ -15,7 +15,6 @@ import { exposureText, meterAlignLimit, meterAlignText, meterFrameTitle, meterSh
 import { bytesText, cameraName, fmtDay, rollCameraFormat, rollFilm, rollFilmName, rollTitle } from '../core/display'
 import { Btn, Canister, DateInput, Empty, EmptyText, Field, Footnote, Group, Progress, Row, RowText, Section, Select, Spinner, Sub, Toggle } from '../kit'
 import { Sheet, SheetBtn } from '../overlay'
-import { bytesToB64 } from '../files'
 import type { PickedFile } from '../pick'
 import { importScans, readFiles } from '../scan'
 import { RollRow } from '../RollRow'
@@ -23,12 +22,12 @@ import { RollGalleryButton } from '../GallerySave'
 import { useTheme } from '../theme'
 import { LabField, rememberLab } from './Editors'
 import { features } from '../core/features'
+import { suggestRolls } from '../core/rollMatch'
 import { nameHints, type NameHints } from '../core/nameHints'
 import { ScanStrip } from './ScanStrip'
 
 type Phase = 'analyzing' | 'pick' | 'confirm' | 'saving' | 'done' | 'error'
 
-const thumbUri = (data: Uint8Array, type: string) => `data:${type === 'png' ? 'image/png' : 'image/jpeg'};base64,${bytesToB64(data)}`
 
 export function ImportFlow({ files, rollId, onClose }: { files: PickedFile[]; rollId?: string; onClose: () => void }) {
   const c = useTheme()
@@ -54,15 +53,27 @@ export function ImportFlow({ files, rollId, onClose }: { files: PickedFile[]; ro
       setRoll(pre)
       setPhase(pre ? 'confirm' : 'pick')
       // 안드로이드가 그릴 수 있는 사진만 미리보기 (TIFF 제외)
-      setThumbs(r.primary.files.slice(0, 12).filter((f) => !/^tiff?$/.test(f.type)).map((f) => thumbUri(f.data, f.type)))
+      setThumbs(r.primary.files.slice(0, 12).filter((f) => !/^tiff?$/.test(f.type)).map((f) => f.uri))
     }).catch((e: Error) => { setError(e.message || 'zip 파일을 열 수 없어요.'); setPhase('error') })
   }, [files, rollId])
 
   const sets = scan ? [scan.primary, ...scan.alternatives] : []
   const set = sets[setIndex]
-  const scanner = useMemo(() => (set ? readScanner(set.files[0].data).name : undefined), [set])
+  const scanner = useMemo(() => (set ? readScanner(set.files[0].head).name : undefined), [set])
   const order: Record<string, number> = { atLab: 0, finished: 1, loaded: 2 }
   const candidates = rolls.filter((r) => !r.deletedAt && r.status !== 'imported').sort((a, b) => order[a.status] - order[b.status] || b.loadedAt - a.loadedAt)
+
+  // 파일 이름과 맞을 것 같은 롤 (맨 위에 '추천'으로, 아이폰과 같음)
+  const cameras = useLiveQuery(() => db.cameras.toArray(), []) ?? []
+  const best = useMemo(() => {
+    const ids = suggestRolls([folderName, ...files.map((f) => f.name.split('/').pop() ?? f.name)].filter((n): n is string => !!n).slice(0, 5), hints, candidates.map((r) => ({
+      id: r.id, filmId: r.filmId, model: cameras.find((x) => x.id === r.cameraId)?.model ?? r.cameraModel, places: r.locations.map((l) => l.name), lab: r.lab,
+      from: Math.min(r.loadedAt, ...r.days.map((d) => d.startedAt)), to: r.droppedAt ?? r.finishedAt ?? Date.now(),
+    })))
+    return ids.map((id) => candidates.find((r) => r.id === id)!)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rolls, cameras, hints])
+  const groups = ([['추천', best], ...([['atLab', '현상 맡김'], ['finished', '촬영 완료'], ['loaded', '촬영 중']] as const).map(([st, title]) => [title, candidates.filter((r) => r.status === st && !best.includes(r))] as const)] as const).filter(([, list]) => list.length)
 
   const save = async (meterOffset = 0, reversed = false) => {
     if (!roll || !set) return
@@ -95,16 +106,16 @@ export function ImportFlow({ files, rollId, onClose }: { files: PickedFile[]; ro
       {scan && phase === 'pick' ? (
         <>
           <Summary name={fileName} thumbs={thumbs} count={scan.primary.files.length} scanner={scanner} />
-          <Section title="어느 롤인가요?">
-            <Group>
-              {candidates.length === 0 ? <Row static><Sub>기록해 둔 롤이 없어요. 아래에서 바로 기록할 수 있어요.</Sub></Row> : null}
-              {candidates.map((r) => (
-                <Row key={r.id} onPress={() => { setRoll(r); setPhase('confirm') }}><RollRow roll={r} /></Row>
-              ))}
-            </Group>
-          </Section>
+          {candidates.length > 0 ? <Footnote>어느 롤의 사진인지 골라 주세요.</Footnote> : null}
+          {groups.map(([title, list]) => (
+            <Section key={title} title={title}>
+              <Group>
+                {list.map((r) => <Row key={r.id} onPress={() => { setRoll(r); setPhase('confirm') }}><RollRow roll={r} /></Row>)}
+              </Group>
+            </Section>
+          ))}
           <Group>
-            <Row onPress={() => setQuick(true)}><RowText color={c.safelight}>+ 기록 없이 새 롤로 저장</RowText></Row>
+            <Row onPress={() => setQuick(true)}><RowText color={c.safelight}>+ 새 롤로 저장</RowText></Row>
           </Group>
         </>
       ) : null}
@@ -257,7 +268,7 @@ function ExposureMap({ roll, count, offset, onOffset }: { roll: Roll; count: num
         </Row> : null}
         {matched.map((s) => (
           <Row key={s.pos} static value={exposureText(s)}>
-            <RowText sub={`노출계 ${meterFrameTitle(s.pos, !!roll.meterPrewind)}`}>{s.pos + offset}번 사진</RowText>
+            <RowText sub={`상세 기록 ${meterFrameTitle(s.pos, !!roll.meterPrewind)}`}>{s.pos + offset}번 사진</RowText>
           </Row>
         ))}
       </Group>

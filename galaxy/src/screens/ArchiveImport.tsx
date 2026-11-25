@@ -1,6 +1,6 @@
 // 웹 pages/ArchiveImport.tsx — 예전에 찍어 스캔본을 받아 둔 롤을 롤 보관함에 넣는다. 모르는 정보는 '알 수 없음'.
 import { useEffect, useRef, useState } from 'react'
-import { FlatList, Image, Modal, Pressable, useWindowDimensions, View } from 'react-native'
+import { FlatList, Image, Pressable, useWindowDimensions, View } from 'react-native'
 import { Text } from '../text'
 import { db } from '../data'
 import { useLiveQuery } from '../store'
@@ -11,7 +11,7 @@ import { allFilms, filmDisplayName, filmFromText } from '../core/films'
 import { nameHints } from '../core/nameHints'
 import { isZipFile, previewZip, reversedSet } from '../core/zip'
 import { Btn, DateInput, Empty, EmptyText, Field, Footnote, Group, Progress, Row, RowText, Section, Select, Sub, Toggle } from '../kit'
-import { Sheet, SheetBtn } from '../overlay'
+import { FullModal, Sheet, SheetBtn } from '../overlay'
 import { readBytes } from '../files'
 import { pickFiles, pickFolder, type PickedFile } from '../pick'
 import { importScans, readFiles } from '../scan'
@@ -181,7 +181,7 @@ function PreviewPager({ uris, start, onClose }: { uris: string[]; start: number;
   const { width, height } = useWindowDimensions()
   const [page, setPage] = useState(start)
   return (
-    <Modal visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <FullModal visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: '#000' }}>
         <FlatList data={uris} horizontal pagingEnabled initialScrollIndex={start} keyExtractor={(_, i) => String(i)}
           getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })} showsHorizontalScrollIndicator={false}
@@ -194,6 +194,6 @@ function PreviewPager({ uris, start, onClose }: { uris: string[]; start: number;
           </Pressable>
         </View>
       </View>
-    </Modal>
+    </FullModal>
   )
 }

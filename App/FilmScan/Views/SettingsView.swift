@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var askDevCode = false
     @State private var confirmDevOff = false
     @State private var devCode = ""
+    @State private var showDevRow = false
     @State private var devWrong = false
     @State private var usedBytes: Int64?
     @State private var logoutStep: String?
@@ -114,13 +115,18 @@ struct SettingsView: View {
 
                 Section {
                     NavigationLink("개인정보 처리방침") { PrivacyPolicyView() }
+                    // 개발자 모드는 숨겨 둔다: 앱 버전을 5초 누르면 나타난다. 켜져 있으면 끌 때까지 늘 보인다
                     LabeledContent("앱 버전", value: Self.appVersion)
-                    Button {
-                        if devMode { confirmDevOff = true } else { devCode = ""; askDevCode = true }
-                    } label: {
-                        LabeledContent("개발자 모드", value: devMode ? "켜짐" : "")
+                        .contentShape(Rectangle())
+                        .onLongPressGesture(minimumDuration: 5) { withAnimation { showDevRow = true } }
+                    if devMode || showDevRow {
+                        Button {
+                            if devMode { confirmDevOff = true } else { devCode = ""; askDevCode = true }
+                        } label: {
+                            LabeledContent("개발자 모드", value: devMode ? "켜짐" : "")
+                        }
+                        .foregroundStyle(.primary)
                     }
-                    .foregroundStyle(.primary)
                     if devMode {
                         NavigationLink("노출계 시험") { MeterLabView() }
                     }
@@ -132,7 +138,7 @@ struct SettingsView: View {
                     Button("모든 기록 지우기", role: .destructive) { confirmWipe = true }
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .filmKeyboard()
             .sheet(isPresented: $showPaywall) { PaywallView() }
             .sheet(isPresented: $showLogin, onDismiss: { accountRevision += 1 }) { WelcomeView(loginOnly: true) }

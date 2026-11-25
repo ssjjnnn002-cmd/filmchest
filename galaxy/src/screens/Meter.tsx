@@ -1,6 +1,7 @@
 // 웹 pages/Meter.tsx — 노출계 화면(src/meterHtml.ts, 원본 prototypes/meter/index.html)을 띄우고 기록을 롤에 저장한다
 import { useMemo } from 'react'
-import { Modal, View } from 'react-native'
+import { View } from 'react-native'
+import { FullModal } from '../overlay'
 import { StatusBar } from 'expo-status-bar'
 import { WebView, type WebViewMessageEvent } from 'react-native-webview'
 import { db } from '../data'
@@ -51,7 +52,7 @@ export function Meter({ roll, onClose, onEnd }: { roll: Roll; onClose: () => voi
   }
 
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <FullModal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <StatusBar style="light" />
       <View style={{ flex: 1, backgroundColor: BG }}>
         {html ? (
@@ -60,6 +61,6 @@ export function Meter({ roll, onClose, onEnd }: { roll: Roll; onClose: () => voi
             javaScriptEnabled domStorageEnabled overScrollMode="never" style={{ flex: 1, backgroundColor: BG }} />
         ) : null}
       </View>
-    </Modal>
+    </FullModal>
   )
 }

@@ -1,22 +1,20 @@
 // 웹 ImportFlow ScanStrip: 가져올 사진 전체를 번호와 함께 훑어본다. 누르면 크게.
-import { useMemo, useState } from 'react'
-import { FlatList, Image, Modal, Pressable, View } from 'react-native'
+import { useState } from 'react'
+import { FlatList, Image, Pressable, View } from 'react-native'
+import { FullModal } from '../overlay'
 import { Text } from '../text'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { bytesToB64 } from '../files'
 import { Btn } from '../kit'
 import { useTheme } from '../theme'
 
-type ScanFile = { name: string; data: Uint8Array; type: string }
+type ScanFile = { name: string; uri: string; type: string }
 const viewable = (t: string) => /^(jpe?g|png|webp|heic|heif)$/.test(t)
 
 export function ScanStrip({ files }: { files: ScanFile[] }) {
   const c = useTheme()
   const insets = useSafeAreaInsets()
   const [open, setOpen] = useState<number | null>(null)
-  const uri = (i: number) => (viewable(files[i].type) ? `data:image/${files[i].type === 'png' ? 'png' : 'jpeg'};base64,${bytesToB64(files[i].data)}` : '')
-  const cache = useMemo(() => new Map<number, string>(), [files])
-  const get = (i: number) => { if (!cache.has(i)) cache.set(i, uri(i)); return cache.get(i)! }
+  const get = (i: number) => (viewable(files[i].type) ? files[i].uri : '')
   return (
     <>
       <FlatList horizontal data={files} keyExtractor={(_, i) => String(i)} initialNumToRender={6} windowSize={5} showsHorizontalScrollIndicator={false}
@@ -30,7 +28,7 @@ export function ScanStrip({ files }: { files: ScanFile[] }) {
           </Pressable>
         )} />
       {open !== null ? (
-        <Modal visible animationType="fade" onRequestClose={() => setOpen(null)} statusBarTranslucent>
+        <FullModal visible animationType="fade" onRequestClose={() => setOpen(null)} statusBarTranslucent>
           <View style={{ flex: 1, backgroundColor: '#000', paddingTop: insets.top + 10, paddingBottom: insets.bottom + 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 }}>
               <Btn label="닫기" kind="ghost" onPress={() => setOpen(null)} />
@@ -47,7 +45,7 @@ export function ScanStrip({ files }: { files: ScanFile[] }) {
               <Btn label="다음" kind="ghost" disabled={open === files.length - 1} onPress={() => setOpen(open + 1)} />
             </View>
           </View>
-        </Modal>
+        </FullModal>
       ) : null}
     </>
   )

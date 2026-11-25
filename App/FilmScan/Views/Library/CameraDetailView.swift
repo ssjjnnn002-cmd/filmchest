@@ -119,7 +119,8 @@ struct CameraDetailView: View {
                                     }
                                 }
                                 Spacer()
-                                Text("\((lens.rolls ?? []).count)롤").foregroundStyle(.secondary)
+                                // 중간에 바꿔 낀 롤도 센다 (웹·갤럭시와 같음)
+                                Text("\(lensRollCount(lens))롤").foregroundStyle(.secondary)
                             }
                         }
                         .buttonStyle(.plain)
@@ -186,6 +187,12 @@ struct CameraDetailView: View {
         if let mount = camera.mount?.nilIfBlank { parts.append("\(mount) 마운트") }
         if let lens = camera.fixedLensName?.nilIfBlank { parts.append(lens) }
         return parts.joined(separator: " · ")
+    }
+
+    private func lensRollCount(_ lens: LensItem) -> Int {
+        (camera.rolls ?? []).filter { r in
+            r.deletedAt == nil && (r.lens?.id == lens.id || r.lensChanges.contains { $0.lensID == lens.id })
+        }.count
     }
 
     private var filmStats: [(name: String, count: Int)] {
@@ -295,10 +302,10 @@ struct LensEditView: View {
                                 placeholder: AnyView(DummyLens3DView(brand: lensBrand, model: model, mount: currentMount, angle: $angle)))
                 Section(mountEditable ? "렌즈" : "렌즈 · \(mount)") {
                     if mountEditable {
-                        TextField("마운트", text: $mountText)
+                        LabeledField("마운트", text: $mountText)
                     }
-                    TextField("제조사", text: $lensBrand)
-                    TextField("렌즈", text: $model)
+                    LabeledField("제조사", text: $lensBrand)
+                    LabeledField("렌즈", text: $model)
                     LensSuggestions(mount: currentMount, text: $model, onPick: applyOptics)
                 }
                 TagField(tags: $tags)
@@ -325,7 +332,7 @@ struct LensEditView: View {
                     }
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .navigationTitle(lens == nil ? "렌즈 추가" : "렌즈 수정")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }

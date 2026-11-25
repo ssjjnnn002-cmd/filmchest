@@ -45,14 +45,9 @@ struct WelcomeView: View {
                         if let step {
                             HStack { Text(step).bold(); Spacer(); ProgressView() }
                         } else {
-                            Button { start() } label: {
-                                LabeledContent("처음이에요") { Text("구글로 시작하기").bold() }
-                            }
-                            .tint(Theme.safelight)
-                            Button { start() } label: {
-                                LabeledContent("계정이 있어요") { Text("구글로 로그인하기").bold() }
-                            }
-                            .tint(Theme.safelight)
+                            // 처음이든 쓰던 계정이든 같은 로그인 (드라이브에 기록이 있으면 받아 온다)
+                            Button { start() } label: { Text("구글로 시작하기").bold() }
+                                .tint(Theme.safelight)
                         }
                         if !loginOnly {
                             Button("로그인 없이 쓰기") {
@@ -82,6 +77,8 @@ struct WelcomeView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.paper)
             .navigationTitle(loginOnly ? "구글로 로그인" : "필름함 시작하기")
             .toolbar {
                 if loginOnly {

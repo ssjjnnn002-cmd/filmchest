@@ -1,3 +1,4 @@
+import { pushOverlay } from '../backStack'
 import { boxPalette } from '../core/filmBox'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -144,7 +145,7 @@ function Recorder({ roll, camera, allLenses, onClose }: {
   // 이어서: 마지막에 찍은 컷의 렌즈·필터·다이얼 값에서 다시 시작
   const last = useMemo(() => [...(roll.meterShots ?? [])].sort((a, b) => b.order - a.order)[0], [])
   const [lens, setLens] = useState<Lens>(() =>
-    (last?.lensId ? setup.lensById(last.lensId) : undefined) ?? setup.lensById(lensIdAt(roll, shots.length + 1) ?? roll.lensId) ?? GENERIC)
+    (last?.lensId ? setup.lensById(last.lensId) : undefined) ?? setup.lensById(lensIdAt(roll, Math.max(0, ...shots.map((s) => s.pos)) + 1) ?? roll.lensId) ?? GENERIC)
   const [dial, setDial] = useState<Dial>(() => {
     const base = setup.baseDial(lens)
     return last ? dialOf.fromShot(last, base, base.aps) : base
@@ -627,6 +628,9 @@ function ShotEdit({ shot, like, lenses, current, box, onClose, onSave, onDelete 
   const [memo, setMemo] = useState(shot.memo ?? '')
   const [sheet, setSheet] = useState<'place' | 'time' | 'filter' | 'lens' | 'iso'>()
   const [camIso, setCamIso] = useState(shot.iso ?? box)
+  const closing = useRef(onClose)
+  closing.current = onClose
+  useEffect(() => pushOverlay(() => closing.current()), [])
   const [ask, setAsk] = useState(false)
   const [note, setNote] = useState<string>()
   const save = () => {
@@ -690,10 +694,11 @@ function ShotEdit({ shot, like, lenses, current, box, onClose, onSave, onDelete 
 }
 
 /** 롤 화면에서 여는 컷 고치기 (상세 기록과 같은 화면) */
-export function RollShotEdit({ roll, pos, onClose, onToast }: { roll: Roll; pos: number; onClose: () => void; onToast: (t: string) => void }) {
+export function RollShotEdit({ roll, pos, create, onClose, onToast }: { roll: Roll; pos: number; /** 기록이 없는 컷이면 새로 */ create?: boolean; onClose: () => void; onToast: (t: string) => void }) {
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
   const allLenses = useLiveQuery(() => db.lenses.toArray(), [])
-  const shot = roll.meterShots?.find((s) => s.pos === pos)
+  const found = roll.meterShots?.find((s) => s.pos === pos)
+  const shot: MeterShot | undefined = found ?? (create ? { pos, order: (roll.meterShots?.length ?? 0) + 1, mode: 'M', aperture: null, shutter: null, comp: 0, flash: false, ev: 0, focal: null, at: null, edited: true } : undefined)
   if ((camera === undefined && roll.cameraId) || !allLenses || !shot) return null
   const setup = setupOf(roll, camera ?? undefined, allLenses)
   const current = setup.lensById(shot.lensId ?? lensIdAt(roll, pos) ?? roll.lensId) ?? GENERIC
@@ -701,7 +706,7 @@ export function RollShotEdit({ roll, pos, onClose, onToast }: { roll: Roll; pos:
   return (
     <ShotEdit shot={shot} like={setup.baseDial(current)} lenses={setup.lensList.length ? setup.lensList : [current]} current={current} iso={setup.iso} box={setup.film?.iso ?? setup.iso}
       onClose={onClose}
-      onSave={(s) => { void save((roll.meterShots ?? []).map((x) => (x.pos === s.pos ? { ...s, edited: true } : x))); onClose(); onToast(`${s.pos}번을 고쳤어요`) }}
+      onSave={(s) => { void save(found ? (roll.meterShots ?? []).map((x) => (x.pos === s.pos ? { ...s, edited: true } : x)) : [...(roll.meterShots ?? []), { ...s, edited: true }]); onClose(); onToast(`${s.pos}번을 고쳤어요`) }}
       onDelete={() => { void save((roll.meterShots ?? []).filter((x) => x.pos !== pos)); onClose(); onToast(`${pos}번 기록을 지웠어요`) }} />
   )
 }

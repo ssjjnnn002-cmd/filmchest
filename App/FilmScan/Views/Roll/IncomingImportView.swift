@@ -44,7 +44,7 @@ struct IncomingImportView: View {
 
                 Section {
                     Button { step = zips.count > 1 ? .multi : .pending } label: {
-                        choiceRow("스캔 대기 중인 롤에 넣기",
+                        choiceRow("기록해 둔 롤에 넣기",
                                   waiting.isEmpty ? "현상 맡긴 롤이 없으면 새 롤로 만들 수 있어요"
                                   : zips.count > 1 ? "파일마다 롤을 골라 한 번에 가져와요" : "현상 맡긴 롤 중에서 골라요")
                     }
@@ -176,7 +176,7 @@ struct MultiRollImportView: View {
                 }
                 if rolls.isEmpty {
                     Section {
-                        Text("스캔 대기 중인 롤이 없어요. 하나씩 가져오면 새 롤로 만들 수 있어요.")
+                        Text("기록해 둔 롤이 없어요. 하나씩 가져오면 새 롤로 만들 수 있어요.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }

@@ -199,7 +199,7 @@ function BarChart({ bars, selected, onPick }: { bars: Bucket[]; selected?: strin
         })}
       </div>
       <div className="month-labels" style={{ gridTemplateColumns: `repeat(${bars.length}, 1fr)` }}>
-        {bars.map((m, i) => <span key={m.key}>{(bars.length - 1 - i) % every === 0 ? m.label : ''}</span>)}
+        {bars.map((m, i) => <span key={m.key}>{i % every === 0 ? m.label : ''}</span>)}
       </div>
     </div>
   )

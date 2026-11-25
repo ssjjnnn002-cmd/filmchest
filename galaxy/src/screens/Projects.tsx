@@ -61,7 +61,8 @@ export function ProjectStrip({ rolls }: { rolls: Roll[] }) {
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -16 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 16, paddingVertical: 2 }}>
         {active.map((p) => (
-          <Pressable key={p.id} onPress={() => setOpened(p.id)} style={({ pressed }) => ({ width: 128, height: 92, borderRadius: 16, backgroundColor: c.card, padding: 12, justifyContent: 'space-between', transform: [{ scale: pressed ? 0.97 : 1 }] })}>
+          <Pressable key={p.id} onPress={() => setOpened(p.id)} style={({ pressed }) => ({ width: 130, height: 92, borderRadius: 16, backgroundColor: c.card, padding: 12, justifyContent: 'space-between', transform: [{ scale: pressed ? 0.97 : 1 }] })}>
+            <View style={{ position: 'absolute', top: 12, right: 12, width: 8, height: 8, borderRadius: 4, backgroundColor: colorOf(p) }} />
             <Folder color={colorOf(p)} />
             <View>
               <Text numberOfLines={1} style={{ fontSize: 15, fontWeight: '700', color: c.ink }}>{p.name}</Text>
@@ -69,16 +70,16 @@ export function ProjectStrip({ rolls }: { rolls: Roll[] }) {
             </View>
           </Pressable>
         ))}
-        <Pressable onPress={() => setEditing('new')} style={({ pressed }) => ({ width: 128, height: 92, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: `${c.safelight}73`,
+        <Pressable onPress={() => setEditing('new')} style={({ pressed }) => ({ width: 110, height: 92, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: `${c.safelight}73`,
           alignItems: 'center', justifyContent: 'center', gap: 6, transform: [{ scale: pressed ? 0.97 : 1 }] })}>
-          <Icon name="plus" size={22} color={c.safelight} />
-          <Text style={{ fontSize: 13, fontWeight: '700', color: c.safelight }}>새 프로젝트</Text>
+          <Icon name="folderPlus" size={22} color={c.safelight} />
+          <Text style={{ fontSize: 12, fontWeight: '600', color: c.safelight }}>새 프로젝트</Text>
         </Pressable>
       </ScrollView>
       {editing ? <ProjectEdit project={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} /> : null}
       {opened ? <ProjectDetail id={opened} onClose={() => setOpened(null)} /> : null}
       {archivedOpen ? (
-        <Sheet title="보관된 프로젝트" onClose={() => setArchivedOpen(false)}>
+        <Sheet push page title="보관된 프로젝트" onClose={() => setArchivedOpen(false)}>
           <Group>
             {archived.map((p) => (
               <Row key={p.id} chev onPress={() => { setArchivedOpen(false); setOpened(p.id) }}>
@@ -146,7 +147,7 @@ function ProjectDetail({ id, onClose }: { id: string; onClose: () => void }) {
   if (!project) return null
   const mine = rolls.filter((r) => kept(r) && project.rollIds.includes(r.id)).sort((a, b) => rollStart(b) - rollStart(a))
   return (
-    <Sheet title={project.name} onClose={onClose} right={<SheetBtn label="수정" accent onPress={() => setEditing(true)} />}>
+    <Sheet push page title={project.name} onClose={onClose} right={<SheetBtn label="수정" accent onPress={() => setEditing(true)} />}>
       <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', paddingTop: 4, paddingHorizontal: 4, paddingBottom: 14 }}>
         <Folder color={colorOf(project)} size={44} />
         <View style={{ flex: 1 }}>
@@ -195,7 +196,6 @@ export function RollProjects({ roll }: { roll: Roll }) {
   const c = useTheme()
   const projects = useLiveQuery(() => db.projects.orderBy('createdAt').reverse().toArray(), []) ?? []
   const [picking, setPicking] = useState(false)
-  const [creating, setCreating] = useState(false)
   const mine = projects.filter((p) => p.rollIds.includes(roll.id))
   return (
     <Section title="프로젝트">
@@ -212,8 +212,19 @@ export function RollProjects({ roll }: { roll: Roll }) {
         ) : null}
         <Row onPress={() => setPicking(true)}><Icon name="plus" size={20} color={c.safelight} /><RowText color={c.safelight}>{mine.length ? '프로젝트 바꾸기' : '프로젝트에 담기'}</RowText></Row>
       </Group>
-      {picking ? (
-        <Sheet title="프로젝트에 담기" onClose={() => setPicking(false)} left={null} right={<SheetBtn label="완료" accent onPress={() => setPicking(false)} />}>
+      {picking ? <RollProjectsPicker roll={roll} onClose={() => setPicking(false)} /> : null}
+    </Section>
+  )
+}
+
+/** 그 롤을 담을 프로젝트 고르기 (롤 화면·목록의 길게 누르기 메뉴) */
+export function RollProjectsPicker({ roll, onClose }: { roll: Roll; onClose: () => void }) {
+  const c = useTheme()
+  const projects = useLiveQuery(() => db.projects.orderBy('createdAt').reverse().toArray(), []) ?? []
+  const [creating, setCreating] = useState(false)
+  return (
+    <>
+        <Sheet title="프로젝트에 담기" onClose={onClose} left={null} right={<SheetBtn label="완료" accent onPress={onClose} />}>
           <Group>
             {projects.map((p) => (
               <Row key={p.id} onPress={() => setInProject(p.id, roll.id)}>
@@ -225,8 +236,7 @@ export function RollProjects({ roll }: { roll: Roll }) {
             <Row onPress={() => setCreating(true)}><Icon name="plus" size={20} color={c.safelight} /><RowText color={c.safelight}>새 프로젝트</RowText></Row>
           </Group>
         </Sheet>
-      ) : null}
       {creating ? <ProjectEdit onClose={() => setCreating(false)} onSaved={(p) => setInProject(p.id, roll.id, true)} /> : null}
-    </Section>
+    </>
   )
 }

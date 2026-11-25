@@ -15,7 +15,8 @@ import { SwipeRow } from '../SwipeRow'
 import { Confirm, Menu, measureAnchor, type MenuAnchor } from '../overlay'
 import { useRollInGallery } from '../GallerySave'
 import { deleteRollFromGallery } from '../gallery'
-import { ProjectStrip } from './Projects'
+import { ProjectStrip, RollProjectsPicker } from './Projects'
+import { PressMenu } from '../PressMenu'
 import { searchMatch } from '../core/searchAlias'
 
 type Period = 'month' | 'quarter' | 'half' | 'year'
@@ -31,8 +32,8 @@ type Mode = 'gallery' | 'list'
 const modeName: Record<Mode, string> = { gallery: '갤러리 보기', list: '목록 보기' }
 const modeIcon: Record<Mode, string> = { gallery: 'grid', list: 'list' }
 type StatusTab = 'all' | 'loaded' | 'waiting' | 'done'
-const statusTabName: Record<StatusTab, string> = { all: '전체', loaded: '장착 중', waiting: '스캔 대기', done: '완료' }
-/** 스캔 대기: 다 찍은 롤과 현상 맡긴 롤 (웹·아이폰과 같음) */
+const statusTabName: Record<StatusTab, string> = { all: '전체', loaded: '촬영 중', waiting: '현상 스캔', done: '완료' }
+/** 현상 스캔(탭과 같은 이름): 다 찍은 롤과 현상 맡긴 롤 (웹·아이폰과 같음) */
 const inTab = (t: StatusTab, s: RollStatus) => t === 'all' || (t === 'loaded' && s === 'loaded') || (t === 'waiting' && (s === 'finished' || s === 'atLab')) || (t === 'done' && s === 'imported')
 
 function periodKey(g: Period, ms: number) {
@@ -144,6 +145,12 @@ export function Rolls() {
   }, [filtered, groupBy, period, sort, ascending, projects, cameras])
 
   const archiveChoice = useArchiveChoice()
+  const [filing, setFiling] = useState<Roll>()
+  const pressItems = (r: Roll) => [
+    { label: r.favorite ? '즐겨찾기 해제' : '즐겨찾기', icon: 'star', onPress: () => void db.rolls.update(r.id, { favorite: !r.favorite }) },
+    { label: '프로젝트에 담기', icon: 'folderPlus', onPress: () => setFiling(r) },
+    { label: '삭제', icon: 'trash', danger: true, onPress: () => setDeleting(r.id) },
+  ]
   return (
     <Page title="롤 보관함"
       left={<SettingsButton />}
@@ -171,12 +178,12 @@ export function Rolls() {
 
       <View style={{ gap: 10 }}>
         <SearchBox placeholder="필름, 카메라, 장소, 메모, #태그" value={search} onChange={setSearch} />
-        <Segmented value={tab} options={(Object.keys(statusTabName) as StatusTab[]).map((t) => [t, statusTabName[t]])} onChange={setTab} />
-        <Chips>
+        {rolls && rolls.length > 0 ? <Segmented value={tab} options={(Object.keys(statusTabName) as StatusTab[]).map((t) => [t, statusTabName[t]])} onChange={setTab} /> : null}
+        {rolls && rolls.length > 0 ? <Chips>
           <View ref={sortRef} collapsable={false}><Chip label={`${sortName[sort]} ${ascending ? '↑' : '↓'}`} icon="sort" chevron onPress={() => void openAt('sort', sortRef)} /></View>
-          <View ref={groupRef} collapsable={false}><Chip label={groupBy === 'period' ? periodGroupName[period] : groupByShort[groupBy]} icon="group" chevron onPress={() => void openAt('group', groupRef)} /></View>
+          <View ref={groupRef} collapsable={false}><Chip label={groupBy === 'period' ? periodGroupName[period] : groupByShort[groupBy]} icon="layers" chevron onPress={() => void openAt('group', groupRef)} /></View>
           <Chip label="즐겨찾기" icon="star" active={favoritesOnly} onPress={() => setFavoritesOnly(!favoritesOnly)} />
-        </Chips>
+        </Chips> : null}
       </View>
 
       {rolls?.length === 0 ? <Empty icon="stack" title="아직 롤이 없어요" /> : null}
@@ -190,23 +197,24 @@ export function Rolls() {
             <View onLayout={(e) => setGridW(e.nativeEvent.layout.width)} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
               {g.rolls.map((r) => (
                 <View key={r.id} style={{ width: gridW ? (gridW - 10) / 2 : '47%' }}>
-                  <RollCard roll={r} onPress={() => nav.push({ type: 'roll', id: r.id })} />
+                  <PressMenu items={pressItems(r)}>{(hold) => <RollCard roll={r} onPress={() => nav.push({ type: 'roll', id: r.id })} onLongPress={hold} />}</PressMenu>
                 </View>
               ))}
             </View>
           ) : (
             // 구분선 없이 촘촘하게 (웹과 같음)
-            <Group plain style={{ paddingVertical: 12 }}>
+            <Group plain style={{ paddingVertical: 9 }}>
               {g.rolls.map((r) => (
                 // 왼쪽→오른쪽 밀면 즐겨찾기, 오른쪽→왼쪽 밀면 삭제 (웹·아이폰과 같음)
                 <SwipeRow key={r.id} favorite={!!r.favorite} onFavorite={() => void db.rolls.update(r.id, { favorite: !r.favorite })} onDelete={() => setDeleting(r.id)}>
-                  <Row chev onPress={() => nav.push({ type: 'roll', id: r.id })} style={{ minHeight: 0, paddingVertical: 5, paddingLeft: 14 }}><RollRow roll={r} /></Row>
+                  <PressMenu items={pressItems(r)}>{(hold) => <Row chev onPress={() => nav.push({ type: 'roll', id: r.id })} onLongPress={hold} style={{ minHeight: 0, paddingVertical: 5, paddingLeft: 14 }}><RollRow roll={r} /></Row>}</PressMenu>
                 </SwipeRow>
               ))}
             </Group>
           )}
         </Section>
       ))}
+      {filing ? <RollProjectsPicker roll={filing} onClose={() => setFiling(undefined)} /> : null}
       {deleting ? (
         <Confirm message="이 롤 기록을 삭제할까요? 24시간 안에는 설정에서 되돌릴 수 있어요. '기록만 삭제'는 갤러리 사진을 남겨요." onCancel={() => setDeleting(undefined)}
           action={inGallery ? '기록만 삭제' : '삭제'}

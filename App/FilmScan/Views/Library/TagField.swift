@@ -82,8 +82,10 @@ struct TagField: View {
                                 } label: { Image(systemName: "xmark").font(.caption2.weight(.bold)) }
                                 .accessibilityLabel("\(t) 추천 지우기")
                             }
+                            // 추천은 회색 (이미 붙인 태그와 헷갈리지 않게, 웹·갤럭시와 같음)
                             .buttonStyle(.bordered)
                             .controlSize(.small)
+                            .tint(.secondary)
                         }
                     }
                 }

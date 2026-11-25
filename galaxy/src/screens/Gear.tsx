@@ -16,7 +16,7 @@ import { FILTER_KIND, expiredSince, formatInfo, kindOf, priceText, priceValue, u
 import { groupSections, lotKey, sortLots, type FilmLotSort, type GearGroup } from '../core/gearGroup'
 import { FilmPicker } from '../FilmPickGrid'
 import { deleteCameraPhoto, readBytes, saveCameraPhoto, useCameraPhoto, usePhotoIsCutout } from '../files'
-import { Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Footnote, Group, LensPicture, Row, Section, Segmented, Select, Sub } from '../kit'
+import { TagPill, Btn, Canister, Chip, Chips, Empty, EmptyText, Field, Footnote, Group, LensPicture, Row, Section, Segmented, Select, Sub } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { getPref, useLiveQuery } from '../store'
 import { forgetSuggestion, hiddenSet, rememberSuggestion } from '../suggest'
@@ -84,12 +84,7 @@ export function PurchaseFields({ date, setDate, price, setPrice, seller, setSell
         <Field label="구입 금액" value={price} onChangeText={(v) => setPrice(groupPrice(v))} keyboardType="number-pad" />
         <Field label="구입처" value={seller} onChangeText={setSeller} />
         {hits.length > 0 && <Chips>{hits.map((name) => (
-          <View key={name} style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Chip label={name} flat onPress={() => setSeller(name)} />
-            <Pressable onPress={() => { forgetSuggestion('knownSellers', name); setRev((n) => n + 1) }} hitSlop={8} accessibilityLabel={`${name} 추천 지우기`}>
-              <Text style={{ fontSize: 16, fontWeight: '700', marginLeft: -6, marginRight: 4 }}>×</Text>
-            </Pressable>
-          </View>
+          <TagPill key={name} label={name} removeLabel={`${name} 추천 지우기`} onPress={() => setSeller(name)} onRemove={() => { forgetSuggestion('knownSellers', name); setRev((n) => n + 1) }} />
         ))}</Chips>}
       </Group>
     </Section>

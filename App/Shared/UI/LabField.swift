@@ -42,7 +42,7 @@ struct LabField: View {
     }
 
     var body: some View {
-        TextField("현상소", text: $lab)
+        LabeledField("현상소", text: $lab)
         if !labs.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 // 추천 칩을 스치면 키보드가 내려가지 않게

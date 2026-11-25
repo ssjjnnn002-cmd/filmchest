@@ -131,7 +131,7 @@ struct DayEditView: View {
                     }
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .navigationTitle(day == nil ? "촬영일 추가" : "촬영일 수정")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -221,7 +221,7 @@ struct PlaceEditView: View {
                     }
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .filmKeyboard()
             .navigationTitle(segment == nil ? "장소 추가" : "장소 수정")
             #if os(iOS)
@@ -300,7 +300,7 @@ struct LabDropOffView: View {
                     DatePicker("맡긴 날", selection: $date, displayedComponents: .date)
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .filmKeyboard()
             .navigationTitle("현상소 고르기")
             .toolbar {

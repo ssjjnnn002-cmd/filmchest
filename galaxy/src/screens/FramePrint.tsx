@@ -1,6 +1,6 @@
 // 웹 pages/FramePrint.tsx — 스캔 한 장을 프레임으로 저장한다 (그림은 웹 framePrint.ts)
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, View } from 'react-native'
+import { ActivityIndicator, Image, Pressable, ScrollView, View } from 'react-native'
 import { Text } from '../text'
 import { TextInput } from '../textInput'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -14,7 +14,7 @@ import { exposureLine } from '../core/frameCaption'
 import { frameAspects, frameCaptionStyles } from '../core/framePrint'
 import { cameraName, fmtDay, rollFilm, rollFilmName, rollTitle, sortedDays } from '../core/display'
 import { Btn, Chip, Chips, Segmented } from '../kit'
-import { OverlayBoundary, Sheet, SheetBtn } from '../overlay'
+import { FullModal, OverlayBoundary, Sheet, SheetBtn } from '../overlay'
 import { b64ToBytes, bytesToB64, readBytes, writeBytes } from '../files'
 import { saveFileNow } from '../platform'
 import { saveImagesToGallery } from '../gallery'
@@ -87,7 +87,7 @@ export function FramePrint({ roll, frames, onClose }: { roll: Roll; frames: Fram
   const meta: [keyof Show, string][] = [['camera', '카메라'], ['lens', '렌즈'], ['film', '필름'], ['filter', '필터'], ['date', '날짜'], ['photographer', '찍은 사람'], ['exposure', '노출']]
 
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <FullModal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <OverlayBoundary>
         <View style={{ flex: 1, backgroundColor: c.paper, paddingTop: insets.top + 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 6 }}>
@@ -136,6 +136,6 @@ export function FramePrint({ roll, frames, onClose }: { roll: Roll; frames: Fram
           ) : null}
         </View>
       </OverlayBoundary>
-    </Modal>
+    </FullModal>
   )
 }

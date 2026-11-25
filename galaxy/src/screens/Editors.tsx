@@ -1,6 +1,6 @@
 // 웹 pages/Editors.tsx
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Image, Keyboard, Modal, Pressable, ScrollView, View } from 'react-native'
+import { ActivityIndicator, Image, Keyboard, Pressable, ScrollView, View } from 'react-native'
 import { Text } from '../text'
 import { TextInput } from '../textInput'
 import { WebView } from 'react-native-webview'
@@ -13,9 +13,9 @@ import { buildTimeline } from '../core/timeline'
 import { resolvedDays, setDays, setPlace, span } from '../core/rangeEdit'
 import { formatInfo, uid } from '../core/types'
 import { rollCameraFormat, sortedLocations } from '../core/display'
-import { Btn, Chip, DateInput, Field, Group, Row, RowText, Section, Spinner, Sub, Toggle } from '../kit'
+import { TagPill, Btn, Chip, DateInput, Field, Group, Row, RowText, Section, Spinner, Sub, Toggle } from '../kit'
 import { Icon } from '../icons'
-import { Confirm, Sheet, SheetBtn } from '../overlay'
+import { FullModal, Confirm, Sheet, SheetBtn } from '../overlay'
 import { currentPlace, locationAvailable, parseCoordinates, placeSearchAvailable, searchPlaces, type Place, weatherAt } from '../platform'
 import { useTheme } from '../theme'
 import { features } from '../core/features'
@@ -299,12 +299,7 @@ export function LabField({ value, onChange }: { value: string; onChange: (v: str
       {labs.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={{ gap: 6, paddingHorizontal: 18, paddingBottom: 12 }}>
           {labs.map((l) => (
-            <View key={l} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Chip label={l} flat active={l === value} onPress={() => onChange(l)} />
-              <Pressable onPress={() => { forgetSuggestion('labs', l); setRev((n) => n + 1) }} hitSlop={8} accessibilityLabel={`${l} 추천 지우기`}>
-                <Text style={{ fontSize: 16, fontWeight: '700', marginLeft: -6 }}>×</Text>
-              </Pressable>
-            </View>
+            <TagPill key={l} label={l} active={l === value} removeLabel={`${l} 추천 지우기`} onPress={() => onChange(l)} onRemove={() => { forgetSuggestion('labs', l); setRev((n) => n + 1) }} />
           ))}
         </ScrollView>
       ) : null}
@@ -426,7 +421,7 @@ function NearbyLabs({ onPick, onClose }: { onPick: (name: string) => void; onClo
   // WebView 안 위치는 앱 위치 권한을 먼저 받아야 쓸 수 있다
   useEffect(() => { Location.requestForegroundPermissionsAsync().finally(() => setReady(true)) }, [])
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <FullModal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: '#0b0b0c' }}>
         {ready ? (
           <WebView source={{ uri: 'https://filmchest.pages.dev/labs.html' }} geolocationEnabled originWhitelist={['*']}
@@ -440,7 +435,7 @@ function NearbyLabs({ onPick, onClose }: { onPick: (name: string) => void; onClo
             }} />
         ) : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#fff" /></View>}
       </View>
-    </Modal>
+    </FullModal>
   )
 }
 

@@ -14,7 +14,7 @@ struct FilmStripView: View {
         let rebate = roll.format.is120 ? 10.0 : frameHeight * 5.5 / 24
 
         ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: frameWidth * 0.055) {
+            LazyHStack(spacing: 0) {
                 ForEach(frames) { frame in
                     Button { onSelect(frame) } label: {
                         VStack(spacing: 0) {
@@ -33,14 +33,14 @@ struct FilmStripView: View {
                                 }
                             edge(top: false, frame: frame, width: frameWidth, rebate: rebate)
                         }
+                        .padding(.horizontal, frameWidth * 0.0275)
+                        .background(Theme.filmBase)
+                        // 컷마다 바탕과 함께 묶어야 구멍이 뚫린다
+                        .compositingGroup()
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 12)
-            .background(Theme.filmBase)
-            // 퍼포레이션 구멍을 뚫는다 (뒤 배경이 비쳐 보이게)
-            .compositingGroup()
         }
         .frame(height: frameHeight + rebate * 2)
     }

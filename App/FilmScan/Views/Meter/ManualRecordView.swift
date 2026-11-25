@@ -134,9 +134,9 @@ struct ManualRecordView: View {
                     .background(Color.meterPanel, in: Circle())
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text(m.gear.cameraName).font(.system(size: 17, weight: .bold)).lineLimit(1)
+                Text(m.gear.cameraName).font(.system(size: 17, weight: .bold)).lineLimit(1).minimumScaleFactor(0.75)
                 if let film = m.gear.film {
-                    Text("\(film.displayName) · \(m.gear.frames)컷").font(.system(size: 12)).foregroundStyle(Color.meterSub).lineLimit(1)
+                    Text("\(film.displayName) · \(m.gear.frames)컷").font(.system(size: 12)).foregroundStyle(Color.meterSub).lineLimit(1).minimumScaleFactor(0.8)
                 }
             }
             Spacer(minLength: 4)
@@ -813,7 +813,14 @@ struct ShotDialEditor: View {
 struct RollShotDialEditor: View {
     let roll: RollItem
     let pos: Int
+    /// 기록이 없는 컷이면 새로 (사진 보기의 '촬영 정보 추가')
+    var create = false
     @Query private var lenses: [LensItem]
+
+    private var shot: MeterShot? {
+        roll.meterShots.first { $0.pos == pos }
+            ?? (create ? MeterShot(pos: pos, order: (roll.meterShots.map(\.order).max() ?? 0) + 1, mode: "M", edited: true) : nil)
+    }
 
     var body: some View {
         var gear = MeterGear.from(roll: roll, lenses: lenses)
@@ -821,12 +828,16 @@ struct RollShotDialEditor: View {
         if let iso = roll.shotISO { gear.iso = Double(iso) }
         let model = MeterModel(gear: gear, shots: roll.meterShots, rollPrewind: roll.meterPrewind ?? false)
         return Group {
-            if let shot = roll.meterShots.first(where: { $0.pos == pos }) {
+            if let shot {
                 ShotDialEditor(shot: shot, like: ManualRecordView.baseDial(gear, model: model),
                                lenses: gear.lenses.isEmpty ? [model.lens] : gear.lenses, current: model.lens, iso: model.iso, box: box) { edited in
                     var e = edited
                     e.edited = true
-                    roll.meterShots = roll.meterShots.map { $0.pos == pos ? e : $0 }
+                    if roll.meterShots.contains(where: { $0.pos == pos }) {
+                        roll.meterShots = roll.meterShots.map { $0.pos == pos ? e : $0 }
+                    } else {
+                        roll.meterShots.append(e)
+                    }
                 } onDelete: {
                     roll.meterShots.removeAll { $0.pos == pos }
                 }

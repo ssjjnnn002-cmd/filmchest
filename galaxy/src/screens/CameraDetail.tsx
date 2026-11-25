@@ -20,6 +20,8 @@ import { GlassBtn, Page } from '../page'
 import { Confirm, Menu, Sheet, SheetBtn } from '../overlay'
 import { RollRow } from '../RollRow'
 import { useTheme } from '../theme'
+import { PressMenu } from '../PressMenu'
+import { SwipeRow } from '../SwipeRow'
 import { CameraEdit } from './CameraEdit'
 import { batteryDue } from './Library'
 
@@ -104,11 +106,15 @@ export function CameraDetail({ id }: { id: string }) {
         <Section title={`렌즈 · ${camera.mount}`} foot="렌즈 탭에 등록한 렌즈를 불러와요. 여기서 빼도 렌즈 탭의 등록은 남아요.">
           <Group>
             {lenses.map((l) => (
-              <Row key={l.id} onPress={() => setLensEdit(l)}
+              // 밀거나 길게 눌러 이 카메라에서 빼기 (아이폰과 같음)
+              <SwipeRow key={l.id} onDelete={() => detachLens(camera, l, lenses)}>
+              <PressMenu items={[{ label: '수정', icon: 'pencil', onPress: () => setLensEdit(l) }, { label: '이 카메라에서 빼기', icon: 'trash', danger: true, onPress: () => detachLens(camera, l, lenses) }]}>{(hold) => (
+              <Row onPress={() => setLensEdit(l)} onLongPress={hold}
                 value={`${rolls.filter((r) => r.lensId === l.id || r.lensChanges?.some((ch) => ch.lensId === l.id)).length}롤`}>
-                <RowText>{l.brand} {l.model}</RowText>
-                <Pressable onPress={() => detachLens(camera, l, lenses)} hitSlop={8}><Text style={{ color: c.muted }}>빼기</Text></Pressable>
+                <RowText sub={lensSpec(l) || undefined}>{l.brand} {l.model}</RowText>
               </Row>
+              )}</PressMenu>
+              </SwipeRow>
             ))}
             <Row onPress={() => setLensEdit('pick')}><Icon name="plus" size={20} color={c.safelight} /><RowText color={c.safelight}>렌즈 추가</RowText></Row>
           </Group>

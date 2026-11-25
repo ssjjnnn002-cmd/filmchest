@@ -4,7 +4,7 @@ import { Welcome } from './Welcome'
 import { getPref } from './store'
 import { driveConnected, keptAccount, onSignedOut } from './drive'
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Animated, BackHandler, Easing, Pressable, View } from 'react-native'
+import { Animated, BackHandler, PanResponder, Pressable, useWindowDimensions, View } from 'react-native'
 import { Text } from './text'
 import { Glass } from './glass'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -12,7 +12,7 @@ import { db, kept, purgeOldCameras, purgeOldRolls, removeDoubleLoads } from './d
 import { useLiveQuery } from './store'
 import { Icon } from './icons'
 import { useTheme } from './theme'
-import { closeTopOverlay, useToast, WorkBanner } from './overlay'
+import { closeTopOverlay, iosCurve, OverlayBoundary, PUSH_MS, trackTap, useToast, WorkBanner } from './overlay'
 import { PageScrollContext, type PageScroll } from './page'
 import { uid } from './core/types'
 import { setCustomFilms } from './core/films'
@@ -76,13 +76,11 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: 'rolls', label: '롤 보관함', icon: 'canister.fill' },
 ]
 
-type Motion = 'none' | 'tab-left' | 'tab-right' | 'push' | 'pop'
 const tabOrder: Tab[] = ['library', 'shooting', 'pending', 'rolls']
 
 export function App() {
   const c = useTheme()
   const [tab, setTabState] = useState<Tab>('library')
-  const [motion, setMotion] = useState<Motion>('none')
   const scrollSaved = useRef(new Map<string, number>()).current
   const toTop = useRef(new Set<() => void>()).current
   const [stacks, setStacks] = useState<Record<Tab, Screen[]>>({ library: [], shooting: [], pending: [], rolls: [] })
@@ -184,7 +182,6 @@ export function App() {
     trail.current.pop()
     const prev = trail.current.at(-1)!
     restoring.current = true
-    setMotion('pop')
     setTabState(prev.tab)
     setStacks(cloneStacks(prev.stacks))
     restoring.current = false
@@ -197,19 +194,16 @@ export function App() {
         // 같은 탭을 다시 누르면: 안쪽 화면이면 처음으로, 처음 화면이면 맨 위로
         if (stacks[t].length) {
           const next = { ...stacks, [t]: [] }
-          setMotion('pop')
           setStacks(next)
           record(t, next)
         } else toTop.forEach((fn) => fn())
         return
       }
-      setMotion(tabOrder.indexOf(t) > tabOrder.indexOf(tab) ? 'tab-left' : 'tab-right')
       setTabState(t)
       record(t, stacks)
     },
     push: (s, inTab) => {
       const t = inTab ?? tab
-      setMotion('push')
       scrollSaved.delete(`${t}/${s.type}/${s.id}`)
       const next = { ...stacks, [t]: [...stacks[t], s] }
       setStacks(next)
@@ -220,7 +214,6 @@ export function App() {
       if (!stacks[tab].length) return false
       scrollSaved.delete(screenKey(tab))
       const next = { ...stacks, [tab]: stacks[tab].slice(0, -1) }
-      setMotion('pop')
       setStacks(next)
       record(tab, next)
       return true
@@ -228,14 +221,12 @@ export function App() {
     showRoll: (id) => {
       const rolls = [...stacks.rolls.filter((s) => !(s.type === 'roll' && s.id === id)), { type: 'roll' as const, id }]
       const next = { ...stacks, rolls }
-      setMotion('push')
       setTabState('rolls')
       setStacks(next)
       record('rolls', next)
     },
     toPending: (rollId) => {
       const next = { ...stacks, shooting: stacks.shooting.filter((s) => !(s.type === 'roll' && s.id === rollId)) }
-      setMotion(tabOrder.indexOf('pending') >= tabOrder.indexOf(tab) ? 'tab-left' : 'tab-right')
       setTabState('pending')
       setStacks(next)
       record('pending', next)
@@ -252,7 +243,6 @@ export function App() {
       const next = [...zipQueueRef.current, ...batch]
       setQueue(next, activeZipId ?? batch[0].id)
       if (tab !== 'pending') {
-        setMotion('tab-left')
         setTabState('pending')
         record('pending', stacks)
       }
@@ -294,40 +284,16 @@ export function App() {
     return () => sub.remove()
   }, [])
 
-  const currentKey = screenKey(tab)
-  const scroll: PageScroll = useMemo(() => ({ key: currentKey, saved: scrollSaved, toTop }), [currentKey, scrollSaved, toTop])
 
-  // 화면 전환 움직임 (웹 .motion-*)
-  const anim = useRef(new Animated.Value(1)).current
-  const motionRef = useRef<Motion>('none')
-  motionRef.current = motion
-  useEffect(() => {
-    if (motionRef.current === 'none') return
-    anim.setValue(0)
-    Animated.timing(anim, { toValue: 1, duration: motionRef.current === 'push' ? 340 : motionRef.current === 'pop' ? 300 : 260, easing: Easing.bezier(0.2, 0.8, 0.2, 1), useNativeDriver: true }).start()
-  }, [currentKey, anim])
-  const from = motion === 'push' ? 120 : motion === 'pop' ? -70 : motion === 'tab-left' ? 14 : motion === 'tab-right' ? -14 : 0
-  const startOpacity = motion === 'pop' ? 0.3 : motion === 'none' ? 1 : 0
-
-  const top = stacks[tab].at(-1)
-  let content: ReactNode
-  if (top?.type === 'camera') content = <CameraDetail key={top.id} id={top.id} />
-  else if (top?.type === 'roll') content = <RollDetail key={top.id} id={top.id} />
-  else if (tab === 'library') content = <Library />
-  else if (tab === 'shooting') content = <Shooting />
-  else if (tab === 'pending') content = <Pending />
-  else content = <Rolls />
+  const render = (t: Tab, top?: Screen): ReactNode =>
+    top?.type === 'camera' ? <CameraDetail id={top.id} /> : top?.type === 'roll' ? <RollDetail id={top.id} />
+      : t === 'library' ? <Library /> : t === 'shooting' ? <Shooting /> : t === 'pending' ? <Pending /> : <Rolls />
 
   return (
     <NavContext.Provider value={nav}>
-      <View style={{ flex: 1, backgroundColor: c.paper }}>
-        <PageScrollContext.Provider value={scroll}>
-          <Animated.View key={currentKey} style={{ flex: 1,
-            opacity: anim.interpolate({ inputRange: [0, motion === 'push' ? 0.4 : 1, 1], outputRange: [startOpacity, 1, 1] }),
-            transform: [{ translateX: anim.interpolate({ inputRange: [0, 1], outputRange: [from, 0] }) }] }}>
-            {content}
-          </Animated.View>
-        </PageScrollContext.Provider>
+      <OverlayBoundary>
+      <View {...trackTap} style={{ flex: 1, backgroundColor: c.paper }}>
+        <ScreenStack key={tab} tab={tab} stack={stacks[tab]} render={render} saved={scrollSaved} toTop={toTop} onBack={() => nav.pop()} />
         <TabBar tab={tab} badge={badge} onTab={nav.setTab} />
       </View>
       {loadFilmFor && (
@@ -351,6 +317,7 @@ export function App() {
             if (!more) nav.showRoll(rollId)
           }} />
       )}
+      </OverlayBoundary>
       <WebToolsHost />
       {toastNode}
       <WorkBanner />
@@ -358,6 +325,60 @@ export function App() {
       {!intro && welcome ? <Welcome onDone={() => setWelcome(false)} /> : null}
     </NavContext.Provider>
   )
+}
+
+/** 탭 하나의 화면 쌓기 (아이폰과 같음): 새 화면이 오른쪽에서 덮고 아래 화면은 왼쪽으로 조금 밀리며 어두워진다.
+ *  왼쪽에서 밀면 손가락을 따라 되돌아간다. */
+function ScreenStack({ tab, stack, render, saved, toTop, onBack }: {
+  tab: Tab; stack: Screen[]; render: (t: Tab, top?: Screen) => ReactNode
+  saved: PageScroll['saved']; toTop: PageScroll['toTop']; onBack: () => void
+}) {
+  const { width } = useWindowDimensions()
+  const [shown, setShown] = useState(stack)
+  const depth = stack.length
+  const pos = useRef(new Animated.Value(depth)).current
+  const was = useRef(depth)
+  // 나가는 화면은 다 밀려난 다음 없앤다
+  const layers = shown.length > depth ? [...stack, ...shown.slice(depth)] : stack
+  useEffect(() => {
+    if (depth === was.current) { setShown(stack); return }
+    const grew = depth > was.current
+    was.current = depth
+    if (grew) setShown(stack)
+    Animated.timing(pos, { toValue: depth, duration: PUSH_MS, easing: iosCurve, useNativeDriver: true }).start(() => setShown(stack))
+  }, [stack, depth, pos])
+  const now = useRef({ depth, width, onBack })
+  now.current = { depth, width, onBack }
+  const pan = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => now.current.depth > 0 && g.x0 < 70 && g.dx > 12 && g.dx > Math.abs(g.dy) * 1.5,
+    onPanResponderMove: (_, g) => pos.setValue(now.current.depth - Math.min(1, Math.max(0, g.dx / now.current.width))),
+    onPanResponderRelease: (_, g) => {
+      if (g.dx > now.current.width * 0.5 || g.vx > 0.4) { now.current.onBack(); return }
+      Animated.timing(pos, { toValue: now.current.depth, duration: 260, easing: iosCurve, useNativeDriver: true }).start()
+    },
+    onPanResponderTerminate: () => { Animated.timing(pos, { toValue: now.current.depth, duration: 260, easing: iosCurve, useNativeDriver: true }).start() },
+  })).current
+  return (
+    <View {...pan.panHandlers} style={{ flex: 1, overflow: 'hidden' }}>
+      {[undefined, ...layers].map((s, i) => {
+        const key = s ? `${tab}/${s.type}/${s.id}` : tab
+        return (
+          <Animated.View key={`${i}:${key}`} pointerEvents={i === depth ? 'auto' : 'none'} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            boxShadow: i ? '-10px 0px 30px rgba(0,0,0,0.12)' : undefined,
+            transform: [{ translateX: pos.interpolate({ inputRange: [i - 1, i, i + 1], outputRange: [width, 0, -width * 0.3], extrapolate: 'clamp' }) }] }}>
+            <Layer id={key} saved={saved} toTop={toTop}>{render(tab, s)}</Layer>
+            <Animated.View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.1)',
+              opacity: pos.interpolate({ inputRange: [i, i + 1], outputRange: [0, 1], extrapolate: 'clamp' }) }} />
+          </Animated.View>
+        )
+      })}
+    </View>
+  )
+}
+
+function Layer({ id, saved, toTop, children }: { id: string; saved: PageScroll['saved']; toTop: PageScroll['toTop']; children: ReactNode }) {
+  const value: PageScroll = useMemo(() => ({ key: id, saved, toTop }), [id, saved, toTop])
+  return <PageScrollContext.Provider value={value}>{children}</PageScrollContext.Provider>
 }
 
 /** 떠 있는 유리 탭바. 선택 표시가 미끄러져 이동 */

@@ -49,6 +49,37 @@ struct CameraEditView: View {
         NavigationStack {
             Form {
                 Section {
+                    LabeledField("제조사", text: $brand)
+                        .focused($focus, equals: .brand)
+                        .autocorrectionDisabled()
+                    if focus == .brand {
+                        brandSuggestions
+                    }
+                    LabeledField("모델", text: $model)
+                        .focused($focus, equals: .model)
+                        .autocorrectionDisabled()
+                    if focus == .model {
+                        modelSuggestions
+                    }
+                    LabeledField("별명 (선택)", text: $nickname)
+                    Picker("포맷", selection: $format) {
+                        ForEach(FilmFormat.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                    }
+                } header: {
+                    HStack {
+                        Text("카메라")
+                        Spacer()
+                        Button("목록에서 고르기") { showCatalog = true }
+                            .font(.caption.weight(.semibold))
+                            .textCase(nil)
+                    }
+                } footer: {
+                    if let known = CameraCatalog.match(brand: brand, model: model) {
+                        Label("\(known.kindText)로 자동 설정했어요.", systemImage: "checkmark.circle")
+                    }
+                }
+
+                Section {
                     VStack(spacing: 12) {
                         ZStack {
                             preview.frame(height: 200)
@@ -108,62 +139,20 @@ struct CameraEditView: View {
                     }
                 }
 
-                Section {
-                    TextField("제조사", text: $brand)
-                        .focused($focus, equals: .brand)
-                        .autocorrectionDisabled()
-                    if focus == .brand {
-                        brandSuggestions
-                    }
-                    TextField("모델", text: $model)
-                        .focused($focus, equals: .model)
-                        .autocorrectionDisabled()
-                    if focus == .model {
-                        modelSuggestions
-                    }
-                    TextField("별명 (선택)", text: $nickname)
-                    Picker("포맷", selection: $format) {
-                        ForEach(FilmFormat.allCases, id: \.self) { Text($0.displayName).tag($0) }
-                    }
-                } header: {
-                    HStack {
-                        Text("카메라")
-                        Spacer()
-                        Button("목록에서 고르기") { showCatalog = true }
-                            .font(.caption.weight(.semibold))
-                            .textCase(nil)
-                    }
-                } footer: {
-                    if let known = CameraCatalog.match(brand: brand, model: model) {
-                        Label("\(known.kindText)로 자동 설정했어요.", systemImage: "checkmark.circle")
-                    }
-                }
-
                 TagField(tags: $tags)
 
                 Section("렌즈") {
                     Toggle("렌즈 교환식", isOn: $interchangeable)
                     if interchangeable {
-                        TextField("마운트", text: $mount)
+                        LabeledField("마운트", text: $mount)
                     } else {
-                        TextField("렌즈", text: $fixedLens)
+                        LabeledField("렌즈", text: $fixedLens)
                     }
                 }
 
                 Section {
-                    TextField("배터리 종류", text: $battery)
-                    HStack {
-                        DatePicker(selection: Binding(get: { batteryDate }, set: { batteryDate = $0; hasBatteryDate = true }), displayedComponents: .date) {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("마지막 교체")
-                                if !hasBatteryDate { Text("기록 안 함").font(.caption).foregroundStyle(.secondary) }
-                            }
-                        }
-                        if hasBatteryDate {
-                            Button { hasBatteryDate = false } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
-                                .buttonStyle(.borderless)
-                        }
-                    }
+                    LabeledField("배터리 종류", text: $battery)
+                    OptionalDateRow(label: "마지막 교체", isSet: $hasBatteryDate, date: $batteryDate)
                 } header: {
                     Text("배터리")
                 } footer: {
@@ -185,7 +174,7 @@ struct CameraEditView: View {
                     Text("프리와인딩은 필름을 먼저 끝까지 감아 두고 카운트가 거꾸로 줄어드는 카메라예요. 스캔을 가져올 때 마지막 사진을 1번 컷으로 거꾸로 넣어요.")
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .filmKeyboard()
             .navigationTitle(camera == nil ? "카메라 추가" : "카메라 수정")
             .toolbar {
@@ -297,7 +286,7 @@ struct CameraEditView: View {
     }
 
     private func windChoice(title: String, detail: String, value: Bool) -> some View {
-        let on = prewind == value
+        let on = (prewind ?? false) == value   // 고르기 전에는 정순
         return Button { prewind = value } label: {
             VStack(spacing: 2) {
                 Text(title).font(.subheadline.weight(.semibold))

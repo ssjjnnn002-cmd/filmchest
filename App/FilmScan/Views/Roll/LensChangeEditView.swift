@@ -42,7 +42,7 @@ struct LensChangeEditView: View {
                         }
                     }
                     if addingLens {
-                        TextField("렌즈 이름", text: $newLensModel)
+                        LabeledField("렌즈 이름", text: $newLensModel)
                         LensSuggestions(mount: mount, text: $newLensModel)
                     } else {
                         Button("새 렌즈", systemImage: "plus") { addingLens = true }

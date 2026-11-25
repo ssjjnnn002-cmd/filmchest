@@ -1,3 +1,4 @@
+import { suggestRolls } from '../core/rollMatch'
 import { createPortal } from 'react-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -55,6 +56,18 @@ export function ImportFlow({ files, rollId, onClose }: { files: File[]; rollId?:
   const order: Record<string, number> = { atLab: 0, finished: 1, loaded: 2 }
   const candidates = rolls.filter((r) => !r.deletedAt && r.status !== 'imported').sort((a, b) => order[a.status] - order[b.status] || b.loadedAt - a.loadedAt)
 
+  // 파일 이름과 맞을 것 같은 롤 (맨 위에 '추천'으로, 아이폰과 같음)
+  const cameras = useLiveQuery(() => db.cameras.toArray(), []) ?? []
+  const best = useMemo(() => {
+    const ids = suggestRolls([folderName, ...files.map((f) => f.name)].filter((n): n is string => !!n).slice(0, 5), hints, candidates.map((r) => ({
+      id: r.id, filmId: r.filmId, model: cameras.find((x) => x.id === r.cameraId)?.model ?? r.cameraModel, places: r.locations.map((l) => l.name), lab: r.lab,
+      from: Math.min(r.loadedAt, ...r.days.map((d) => d.startedAt)), to: r.droppedAt ?? r.finishedAt ?? Date.now(),
+    })))
+    return ids.map((id) => candidates.find((r) => r.id === id)!)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rolls, cameras, hints])
+  const groups = ([['추천', best], ...([['atLab', '현상 맡김'], ['finished', '촬영 완료'], ['loaded', '촬영 중']] as const).map(([st, title]) => [title, candidates.filter((r) => r.status === st && !best.includes(r))] as const)] as const).filter(([, list]) => list.length)
+
   const save = async (meterOffset = 0, reversed = false) => {
     if (!roll || !set) return
     // 프리와인딩: 마지막 파일이 1번 컷
@@ -87,17 +100,17 @@ export function ImportFlow({ files, rollId, onClose }: { files: File[]; rollId?:
       {scan && phase === 'pick' && (
         <>
           <Summary name={fileName} thumbs={thumbs} count={scan.primary.files.length} scanner={scanner} />
-          <div className="section">
-            <h2>어느 롤인가요?</h2>
-            <div className="group">
-              {candidates.length === 0 && <div className="row static sub">기록해 둔 롤이 없어요. 아래에서 바로 기록할 수 있어요.</div>}
-              {candidates.map((r) => (
-                <button key={r.id} className="row" onClick={() => { setRoll(r); setPhase('confirm') }}><RollRow roll={r} /></button>
-              ))}
+          {candidates.length > 0 && <p className="footnote">어느 롤의 사진인지 골라 주세요.</p>}
+          {groups.map(([title, list]) => (
+            <div className="section" key={title}>
+              <h2>{title}</h2>
+              <div className="group">
+                {list.map((r) => <button key={r.id} className="row" onClick={() => { setRoll(r); setPhase('confirm') }}><RollRow roll={r} /></button>)}
+              </div>
             </div>
-          </div>
+          ))}
           <div className="group">
-            <button className="row" style={{ color: 'var(--safelight)' }} onClick={() => setQuick(true)}>+ 기록 없이 새 롤로 저장</button>
+            <button className="row" style={{ color: 'var(--safelight)' }} onClick={() => setQuick(true)}>+ 새 롤로 저장</button>
           </div>
         </>
       )}
@@ -264,7 +277,7 @@ function ExposureMap({ roll, count, offset, onOffset }: { roll: Roll; count: num
           <div key={s.pos} className="row static">
             <span className="grow">
               {s.pos + offset}번 사진
-              <div className="sub">노출계 {meterFrameTitle(s.pos, !!roll.meterPrewind)}</div>
+              <div className="sub">상세 기록 {meterFrameTitle(s.pos, !!roll.meterPrewind)}</div>
             </span>
             <span className="value">{exposureText(s)}</span>
           </div>

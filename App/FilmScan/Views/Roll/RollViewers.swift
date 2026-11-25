@@ -6,6 +6,12 @@ struct FrameViewer: View {
     let roll: RollItem
     @State var index: Int
     @State private var editShot = false
+    @State private var preparing = false
+    #if os(iOS)
+    @State private var shareFile: ShareFile?
+    @State private var sharedDir: URL?
+    private struct ShareFile: Identifiable { let url: URL; var id: String { url.path } }
+    #endif
     @Environment(\.dismiss) private var dismiss
 
     private var frames: [FrameItem] { roll.sortedFrames }
@@ -31,6 +37,10 @@ struct FrameViewer: View {
                                 roll.coverFrameIndex = frame.index
                             }
                             .disabled(isCover)
+                            #if os(iOS)
+                            Button("공유", systemImage: "square.and.arrow.up") { Task { await share(frame) } }
+                                .disabled(preparing)
+                            #endif
                         } label: {
                             Image(systemName: "ellipsis").foregroundStyle(.white)
                         }
@@ -56,8 +66,20 @@ struct FrameViewer: View {
         }
         // 돌린 사진은 닫을 때 사진 앱에도 한꺼번에 반영한다 (허락 창이 한 번만 뜨게)
         .onDisappear { syncRotationsToPhotos() }
+        #if os(iOS)
+        .sheet(item: $shareFile, onDismiss: { if let dir = sharedDir { try? FileManager.default.removeItem(at: dir); sharedDir = nil } }) {
+            ShareSheet(url: $0.url).presentationDetents([.medium, .large])
+        }
+        .overlay { if preparing { ProgressView().tint(.white).padding(24).background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 16)) } }
+        #endif
         .sheet(isPresented: $editShot) {
-            if let frame = current { FrameShotEditView(roll: roll, pos: frame.index - roll.meterOffset) }
+            if let frame = current {
+                #if os(iOS)
+                RollShotDialEditor(roll: roll, pos: frame.index - roll.meterOffset, create: true)
+                #else
+                FrameShotEditView(roll: roll, pos: frame.index - roll.meterOffset)
+                #endif
+            }
         }
         #if os(macOS)
         .frame(minWidth: 860, minHeight: 680)
@@ -155,6 +177,34 @@ struct FrameViewer: View {
         }
     }
 
+    #if os(iOS)
+    /// 사진 한 장 공유: 사진 앱의 원본, 없으면 앱에 있는 미리보기 사진. 돌려 둔 사진은 돌린 채로
+    private func share(_ frame: FrameItem) async {
+        preparing = true
+        defer { preparing = false }
+        if frame.turns == 0, let id = frame.assetIdentifier, let orig = await PhotoLibrary.originalFile(assetID: id) {
+            sharedDir = orig.url.deletingLastPathComponent()
+            shareFile = ShareFile(url: orig.url)
+            return
+        }
+        var image: CGImage?
+        if let id = frame.assetIdentifier, let big = await PhotoLibrary.image(assetID: id, maxPixel: 6000) {
+            image = big.rotated(quarterTurns: frame.turnsFromPhoto)
+        } else if let data = frame.thumbnail, let thumb = ImageThumbnail.make(data: data, maxPixel: 4000) {
+            image = thumb.rotated(quarterTurns: frame.turns)
+        }
+        guard let image, let data = ImageEncoder.data(image, quality: 0.92) else { return }
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("share-\(UUID().uuidString)", isDirectory: true)
+        let url = dir.appendingPathComponent("\(roll.filmName) \(frame.index).jpg".replacingOccurrences(of: "/", with: "-"))
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try data.write(to: url)
+            sharedDir = dir
+            shareFile = ShareFile(url: url)
+        } catch { return }
+    }
+    #endif
+
     private func toggleFavorite(_ frame: FrameItem) {
         frame.isFavorite.toggle()
         if let id = frame.assetIdentifier {
@@ -234,3 +284,14 @@ enum ContactSheetBuilder {
         }.value
     }
 }
+
+#if os(iOS)
+/// 시스템 공유 창
+struct ShareSheet: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+#endif

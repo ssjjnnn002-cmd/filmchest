@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { useNav } from '../App'
@@ -8,15 +8,17 @@ import { exposureText, meterShotAt } from '../core/meter'
 import { edgeMarking } from '../core/films'
 import { renderContactSheet } from '../core/contactSheet'
 import { ZoomView } from '../ui/Viewers'
-import { Icon, Sheet, bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedLocations, useObjectURL } from '../ui/common'
+import { Icon, PickMenu, Sheet, bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedLocations, useObjectURL } from '../ui/common'
 import { inClaudeHost, saveFile, saveFileNow, saveToGallery } from '../platform'
+import { RollShotEdit } from './ManualRecord'
+import { pushOverlay } from '../backStack'
 import { rotatedBlob } from '../core/importer'
 
 /** 필름 롤을 펼친 모양 */
 export function FilmStrip({ roll, frames, onSelect }: { roll: Roll; frames: Frame[]; onSelect: (i: number) => void }) {
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
   const fmt = formatInfo[rollCameraFormat(camera, roll)]
-  const h = 120
+  const h = 132
   const w = h * fmt.aspect
   const film = rollFilm(roll)
   // 퍼포레이션: 가장자리 띠에 구멍 모양 마스크를 씌워 뒤 배경이 비쳐 보이게 한다
@@ -81,7 +83,30 @@ export function FrameViewer({ frames, start, onClose, showInfo }: { frames: Fram
   }, [original?.blob, frame?.thumb, turns])
   const url = useObjectURL(shown)
   const rotate = (d: number) => { if (frame) void db.frames.update(frame.id, { rotation: ((turns + d) % 4 + 4) % 4 }) }
-  const step = (d: number) => setI((x) => Math.min(Math.max(x + d, 0), frames.length - 1))
+  // 옆으로 넘기기: 손가락을 따라 옆 사진이 밀려 들어온다 (아이폰과 같음)
+  const track = useRef<HTMLDivElement>(null)
+  const move = (dx: number, ms = 0) => {
+    const el = track.current
+    if (!el) return
+    el.style.transition = ms ? `transform ${ms}ms cubic-bezier(.32,.72,0,1)` : 'none'
+    el.style.transform = dx ? `translateX(${dx}px)` : ''
+  }
+  const closing = useRef(onClose)
+  closing.current = onClose
+  useEffect(() => pushOverlay(() => closing.current()), [])
+  const index = useRef(i)
+  index.current = i
+  const step = (d: number) => {
+    const next = index.current + d
+    if (next < 0 || next >= frames.length) { move(0, 260); return }
+    move(-d * (track.current?.clientWidth ?? window.innerWidth), 300)
+    window.setTimeout(() => { setI(next) }, 300)
+  }
+  useLayoutEffect(() => { move(0) }, [i])
+  const onDrag = (dx: number, done: boolean) => {
+    const edge = (dx > 0 && index.current === 0) || (dx < 0 && index.current === frames.length - 1)
+    move(edge ? dx / 3 : dx, done ? 260 : 0)
+  }
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -98,14 +123,34 @@ export function FrameViewer({ frames, start, onClose, showInfo }: { frames: Fram
   const infoCamera = useLiveQuery(() => (showInfo && roll?.cameraId ? db.cameras.get(roll.cameraId) : undefined), [showInfo, roll?.cameraId])
   const infoLens = useLiveQuery(() => (showInfo && roll?.lensId ? db.lenses.get(roll.lensId) : undefined), [showInfo, roll?.lensId])
   const [infoOpen, setInfoOpen] = useState(false)
+  const [shotEdit, setShotEdit] = useState(false)
   if (!frame) return null
   const fav = live?.favorite ?? frame.favorite
   const shot = meterShotAt(roll?.meterShots, frame.index, roll?.meterOffset ?? 0)
   const isCover = (roll?.coverIndex ?? 1) === frame.index
+  // 사진 한 장 공유 (원본, 없으면 미리보기 사진). 돌려 둔 사진은 돌린 채로
+  const canShare = !!shown && typeof navigator.share === 'function' && typeof navigator.canShare === 'function'
+  const shareOne = async () => {
+    if (!shown) return
+    const type = shown.type.startsWith('image/') ? shown.type : 'image/jpeg'
+    const file = new File([shown], frame.name?.split('/').pop() ?? `${String(frame.index).padStart(2, '0')}.jpg`, { type })
+    if (!navigator.canShare({ files: [file] })) { nav.toast('이 브라우저에서는 사진을 공유할 수 없어요'); return }
+    try { await navigator.share({ files: [file] }) } catch (e) { if ((e as Error).name !== 'AbortError') nav.toast('공유하지 못했어요') }
+  }
+  const saveOne = () => {
+    if (!original) return
+    const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase()
+    const name = `${String(frame.index).padStart(2, '0')}.${ext}`
+    const type = original.blob.type.startsWith('image/') ? original.blob.type : 'image/jpeg'
+    const opened = saveToGallery([new File([shown ?? original.blob], name, { type })], name)
+    if (opened.kind === 'share') nav.toast('공유 창에서 이미지 저장을 누르면 갤러리 최근 항목에 들어가요.')
+    else if (opened.kind === 'file') nav.toast('갤러리에 바로 넣지 못해서 사진 파일로 저장했어요')
+    else void saveFile(name, shown ?? original.blob).then((r) => nav.toast(r === 'saved' ? '사진 파일로 저장했어요' : '이 화면에서는 저장할 수 없어요'))
+  }
   return (
-    <div className="fullscreen dark" role="dialog" aria-label="사진 보기">
+    <div className="fullscreen dark photo-viewer" role="dialog" aria-label="사진 보기">
       <div className="fs-bar">
-        <button className="btn ghost" onClick={onClose}>닫기</button>
+        <button className="glass-btn" style={{ color: 'var(--safelight)' }} onClick={onClose}>닫기</button>
         <h2 style={{ fontVariantNumeric: 'tabular-nums' }}>{showInfo && roll ? <>{frame.takenAt ? fmtDay(frame.takenAt) : ''}<div style={{ fontSize: 12, fontWeight: 400 }}>{rollName(roll)} · {frame.index}번</div></> : `${i + 1} / ${frames.length}`}</h2>
         <div style={{ display: 'flex', gap: 4 }}>
           {showInfo && (
@@ -113,21 +158,15 @@ export function FrameViewer({ frames, start, onClose, showInfo }: { frames: Fram
               <svg width="22" height="22" viewBox="0 0 24 24" fill={infoOpen ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.9" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.01" stroke={infoOpen ? '#000' : 'currentColor'} strokeLinecap="round" /></svg>
             </button>
           )}
+          <PickMenu label="더 보기" align="right" className="btn ghost icon-btn" trigger={<span style={{ color: '#fff', display: 'grid' }}><Icon name="ellipsis" /></span>} sections={[
+            { value: isCover ? 'cover' : '', options: [['cover', isCover ? '대표 사진' : '대표 사진으로 지정']], onPick: () => { if (!isCover) void db.rolls.update(frame.rollId, { coverIndex: frame.index }).then(() => nav.toast('대표 사진으로 정했어요')) } },
+            ...(canShare ? [{ value: '', options: [['share', '공유'] as [string, string]], onPick: () => { void shareOne() } }] : []),
+            ...(original ? [{ value: '', options: [['save', '갤러리에 저장'] as [string, string]], onPick: saveOne }] : []),
+          ]} />
           <button className="btn ghost icon-btn" aria-label={fav ? '즐겨찾기 해제' : '즐겨찾기'}
             style={{ color: fav ? 'var(--safelight)' : '#fff' }} onClick={() => db.frames.update(frame.id, { favorite: !fav })}>
             <Icon name={fav ? 'heartFill' : 'heart'} />
           </button>
-          {original && (
-            <button className="btn ghost icon-btn" aria-label="이 사진 갤러리에 저장" style={{ color: '#fff' }} onClick={() => {
-              const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase()
-              const name = `${String(frame.index).padStart(2, '0')}.${ext}`
-              const type = original.blob.type.startsWith('image/') ? original.blob.type : 'image/jpeg'
-              const opened = saveToGallery([new File([shown ?? original.blob], name, { type })], name)
-              if (opened.kind === 'share') nav.toast('공유 창에서 이미지 저장을 누르면 갤러리 최근 항목에 들어가요.')
-              else if (opened.kind === 'file') nav.toast('갤러리에 바로 넣지 못해서 사진 파일로 저장했어요')
-              else void saveFile(name, shown ?? original.blob).then((r) => nav.toast(r === 'saved' ? '사진 파일로 저장했어요' : '이 화면에서는 저장할 수 없어요'))
-            }}><Icon name="download" /></button>
-          )}
         </div>
       </div>
       <div style={{ position: 'relative', minHeight: 0 }}>
@@ -148,14 +187,20 @@ export function FrameViewer({ frames, start, onClose, showInfo }: { frames: Fram
               onClick={() => { onClose(); nav.showRoll(roll.id) }}><b>이 롤 보기</b></button>
           </div>
         )}
-        {url && <ZoomView key={`${frame.id}-${turns}`} src={url} background="#000" onSwipe={step} />}
-        <button className="btn ghost icon-btn" aria-label="이전" onClick={() => step(-1)} disabled={i === 0}
+        <div ref={track} className="photo-track">
+          {i > 0 && <Side frame={frames[i - 1]} at={-1} />}
+          {url && <ZoomView key={`${frame.id}-${turns}`} src={url} background="#000" onSwipe={step} onDrag={onDrag} />}
+          {i < frames.length - 1 && <Side frame={frames[i + 1]} at={1} />}
+        </div>
+        <button className="btn ghost icon-btn side-btn" aria-label="이전" onClick={() => step(-1)} disabled={i === 0}
           style={{ position: 'absolute', left: 8, top: '50%', color: '#fff', background: 'rgb(0 0 0 / 0.4)' }}><Icon name="left" /></button>
-        <button className="btn ghost icon-btn" aria-label="다음" onClick={() => step(1)} disabled={i === frames.length - 1}
+        <button className="btn ghost icon-btn side-btn" aria-label="다음" onClick={() => step(1)} disabled={i === frames.length - 1}
           style={{ position: 'absolute', right: 8, top: '50%', color: '#fff', background: 'rgb(0 0 0 / 0.4)' }}><Icon name="right" /></button>
       </div>
       <div style={{ textAlign: 'center', padding: '10px 16px calc(14px + env(safe-area-inset-bottom, 0px))', fontSize: 13 }}>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 28, marginBottom: 6 }}>
+        {shot ? <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{exposureText(shot)}</div> : null}
+        {roll && <button className="shot-info" onClick={() => setShotEdit(true)}>{shot ? '촬영 정보' : '촬영 정보 추가'}</button>}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 2 }}>
           <button className="btn ghost icon-btn" aria-label="왼쪽으로 돌리기" style={{ color: '#fff' }} onClick={() => rotate(-1)}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 8V3.8M4 8h4.2M4.6 8A8 8 0 1 1 4 12" /></svg>
           </button>
@@ -163,16 +208,26 @@ export function FrameViewer({ frames, start, onClose, showInfo }: { frames: Fram
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 8V3.8M20 8h-4.2M19.4 8A8 8 0 1 0 20 12" /></svg>
           </button>
         </div>
-        {shot ? <div style={{ fontWeight: 600, marginBottom: 2 }}>{exposureText(shot)}</div> : null}
         <div>{[frame.takenAt ? fmtDayTime(frame.takenAt) : undefined, frame.locationName].filter(Boolean).join(' · ')}</div>
         <div style={{ opacity: 0.6 }}>{[resolutionText(frame.w, frame.h), bytesText(frame.bytes)].filter(Boolean).join(' · ')}</div>
-        <button className="glass-btn" style={{ marginTop: 10, fontSize: 15 }} disabled={isCover}
-          onClick={async () => { await db.rolls.update(frame.rollId, { coverIndex: frame.index }); nav.toast('대표 사진으로 정했어요') }}>
-          {isCover ? '대표 사진' : '대표 사진으로 지정'}
-        </button>
       </div>
+      {shotEdit && roll && <RollShotEdit roll={roll} pos={frame.index - (roll.meterOffset ?? 0)} create onClose={() => setShotEdit(false)} onToast={nav.toast} />}
     </div>
   )
+}
+
+/** 옆에서 밀려 들어오는 앞뒤 사진 */
+function Side({ frame, at }: { frame: Frame; at: 1 | -1 }) {
+  const live = useLiveQuery(() => db.frames.get(frame.id), [frame.id])
+  const [b, setB] = useState<Blob>()
+  const turns = (((live?.rotation ?? frame.rotation ?? 0) % 4) + 4) % 4
+  useEffect(() => {
+    let on = true
+    if (frame.thumb) void rotatedBlob(frame.thumb, turns).then((x) => { if (on) setB(x) })
+    return () => { on = false }
+  }, [frame.thumb, turns])
+  const url = useObjectURL(b)
+  return <div className="photo-side" style={{ transform: `translateX(${at * 100}%)` }}>{url && <img src={url} alt="" />}</div>
 }
 
 function headerFor(roll: Roll, camera?: Camera, lensName?: string) {
@@ -193,8 +248,8 @@ export function ContactSheetView({ roll, frames, onClose }: { roll: Roll; frames
   const nav = useNav()
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
   const lens = useLiveQuery(() => (roll.lensId ? db.lenses.get(roll.lensId) : undefined), [roll.lensId])
-  const [useTitle, setUseTitle] = useState(!!roll.note)
-  const [title, setTitle] = useState(roll.note ?? '')
+  const [useTitle, setUseTitle] = useState(!!(roll.title?.trim() || roll.note))
+  const [title, setTitle] = useState(roll.title?.trim() || roll.note || '')
   const [info, setInfo] = useState(true)
   const [url, setUrl] = useState<string>()
   const [blob, setBlob] = useState<Blob>()

@@ -69,7 +69,6 @@ struct RootView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .syncCustomFilms()
-        .tint(Theme.safelight)
         .sheet(isPresented: $router.showLoadFilm) {
             LoadFilmView(initialCamera: router.loadFilmCamera)
         }
@@ -103,6 +102,11 @@ struct RootView: View {
             Button("확인", role: .cancel) {}
         } message: {
             Text("사진 앱에서 같은 사진을 찾지 못했어요. 필름함 › 현상 스캔 › + › 기존 롤 가져오기 › 사진 앱에서 고르기로 가져와 주세요.")
+        }
+        .alert("파일을 열지 못했어요", isPresented: $router.openFailed) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text("파일을 기기에 내려받은 뒤 다시 골라 주세요.")
         }
         .fileImporter(isPresented: $router.showZipPicker, allowedContentTypes: [.zip, .folder], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result, !urls.isEmpty else { return }
@@ -169,5 +173,7 @@ struct RootView: View {
             router.receiveZips(zips)
             return true
         }
+        // 맨 바깥에: 여기서 여는 창(장착·가져오기·시작하기)의 글씨·스위치도 같은 색
+        .tint(Theme.safelight)
     }
 }

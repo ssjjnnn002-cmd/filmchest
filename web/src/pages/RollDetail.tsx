@@ -10,6 +10,11 @@ import { RollGalleryButton } from '../ui/GallerySave'
 import { CameraCover, Canister, cameraName, Confirm, Sheet, toInputDate, GlassGroup, Icon, PageHeader, StatusBadge, bytesText, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedLocations } from '../ui/common'
 import { DayEdit, LabDropOff, LabField, LensChangeEdit, PlaceEdit, rememberLab } from './Editors'
 import { RollProjects } from './Projects'
+import { CustomFilmEdit } from './CustomFilmEdit'
+import { FilmPicker } from '../ui/FilmPicker'
+import { filmById } from '../core/films'
+import { PressMenu } from '../ui/PressMenu'
+import { SwipeRow } from '../ui/SwipeRow'
 import { TagField } from '../ui/gearExtras'
 import { FramePrint } from './FramePrint'
 import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
@@ -40,6 +45,8 @@ export function RollDetail({ id }: { id: string }) {
   const [recording, setRecording] = useState(false)
   const [moreMenu, setMoreMenu] = useState(false)
   const [pickCamera, setPickCamera] = useState(false)
+  const [pickFilm, setPickFilm] = useState(false)
+  const [askFilm, setAskFilm] = useState(false)
   const [shotEdit, setShotEdit] = useState<number>()
   const [allShots, setAllShots] = useState(false)
   const [labEdit, setLabEdit] = useState(false)
@@ -85,11 +92,12 @@ export function RollDetail({ id }: { id: string }) {
               <button aria-label="더 보기" onClick={() => setMoreMenu(!moreMenu)}><Icon name="more" /></button>
               {moreMenu && (
                 <div className="menu">
-                  <button className="row" onClick={() => { setMoreMenu(false); setPickCamera(true) }}>카메라 바꾸기</button>
-                  <button className="row" onClick={() => { setMoreMenu(false); setLabEdit(true) }}>현상소 수정</button>
-                  <button className="row" onClick={() => { setMoreMenu(false); setExpiryEdit(true) }}>필름 유통기한</button>
-                  {(roll.frameCount ?? 0) > 1 && <button className="row" onClick={() => { setMoreMenu(false); setConfirmReverse(true) }}>컷 순서 뒤집기</button>}
-                  <button className="row danger" onClick={() => { setMoreMenu(false); setConfirm(true) }}>롤 삭제</button>
+                  <button className="row" onClick={() => { setMoreMenu(false); setPickCamera(true) }}><MenuIcon name="camera" />카메라 바꾸기</button>
+                  <button className="row" onClick={() => { setMoreMenu(false); if (roll.status === 'loaded' && roll.cameraId) setAskFilm(true); else setPickFilm(true) }}><MenuIcon name="film" />필름 바꾸기</button>
+                  <button className="row" onClick={() => { setMoreMenu(false); setLabEdit(true) }}><MenuIcon name="building" />현상소 수정</button>
+                  <button className="row" onClick={() => { setMoreMenu(false); setExpiryEdit(true) }}><MenuIcon name="calendar" />필름 유통기한</button>
+                  {(roll.frameCount ?? 0) > 1 && <button className="row" onClick={() => { setMoreMenu(false); setConfirmReverse(true) }}><MenuIcon name="sort" />컷 순서 뒤집기</button>}
+                  <button className="row danger" onClick={() => { setMoreMenu(false); setConfirm(true) }}><MenuIcon name="trash" />롤 삭제</button>
                 </div>
               )}
             </div>
@@ -99,8 +107,8 @@ export function RollDetail({ id }: { id: string }) {
       {/* 맨 위 큰 제목 바로 아래: 제목 편집 (비우면 필름 이름) */}
       <button className="title-edit" onClick={() => setTitleEdit(roll.title ?? '')}><Icon name="pencil" size={15} />제목 편집</button>
 
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center', margin: '0 4px 8px' }}>
-        <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={104} />
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center', margin: '0 16px 12px' }}>
+        <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={94} />
         <div style={{ display: 'grid', gap: 3, minWidth: 0, justifyItems: 'start' }}>
           <StatusBadge status={roll.status} />
           <h2 style={{ fontSize: 22, fontWeight: 700 }}>{rollFilmName(roll)}{roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}</h2>
@@ -108,7 +116,6 @@ export function RollDetail({ id }: { id: string }) {
           {(lens || camera?.fixedLens || roll.cameraFixedLens) && (
             <span className="sub">
               {lens ? `${lens.brand} ${lens.model}` : camera?.fixedLens || roll.cameraFixedLens}
-              {roll.lensChanges?.length ? ` 외 렌즈 ${roll.lensChanges.length}번 교체` : ''}
             </span>
           )}
           <span className="sub">{dateRangeText(roll)}</span>
@@ -122,7 +129,7 @@ export function RollDetail({ id }: { id: string }) {
 
       {/* 다음에 할 일을 맨 위에: 상세 기록 / 현상소 고르기 / 스캔 불러오기 (아이폰과 같음) */}
       {roll.status === 'loaded' && <button className="btn primary block" style={{ margin: '4px 0 8px' }} onClick={() => setRecording(true)}>상세 기록</button>}
-      {roll.status === 'finished' && <div className="section"><button className="btn primary block" onClick={() => setDropOff(true)}>현상소 고르기</button><p className="footnote">고르면 스캔 대기로 넘어가요.</p></div>}
+      {roll.status === 'finished' && <div className="section"><button className="btn primary block" onClick={() => setDropOff(true)}>현상소 고르기</button><p className="footnote">고르면 현상 맡김으로 넘어가요.</p></div>}
       {roll.status === 'atLab' && <div className="section"><ScanButton rollId={id} /><p className="footnote">현상소에서 받은 zip이나 사진을 골라요.</p></div>}
 
       {roll.status === 'imported' && frames.length > 0 && (
@@ -143,10 +150,15 @@ export function RollDetail({ id }: { id: string }) {
         <h2>촬영일</h2>
         <div className="group">
           {orderedDays(roll.days).map((d) => (
-            <button key={d.id} className="row" onClick={() => setDay(d)}>
-              <span className="grow">{fmtDayTime(d.startedAt)}</span>
-              <span className="value">{dayRange(d)}</span>
-            </button>
+            // 밀면 삭제, 길게 누르면 수정·삭제 (아이폰과 같음)
+            <SwipeRow key={d.id} onDelete={() => void db.rolls.update(id, { days: roll.days.filter((x) => x.id !== d.id) })}>
+              <PressMenu items={[{ label: '수정', icon: 'pencil', onPress: () => setDay(d) }, { label: '삭제', icon: 'trash', danger: true, onPress: () => void db.rolls.update(id, { days: roll.days.filter((x) => x.id !== d.id) }) }]}>
+                <button className="row" onClick={() => setDay(d)}>
+                  <span className="grow">{fmtDayTime(d.startedAt)}</span>
+                  <span className="value">{dayRange(d)}</span>
+                </button>
+              </PressMenu>
+            </SwipeRow>
           ))}
           {roll.isArchive && roll.days.length === 0 && <div className="row static sub">알 수 없음 (원본 날짜 유지)</div>}
           <button className="row accent" onClick={() => setDay('new')}><Icon name="plus" /> 촬영일 추가</button>
@@ -163,10 +175,12 @@ export function RollDetail({ id }: { id: string }) {
               <span className="value">1번부터</span>
             </button>
             {[...(roll.lensChanges ?? [])].sort((a, b) => a.startFrame - b.startFrame).map((c) => (
-              <button key={c.id} className="row" onClick={() => setLensEdit(c)}>
-                <span className="grow">{lensName(c.lensId)}</span>
-                <span className="value">{c.startFrame}번부터</span>
-              </button>
+              <SwipeRow key={c.id} onDelete={() => void db.rolls.update(id, { lensChanges: (roll.lensChanges ?? []).filter((x) => x.id !== c.id) })}>
+                <button className="row" onClick={() => setLensEdit(c)}>
+                  <span className="grow">{lensName(c.lensId)}</span>
+                  <span className="value">{c.startFrame}번부터</span>
+                </button>
+              </SwipeRow>
             ))}
             <button className="row accent" onClick={() => setLensEdit('new')}><Icon name="plus" /> 렌즈 바꿔 낌</button>
           </div>
@@ -178,7 +192,9 @@ export function RollDetail({ id }: { id: string }) {
         <h2>장소</h2>
         <div className="group">
           {locs.map((l, i) => (
-            <button key={l.id} className="row" onClick={() => setPlace(l)}>
+            <SwipeRow key={l.id} onDelete={() => void db.rolls.update(id, { locations: roll.locations.filter((x) => x.id !== l.id) })}>
+            <PressMenu items={[{ label: '수정', icon: 'pencil', onPress: () => setPlace(l) }, { label: '삭제', icon: 'trash', danger: true, onPress: () => void db.rolls.update(id, { locations: roll.locations.filter((x) => x.id !== l.id) }) }]}>
+            <button className="row" onClick={() => setPlace(l)}>
               {/* 이름만 있고 좌표가 없으면 주황, 장소 미상은 회색 */}
               <span style={{ color: l.point ? 'var(--safelight)' : l.name ? 'var(--warn)' : 'var(--muted)' }}><Icon name="pin" /></span>
               <span className="grow">
@@ -189,6 +205,8 @@ export function RollDetail({ id }: { id: string }) {
               </span>
               <span className="value">{rangeOf(i)}</span>
             </button>
+            </PressMenu>
+            </SwipeRow>
           ))}
           <button className="row accent" onClick={() => setPlace('new')}><Icon name="plus" /> 장소 추가</button>
         </div>
@@ -227,15 +245,20 @@ export function RollDetail({ id }: { id: string }) {
 
       {roll.status !== 'atLab' && (
         <div className="section">
-        <div className="action-stack">
-          {roll.status === 'loaded' && <button className="btn primary" onClick={() => setDropOff(true)}>촬영 끝내기</button>}
-          {roll.status === 'finished' && <button className="btn" onClick={() => db.rolls.update(id, { status: 'loaded' })}>다시 촬영 중으로</button>}
-          {roll.status === 'imported' && <ScanButton rollId={id} label="다시 불러오기" />}
-          {roll.status === 'imported' && <button className="btn" onClick={() => { void syncPhotoMeta(id, nav.toast) }}>사진 날짜·위치 다시 맞추기</button>}
+        <div className="group">
+          {roll.status === 'loaded' && <button className="row accent" onClick={() => setDropOff(true)}>촬영 끝내기</button>}
+          {roll.status === 'finished' && <button className="row accent" onClick={() => db.rolls.update(id, { status: 'loaded' })}>다시 촬영 중으로</button>}
+          {roll.status === 'imported' && <ScanButton rollId={id} label="다시 불러오기" row />}
+          {roll.status === 'imported' && <button className="row accent" onClick={() => { void syncPhotoMeta(id, nav.toast) }}>사진 날짜·위치 다시 맞추기</button>}
         </div>
       </div>
       )}
 
+      {askFilm && (
+        <Confirm message="이 필름을 다 찍고 바꾸는 건가요?" safe action="다 찍었어요 · 새 필름 장착" extra={{ label: '아직 찍는 중 · 필름 기록만 고치기', onPress: () => { setAskFilm(false); setPickFilm(true) } }}
+          onCancel={() => setAskFilm(false)} onConfirm={() => { setAskFilm(false); nav.loadFilm(roll.cameraId) }} />
+      )}
+      {pickFilm && <RollFilmPick roll={roll} format={rollCameraFormat(camera, roll)} onClose={() => setPickFilm(false)} />}
       {pickCamera && <RollCameraPick roll={roll} onClose={() => setPickCamera(false)} />}
       {recording && <ManualRecord roll={roll} onClose={() => setRecording(false)} />}
       {shotEdit !== undefined && <RollShotEdit roll={roll} pos={shotEdit} onClose={() => setShotEdit(undefined)} onToast={nav.toast} />}
@@ -318,6 +341,28 @@ function ExpiryEditSheet({ roll, onClose }: { roll: Roll; onClose: () => void })
 
 function Info({ label, value }: { label: string; value: string }) {
   return <div className="row static"><span className="grow">{label}</span><span className="value">{value}</span></div>
+}
+
+/** 롤에 기록한 필름을 다른 필름으로 고친다 (아이폰 RollFilmPicker와 같음) */
+function RollFilmPick({ roll, format, onClose }: { roll: Roll; format: FilmFormat; onClose: () => void }) {
+  const [filmId, setFilmId] = useState<string | undefined>(roll.filmId || undefined)
+  const [custom, setCustom] = useState<string>()
+  const customRows = useLiveQuery(() => db.customFilms.toArray(), []) ?? []
+  const save = async () => {
+    if (filmId && filmId !== roll.filmId) {
+      // 증감 감도가 새 필름 감도와 같으면 따로 적지 않는다. 유통기한은 예전 필름 것이라 비운다
+      await db.rolls.update(roll.id, { filmId, filmExpiresAt: undefined, ...(roll.shotISO === filmById(filmId)?.iso ? { shotISO: undefined } : {}) })
+    }
+    onClose()
+  }
+  return (
+    <Sheet title="필름 바꾸기" onClose={onClose} right={<button className="btn ghost" disabled={!filmId} onClick={() => { void save() }}><b>저장</b></button>}>
+      <FilmPicker format={format} filmId={filmId} onPick={(id) => setFilmId(id)} onAddCustom={() => setCustom('new')} onEditCustom={setCustom}
+        footer={(roll.frameCount ?? 0) > 0 && <p className="footnote">저장한 사진의 필름 정보도 함께 바꿔요. 휴대폰 갤러리에 이미 저장한 사진은 '갤러리에 저장'을 다시 눌러 주세요.</p>} />
+      {custom && <CustomFilmEdit row={custom === 'new' ? undefined : customRows.find((r) => r.id === custom)}
+        onClose={(saved) => { setCustom(undefined); if (saved !== undefined) setFilmId(saved || undefined) }} />}
+    </Sheet>
+  )
 }
 
 /** 롤 카메라 바꾸기: 내 장비 카메라 중에서 (아이폰 RollCameraPicker와 같음). 촬영 중인 롤은 다른 필름이 든 카메라로는 못 옮긴다.
@@ -423,7 +468,7 @@ function AllShots({ roll, format, onEdit }: { roll: Roll; format: FilmFormat; on
 /** 촬영일·장소를 고치면 저장한 사진 속 날짜·위치도 새로 쓴다. 드라이브에 연결돼 있으면 새 정보의 사진으로 다시 올린다 */
 function usePhotoMetaSync(roll: Roll | undefined, toast: (m: string) => void) {
   const key = roll?.status === 'imported'
-    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive, roll.cameraId, roll.cameraBrand, roll.cameraModel, roll.lensId, roll.lab,
+    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive, roll.cameraId, roll.cameraBrand, roll.cameraModel, roll.lensId, roll.lab, roll.filmId, roll.shotISO,
       (roll.meterShots ?? []).map((x) => [x.pos, x.at, x.place, x.lat, x.lon, x.lensId, x.iso])])
     : ''
   const last = useRef<string | undefined>(undefined)
@@ -444,3 +489,5 @@ async function syncPhotoMeta(rollId: string, toast: (m: string) => void) {
   toast(drive ? `사진 정보도 바꿨어요 (${n}장). 드라이브에도 새로 올려요` : `사진 정보도 바꿨어요 (${n}장)`)
   if (drive) void syncPhotosToDrive().catch(() => {})
 }
+
+const MenuIcon = ({ name }: { name: string }) => <span style={{ color: 'var(--safelight)', display: 'grid' }}><Icon name={name} size={21} /></span>

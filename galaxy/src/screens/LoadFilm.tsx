@@ -10,10 +10,12 @@ import { formatInfo, uid } from '../core/types'
 import { allFilms, filmById, filmDisplayName, popularFilms } from '../core/films'
 import { hasExpiredLot, lotToUse, stockCount } from '../core/filmStock'
 import { lensesFor } from '../core/lenses'
-import { Btn, CameraCover, Canister, Chip, DateInput, Field, Footnote, Group, Row, Section, Select, Toggle } from '../kit'
+import { Btn, CameraCover, Canister, Chip, DateInput, Field, Footnote, Group, Row, RowText, Section, Select, Toggle } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
 import { currentPlace, locationAvailable, weatherAt } from '../platform'
 import { useTheme } from '../theme'
+import { Icon } from '../icons'
+import { CameraEdit } from './CameraEdit'
 import { CustomFilmEdit } from './CustomFilmEdit'
 
 export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: string; onClose: (loaded?: Roll) => void }) {
@@ -67,6 +69,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const expired = !!film && hasExpiredLot(lots, film.id)
   const stock = film ? stockCount(lots, film.id) : 0
   const [confirmExpired, setConfirmExpired] = useState(false)
+  const [addingCamera, setAddingCamera] = useState(false)
 
   // 렌즈 교환식 카메라는 렌즈를 골라야 장착할 수 있다
   const lensReady = !camera?.mount || (lensId === '__new' ? !!newLens.trim() : !!lensId)
@@ -119,7 +122,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
     <Sheet title="필름 장착하기" onClose={() => onClose()}
       right={<SheetBtn label="장착" accent disabled={!camera || !film || !lensReady} onPress={() => expired ? setConfirmExpired(true) : load()} />}>
       <Section title="카메라" foot={loaded ? "지금 장착된 필름은 '촬영 완료'로 바뀌어요." : undefined} warn>
-        {cameras?.length === 0 ? <Footnote>먼저 내 장비에서 카메라를 추가해 주세요.</Footnote> : null}
+        {cameras?.length === 0 ? <Group><Row onPress={() => setAddingCamera(true)}><Icon name="plus" size={22} color={c.safelight} /><RowText color={c.safelight}>카메라 추가</RowText></Row></Group> : null}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2, paddingTop: 2, paddingBottom: 4 }}>
           {pickOrder.map((x) => {
             const on = x.id === cameraId
@@ -181,6 +184,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
           </Group>
         </Section>
       ) : null}
+      {addingCamera ? <CameraEdit onClose={() => setAddingCamera(false)} /> : null}
       {confirmExpired ? <Confirm message="유통기한이 지난 필름이에요." action="그래도 장착" safe onCancel={() => setConfirmExpired(false)} onConfirm={() => { setConfirmExpired(false); void load() }} /> : null}
       {customEdit ? (
         <CustomFilmEdit row={customEdit === 'new' ? undefined : customRows.find((r) => r.id === customEdit)}

@@ -37,7 +37,7 @@ export function IncomingImport({ files, onClose }: { files: File[]; onClose: () 
       </div>
       <div className="group">
         <button className="row" onClick={() => { reuseNextOverlay(); setStep(many ? 'multi' : 'pending') }}>
-          <span className="grow"><b>스캔 대기 중인 롤에 넣기</b>
+          <span className="grow"><b>기록해 둔 롤에 넣기</b>
             <div className="sub">{rolls.length === 0 ? '현상 맡긴 롤이 없으면 새 롤로 만들 수 있어요' : many ? '파일마다 롤을 골라 한 번에 가져와요' : '현상 맡긴 롤 중에서 골라요'}</div>
           </span>
         </button>
@@ -155,7 +155,7 @@ function MultiRollImport({ files, samples, onClose }: { files: File[]; samples: 
           </div>
         </div>
       ))}
-      {all && rolls.length === 0 && <p className="footnote">스캔 대기 중인 롤이 없어요. 하나씩 가져오면 새 롤로 만들 수 있어요.</p>}
+      {all && rolls.length === 0 && <p className="footnote">기록해 둔 롤이 없어요. 하나씩 가져오면 새 롤로 만들 수 있어요.</p>}
       {error && <p className="footnote warn">{error}</p>}
     </Sheet>
   )

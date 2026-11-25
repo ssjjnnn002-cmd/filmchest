@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { subscribeWork } from '../core/work'
 import { pushOverlay } from '../backStack'
+import { lastTap, tick } from '../motion'
 import type { Camera, Roll, RollStatus } from '../core/types'
 import { statusName } from '../core/types'
 import type { FilmStock } from '../core/films'
@@ -39,18 +40,22 @@ type IconDef = { d: string; fill?: boolean; width?: number }
 const icons: Record<string, IconDef> = {
   // 탭 (채운 모양)
   'camera.fill': { fill: true, d: 'M5 7.4h2.5l1.4-2.1a1.8 1.8 0 0 1 1.5-.8h3.2a1.8 1.8 0 0 1 1.5.8l1.4 2.1H19a3 3 0 0 1 3 3v7.6a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-7.6a3 3 0 0 1 3-3z M12 18.1a3.9 3.9 0 1 0 0-7.8 3.9 3.9 0 0 0 0 7.8z M12 16.4a2.2 2.2 0 1 1 0-4.4 2.2 2.2 0 0 1 0 4.4z M18.6 11.3a1 1 0 1 0 0-2 1 1 0 0 0 0 2z' },
-  'film.fill': { fill: true, d: `M5 3.5h14a2.2 2.2 0 0 1 2.2 2.2v12.6a2.2 2.2 0 0 1-2.2 2.2H5a2.2 2.2 0 0 1-2.2-2.2V5.7A2.2 2.2 0 0 1 5 3.5z M7 4.6h.9v14.8H7z M16.1 4.6h.9v14.8h-.9z ${perfs(4.2)} ${perfs(18.2)} M4.2 18.8h1.6v.1h-1.6z` },
+  'film.fill': { fill: true, d: `M5 3.5h14a2.2 2.2 0 0 1 2.2 2.2v12.6a2.2 2.2 0 0 1-2.2 2.2H5a2.2 2.2 0 0 1-2.2-2.2V5.7A2.2 2.2 0 0 1 5 3.5z M7.6 11.4h8.8v1.2H7.6z ${perfs(4.4)} ${perfs(18)}` },
   'tray.fill': { fill: true, d: 'M2.8 13.6 5 7.2a1.6 1.6 0 0 1 1.5-1.1H9v1.8H7l-1.8 5.1h3.3a1 1 0 0 1 .95.7l.45 1.3h4.2l.45-1.3a1 1 0 0 1 .95-.7h3.3L17 7.9h-2V6.1h2.5A1.6 1.6 0 0 1 19 7.2l2.2 6.4V18a2.4 2.4 0 0 1-2.4 2.4H5.2A2.4 2.4 0 0 1 2.8 18z M11.05 2.4h1.9v6.4l1.9-1.9 1.35 1.35L12 12.4 7.8 8.25 9.15 6.9l1.9 1.9z' },
-  'canister.fill': { fill: true, d: 'M9.3 2.3h5.4a1.1 1.1 0 0 1 1.1 1.1v1.4H8.2V3.4a1.1 1.1 0 0 1 1.1-1.1z M7.6 5.8h8.8a2.2 2.2 0 0 1 2.2 2.2v11.4a2.2 2.2 0 0 1-2.2 2.2H7.6a2.2 2.2 0 0 1-2.2-2.2V8a2.2 2.2 0 0 1 2.2-2.2z M5.4 9.3h13.2v1H5.4z M5.4 17.2h13.2v1H5.4z' },
+  'canister.fill': { fill: true, d: 'M6.6 8.6h10.8a2.4 2.4 0 0 1 2.4 2.4v8a2.4 2.4 0 0 1-2.4 2.4H6.6A2.4 2.4 0 0 1 4.2 19v-8a2.4 2.4 0 0 1 2.4-2.4z M7.2 5.4h9.6a.9.9 0 0 1 .9.9v.5H6.3v-.5a.9.9 0 0 1 .9-.9z M9 2.5h6a.8.8 0 0 1 .8.8v.4H8.2v-.4a.8.8 0 0 1 .8-.8z' },
 
   // 선 아이콘
   camera: { d: 'M5 7.4h2.5l1.4-2.1a1.8 1.8 0 0 1 1.5-.8h3.2a1.8 1.8 0 0 1 1.5.8l1.4 2.1H19a3 3 0 0 1 3 3v7.6a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-7.6a3 3 0 0 1 3-3z M12 17.6a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8z' },
   film: { d: 'M5 3.5h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z M7.5 3.5v17 M16.5 3.5v17 M3 8h4.5 M3 12h4.5 M3 16h4.5 M16.5 8H21 M16.5 12H21 M16.5 16H21' },
   inbox: { d: 'M3 13.5 5.3 6.8A1.5 1.5 0 0 1 6.7 5.8H9 M15 5.8h2.3a1.5 1.5 0 0 1 1.4 1L21 13.5V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M3 13.5h5l1 2h6l1-2h5 M12 3v8 M9 8l3 3 3-3' },
-  stack: { d: 'M9.3 2.8h5.4v2.4H9.3z M7.6 5.2h8.8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7.6a2 2 0 0 1-2-2v-12a2 2 0 0 1 2-2z M5.6 9.5h12.8 M5.6 17h12.8' },
-  group: { d: 'M4 4.5h16v4H4z M4 10.5h16v4H4z M4 16.5h10v3.5H4z' },
+  stack: { d: 'M6.8 8.6h10.4a2.2 2.2 0 0 1 2.2 2.2v8.2a2.2 2.2 0 0 1-2.2 2.2H6.8A2.2 2.2 0 0 1 4.6 19v-8.2a2.2 2.2 0 0 1 2.2-2.2z M6.8 5.6h10.4 M8.6 2.8h6.8' },
+  group: { d: 'M4 5.5h7.5a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z M6 14h5.5a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1z M16 7h4a1 1 0 0 1 1 1v8.5a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z' },
+  /** 그룹화 칩 (겹친 판) */
+  layers: { d: 'M12 3.6 20.5 8 12 12.4 3.5 8z M3.5 12 12 16.4 20.5 12 M3.5 16 12 20.4 20.5 16' },
+  /** 프로젝트에 담기 */
+  folderPlus: { d: 'M15 6.8h-4l-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12.5a2 2 0 0 0 2-2V13 M18.6 4v6.4 M15.4 7.2h6.4' },
   plus: { d: 'M12 4.8v14.4 M4.8 12h14.4', width: 2.1 },
-  gear: { fill: true, d: gearPath() },
+  gear: { d: gearPath(), width: 1.6 },
   grid: { d: `${roundSq(4, 4, 6.8, 1.8)} ${roundSq(13.2, 4, 6.8, 1.8)} ${roundSq(4, 13.2, 6.8, 1.8)} ${roundSq(13.2, 13.2, 6.8, 1.8)}` },
   list: { d: 'M9 6.5h11 M9 12h11 M9 17.5h11 M4.6 6.5h.01 M4.6 12h.01 M4.6 17.5h.01', width: 2.1 },
   back: { d: 'M14.8 5.2 8 12l6.8 6.8', width: 2.2 },
@@ -76,6 +81,8 @@ const icons: Record<string, IconDef> = {
   zip: { d: 'M7 2.8h6.6L19 8.2V19a2.2 2.2 0 0 1-2.2 2.2H7A2.2 2.2 0 0 1 4.8 19V5A2.2 2.2 0 0 1 7 2.8z M13.4 2.8v5.6H19 M10.2 2.8v1.8 M10.2 6.4v1.8 M10.2 10v1.8 M9 14.4h2.4v3.6H9z' },
   sheet: { d: [4, 9.6, 15.2].flatMap((y) => [4, 9.6, 15.2].map((x) => roundSq(x, y, 4.8, 1.2))).join(' ') },
   photos: { d: 'M7 5.5h11a2 2 0 0 1 2 2v9 M4 8.5h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z M2.5 17.5l4-4 4 4 2.5-2.5 4 4' },
+  building: { d: 'M6 20.5v-16a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v16z M9.5 7.5h1.2 M13.3 7.5h1.2 M9.5 11h1.2 M13.3 11h1.2 M9.5 14.5h1.2 M13.3 14.5h1.2 M10.5 20.5v-2.5h3v2.5' },
+  calendar: { d: 'M5.5 5.5h13a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2z M3.5 9.8h17 M8 3.4v3.2 M16 3.4v3.2' },
   battery: { d: 'M4.5 7.5h13a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z M21.5 10.5v3' },
   meter: { d: 'M6.2 5h11.6A3.2 3.2 0 0 1 21 8.2v7.6a3.2 3.2 0 0 1-3.2 3.2H6.2A3.2 3.2 0 0 1 3 15.8V8.2A3.2 3.2 0 0 1 6.2 5zM12 13.2a1.2 1.2 0 1 0 0-2.4 1.2 1.2 0 0 0 0 2.4z' },
   search: { d: 'M10.8 17.6a6.8 6.8 0 1 0 0-13.6 6.8 6.8 0 0 0 0 13.6z M15.8 15.8 20.4 20.4', width: 2.1 },
@@ -130,8 +137,17 @@ export function GlassGroup({ children }: { children: ReactNode }) {
 
 // --- 시트 (아래에서 올라오는 창)
 
-export function Sheet({ title, onClose, left, right, children, wide, page, shield }: {
+/** 아이폰에서 작은 제목(가운데)으로 뜨는 창들. 나머지 입력 창은 왼쪽 큰 제목 */
+const inlineTitles = /^(스캔 불러오기|스캔 가져오기|통계와 기록|백업|클라우드 백업|개인정보|필름함 시작하기|구글로 로그인|밀착|프레임|컷 기록|필터|필름 · 컷|촬영 시간|카메라 ISO|렌즈$|장소$|개발자 모드|사진 \d|기존 롤|주소가|기록 옮기기|예전)/
+/** 아이폰에서 창 안에서 옆으로 넘어가는 화면 (뒤로 버튼) */
+const pushTitles = /^(통계와 기록|백업 및 복구|클라우드 백업|개인정보 처리방침|노출계 시험|장비에 쓴 돈)$/
+/** 아이폰에서 화면 절반만 올라오는 창들 */
+const halfTitles = /^(밀착 인화지로 만들기|프레임 만들기|필름 유통기한|필터|카메라 ISO|렌즈$|촬영 시간|롤 제목|개발자 모드)/
+
+export function Sheet({ title, onClose, left, right, children, wide, page, shield, push: pushProp }: {
   title: string; onClose: () => void; left?: ReactNode; right?: ReactNode; children: ReactNode; wide?: boolean
+  /** 옆에서 밀려 들어오는 화면 (프로젝트처럼) */
+  push?: boolean
   /** 화면을 꽉 채운다. 바깥 탭으로 닫히지 않는다. */
   page?: boolean
   /** 연 직후 남는 탭을 한 번 삼킨다. 파일 선택 직후 창이 닫히거나 가져오기가 눌리는 것을 막는다. */
@@ -170,7 +186,19 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
   // 닫힐 때(어떤 이유로든 사라질 때) 모습을 복제해 내려가며 사라지게 한다
   const rootRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ y: number; dy: number } | null>(null)
+  const drag = useRef<{ y: number; dy: number; t: number; v: number } | null>(null)
+  const push = !!pushProp || pushTitles.test(title)
+  const half = !page && halfTitles.test(title)
+  const [tall, setTall] = useState(false)
+  const big = (!inlineTitles.test(title) || !!pushProp) && !half
+  const [small, setSmall] = useState(!big)
+  const bigRef = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (!big || !bigRef.current) { setSmall(true); return }
+    const io = new IntersectionObserver(([e]) => setSmall(!e.isIntersecting), { root: sheetRef.current, rootMargin: page ? '-4px 0px 0px 0px' : '-62px 0px 0px 0px' })
+    io.observe(bigRef.current)
+    return () => io.disconnect()
+  }, [big, page])
   const backdropDown = useRef(false)
   useLayoutEffect(() => {
     const root = rootRef.current
@@ -190,7 +218,7 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       const ghostScroller = ghost.querySelector('.sheet, .sheet-page')
       document.body.appendChild(ghost)
       if (scroller && ghostScroller) ghostScroller.scrollTop = scroller.scrollTop
-      window.setTimeout(() => ghost.remove(), 300)
+      window.setTimeout(() => ghost.remove(), 460)
     }
   }, [])
 
@@ -332,7 +360,7 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
       const el = e.target
       if (!(el instanceof HTMLElement) || (el !== root && el !== sheet)) return
       // transform 애니메이션이 남아 있으면 아이폰이 입력 칸 포커스를 바로 놓친다
-      if (e.animationName === 'sheet-up' || e.animationName === 'sheet-pop') el.style.animation = 'none'
+      if (e.animationName === 'sheet-up' || e.animationName === 'sheet-half' || e.animationName === 'side-in' || e.animationName === 'sheet-pop') el.style.animation = 'none'
     }
     const settleTimer = window.setTimeout(() => {
       if (root.classList.contains('fullscreen')) root.style.animation = 'none'
@@ -380,41 +408,70 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
   // 위쪽(손잡이·제목줄)을 아래로 끌어 닫기
   const onDragStart = (e: React.PointerEvent) => {
     if (page || (e.target as HTMLElement).closest('button')) return
-    drag.current = { y: e.clientY, dy: 0 }
+    drag.current = { y: e.clientY, dy: 0, t: performance.now(), v: 0 }
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }
   const onDragMove = (e: React.PointerEvent) => {
     const d = drag.current, el = sheetRef.current
     if (!d || !el) return
-    d.dy = Math.max(0, e.clientY - d.y)
+    const dy = e.clientY - d.y, now = performance.now()
+    if (now > d.t) d.v = (dy - d.dy) / (now - d.t)
+    d.t = now
+    d.dy = dy
     el.style.transition = 'none'
-    el.style.transform = `translateY(${d.dy}px)`
+    // 위로는 뻑뻑하게
+    el.style.transform = `translateY(${dy > 0 ? dy : dy / 6}px)`
   }
   const onDragEnd = () => {
     const d = drag.current, el = sheetRef.current
     drag.current = null
     if (!d || !el) return
     el.style.transition = ''
-    if (d.dy > 110) { onClose(); return }
+    const fast = d.v > 0.5
+    // 절반 창을 위로 끌면 꽉 차게, 꽉 찬 창을 조금 내리면 닫힘 (아이폰과 같음)
+    if (half && !tall && d.dy < -40) { setTall(true); el.style.transform = ''; tick(); return }
+    if (half && tall && d.dy > 60 && d.dy < window.innerHeight * 0.5 && !fast) { setTall(false); el.style.transform = ''; return }
+    if (d.dy > el.clientHeight * 0.4 || (fast && d.dy > 30)) { onClose(); return }
     el.style.transform = ''
   }
 
   const head = (
     <div className="sheet-head" onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}>
-      <div className="left">{left ?? <button className="btn" onClick={onClose}>닫기</button>}</div>
-      <h2>{title}</h2>
-      <div className="right">{right}</div>
+      <div className="left">{push ? <button className="glass-btn round back" onClick={onClose} aria-label="뒤로"><Icon name="back" size={22} /></button> : left ?? <button className="btn" onClick={onClose}>{right ? '취소' : '닫기'}</button>}</div>
+      <h2 style={{ opacity: small ? 1 : 0 }}>{title}</h2>
+      <div className="right">{push && !pushProp ? null : right}</div>
     </div>
   )
+  // 옆으로 넘어온 화면은 왼쪽 가장자리에서 밀어 되돌린다
+  const edge = useRef<{ x: number; dx: number; t: number; v: number } | null>(null)
+  const edgeProps = !push ? {} : {
+    onTouchStart: (e: React.TouchEvent) => { const x = e.touches[0].clientX; edge.current = x < 28 ? { x, dx: 0, t: performance.now(), v: 0 } : null },
+    onTouchMove: (e: React.TouchEvent) => {
+      const g = edge.current, el = page ? rootRef.current : sheetRef.current
+      if (!g || !el) return
+      const dx = Math.max(0, e.touches[0].clientX - g.x), now = performance.now()
+      if (now > g.t) g.v = (dx - g.dx) / (now - g.t)
+      g.t = now; g.dx = dx
+      el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)`
+    },
+    onTouchEnd: () => {
+      const g = edge.current, el = page ? rootRef.current : sheetRef.current
+      edge.current = null
+      if (!g || !el) return
+      el.style.transition = ''
+      if (g.dx > window.innerWidth * 0.5 || g.v > 0.4) onClose(); else el.style.transform = ''
+    },
+  }
+  const bigTitle = big ? <h1 ref={bigRef} className="sheet-title">{title}</h1> : null
   const guard = shieldOn ? (
     <div className="sheet-shield" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation() }} />
   ) : null
   if (page) {
     return createPortal(
-      <div ref={rootRef} className="fullscreen sheet-root" role="dialog" aria-modal="true" aria-label={title}>
+      <div ref={rootRef} {...edgeProps} className={`fullscreen sheet-root ${push ? 'push' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         {head}
-        <div ref={sheetRef} className="sheet-page">{children}</div>
+        <div ref={sheetRef} className="sheet-page">{bigTitle}{children}</div>
         {guard}
       </div>,
       document.body,
@@ -422,7 +479,7 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
   }
   // 움직이는(transform) 카드 안에서 열려도 화면 기준으로 뜨게 body에 둔다
   return createPortal(
-    <div ref={rootRef} className="sheet-backdrop sheet-root"
+    <div ref={rootRef} {...edgeProps} className={`sheet-backdrop sheet-root ${push ? 'push' : ''}`}
       onPointerDown={(e) => { backdropDown.current = e.target === e.currentTarget }}
       onPointerUp={(e) => {
         const startedOutside = backdropDown.current
@@ -430,8 +487,9 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
         if (!startedOutside || e.target !== e.currentTarget || blockBackdrop.current) return
         onClose()
       }}>
-      <div ref={sheetRef} className="sheet" role="dialog" aria-modal="true" aria-label={title} style={wide ? { width: 'min(820px, 100%)' } : undefined}>
+      <div ref={sheetRef} className={`sheet ${half && !tall ? 'half' : ''} ${small ? 'compact' : ''}`} role="dialog" aria-modal="true" aria-label={title} style={wide ? { width: 'min(820px, 100%)' } : undefined}>
         {head}
+        {bigTitle}
         {children}
         {guard}
       </div>
@@ -441,19 +499,39 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
 }
 
 /** 페이지 안 확인 창 (브라우저 confirm()은 쓸 수 없는 환경이 있어서) */
-export function Confirm({ message, action = '삭제', safe, onConfirm, onCancel }: {
+export function Confirm({ message, action = '삭제', safe, extra, onConfirm, onCancel }: {
   message: string; action?: string; safe?: boolean; onConfirm: () => void; onCancel: () => void
+  /** 아래 버튼 하나 더 */
+  extra?: { label: string; onPress: () => void }
 }) {
   const cancelRef = useRef(onCancel)
   cancelRef.current = onCancel
   useEffect(() => pushOverlay(() => cancelRef.current()), [])
+  // 누른 자리 옆의 말풍선 (아이폰과 같음). 밖을 누르면 취소
+  const box = useRef<HTMLDivElement>(null)
+  const cancelSoon = useRef(false)
+  const tap = useRef({ ...lastTap })
+  useLayoutEffect(() => {
+    const el = box.current
+    if (!el) return
+    const w = el.offsetWidth, h = el.offsetHeight, { x, y } = tap.current
+    const left = Math.min(Math.max(16, x - w / 2), window.innerWidth - w - 16)
+    const above = y - h - 28 > 12
+    const top = above ? y - h - 28 : Math.min(y + 28, window.innerHeight - h - 16)
+    el.style.left = `${left}px`
+    el.style.top = `${top}px`
+    el.style.transformOrigin = `${x - left}px ${above ? '100%' : '0%'}`
+    el.classList.add('placed')
+  }, [])
   return createPortal(
-    <div className="alert-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}>
-      <div className="alert" role="alertdialog" aria-label={message}>
+    <div className="alert-backdrop" onPointerDown={(e) => { if (e.target === e.currentTarget) cancelSoon.current = true }}
+      onClick={(e) => { if (e.target === e.currentTarget && cancelSoon.current) onCancel() }}>
+      <div ref={box} className="alert bubble" role="alertdialog" aria-label={message}>
         <p>{message}</p>
         <div className="actions">
-          <button className="btn" onClick={onCancel}>취소</button>
+          <button className="btn sr" onClick={onCancel}>취소</button>
           <button className="btn" style={{ color: safe ? 'var(--safelight)' : 'var(--danger)', fontWeight: 600 }} onClick={onConfirm}>{action}</button>
+          {extra && <button className="btn" style={{ color: 'var(--safelight)', fontWeight: 500 }} onClick={extra.onPress}>{extra.label}</button>}
         </div>
       </div>
     </div>,

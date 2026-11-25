@@ -37,7 +37,7 @@ struct CustomFilmEditView: View {
                         .listRowBackground(Color.clear)
                 }
                 Section {
-                    TextField("필름 이름", text: $name)
+                    LabeledField("필름 이름", text: $name)
                     HStack {
                         Text("감도")
                         Spacer()

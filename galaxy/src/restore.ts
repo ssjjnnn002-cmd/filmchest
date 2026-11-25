@@ -1,15 +1,33 @@
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 // 웹 core/restore.ts (사진·썸네일은 기기 파일)
 import { db, restoreRoll } from './data'
 import { guessRollFromMeta, readFilmchestMark, readPhotoInfo, rollPatchFromPhotos } from './core/exif'
 import { allFilms, filmDisplayName } from './core/films'
 import { uid } from './core/types'
 import type { Roll } from './core/types'
-import { b64ToBytes, bytesToB64, readBytes, writeBytes } from './files'
+import { b64ToBytes, bytesToB64, readBytes, writeBytes, copyIn, removeFile } from './files'
 import type { PickedFile } from './pick'
 import { webTool } from './webTools'
 
 /** 사진을 줄인 썸네일을 파일로 */
-export async function thumbOf(bytes: Uint8Array, type: string, name: string) {
+export async function thumbOf(bytes: Uint8Array, type: string, name: string, uri?: string) {
+  // 파일이 있으면 기기 기능으로 줄인다 (빠르고 메모리를 덜 쓴다). 못 여는 형식이면 아래 방법으로
+  if (uri && !/tiff?$/.test(type)) {
+    try {
+      const ctx = ImageManipulator.manipulate(uri)
+      const full = await ctx.renderAsync()
+      const w = full.width, h = full.height
+      full.release()
+      const scale = Math.min(1, 1200 / Math.max(w, h))
+      ctx.resize({ width: Math.round(w * scale) })
+      const small = await ctx.renderAsync()
+      const out = await small.saveAsync({ compress: 0.85, format: SaveFormat.JPEG })
+      small.release(); ctx.release()
+      const thumb = await copyIn(out.uri, 'thumbs', `${name}.jpg`)
+      removeFile(out.uri)
+      return { thumb, w, h }
+    } catch { /* 아래 방법으로 */ }
+  }
   try {
     const r = await webTool<{ data: string; width: number; height: number }>('thumb', { data: bytesToB64(bytes), type, max: 1200, quality: 0.85 })
     return { thumb: writeBytes('thumbs', `${name}.jpg`, b64ToBytes(r.data)), w: r.width, h: r.height }

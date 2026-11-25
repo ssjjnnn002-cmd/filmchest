@@ -45,7 +45,7 @@ struct ProjectStrip: View {
                             Text("새 프로젝트").font(.caption.weight(.semibold))
                         }
                         .foregroundStyle(Theme.safelight)
-                        .frame(width: 110, height: 92)
+                        .frame(width: 110).frame(minHeight: 92, maxHeight: .infinity)
                         .background(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.safelight.opacity(0.4), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
                     }
                     .buttonStyle(.plain)
@@ -74,7 +74,7 @@ struct ProjectFolderCard: View {
             Text("\(count)롤").font(.caption).foregroundStyle(.secondary)
         }
         .padding(12)
-        .frame(width: 130, height: 92, alignment: .leading)
+        .frame(width: 130, alignment: .leading).frame(minHeight: 92, maxHeight: .infinity)
         .background(RoundedRectangle(cornerRadius: 16).fill(Theme.card))
         .overlay(alignment: .topTrailing) {
             Circle().fill(project.color).frame(width: 8, height: 8).padding(12)
@@ -216,7 +216,7 @@ struct ProjectEditView: View {
                     .padding(.vertical, 4)
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .navigationTitle(project == nil ? "새 프로젝트" : "프로젝트 수정")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }

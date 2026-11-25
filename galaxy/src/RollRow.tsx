@@ -18,7 +18,7 @@ export function RollRow({ roll }: { roll: Roll }) {
   const cover = useCoverFrame(roll)
   const coverUri = useCoverThumb(cover)
   return (
-    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14, minWidth: 0 }}>
+    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 }}>
       {/* 스캔이 있으면 대표 사진, 없으면 필름통 (웹과 같음) */}
       {/* 바둑판형 표지와 같은 가로 비율. 필름통도 같은 폭 칸에 두어 글 시작이 맞는다 */}
       <View style={{ width: 90, height: 60, alignItems: 'center', justifyContent: 'center' }}>
@@ -27,31 +27,31 @@ export function RollRow({ roll }: { roll: Roll }) {
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 17, fontWeight: '600', color: c.ink }}>{rollName(roll)}</Text>
+          <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 15, fontWeight: '600', color: c.ink }}>{rollName(roll)}</Text>
           <StatusBadge status={roll.status} />
           {roll.favorite ? <Text style={{ color: '#F5B700' }}>★</Text> : null}
         </View>
         {/* 제목을 붙였으면 필름 이름은 아래 줄에 (웹과 같음) */}
-        <Sub lines={1}>{[roll.title?.trim() ? rollFilmName(roll) : undefined, cameraName(camera, roll), dateRangeText(roll)].filter(Boolean).join(' · ')}</Sub>
+        <Sub small lines={1}>{[roll.title?.trim() ? rollFilmName(roll) : undefined, cameraName(camera, roll), dateRangeText(roll)].filter(Boolean).join(' · ')}</Sub>
         {/* 메모는 장소 줄에 이어 붙인다 (줄이 늘면 높이가 달라진다) */}
-        <Sub lines={1}>{placeAndMemo(roll) || ' '}</Sub>
+        <Sub small lines={1}>{placeAndMemo(roll) || ' '}</Sub>
         <TagLine tags={roll.tags} />
       </View>
     </View>
   )
 }
 
-export function RollCard({ roll, onPress }: { roll: Roll; onPress: () => void }) {
+export function RollCard({ roll, onPress, onLongPress }: { roll: Roll; onPress: () => void; onLongPress?: () => void }) {
   const c = useTheme()
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
   const first = useCoverFrame(roll)
   const firstUri = useCoverThumb(first)
   const format = rollCameraFormat(camera, roll)
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => ({ flex: 1, minWidth: 0, backgroundColor: c.cell, borderRadius: 18, padding: 10, gap: 8,
+    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={450} style={({ pressed }) => ({ flex: 1, minWidth: 0, backgroundColor: c.cell, borderRadius: 18, padding: 10, gap: 8,
       boxShadow: c.shadow, transform: [{ scale: pressed ? 0.98 : 1 }] })}>
       <View style={{ height: 110, borderRadius: 12, backgroundColor: c.filmBase, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
-        {firstUri ? <Image source={{ uri: firstUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : <Canister film={rollFilm(roll)} format={format} cover />}
+        {firstUri ? <Image source={{ uri: firstUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : <Canister film={rollFilm(roll)} format={format} fill />}
         {roll.favorite ? <Text style={{ position: 'absolute', top: 5, right: 6, color: '#F5B700', fontSize: 13 }}>★</Text> : null}
       </View>
       <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', minWidth: 0 }}>

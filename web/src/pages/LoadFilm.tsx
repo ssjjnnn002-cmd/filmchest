@@ -5,9 +5,10 @@ import type { Roll } from '../core/types'
 import { uid } from '../core/types'
 import { filmById } from '../core/films'
 import { hasExpiredLot, lotToUse, stockCount } from '../core/filmStock'
+import { CameraEdit } from './CameraEdit'
 import { CustomFilmEdit } from './CustomFilmEdit'
 import { lensesFor } from '../core/lenses'
-import { CameraCover, Confirm, Sheet, toInputDate } from '../ui/common'
+import { CameraCover, Confirm, Icon, Sheet, toInputDate } from '../ui/common'
 import { currentPlace, locationAvailable, weatherAt } from '../platform'
 import { FilmPicker } from '../ui/FilmPicker'
 
@@ -61,6 +62,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const expired = !!film && hasExpiredLot(lots, film.id)
   const stock = film ? stockCount(lots, film.id) : 0
   const [confirmExpired, setConfirmExpired] = useState(false)
+  const [addingCamera, setAddingCamera] = useState(false)
 
   // 렌즈 교환식 카메라는 렌즈를 골라야 장착할 수 있다
   const lensReady = !camera?.mount || (lensId === '__new' ? !!newLens.trim() : !!lensId)
@@ -109,8 +111,8 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
       right={<button className="btn ghost" disabled={!camera || !film || !lensReady} onClick={() => expired ? setConfirmExpired(true) : load()}><b>장착</b></button>}>
       <div className="section">
         <h2>카메라</h2>
-        {cameras?.length === 0 && <p className="footnote">먼저 내 장비에서 카메라를 추가해 주세요.</p>}
-        <div className="chips">
+        {cameras?.length === 0 && <div className="group"><button className="row accent" onClick={() => setAddingCamera(true)}><Icon name="plus" /> <span className="grow">카메라 추가</span></button></div>}
+        {!!cameras?.length && <div className="group" style={{ padding: '16px 0' }}><div className="chips" style={{ padding: '0 16px' }}>
           {pickOrder.map((c) => {
             return (
               <button key={c.id} className={`camera-pick ${c.id === cameraId ? 'on' : ''}`} onClick={() => { setCameraId(c.id); setLensId('') }}>
@@ -119,7 +121,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
               </button>
             )
           })}
-        </div>
+        </div></div>}
         {loaded && <p className="footnote warn">지금 장착된 필름은 '촬영 완료'로 바뀌어요.</p>}
       </div>
 
@@ -186,6 +188,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
           {today && isToday && <p className="footnote">{locationAvailable() ? '지금 시각과 현재 위치를 첫 촬영일로 기록해요.' : '지금 시각을 첫 촬영일로 기록해요. 장소는 롤 화면에서 넣을 수 있어요.'}</p>}
         </div>
       )}
+      {addingCamera && <CameraEdit onClose={() => setAddingCamera(false)} />}
       {confirmExpired && <Confirm message="유통기한이 지난 필름이에요." action="그래도 장착" safe onCancel={() => setConfirmExpired(false)} onConfirm={() => { setConfirmExpired(false); void load() }} />}
       {customEdit && (
         <CustomFilmEdit row={customEdit === 'new' ? undefined : customRows.find((r) => r.id === customEdit)}

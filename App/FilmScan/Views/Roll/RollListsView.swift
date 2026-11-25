@@ -48,7 +48,7 @@ struct ShootingView: View {
                             .tint(.yellow)
                         }
                         .swipeActions(edge: .trailing) {
-                            Button("삭제", systemImage: "trash", role: .destructive) { deleting = roll }
+                            Button("삭제", systemImage: "trash", role: .destructive) { deleting = roll }.tint(.red)
                         }
                     RollQuickActions(roll: roll, onMeter: { meterRoll = roll }) { openDropOff(roll) }
                 }
@@ -262,25 +262,23 @@ struct PendingView: View {
             let atLab = rolls.filter { $0.deletedAt == nil && $0.status == .atLab }
             let finished = rolls.filter { $0.deletedAt == nil && $0.status == .finished }
 
+            if !atLab.isEmpty {
             Section("현상 맡김 · \(atLab.count)") {
                 ForEach(atLab) { roll in
-                    HStack(spacing: 10) {
-                        NavigationLink(value: roll) { RollRow(roll: roll) }
-                        Button("불러오기") { router.pickZip(for: roll) }
-                            .buttonStyle(.borderedProminent).tint(Theme.safelight).controlSize(.small)
-                    }
-                    .swipeActions { Button("불러오기") { router.pickZip(for: roll) }.tint(Theme.safelight) }
+                    pendingRow(roll, label: "불러오기", prominent: true) { router.pickZip(for: roll) }
                 }
             }
+            }
+            if !finished.isEmpty {
             Section("촬영 완료 · \(finished.count)") {
                 ForEach(finished) { roll in
-                    HStack(spacing: 10) {
-                        NavigationLink(value: roll) { RollRow(roll: roll) }
-                        Button("현상소 고르기") { dropOff = roll }
-                            .buttonStyle(.bordered).tint(Theme.safelight).controlSize(.small)
-                    }
-                    .swipeActions { Button("현상소 고르기") { dropOff = roll }.tint(.blue) }
+                    pendingRow(roll, label: "현상소 고르기", prominent: false) { dropOff = roll }
                 }
+            }
+            }
+            if atLab.isEmpty && finished.isEmpty && queue.isEmpty {
+                ContentUnavailableView("현상할 롤이 없어요", systemImage: "tray")
+                    .listRowBackground(Color.clear)
             }
         }
         .scrollContentBackground(.hidden)
@@ -339,6 +337,23 @@ struct PendingView: View {
             }
         }
         .settingsButton()
+    }
+
+    /// 롤 한 줄 + 아래에 넓은 버튼 (촬영 중 카드와 같은 모양. 옆에 두면 이름이 잘린다)
+    private func pendingRow(_ roll: RollItem, label: String, prominent: Bool, action: @escaping () -> Void) -> some View {
+        Group {
+            NavigationLink(value: roll) { RollRow(roll: roll) }
+            Group {
+                if prominent {
+                    Button(action: action) { Text(label).frame(maxWidth: .infinity) }.buttonStyle(.borderedProminent)
+                } else {
+                    Button(action: action) { Text(label).frame(maxWidth: .infinity) }.buttonStyle(.bordered)
+                }
+            }
+            .tint(Theme.safelight)
+            .font(.subheadline.weight(.semibold))
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 12, trailing: 16))
+        }
     }
 
     private func enqueue(_ urls: [URL]) {
@@ -523,7 +538,6 @@ struct RollsView: View {
             .fileImporter(isPresented: $showMultiZip, allowedContentTypes: [.zip, .folder], allowsMultipleSelection: true) { result in
                 if case .success(let urls) = result { router.enqueueArchive(urls) }
             }
-            .searchable(text: $search, prompt: "필름, 카메라, 장소, 현상소, 메모, #태그")
             .background(Theme.paper)
             .navigationTitle("롤 보관함")
             .navigationDestination(for: RollItem.self) { RollDetailView(roll: $0) }
@@ -574,7 +588,8 @@ struct RollsView: View {
         case .list:
             List {
                 Section { controls }
-                    .listRowInsets(EdgeInsets())
+                    // 목록 카드 왼쪽 끝과 줄을 맞춘다 (안쪽 여백 16을 되돌림)
+                    .listRowInsets(EdgeInsets(top: 0, leading: -16, bottom: 0, trailing: -16))
                     .listRowBackground(Color.clear)
                 emptyState.listRowBackground(Color.clear)
                 ForEach(groups, id: \.key) { group in
@@ -603,7 +618,7 @@ struct RollsView: View {
                     .tint(.yellow)
                 }
                 .swipeActions(edge: .trailing) {
-                    Button("삭제", systemImage: "trash", role: .destructive) { deleting = roll }
+                    Button("삭제", systemImage: "trash", role: .destructive) { deleting = roll }.tint(.red)
                 }
                 .contextMenu { rollMenu(roll) }
                 // 구분선 없이 촘촘하게 (사진이 줄을 나눈다)
@@ -618,12 +633,26 @@ struct RollsView: View {
     private var controls: some View {
         VStack(spacing: 10) {
             ProjectStrip(rolls: rolls)
-            Picker("상태", selection: $statusTab) {
-                ForEach(RollStatusTab.allCases) { Text($0.displayName).tag($0) }
+            // 검색은 늘 보이게 (내 장비와 같은 모양, 웹·갤럭시와 같은 자리)
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("필름, 카메라, 장소, 메모, #태그", text: $search).autocorrectionDisabled()
+                if !search.isEmpty {
+                    Button { search = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
+                        .buttonStyle(.plain)
+                }
             }
-            .pickerStyle(.segmented)
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal, 16)
-            filterBar
+            if rolls.contains(where: { $0.deletedAt == nil }) {
+                Picker("상태", selection: $statusTab) {
+                    ForEach(RollStatusTab.allCases) { Text($0.displayName).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                filterBar
+            }
         }
         .padding(.vertical, 4)
     }
@@ -742,12 +771,12 @@ enum RollStatusTab: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .all: "전체"
-        case .loaded: "장착 중"
-        case .waiting: "스캔 대기"
+        case .loaded: "촬영 중"
+        case .waiting: "현상 스캔"
         case .done: "완료"
         }
     }
-    /// 스캔 대기: 다 찍은 롤과 현상 맡긴 롤
+    /// 현상 스캔(탭과 같은 이름): 다 찍은 롤과 현상 맡긴 롤
     func includes(_ s: RollStatus) -> Bool {
         switch self {
         case .all: true

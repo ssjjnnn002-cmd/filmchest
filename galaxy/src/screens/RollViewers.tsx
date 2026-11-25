@@ -1,10 +1,11 @@
 // 웹 pages/RollViewers.tsx + ui/Viewers.tsx ZoomView
-import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Animated, Image, Modal, Pressable, ScrollView, View } from 'react-native'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { ActivityIndicator, Animated, Image, Pressable, ScrollView, View, useWindowDimensions } from 'react-native'
 import { Text } from '../text'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
+import * as Sharing from 'expo-sharing'
 import Svg, { Path } from 'react-native-svg'
 import { db } from '../data'
 import { useLiveQuery } from '../store'
@@ -16,7 +17,8 @@ import { edgeMarking } from '../core/films'
 import { bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedLocations } from '../core/display'
 import { Btn, Field, Group, Section, Toggle } from '../kit'
 import { Icon } from '../icons'
-import { OverlayBoundary, Sheet, SheetBtn } from '../overlay'
+import { FullModal, iosCurve, Menu, OverlayBoundary, Sheet, SheetBtn } from '../overlay'
+import { RollShotEdit } from './ManualRecord'
 import { b64ToBytes, bytesToB64, readBytes, writeBytes } from '../files'
 import { saveFileNow } from '../platform'
 import { saveImagesToGallery } from '../gallery'
@@ -29,7 +31,7 @@ export function FilmStrip({ roll, frames, onSelect }: { roll: Roll; frames: Fram
   const c = useTheme()
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
   const fmt = formatInfo[rollCameraFormat(camera, roll)]
-  const h = 120
+  const h = 132
   const w = h * fmt.aspect
   const film = rollFilm(roll)
   const fw = w + 8
@@ -75,7 +77,7 @@ export function FilmStrip({ roll, frames, onSelect }: { roll: Roll; frames: Fram
 }
 
 /** 확대/이동 보기: 두 손가락 확대, 끌어서 이동, 두 번 눌러 확대/원래대로. onSwipe가 있으면 원래 크기에서 좌우로 밀 때. */
-export function ZoomView({ uri, onSwipe, background = 'transparent' }: { uri: string; onSwipe?: (dir: 1 | -1) => void; background?: string }) {
+export function ZoomView({ uri, onSwipe, onDrag, background = 'transparent' }: { uri: string; onSwipe?: (dir: 1 | -1) => void; background?: string; /** 원래 크기에서 옆으로 끄는 동안. 넘기지 않으면 0 */ onDrag?: (dx: number, done: boolean) => void }) {
   const [box, setBox] = useState({ w: 0, h: 0 })
   const [nat, setNat] = useState({ w: 0, h: 0 })
   const t = useRef({ s: 1, x: 0, y: 0, fit: 1 })
@@ -121,7 +123,7 @@ export function ZoomView({ uri, onSwipe, background = 'transparent' }: { uri: st
   const pan = Gesture.Pan().runOnJS(true).minDistance(6)
     .onStart(() => { start.current = { ...t.current } })
     .onUpdate((e) => {
-      if (!zoomed()) return
+      if (!zoomed()) { if (e.numberOfPointers <= 1 && start.current.s <= t.current.fit * 1.01) onDrag?.(e.translationX, false); return }
       t.current.x = start.current.x + e.translationX
       t.current.y = start.current.y + e.translationY
       clamp()
@@ -129,6 +131,7 @@ export function ZoomView({ uri, onSwipe, background = 'transparent' }: { uri: st
     })
     .onEnd((e) => {
       if (onSwipe && start.current.s <= t.current.fit * 1.01 && e.numberOfPointers <= 1 && Math.abs(e.translationX) > 50) onSwipe(e.translationX < 0 ? 1 : -1)
+      else onDrag?.(0, true)
     })
   const dbl = Gesture.Tap().numberOfTaps(2).runOnJS(true).onEnd((e) => {
     if (t.current.s > t.current.fit * 1.05) fit()
@@ -169,7 +172,22 @@ export function FrameViewer({ frames, start, onClose, showInfo }: { frames: Fram
   const infoCamera = useLiveQuery(() => (showInfo && roll?.cameraId ? db.cameras.get(roll.cameraId) : undefined), [showInfo, roll?.cameraId])
   const infoLens = useLiveQuery(() => (showInfo && roll?.lensId ? db.lenses.get(roll.lensId) : undefined), [showInfo, roll?.lensId])
   const [infoOpen, setInfoOpen] = useState(false)
-  const step = (d: number) => setI((x) => Math.min(Math.max(x + d, 0), frames.length - 1))
+  // 옆으로 넘기기: 손가락을 따라 옆 사진이 밀려 들어온다 (아이폰과 같음)
+  const { width } = useWindowDimensions()
+  const slide = useRef(new Animated.Value(0)).current
+  const step = (d: number) => {
+    const next = i + d
+    if (next < 0 || next >= frames.length) { Animated.timing(slide, { toValue: 0, duration: 260, easing: iosCurve, useNativeDriver: true }).start(); return }
+    Animated.timing(slide, { toValue: -d * width, duration: 300, easing: iosCurve, useNativeDriver: true }).start(() => { setI(next) })
+  }
+  useLayoutEffect(() => { slide.setValue(0) }, [i, slide])
+  const onDrag = (dx: number, done: boolean) => {
+    if (done) { Animated.timing(slide, { toValue: 0, duration: 260, easing: iosCurve, useNativeDriver: true }).start(); return }
+    const edge = (dx > 0 && i === 0) || (dx < 0 && i === frames.length - 1)
+    slide.setValue(edge ? dx / 3 : dx)
+  }
+  const [menu, setMenu] = useState(false)
+  const [shotEdit, setShotEdit] = useState(false)
   const turns = ((live?.rotation ?? frame?.rotation ?? 0) % 4 + 4) % 4
   const src = frame ? (original && !/\.tiff?$/i.test(frame.name ?? '') ? original.blob : frame.thumb) : undefined
   const [rotatedUri, setRotatedUri] = useState<string>()
@@ -188,28 +206,21 @@ export function FrameViewer({ frames, start, onClose, showInfo }: { frames: Fram
   const shot = meterShotAt(roll?.meterShots, frame.index, roll?.meterOffset ?? 0)
   const isCover = (roll?.coverIndex ?? 1) === frame.index
   return (
-    <Modal visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <FullModal visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000' }}>
         <StatusBar style="light" />
         <View style={{ paddingTop: insets.top + 10, paddingBottom: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <Btn label="닫기" kind="ghost" onPress={onClose} />
+          <Pressable onPress={onClose} style={{ height: 44, paddingHorizontal: 16, borderRadius: 22, justifyContent: 'center', backgroundColor: 'rgba(40,40,40,0.7)' }}><Text style={{ color: c.safelight, fontSize: 17 }}>닫기</Text></Pressable>
           {showInfo && roll ? (
             <View style={{ alignItems: 'center', flexShrink: 1 }}>
               <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>{frame.takenAt ? fmtDay(frame.takenAt) : ''}</Text>
               <Text numberOfLines={1} style={{ color: '#fff', fontSize: 12 }}>{rollName(roll)} · {frame.index}번</Text>
             </View>
           ) : <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{i + 1} / {frames.length}</Text>}
-          <View style={{ flexDirection: 'row', gap: 4 }}>
+          <View style={{ flexDirection: 'row', borderRadius: 22, paddingHorizontal: 4, backgroundColor: 'rgba(40,40,40,0.7)' }}>
             {showInfo ? <RoundBtn icon="info" label="정보" color={infoOpen ? c.safelight : '#fff'} onPress={() => setInfoOpen(!infoOpen)} /> : null}
+            <RoundBtn icon="ellipsis" label="더 보기" onPress={() => setMenu(true)} />
             <RoundBtn icon={fav ? 'heartFill' : 'heart'} label={fav ? '즐겨찾기 해제' : '즐겨찾기'} color={fav ? c.safelight : '#fff'} onPress={() => db.frames.update(frame.id, { favorite: !fav })} />
-            {original ? (
-              <RoundBtn icon="download" label="이 사진 갤러리에 저장" onPress={async () => {
-                const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase()
-                const name = `${String(frame.index).padStart(2, '0')}.${ext}`
-                const r = await saveImagesToGallery([{ uri: await rotatedFile(original.blob, frame.rotation, frame.id), name, key: frame.id }])
-                nav.toast(r.saved ? '갤러리에 저장했어요' : r.denied ? '사진 저장을 허용해 주세요' : '갤러리에 저장하지 못했어요')
-              }} />
-            ) : null}
           </View>
         </View>
         <View style={{ flex: 1 }}>
@@ -234,25 +245,50 @@ export function FrameViewer({ frames, start, onClose, showInfo }: { frames: Fram
               </Pressable>
             </View>
           ) : null}
-          {viewable ? <ZoomView key={`${frame.id}-${turns}`} uri={viewable} background="#000" onSwipe={step} /> : null}
-          <View style={{ position: 'absolute', left: 8, top: '50%' }}><RoundBtn icon="left" label="이전" bg="rgba(0,0,0,0.4)" disabled={i === 0} onPress={() => step(-1)} /></View>
-          <View style={{ position: 'absolute', right: 8, top: '50%' }}><RoundBtn icon="right" label="다음" bg="rgba(0,0,0,0.4)" disabled={i === frames.length - 1} onPress={() => step(1)} /></View>
+          <Animated.View style={{ flex: 1, transform: [{ translateX: slide }] }}>
+            {i > 0 ? <Side frame={frames[i - 1]} left={-width} /> : null}
+            {viewable ? <ZoomView key={`${frame.id}-${turns}`} uri={viewable} background="#000" onSwipe={step} onDrag={onDrag} /> : null}
+            {i < frames.length - 1 ? <Side frame={frames[i + 1]} left={width} /> : null}
+          </Animated.View>
         </View>
         <View style={{ alignItems: 'center', paddingTop: 10, paddingHorizontal: 16, paddingBottom: insets.bottom + 14 }}>
-          <View style={{ flexDirection: 'row', gap: 28, marginBottom: 6 }}>
+          {shot ? <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600', marginBottom: 4 }}>{exposureText(shot)}</Text> : null}
+          {roll ? <Pressable onPress={() => setShotEdit(true)} style={{ borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(255,255,255,0.14)' }}><Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>{shot ? '촬영 정보' : '촬영 정보 추가'}</Text></Pressable> : null}
+          <View style={{ flexDirection: 'row', gap: 14, marginBottom: 2 }}>
             <RoundBtn icon="rotate.left" label="왼쪽으로 돌리기" onPress={() => rotate(-1)} />
             <RoundBtn icon="rotate.right" label="오른쪽으로 돌리기" onPress={() => rotate(1)} />
           </View>
-          {shot ? <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600', marginBottom: 2 }}>{exposureText(shot)}</Text> : null}
           <Text style={{ color: '#fff', fontSize: 13 }}>{[frame.takenAt ? fmtDayTime(frame.takenAt) : undefined, frame.locationName].filter(Boolean).join(' · ')}</Text>
           <Text style={{ color: '#fff', opacity: 0.6, fontSize: 13 }}>{[resolutionText(frame.w, frame.h), bytesText(frame.bytes)].filter(Boolean).join(' · ')}</Text>
-          <Pressable disabled={isCover} onPress={async () => { await db.rolls.update(frame.rollId, { coverIndex: frame.index }); nav.toast('대표 사진으로 정했어요') }}
-            style={{ marginTop: 10, height: 44, paddingHorizontal: 14, borderRadius: 22, justifyContent: 'center', backgroundColor: 'rgba(40,40,40,0.6)', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', opacity: isCover ? 0.4 : 1 }}>
-            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '500' }}>{isCover ? '대표 사진' : '대표 사진으로 지정'}</Text>
-          </Pressable>
         </View>
+        {menu ? <Menu onClose={() => setMenu(false)} items={[
+          { label: isCover ? '대표 사진' : '대표 사진으로 지정', checked: isCover, onPress: () => { if (!isCover) void db.rolls.update(frame.rollId, { coverIndex: frame.index }).then(() => nav.toast('대표 사진으로 정했어요')) } },
+          { label: '공유', checked: false, onPress: async () => {
+            // 원본, 없으면 미리보기 사진. 돌려 둔 사진은 돌린 채로
+            const uri = original ? await rotatedFile(original.blob, turns, frame.id) : viewable
+            if (!uri || !(await Sharing.isAvailableAsync())) { nav.toast('공유하지 못했어요'); return }
+            try { await Sharing.shareAsync(uri, { mimeType: /\.tiff?$/i.test(uri) ? 'image/tiff' : /\.png$/i.test(uri) ? 'image/png' : 'image/jpeg' }) } catch { nav.toast('공유하지 못했어요') }
+          } },
+          ...(original ? [{ label: '갤러리에 저장', checked: false, onPress: async () => {
+            const ext = (frame.name?.split('.').pop() ?? 'jpg').toLowerCase()
+            const name = `${String(frame.index).padStart(2, '0')}.${ext}`
+            const r = await saveImagesToGallery([{ uri: await rotatedFile(original.blob, frame.rotation, frame.id), name, key: frame.id }])
+            nav.toast(r.saved ? '갤러리에 저장했어요' : r.denied ? '사진 저장을 허용해 주세요' : '갤러리에 저장하지 못했어요')
+          } }] : []),
+        ]} /> : null}
+        {shotEdit && roll ? <RollShotEdit roll={roll} pos={frame.index - (roll.meterOffset ?? 0)} create onClose={() => setShotEdit(false)} onToast={nav.toast} /> : null}
       </GestureHandlerRootView>
-    </Modal>
+    </FullModal>
+  )
+}
+
+/** 옆에서 밀려 들어오는 앞뒤 사진 */
+function Side({ frame, left }: { frame: Frame; left: number }) {
+  const t = (((frame.rotation ?? 0) % 4) + 4) % 4
+  return (
+    <View style={{ position: 'absolute', top: 0, bottom: 0, left, width: Math.abs(left), alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
+      {frame.thumb ? <Image source={{ uri: frame.thumb }} resizeMode="contain" style={{ width: '100%', height: '100%', transform: [{ rotate: `${t * 90}deg` }] }} /> : null}
+    </View>
   )
 }
 
@@ -276,8 +312,8 @@ export function ContactSheetView({ roll, frames, onClose }: { roll: Roll; frames
   const insets = useSafeAreaInsets()
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
   const lens = useLiveQuery(() => (roll.lensId ? db.lenses.get(roll.lensId) : undefined), [roll.lensId])
-  const [useTitle, setUseTitle] = useState(!!roll.note)
-  const [title, setTitle] = useState(roll.note ?? '')
+  const [useTitle, setUseTitle] = useState(!!(roll.title?.trim() || roll.note))
+  const [title, setTitle] = useState(roll.title?.trim() || roll.note || '')
   const [info, setInfo] = useState(true)
   const [uri, setUri] = useState<string>()
   const [exporting, setExporting] = useState(false)
@@ -322,7 +358,7 @@ export function ContactSheetView({ roll, frames, onClose }: { roll: Roll; frames
   }
 
   return (
-    <Modal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <FullModal visible animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <OverlayBoundary>
         <GestureHandlerRootView style={{ flex: 1, backgroundColor: c.paper }}>
           <View style={{ paddingTop: insets.top + 10, paddingBottom: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -362,7 +398,7 @@ export function ContactSheetView({ roll, frames, onClose }: { roll: Roll; frames
           ) : null}
         </GestureHandlerRootView>
       </OverlayBoundary>
-    </Modal>
+    </FullModal>
   )
 }
 

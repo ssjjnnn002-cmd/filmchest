@@ -247,13 +247,13 @@ export function Library() {
               <button onClick={toggleLayout} aria-label={layout === 'grid' ? '목록으로 보기' : '그리드로 보기'}>
                 <Icon name={layout === 'grid' ? 'list' : 'grid'} />
               </button>
-              <button onClick={() => gear === 'camera' ? setAdding(true) : setGearAdd(true)} aria-label={gear === 'camera' ? '카메라 추가' : `${gear === 'lens' ? '렌즈' : gear === 'filter' ? '필터' : '필름'} 추가`}><Icon name="plus" /></button>
+              <button onClick={() => gear === 'camera' ? setAdding(true) : setGearAdd(true)} aria-label={gear === 'camera' ? '카메라 추가' : `${gear === 'lens' ? '렌즈' : gear === 'filter' ? '액세서리' : '필름'} 추가`}><Icon name="plus" /></button>
             </GlassGroup>
           )} />
 
       {!editing && <BackupNudge onBackup={() => setSettings('backup')} />}
       {!editing && (
-        <div className="segmented" role="tablist" aria-label="장비" style={{ margin: '4px 0 12px' }}>
+        <div className="segmented slide" role="tablist" aria-label="장비" style={{ margin: '4px 0 8px', '--i': ['camera', 'lens', 'filter', 'film'].indexOf(gear), '--n': 4 } as React.CSSProperties}>
           {([['camera', '카메라'], ['lens', '렌즈'], ['filter', '액세서리'], ['film', '필름']] as const).map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={gear === id} className={gear === id ? 'on' : ''} onClick={() => { setGear(id); setTag(undefined); setSearch('') }}>{label}</button>
           ))}
@@ -291,7 +291,7 @@ export function Library() {
           <span>가진 카메라를 등록해 보세요.</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn primary" onClick={() => setAdding(true)}>카메라 추가</button>
-            <button className="btn" onClick={async () => { await seedExample(); nav.toast('예시 카메라와 롤을 넣었어요') }}>예시로 둘러보기</button>
+            <button className="btn soft" onClick={async () => { await seedExample(); nav.toast('예시 카메라와 롤을 넣었어요') }}>예시로 둘러보기</button>
           </div>
         </div>
       )}

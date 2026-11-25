@@ -1,12 +1,13 @@
-// 자동 복사: web/src/core/zip.ts (미리보기만 파일 경로·data URI). 여기서 고치지 말 것.
-import { bytesToB64, writeBytes } from '../files'
+// 자동 복사: web/src/core/zip.ts (사진은 임시 폴더의 파일 경로로). 여기서 고치지 말 것.
+import { clearFolder, writeBytes } from '../files'
 import JSZip from 'jszip'
 
 /** 압축을 푼 스캔 이미지 한 장 */
 export interface ScanFile {
   index: number // 촬영 순서 (1부터)
   name: string // 원래 경로
-  data: Uint8Array
+  uri: string // 앱 임시 폴더에 풀어 둔 파일
+  head: Uint8Array // 파일 앞부분 (스캐너 정보 읽기용)
   size: number
   type: string // 'jpg' | 'tif' ...
 }
@@ -67,9 +68,12 @@ export function decodeFileName(bytes: Uint8Array): string {
   }
 }
 
-function group(files: { name: string; data: Uint8Array }[]): ScanResult {
+/** 풀어 둔 사진 한 장 */
+export interface Unpacked { name: string; uri: string; head: Uint8Array; size: number }
+
+export function group(files: Unpacked[]): ScanResult {
   if (files.length === 0) throw new Error('사진 파일이 없어요.')
-  const groups = new Map<string, { name: string; data: Uint8Array }[]>()
+  const groups = new Map<string, Unpacked[]>()
   for (const f of files) {
     const folder = f.name.includes('/') ? f.name.slice(0, f.name.lastIndexOf('/')) : ''
     const key = `${folder}|${formatFamily(f.name)}`
@@ -79,7 +83,7 @@ function group(files: { name: string; data: Uint8Array }[]): ScanResult {
     const [folder, fam] = key.split('|')
     const sorted = [...list].sort((a, b) => naturalCompare(a.name, b.name))
     const out = sorted.map((f, i) => ({
-      index: i + 1, name: f.name, data: f.data, size: f.data.byteLength, type: extOf(f.name),
+      index: i + 1, name: f.name, uri: f.uri, head: f.head, size: f.size, type: extOf(f.name),
     }))
     return {
       label: folder ? `${folder}/ · ${fam}` : fam,
@@ -95,13 +99,19 @@ function group(files: { name: string; data: Uint8Array }[]): ScanResult {
 export async function readZip(data: Blob | ArrayBuffer | Uint8Array): Promise<ScanResult> {
   const zip = await JSZip.loadAsync(data, { decodeFileName: (b) => decodeFileName(b as Uint8Array) })
   const entries = Object.values(zip.files).filter((e) => !e.dir && isScanImage(e.name))
-  const files = await Promise.all(entries.map(async (e) => ({ name: e.name, data: await e.async('uint8array') })))
+  clearFolder('scan-tmp')
+  const run = Date.now().toString(36)
+  const files: Unpacked[] = []
+  for (const [i, e] of entries.entries()) {
+    const data = await e.async('uint8array')
+    files.push({ name: e.name, uri: writeBytes('scan-tmp', `${run}-${i}.${extOf(e.name)}`, data), head: data.slice(0, 256 * 1024), size: data.byteLength })
+  }
   return group(files)
 }
 
 /** 가져오기 전에 보여줄 몇 장. 가능하면 JPG 묶음에서 고른다. */
 /** 가져오기 전에 보여줄 사진 (limit 없으면 전부). 가능하면 JPG 묶음에서 고른다.
- *  limit이 있으면(목록용 몇 장) data URI, 없으면 앱 임시 폴더에 풀어 둔 파일 경로 (전부를 data URI로 들고 있으면 메모리가 모자라다) */
+ *  앱 임시 폴더에 풀어 둔 파일 경로 (그림을 통째로 들고 있으면 메모리가 모자라다). 임시 폴더는 앱을 켤 때 비운다 */
 export async function previewZip(file: Uint8Array, limit?: number): Promise<{ paths: string[]; thumbs: string[] }> {
   const zip = await JSZip.loadAsync(file, { decodeFileName: (b) => decodeFileName(b as Uint8Array) })
   const entries = Object.values(zip.files).filter((e) => !e.dir && isScanImage(e.name))
@@ -115,11 +125,11 @@ export async function previewZip(file: Uint8Array, limit?: number): Promise<{ pa
   const chosen = (jpg?.[1] ?? [...groups.values()].sort((a, b) => b.length - a.length)[0] ?? [])
     .slice().sort((a, b) => naturalCompare(a.name, b.name)).slice(0, limit ?? Infinity)
   const thumbs: string[] = []
-  const run = Date.now().toString(36)
+  const run = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
   for (const [i, e] of chosen.entries()) {
     const data = await e.async('uint8array')
     const png = extOf(e.name) === 'png'
-    thumbs.push(limit ? `data:${png ? 'image/png' : 'image/jpeg'};base64,${bytesToB64(data)}` : writeBytes('zip-preview', `${run}-${i}.${png ? 'png' : 'jpg'}`, data))
+    thumbs.push(writeBytes('zip-preview', `${run}-${i}.${png ? 'png' : 'jpg'}`, data))
   }
   return { paths: entries.map((e) => e.name), thumbs }
 }

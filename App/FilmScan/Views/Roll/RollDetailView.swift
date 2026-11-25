@@ -45,6 +45,8 @@ struct RollDetailView: View {
     @State private var confirmDelete = false
     @State private var recording = false
     @State private var pickingCamera = false
+    @State private var pickingFilm = false
+    @State private var askFilmChange = false
     @State private var editingLab = false
     @State private var editingExpiry = false
     @State private var confirmReverse = false
@@ -106,7 +108,7 @@ struct RollDetailView: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
                 } footer: {
-                    Text(roll.status == .atLab ? "현상소에서 받은 zip이나 사진을 골라요." : "고르면 스캔 대기로 넘어가요.")
+                    Text(roll.status == .atLab ? "현상소에서 받은 zip이나 사진을 골라요." : "고르면 현상 맡김으로 넘어가요.")
                 }
             }
 
@@ -303,6 +305,10 @@ struct RollDetailView: View {
             ToolbarItem {
                 Menu("더 보기", systemImage: "ellipsis.circle") {
                     Button("카메라 바꾸기", systemImage: "camera") { pickingCamera = true }
+                    Button("필름 바꾸기", systemImage: "film") {
+                        // 촬영 중이면 다 찍고 새 필름을 넣는 건지 먼저 묻는다
+                        if roll.status == .loaded, roll.camera != nil { askFilmChange = true } else { pickingFilm = true }
+                    }
                     Button("현상소 수정", systemImage: "building.2") { editingLab = true }
                     Button("필름 유통기한", systemImage: "calendar.badge.exclamationmark") { editingExpiry = true }
                     if (roll.frames ?? []).count > 1 {
@@ -318,6 +324,14 @@ struct RollDetailView: View {
                 guard changed else { return }
                 rewritePhotos()
             }
+        }
+        .sheet(isPresented: $pickingFilm) {
+            RollFilmPicker(roll: roll) { changed in if changed { rewritePhotos() } }
+        }
+        .confirmationDialog("이 필름을 다 찍고 바꾸는 건가요?", isPresented: $askFilmChange, titleVisibility: .visible) {
+            Button("다 찍었어요 · 새 필름 장착") { router.loadFilm(camera: roll.camera) }
+            Button("아직 찍는 중 · 필름 기록만 고치기") { pickingFilm = true }
+            Button("취소", role: .cancel) {}
         }
         .sheet(isPresented: $editingExpiry) { FilmExpiryEditView(roll: roll) }
         .sheet(isPresented: $editingLab) {
@@ -733,6 +747,50 @@ struct RollCameraPicker: View {
 }
 
 
+/// 롤에 기록한 필름을 다른 필름으로 고친다 (웹·갤럭시 RollFilmPick과 같음)
+private struct RollFilmPicker: View {
+    @Bindable var roll: RollItem
+    var onDone: (_ changed: Bool) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var filmID: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                FilmPickSection(filmID: $filmID, format: roll.format) {
+                    if (roll.frames ?? []).contains(where: { $0.assetIdentifier != nil }) {
+                        Text("사진 앱에 저장한 사진의 필름 정보도 함께 바꿔요.")
+                    }
+                }
+            }
+            .filmForm()
+            .filmKeyboard()
+            .navigationTitle("필름 바꾸기")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("저장") {
+                        let changed = filmID != nil && filmID != roll.filmStockID
+                        if changed, let filmID {
+                            roll.filmStockID = filmID
+                            // 증감 감도가 새 필름 감도와 같으면 따로 적지 않는다. 유통기한은 예전 필름 것이라 비운다
+                            if roll.shotISO == roll.film?.iso { roll.shotISO = nil }
+                            roll.filmExpiresAt = nil
+                        }
+                        dismiss()
+                        onDone(changed)
+                    }
+                    .disabled(filmID == nil)
+                }
+            }
+            .onAppear { filmID = roll.filmStockID.isEmpty ? nil : roll.filmStockID }
+        }
+        #if os(macOS)
+        .frame(minWidth: 560, minHeight: 600)
+        #endif
+    }
+}
+
 /// 현상소만 고친다
 private struct LabEditView: View {
     @Bindable var roll: RollItem
@@ -751,7 +809,7 @@ private struct LabEditView: View {
                     }
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .filmKeyboard()
             .navigationTitle("현상소")
             #if os(iOS)
@@ -796,7 +854,7 @@ private struct FilmExpiryEditView: View {
                     }
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .navigationTitle("필름 유통기한")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

@@ -1,12 +1,15 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, deleteRoll, kept } from '../db'
 import { useNav } from '../App'
 import type { Roll } from '../core/types'
+import { weatherText } from '../core/types'
 import { CameraCover, cameraName, Canister, Confirm, Icon, PageHeader, fmtDay, rollCameraFormat, rollFilm, rollFilmName, sortedLocations } from '../ui/common'
 import { LabDropOff, PlaceEdit } from './Editors'
 import { ManualRecord } from './ManualRecord'
 import { SettingsButton } from './Settings'
+import { PressMenu } from '../ui/PressMenu'
+import { SwipeRow } from '../ui/SwipeRow'
 
 export function Shooting() {
   const nav = useNav()
@@ -38,18 +41,18 @@ function LoadedCard({ roll }: { roll: Roll }) {
   const [placing, setPlacing] = useState(false)
   const [dropOff, setDropOff] = useState(false)
   const [meter, setMeter] = useState(false)
-  // 꾹 누르면 삭제 (아이폰과 같음): 0.5초 누르고 있으면 묻는다
   const [deleting, setDeleting] = useState(false)
-  const press = useRef<number>()
-  const held = useRef(false)
-  const startPress = () => { held.current = false; window.clearTimeout(press.current); press.current = window.setTimeout(() => { held.current = true; navigator.vibrate?.(15); setDeleting(true) }, 500) }
-  const stopPress = () => window.clearTimeout(press.current)
-  const places = sortedLocations(roll).map((l) => l.name).filter(Boolean).join(' → ')
+  const toggle = () => void db.rolls.update(roll.id, { favorite: !roll.favorite })
+  const locs = sortedLocations(roll)
+  const place = locs.map((l) => l.name).filter(Boolean).join(' → ')
+  const weather = locs.at(-1)?.weather
+  const places = place ? place + (weather ? ` · ${weatherText(weather)}` : '') : ''
   return (
     <div className="card shooting-card">
-      <button className="shooting-main" onClick={() => { if (!held.current) nav.push({ type: 'roll', id: roll.id }) }}
-        onPointerDown={startPress} onPointerUp={stopPress} onPointerLeave={stopPress} onPointerCancel={stopPress}
-        onContextMenu={(e) => { e.preventDefault(); setDeleting(true) }}>
+      {/* 길게 누르면 메뉴, 밀면 즐겨찾기·삭제 (아이폰과 같음) */}
+      <SwipeRow favorite={!!roll.favorite} onFavorite={toggle} onDelete={() => setDeleting(true)}>
+      <PressMenu items={[{ label: roll.favorite ? '즐겨찾기 해제' : '즐겨찾기', icon: 'star', onPress: toggle }, { label: '삭제', icon: 'trash', danger: true, onPress: () => setDeleting(true) }]}>
+      <button className="shooting-main" onClick={() => nav.push({ type: 'roll', id: roll.id })}>
         <div className="shooting-art">
           {camera && <CameraCover camera={camera} height={72} />}
           <div className="shooting-can"><Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={44} /></div>
@@ -62,6 +65,8 @@ function LoadedCard({ roll }: { roll: Roll }) {
         </div>
         <Icon name="chev" size={18} />
       </button>
+      </PressMenu>
+      </SwipeRow>
       <div className="shooting-actions">
         {roll.locations.length === 0 && <button className="btn soft" onClick={() => setPlacing(true)}><Icon name="pin" size={18} /> 장소 추가</button>}
         <button className="btn soft" onClick={() => setMeter(true)}>상세 기록</button>

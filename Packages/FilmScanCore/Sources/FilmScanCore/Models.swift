@@ -151,16 +151,16 @@ public struct Lens: Identifiable, Codable, Hashable, Sendable {
 }
 
 public enum RollStatus: String, Codable, CaseIterable, Sendable {
-    case loaded       // 장착 중 (촬영 중)
+    case loaded       // 촬영 중
     case finished     // 촬영 완료, 아직 안 맡김
-    case atLab        // 현상 맡김 (스캔 대기)
+    case atLab        // 현상 맡김
     case imported     // 스캔 불러오기 완료
 
     public var displayName: String {
         switch self {
-        case .loaded: "장착 중"
+        case .loaded: "촬영 중"
         case .finished: "촬영 완료"
-        case .atLab: "스캔 대기"
+        case .atLab: "현상 맡김"
         case .imported: "완료"
         }
     }

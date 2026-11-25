@@ -33,6 +33,18 @@ struct ImportFlowView: View {
             .sorted { (order[$0.status] ?? 9, $1.loadedAt) < (order[$1.status] ?? 9, $0.loadedAt) }
     }
 
+    /// 파일 이름과 맞을 것 같은 롤 (맨 위에 '추천'으로)
+    private var suggested: [RollItem] {
+        let name = zipURL.lastPathComponent
+        let names = [name, SearchAlias.latin(name)]
+        let hints = NameHints.guess([name])
+        let ids = RollMatch.suggest(names: names, filmID: hints.filmID, date: hints.date?.noonDate, rolls: candidates.map { r in
+            RollMatch.Facts(id: r.id, filmID: r.filmStockID, model: r.camera?.model, places: r.locations.map(\.name), lab: r.labName,
+                            from: r.sortedDays.first?.startedAt ?? r.loadedAt, to: r.droppedOffAt ?? r.finishedAt ?? Date())
+        })
+        return ids.compactMap { id in candidates.first { $0.id == id } }
+    }
+
     private var sets: [ScanSet] {
         guard let preview else { return [] }
         return [preview.result.primary] + preview.result.alternatives
@@ -68,6 +80,7 @@ struct ImportFlowView: View {
                 }
             }
         }
+        .interactiveDismissDisabled(saving)
         .task { await analyze() }
         .sheet(isPresented: $showQuickRoll) {
             QuickRollForm(hints: NameHints.guess([zipURL.lastPathComponent])) { newRoll in roll = newRoll; meterOffset = 0 }
@@ -81,11 +94,15 @@ struct ImportFlowView: View {
             if let preview {
                 Section {
                     summaryRow(preview)
+                } footer: {
+                    if !candidates.isEmpty { Text("어느 롤의 사진인지 골라 주세요.") }
                 }
             }
-            rollSection("스캔 대기", candidates.filter { $0.status == .atLab })
-            rollSection("촬영 완료", candidates.filter { $0.status == .finished })
-            rollSection("촬영 중", candidates.filter { $0.status == .loaded })
+            let best = suggested
+            rollSection("추천", best)
+            rollSection("현상 맡김", candidates.filter { r in r.status == .atLab && !best.contains { $0.id == r.id } })
+            rollSection("촬영 완료", candidates.filter { r in r.status == .finished && !best.contains { $0.id == r.id } })
+            rollSection("촬영 중", candidates.filter { r in r.status == .loaded && !best.contains { $0.id == r.id } })
             Section {
                 Button("새 롤로 저장", systemImage: "plus") { showQuickRoll = true }
             } footer: {
@@ -259,7 +276,7 @@ struct ImportFlowView: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(shot.pos + meterOffset)번 사진")
-                                Text("노출계 \(MeterShot.frameTitle(shot.pos, prewind: roll.meterPrewind == true))")
+                                Text("상세 기록 \(MeterShot.frameTitle(shot.pos, prewind: roll.meterPrewind == true))")
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                         }
@@ -443,8 +460,8 @@ struct QuickRollForm: View {
                         }
                     }
                     if cameraID == nil {
-                        TextField("제조사", text: $newBrand)
-                        TextField("모델", text: $newModel)
+                        LabeledField("제조사", text: $newBrand)
+                        LabeledField("모델", text: $newModel)
                     }
                 }
                 Section("필름") {
@@ -454,11 +471,11 @@ struct QuickRollForm: View {
                 }
                 Section("촬영") {
                     DatePicker("촬영일", selection: $date)
-                    TextField("장소 (선택)", text: $place)
+                    LabeledField("장소 (선택)", text: $place)
                     LabField(lab: $lab)
                 }
             }
-            .formStyle(.grouped)
+            .filmForm()
             .filmKeyboard()
             .rollPaywall()
             .navigationTitle("새 롤")

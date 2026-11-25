@@ -66,7 +66,7 @@ enum DemoSeed {
                  "days": [["id": id(), "startedAt": now - 3 * d, "startFrame": 1], ["id": id(), "startedAt": now - 1 * d, "startFrame": 9]],
                  "locations": [["id": id(), "startFrame": 1, "name": "망원동", "point": ["latitude": 37.5556, "longitude": 126.9019], "weather": ["code": 1, "temperature": 17]],
                                ["id": id(), "startFrame": 9, "name": "한강공원", "point": ["latitude": 37.5531, "longitude": 126.8960], "weather": ["code": 0, "temperature": 19]]],
-                 "favorite": false, "isArchive": false, "note": "예시 롤 · 노출계 기록이 있어요"],
+                 "favorite": false, "isArchive": false, "note": "예시 롤 · 컷마다 상세 기록이 있어요"],
                 ["id": finished, "cameraId": xa, "filmId": "kodak-gold-200", "status": "finished", "loadedAt": day("2026-10-05T10:00:00"), "finishedAt": day("2026-10-19T18:00:00"),
                  "days": [["id": id(), "startedAt": day("2026-10-05T10:00:00"), "startFrame": 1]],
                  "locations": [["id": id(), "startFrame": 1, "name": "연남동", "point": ["latitude": 37.5626, "longitude": 126.9254]]],

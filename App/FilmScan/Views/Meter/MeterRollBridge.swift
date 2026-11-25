@@ -32,7 +32,7 @@ extension MeterGear {
         let camera = roll.camera
         let lens: MeterLens = {
             if let fixed = camera?.fixedLensName, !fixed.isEmpty { return .fixed(name: fixed) }
-            let frame = roll.meterShots.count + 1
+            let frame = (roll.meterShots.map(\.pos).max() ?? 0) + 1   // 건너뛴 컷이 있어도 다음 컷 번호로
             if let id = roll.lensID(at: frame), let l = lenses.first(where: { $0.id == id }) { return MeterLens(l) }
             if let l = roll.lens { return MeterLens(l) }
             return .generic

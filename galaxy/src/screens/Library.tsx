@@ -201,7 +201,7 @@ export function Library() {
           <EmptyText>가진 카메라를 등록해 보세요.</EmptyText>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Btn label="카메라 추가" kind="primary" onPress={() => setAdding(true)} />
-            <Btn label="예시로 둘러보기" onPress={async () => { await seedExample(); nav.toast('예시 카메라와 롤을 넣었어요') }} />
+            <Btn label="예시로 둘러보기" kind="soft" onPress={async () => { await seedExample(); nav.toast('예시 카메라와 롤을 넣었어요') }} />
           </View>
         </Empty>
       ) : null}
@@ -209,14 +209,14 @@ export function Library() {
       {gear === 'camera' && cameras && cameras.length > 0 ? (
         <View style={{ gap: 18 }}>
           <Pressable disabled={editing} onPress={() => nav.loadFilm()} style={({ pressed }) => ({
-            flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 18, borderRadius: 22,
+            flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 16,
             backgroundColor: c.safelight, opacity: editing ? 0.4 : 1, transform: [{ scale: pressed ? 0.98 : 1 }],
           })}>
             {/* 글씨 없는 필름통 그림 (세 앱 같은 그림) */}
-            <Image source={require('../../assets/canisters/plain-canister.png')} style={{ width: 52, height: 52 }} />
+            <Image source={require('../../assets/canisters/plain-canister.png')} style={{ width: 44, height: 44 }} />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: '#fff', fontSize: 19, fontWeight: '600' }}>필름 장착하기</Text>
-              <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>{empty > 0 ? `빈 카메라 ${empty}대` : '모든 카메라에 필름이 들어 있어요'}</Text>
+              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>필름 장착하기</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>{empty > 0 ? `빈 카메라 ${empty}대` : '모든 카메라에 필름이 들어 있어요'}</Text>
             </View>
             <Icon name="right" size={20} color="#fff" />
           </Pressable>

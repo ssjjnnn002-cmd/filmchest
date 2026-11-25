@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { tick } from '../motion'
+import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, wipeLocal, deleteRoll, purgeCamera, purgeOldCameras, purgeOldRolls, restoreCamera, restoreRoll, storageEstimate } from '../db'
 import { backupFileName, exportAll, exportWithPhotos, importBackupFile, photoBackupFileName } from '../core/backup'
@@ -49,6 +50,8 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   const [logoutStep, setLogoutStep] = useState<string>()
   const [logoutError, setLogoutError] = useState<string>()
   const [saving, setSaving] = useState<string>()
+  const [showDev, setShowDev] = useState(false)
+  const devPress = useRef<number>()
   useEffect(() => {
     // 아이폰, 클로드 화면, 이미 설치된 앱 안에서는 숨긴다
     const installed = matchMedia('(display-mode: standalone)').matches || document.referrer.startsWith('android-app://')
@@ -107,23 +110,26 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
 
       <div className="section">
         <h2>화면</h2>
-        <div className="segmented slide" style={{ '--i': Math.max(0, themes.findIndex(([k]) => k === theme)), '--n': themes.length } as React.CSSProperties}>
+        <div className="group"><div className="segmented-cell"><div className="segmented slide" style={{ '--i': Math.max(0, themes.findIndex(([k]) => k === theme)), '--n': themes.length } as React.CSSProperties}>
           {themes.map(([k, n]) => <button key={k} className={k === theme ? 'on' : ''} onClick={() => choose(k)}>{n}</button>)}
-        </div>
+        </div></div></div>
       </div>
 
       <div className="section">
         <h2>정보</h2>
         <div className="group">
-          <button className="row" onClick={() => setPrivacy(true)}>개인정보 처리방침</button>
-          <div className="row static">
+          <button className="row" onClick={() => setPrivacy(true)}><span className="grow">개인정보 처리방침</span><Icon name="chev" size={18} /></button>
+          {/* 개발자 모드는 숨겨 둔다: 앱 버전을 5초 누르면 나타난다. 켜져 있으면 끌 때까지 늘 보인다 */}
+          <div className="row static" style={{ userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }} onContextMenu={(e) => e.preventDefault()}
+            onPointerDown={() => { window.clearTimeout(devPress.current); devPress.current = window.setTimeout(() => { tick(15); setShowDev(true) }, 5000) }}
+            onPointerUp={() => window.clearTimeout(devPress.current)} onPointerLeave={() => window.clearTimeout(devPress.current)} onPointerCancel={() => window.clearTimeout(devPress.current)}>
             <span className="grow">앱 버전</span>
             <span className="value">{__APP_VERSION__}</span>
           </div>
           <button className="row" onClick={() => { void withWork(async () => { await refreshApp() }) }}>
             <span className="grow">최신 버전 적용</span>
           </button>
-          <DevModeRow />
+          <DevModeRow shown={showDev} />
         </div>
         <p className="footnote">
           앱 버전은 아이폰, 갤럭시, 웹이 같습니다.
@@ -278,7 +284,7 @@ export function SettingsButton() {
 }
 
 /** 개발자 모드: 관리자 코드를 넣으면 아직 모두에게 열지 않은 기능(노출계)이 열린다 */
-function DevModeRow() {
+function DevModeRow({ shown }: { shown: boolean }) {
   const on = useDevMode()
   const [asking, setAsking] = useState(false)
   const [offAsk, setOffAsk] = useState(false)
@@ -288,10 +294,10 @@ function DevModeRow() {
   const submit = () => { if (unlockDevMode(code)) close(); else setWrong(true) }
   return (
     <>
-      <button className="row" onClick={() => (on ? setOffAsk(true) : setAsking(true))}>
+      {(on || shown) && <button className="row" onClick={() => (on ? setOffAsk(true) : setAsking(true))}>
         <span className="grow">개발자 모드</span>
         {on && <span className="value">켜짐</span>}
-      </button>
+      </button>}
       {on && <a className="row" href={`${import.meta.env.BASE_URL}meter-lab.html`}><span className="grow">노출계 시험</span><Icon name="chev" size={18} /></a>}
       {asking && (
         <Sheet title="개발자 모드" onClose={close}

@@ -113,7 +113,7 @@ struct BackupRestoreView: View {
             Text("지운 카메라는 24시간 동안 여기 남아요. 필름에 적힌 카메라 정보는 카메라를 지워도 그대로예요.")
         }
         }
-        .formStyle(.grouped)
+        .filmForm()
     .fileExporter(isPresented: $showExport, document: gearDoc, contentType: .json, defaultFilename: DataBackup.fileName) { _ in }
     .fileImporter(isPresented: $showImport, allowedContentTypes: [.json]) { result in
         guard case .success(let url) = result else { return }

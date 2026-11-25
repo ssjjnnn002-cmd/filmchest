@@ -202,6 +202,24 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
     <Sheet title={camera ? '카메라 수정' : '카메라 추가'} onClose={onClose}
       right={<SheetBtn label="저장" accent disabled={!brand.trim() || !model.trim() || !photoReady} onPress={save} />}>
 
+      <Section title="카메라" right={<Pressable onPress={() => setShowCatalog(true)}><Text style={{ color: c.safelight, fontSize: 15, fontWeight: '600' }}>목록에서 고르기</Text></Pressable>}
+        foot={known ? `✓ ${kindText(known)}로 자동 설정했어요.` : undefined}>
+        <Group>
+          <Field label="제조사" value={brand} autoCorrect={false} onFocus={() => setFocus('brand')} onChangeText={setBrand} />
+          {focus === 'brand' && brandList.length > 0 ? suggest(brandList.map((b) => (
+            <Chip key={b} label={b} flat onPress={() => { setBrand(b); setFocus('model') }} />
+          ))) : null}
+          <Field label="모델" value={model} autoCorrect={false} autoFocus={false} onFocus={() => setFocus('model')} onChangeText={onModelChange} />
+          {focus === 'model' && modelList.length > 0 ? suggest(modelList.map((k) => (
+            <Chip key={catalogName(k)} label={brand ? k.model : catalogName(k)} flat active={k === known} onPress={() => apply(k)} />
+          ))) : null}
+          <Field label="별명 (선택)" value={nickname} onChangeText={setNickname} />
+          <Field label="포맷">
+            <Select value={format} title="포맷" onChange={setFormat} options={(Object.keys(formatInfo) as FilmFormat[]).map((k) => [k, formatInfo[k].name])} />
+          </Field>
+        </Group>
+      </Section>
+
       <Section title="외관">
         <Group style={{ padding: 12, gap: 12 }}>
           {photo ? (
@@ -243,24 +261,6 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
             onClear={photo ? () => { setPhoto(undefined); setOriginal(undefined) } : undefined} />
         </Group>
         <Text style={{ fontSize: 13, color: c.muted, lineHeight: 18, marginTop: 6, marginHorizontal: 16 }}>{photo ? '사진은 그대로 써요. 배경을 지우려면 배경 지우기를 켜 주세요.' : '사진이 없으면 고른 형태의 기본 모형으로 보여요.'}</Text>
-      </Section>
-
-      <Section title="카메라" right={<Pressable onPress={() => setShowCatalog(true)}><Text style={{ color: c.safelight, fontSize: 15, fontWeight: '600' }}>목록에서 고르기</Text></Pressable>}
-        foot={known ? `✓ ${kindText(known)}로 자동 설정했어요.` : undefined}>
-        <Group>
-          <Field label="제조사" value={brand} autoCorrect={false} onFocus={() => setFocus('brand')} onChangeText={setBrand} />
-          {focus === 'brand' && brandList.length > 0 ? suggest(brandList.map((b) => (
-            <Chip key={b} label={b} flat onPress={() => { setBrand(b); setFocus('model') }} />
-          ))) : null}
-          <Field label="모델" value={model} autoCorrect={false} autoFocus={false} onFocus={() => setFocus('model')} onChangeText={onModelChange} />
-          {focus === 'model' && modelList.length > 0 ? suggest(modelList.map((k) => (
-            <Chip key={catalogName(k)} label={brand ? k.model : catalogName(k)} flat active={k === known} onPress={() => apply(k)} />
-          ))) : null}
-          <Field label="별명 (선택)" value={nickname} onChangeText={setNickname} />
-          <Field label="포맷">
-            <Select value={format} title="포맷" onChange={setFormat} options={(Object.keys(formatInfo) as FilmFormat[]).map((k) => [k, formatInfo[k].name])} />
-          </Field>
-        </Group>
       </Section>
 
       <TagField tags={tags} setTags={setTags} />

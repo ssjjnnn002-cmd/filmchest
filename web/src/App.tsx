@@ -22,6 +22,7 @@ import { Welcome } from './ui/Welcome'
 import { driveAvailable, driveConnected, keptAccount } from './core/drive'
 import { isOldSite } from './core/move'
 import { getPref, inClaudeHost } from './platform'
+import { capturePage, dropStill, playPop, playPush, startSwipeBack } from './motion'
 import { goBack, noteNavigation, replaceUrl, reuseNextOverlay, startBackStack, type BackSnap } from './backStack'
 
 export type Tab = 'library' | 'shooting' | 'pending' | 'rolls'
@@ -73,6 +74,7 @@ export function App() {
   const [motion, setMotion] = useState<Motion>('none')
   // 화면마다 보던 스크롤 위치 (탭을 오가도, 뒤로 와도 그 자리로)
   const scrollPos = useRef(new Map<string, number>())
+  const pageRef = useRef<HTMLDivElement>(null)
   const [stacks, setStacks] = useState<Record<Tab, Screen[]>>({ library: [], shooting: [], pending: [], rolls: [] })
   const [loadFilmFor, setLoadFilmFor] = useState<{ cameraId?: string } | null>(null)
   const [importReq, setImportReq] = useState<{ files: File[]; rollId?: string } | null>(null)
@@ -148,7 +150,10 @@ export function App() {
     const top = st[t].at(-1)
     return top ? `${t}/${top.type}/${top.id}` : t
   }
-  const remember = () => scrollPos.current.set(screenKey(tab), window.scrollY)
+  const remember = () => {
+    scrollPos.current.set(screenKey(tab), window.scrollY)
+    capturePage(screenKey(tab), pageRef.current)
+  }
 
   const land = (next: BackSnap, motion: Motion) => {
     remember()
@@ -177,6 +182,7 @@ export function App() {
     pop: () => {
       if (goBack()) return
       if (!stacks[tab].length) return
+      remember()
       scrollPos.current.delete(screenKey(tab))
       setMotion('pop')
       setStacks((st) => ({ ...st, [tab]: st[tab].slice(0, -1) }))
@@ -226,6 +232,7 @@ export function App() {
     return active != null
   }
 
+  const swipedBack = useRef(false)
   const snapRef = useRef({ tab, stacks })
   snapRef.current = { tab, stacks }
   const rememberRef = useRef(remember)
@@ -234,56 +241,63 @@ export function App() {
     rememberRef.current()
     const cur = snapRef.current
     const same = cur.tab === restored.tab && JSON.stringify(cur.stacks) === JSON.stringify(restored.stacks)
-    if (!same) setMotion('pop')
+    // 밀어서 돌아왔으면 이미 움직였다. 탭만 바뀐 뒤로 가기는 미끄러지지 않는다
+    if (!same) setMotion(swipedBack.current || cur.tab !== restored.tab ? 'none' : 'pop')
+    swipedBack.current = false
     setTabState(restored.tab as Tab)
     setStacks(restored.stacks as Record<Tab, Screen[]>)
   }), [])
 
   const currentKey = screenKey(tab)
+  const shownKey = useRef(currentKey)
+  const motionNow = useRef<Motion>(motion)
+  motionNow.current = motion
   useLayoutEffect(() => {
     window.scrollTo(0, scrollPos.current.get(currentKey) ?? 0)
+    const from = shownKey.current
+    shownKey.current = currentKey
+    if (from === currentKey || from.split('/')[0] !== currentKey.split('/')[0] && motionNow.current !== 'push') return
+    if (motionNow.current === 'push') playPush(from, pageRef.current)
+    else if (motionNow.current === 'pop') { playPop(from, pageRef.current); dropStill(from) }
   }, [currentKey])
 
   // 왼쪽 가장자리에서 오른쪽으로 밀면 뒤로 (iOS처럼)
-  const swipe = useRef<{ x: number; y: number; dx: number; active: boolean } | null>(null)
-  const pageRef = useRef<HTMLDivElement>(null)
+  const swipe = useRef<{ x: number; y: number; dx: number; t: number; v: number; run?: ReturnType<typeof startSwipeBack> } | null>(null)
   const onTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0]
     if (!stacks[tab].length || t.clientX > 28) return
-    swipe.current = { x: t.clientX, y: t.clientY, dx: 0, active: false }
+    swipe.current = { x: t.clientX, y: t.clientY, dx: 0, t: performance.now(), v: 0 }
   }
   const onTouchMove = (e: React.TouchEvent) => {
     const g = swipe.current
     if (!g) return
     const t = e.touches[0]
     const dx = t.clientX - g.x, dy = t.clientY - g.y
-    if (!g.active) {
+    if (!g.run) {
       if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) { swipe.current = null; return }
-      if (dx > 8) g.active = true
+      if (dx > 8 && pageRef.current) g.run = startSwipeBack(screenKey(tab, { ...stacks, [tab]: stacks[tab].slice(0, -1) }), pageRef.current)
     }
-    if (g.active && pageRef.current) {
-      g.dx = Math.max(0, dx)
-      pageRef.current.style.transition = 'none'
-      pageRef.current.style.transform = `translateX(${g.dx}px)`
-      pageRef.current.style.boxShadow = '-12px 0 30px rgb(0 0 0 / 0.12)'
-    }
+    if (!g.run) return
+    const now = performance.now()
+    const next = Math.max(0, dx)
+    if (now > g.t) g.v = (next - g.dx) / (now - g.t)
+    g.t = now
+    g.dx = next
+    g.run.move(next)
   }
   const onTouchEnd = () => {
     const g = swipe.current
     swipe.current = null
-    const el = pageRef.current
-    if (!g?.active || !el) return
-    const done = g.dx > Math.min(120, window.innerWidth * 0.3)
-    el.style.transition = 'transform .22s cubic-bezier(.2,.8,.2,1)'
-    el.style.transform = done ? `translateX(${window.innerWidth}px)` : 'translateX(0)'
-    window.setTimeout(() => {
-      el.style.transition = ''; el.style.transform = ''; el.style.boxShadow = ''
-      if (done) {
-        scrollPos.current.delete(currentKey)
-        setMotion('none')
-        if (!goBack()) setStacks((st) => ({ ...st, [tab]: st[tab].slice(0, -1) }))
-      }
-    }, 220)
+    if (!g?.run) return
+    // 절반을 넘겼거나 빠르게 튕기면 뒤로
+    const done = g.dx > window.innerWidth * 0.5 || g.v > 0.4
+    g.run.end(done, g.dx, () => {
+      scrollPos.current.delete(currentKey)
+      dropStill(currentKey)
+      swipedBack.current = true
+      setMotion('none')
+      if (!goBack()) setStacks((st) => ({ ...st, [tab]: st[tab].slice(0, -1) }))
+    })
   }
 
   const top = stacks[tab].at(-1)

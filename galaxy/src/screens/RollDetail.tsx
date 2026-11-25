@@ -13,7 +13,7 @@ import { ManualRecord, RollShotEdit } from './ManualRecord'
 import { bytesText, cameraName, dateRangeText, fmtDay, fmtDayTime, resolutionText, rollCameraFormat, rollFilm, rollFilmName, rollName, rollTitle, sortedLocations } from '../core/display'
 import { resolvedDays, span } from '../core/rangeEdit'
 import { orderedDays } from '../core/timeline'
-import { Btn, CameraCover, Canister, DateInput, Field, Group, Progress, Row, RowText, Section, Segmented, StatusBadge, Sub } from '../kit'
+import { Btn, CameraCover, Canister, DateInput, Field, Footnote, Group, Progress, Row, RowText, Section, Segmented, StatusBadge, Sub } from '../kit'
 import { Icon } from '../icons'
 import { Page } from '../page'
 import { Confirm, Menu, Sheet, SheetBtn } from '../overlay'
@@ -22,6 +22,11 @@ import { RollGalleryButton, useRollInGallery } from '../GallerySave'
 import { useTheme } from '../theme'
 import { DayEdit, LabDropOff, LabField, LensChangeEdit, PlaceEdit, rememberLab } from './Editors'
 import { RollProjects } from './Projects'
+import { CustomFilmEdit } from './CustomFilmEdit'
+import { FilmPicker } from '../FilmPickGrid'
+import { filmById } from '../core/films'
+import { PressMenu } from '../PressMenu'
+import { SwipeRow } from '../SwipeRow'
 import { TagField } from '../gearExtras'
 import { FramePrint } from './FramePrint'
 import { ContactSheetView, FilmStrip, FrameViewer } from './RollViewers'
@@ -56,6 +61,8 @@ export function RollDetail({ id }: { id: string }) {
   const [recording, setRecording] = useState(false)
   const [moreMenu, setMoreMenu] = useState(false)
   const [pickCamera, setPickCamera] = useState(false)
+  const [pickFilm, setPickFilm] = useState(false)
+  const [askFilm, setAskFilm] = useState(false)
   const [shotEdit, setShotEdit] = useState<number>()
   const [allShots, setAllShots] = useState(false)
 
@@ -110,8 +117,8 @@ export function RollDetail({ id }: { id: string }) {
         <Icon name="pencil" size={15} color={c.muted} />
         <Text style={{ fontSize: 13, fontWeight: '600', color: c.muted }}>제목 편집</Text>
       </Pressable>
-      <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center', marginHorizontal: 4, marginBottom: 8 }}>
-        <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={104} />
+      <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center', marginHorizontal: 16, marginBottom: 12 }}>
+        <Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={94} />
         <View style={{ gap: 3, minWidth: 0, flex: 1, alignItems: 'flex-start' }}>
           <StatusBadge status={roll.status} />
           <Text style={{ fontSize: 22, fontWeight: '700', color: c.ink }}>{rollFilmName(roll)}{roll.shotISO ? ` @ ISO ${roll.shotISO}` : ''}</Text>
@@ -119,7 +126,6 @@ export function RollDetail({ id }: { id: string }) {
           {lens || camera?.fixedLens || roll.cameraFixedLens ? (
             <Sub>
               {lens ? `${lens.brand} ${lens.model}` : camera?.fixedLens || roll.cameraFixedLens}
-              {roll.lensChanges?.length ? ` 외 렌즈 ${roll.lensChanges.length}번 교체` : ''}
             </Sub>
           ) : null}
           <Sub>{dateRangeText(roll)}</Sub>
@@ -134,7 +140,7 @@ export function RollDetail({ id }: { id: string }) {
 
       {/* 다음에 할 일을 맨 위에: 촬영 중이면 상세 기록 */}
       {roll.status === 'loaded' ? <View style={{ marginTop: 4, marginBottom: 8 }}><Btn label="상세 기록" kind="primary" block onPress={() => setRecording(true)} /></View> : null}
-      {roll.status === 'finished' ? <Section foot="고르면 스캔 대기로 넘어가요."><Btn label="현상소 고르기" kind="primary" block onPress={() => setDropOff(true)} /></Section> : null}
+      {roll.status === 'finished' ? <Section foot="고르면 현상 맡김으로 넘어가요."><Btn label="현상소 고르기" kind="primary" block onPress={() => setDropOff(true)} /></Section> : null}
       {roll.status === 'atLab' ? <Section foot="현상소에서 받은 zip이나 사진을 골라요."><ScanButton rollId={id} big /></Section> : null}
 
       {roll.status === 'imported' && frames.length > 0 ? (
@@ -153,9 +159,12 @@ export function RollDetail({ id }: { id: string }) {
       {noShots ? <Section title="촬영일" foot={roll.days.length > 0 ? '눌러서 수정하거나 삭제할 수 있어요.' : undefined}>
         <Group>
           {orderedDays(roll.days).map((d) => (
-            <Row key={d.id} onPress={() => setDay(d)} value={dayRange(d)}>
-              <RowText>{fmtDayTime(d.startedAt)}</RowText>
-            </Row>
+            // 밀면 삭제, 길게 누르면 수정·삭제 (아이폰과 같음)
+            <SwipeRow key={d.id} onDelete={() => void db.rolls.update(id, { days: roll.days.filter((x) => x.id !== d.id) })}>
+              <PressMenu items={[{ label: '수정', icon: 'pencil', onPress: () => setDay(d) }, { label: '삭제', icon: 'trash', danger: true, onPress: () => void db.rolls.update(id, { days: roll.days.filter((x) => x.id !== d.id) }) }]}>{(hold) => (
+                <Row onPress={() => setDay(d)} onLongPress={hold} value={dayRange(d)}><RowText>{fmtDayTime(d.startedAt)}</RowText></Row>
+              )}</PressMenu>
+            </SwipeRow>
           ))}
           {roll.isArchive && roll.days.length === 0 ? <Row static><Sub>알 수 없음 (원본 날짜 유지)</Sub></Row> : null}
           {accentRow('plus', '촬영일 추가', () => setDay('new'))}
@@ -167,7 +176,9 @@ export function RollDetail({ id }: { id: string }) {
           <Group>
             <Row onPress={() => setLensEdit('first')} value="1번부터"><RowText>{roll.lensId ? lensName(roll.lensId) : '렌즈 고르기'}</RowText></Row>
             {[...(roll.lensChanges ?? [])].sort((a, b) => a.startFrame - b.startFrame).map((x) => (
-              <Row key={x.id} onPress={() => setLensEdit(x)} value={`${x.startFrame}번부터`}><RowText>{lensName(x.lensId)}</RowText></Row>
+              <SwipeRow key={x.id} onDelete={() => void db.rolls.update(id, { lensChanges: (roll.lensChanges ?? []).filter((y) => y.id !== x.id) })}>
+                <Row onPress={() => setLensEdit(x)} value={`${x.startFrame}번부터`}><RowText>{lensName(x.lensId)}</RowText></Row>
+              </SwipeRow>
             ))}
             {accentRow('plus', '렌즈 바꿔 낌', () => setLensEdit('new'))}
           </Group>
@@ -177,7 +188,9 @@ export function RollDetail({ id }: { id: string }) {
       {noShots ? <Section title="장소" warn foot={locs.some((l) => !l.point && l.name) ? '주황색 장소는 좌표가 없어 사진에 위치가 기록되지 않아요. 눌러서 좌표를 넣어 주세요.' : undefined}>
         <Group>
           {locs.map((l, i) => (
-            <Row key={l.id} onPress={() => setPlace(l)} value={rangeOf(i)}>
+            <SwipeRow key={l.id} onDelete={() => void db.rolls.update(id, { locations: roll.locations.filter((x) => x.id !== l.id) })}>
+            <PressMenu items={[{ label: '수정', icon: 'pencil', onPress: () => setPlace(l) }, { label: '삭제', icon: 'trash', danger: true, onPress: () => void db.rolls.update(id, { locations: roll.locations.filter((x) => x.id !== l.id) }) }]}>{(hold) => (
+            <Row onPress={() => setPlace(l)} onLongPress={hold} value={rangeOf(i)}>
               {/* 이름만 있고 좌표가 없으면 주황, 장소 미상은 회색 (웹과 같음) */}
               <Icon name="pin" size={20} color={l.point ? c.safelight : l.name ? c.warn : c.muted} />
               <View style={{ flex: 1, minWidth: 0 }}>
@@ -187,6 +200,8 @@ export function RollDetail({ id }: { id: string }) {
                 {!l.point && l.name ? <Text style={{ fontSize: 14, color: c.warn }}>좌표 없음</Text> : null}
               </View>
             </Row>
+            )}</PressMenu>
+            </SwipeRow>
           ))}
           {accentRow('plus', '장소 추가', () => setPlace('new'))}
         </Group>
@@ -227,21 +242,22 @@ export function RollDetail({ id }: { id: string }) {
 
       {roll.status !== 'atLab' ? (
       <Section>
-        <View style={{ gap: 10 }}>
-          {roll.status === 'loaded' ? <Btn label="촬영 끝내기" kind="primary" size="stack" block onPress={() => setDropOff(true)} /> : null}
-          {roll.status === 'finished' ? <Btn label="다시 촬영 중으로" size="stack" block onPress={() => db.rolls.update(id, { status: 'loaded' })} /> : null}
-          {roll.status === 'imported' ? <ScanButton rollId={id} label="다시 불러오기" big /> : null}
-          {roll.status === 'imported' ? <Btn label="사진 날짜·위치 다시 맞추기" size="stack" block onPress={() => { void syncPhotoMeta(id, nav.toast) }} /> : null}
-        </View>
+        <Group>
+          {roll.status === 'loaded' ? <Row accent onPress={() => setDropOff(true)}>촬영 끝내기</Row> : null}
+          {roll.status === 'finished' ? <Row accent onPress={() => db.rolls.update(id, { status: 'loaded' })}>다시 촬영 중으로</Row> : null}
+          {roll.status === 'imported' ? <ScanButton rollId={id} label="다시 불러오기" row /> : null}
+          {roll.status === 'imported' ? <Row accent onPress={() => { void syncPhotoMeta(id, nav.toast) }}>사진 날짜·위치 다시 맞추기</Row> : null}
+        </Group>
       </Section>
       ) : null}
 
       {moreMenu ? <Menu onClose={() => setMoreMenu(false)} items={[
-        { label: '카메라 바꾸기', onPress: () => setPickCamera(true) },
-        { label: '현상소 수정', onPress: () => setLabEdit(true) },
-        { label: '필름 유통기한', onPress: () => setExpiryEdit(true) },
-        ...((roll.frameCount ?? 0) > 1 ? [{ label: '컷 순서 뒤집기', onPress: () => setConfirmReverse(true) }] : []),
-        { label: '롤 삭제', danger: true, onPress: () => setConfirm(true) },
+        { label: '카메라 바꾸기', icon: 'camera', onPress: () => setPickCamera(true) },
+        { label: '필름 바꾸기', icon: 'film', onPress: () => { if (roll.status === 'loaded' && roll.cameraId) setAskFilm(true); else setPickFilm(true) } },
+        { label: '현상소 수정', icon: 'building', onPress: () => setLabEdit(true) },
+        { label: '필름 유통기한', icon: 'calendar', onPress: () => setExpiryEdit(true) },
+        ...((roll.frameCount ?? 0) > 1 ? [{ label: '컷 순서 뒤집기', icon: 'sort', onPress: () => setConfirmReverse(true) }] : []),
+        { label: '롤 삭제', icon: 'trash', danger: true, onPress: () => setConfirm(true) },
       ]} /> : null}
       {labEdit ? <LabEditSheet roll={roll} onClose={() => setLabEdit(false)} /> : null}
       {expiryEdit ? <ExpiryEditSheet roll={roll} onClose={() => setExpiryEdit(false)} /> : null}
@@ -250,6 +266,11 @@ export function RollDetail({ id }: { id: string }) {
           onCancel={() => setConfirmReverse(false)}
           onConfirm={async () => { setConfirmReverse(false); if (await reverseRollFrames(id)) { nav.toast('컷 순서를 뒤집었어요'); void syncPhotoMeta(id, nav.toast) } }} />
       ) : null}
+      {askFilm ? (
+        <Confirm message="이 필름을 다 찍고 바꾸는 건가요?" safe action="다 찍었어요 · 새 필름 장착" extra={{ label: '아직 찍는 중 · 필름 기록만 고치기', safe: true, onPress: () => { setAskFilm(false); setPickFilm(true) } }}
+          onCancel={() => setAskFilm(false)} onConfirm={() => { setAskFilm(false); nav.loadFilm(roll.cameraId) }} />
+      ) : null}
+      {pickFilm ? <RollFilmPick roll={roll} format={rollCameraFormat(camera, roll)} onClose={() => setPickFilm(false)} /> : null}
       {pickCamera ? <RollCameraPick roll={roll} onClose={() => setPickCamera(false)} /> : null}
       {recording ? <ManualRecord roll={roll} onClose={() => setRecording(false)} /> : null}
       {shotEdit !== undefined ? <RollShotEdit roll={roll} pos={shotEdit} onClose={() => setShotEdit(undefined)} onToast={nav.toast} /> : null}
@@ -285,6 +306,27 @@ export function RollDetail({ id }: { id: string }) {
           change={lensEdit === 'new' ? undefined : lensEdit} onClose={() => setLensEdit(null)} />
       ) : null}
     </Page>
+  )
+}
+
+/** 롤에 기록한 필름을 다른 필름으로 고친다 (웹·아이폰과 같음) */
+function RollFilmPick({ roll, format, onClose }: { roll: Roll; format: FilmFormat; onClose: () => void }) {
+  const [filmId, setFilmId] = useState<string | undefined>(roll.filmId || undefined)
+  const [custom, setCustom] = useState<string>()
+  const customRows = useLiveQuery(() => db.customFilms.toArray(), []) ?? []
+  const save = async () => {
+    if (filmId && filmId !== roll.filmId) {
+      await db.rolls.update(roll.id, { filmId, filmExpiresAt: undefined, ...(roll.shotISO === filmById(filmId)?.iso ? { shotISO: undefined } : {}) })
+    }
+    onClose()
+  }
+  return (
+    <Sheet title="필름 바꾸기" onClose={onClose} right={<SheetBtn label="저장" accent disabled={!filmId} onPress={() => { void save() }} />}>
+      <FilmPicker format={format} filmId={filmId} onPick={(id) => setFilmId(id)} onAddCustom={() => setCustom('new')} onEditCustom={setCustom}
+        footer={(roll.frameCount ?? 0) > 0 ? <Footnote>저장한 사진의 필름 정보도 함께 바꿔요.</Footnote> : undefined} />
+      {custom ? <CustomFilmEdit row={custom === 'new' ? undefined : customRows.find((r) => r.id === custom)}
+        onClose={(saved) => { setCustom(undefined); if (saved !== undefined) setFilmId(saved || undefined) }} /> : null}
+    </Sheet>
   )
 }
 
@@ -389,7 +431,7 @@ function AllShots({ roll, format, onEdit }: { roll: Roll; format: FilmFormat; on
 /** 촬영일·장소를 고치면 저장한 사진 속 날짜·위치도 새로 쓴다. 드라이브에 연결돼 있으면 새 정보의 사진으로 다시 올린다 */
 function usePhotoMetaSync(roll: Roll | undefined, toast: (m: string) => void) {
   const key = roll?.status === 'imported'
-    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive, roll.cameraId, roll.cameraBrand, roll.cameraModel, roll.lensId, roll.lab,
+    ? JSON.stringify([roll.days.map((d) => [d.startedAt, d.startFrame]), roll.locations.map((l) => [l.startFrame, l.name, l.point?.latitude, l.point?.longitude]), roll.isArchive, roll.cameraId, roll.cameraBrand, roll.cameraModel, roll.lensId, roll.lab, roll.filmId, roll.shotISO,
       (roll.meterShots ?? []).map((x) => [x.pos, x.at, x.place, x.lat, x.lon, x.lensId, x.iso])])
     : ''
   const last = useRef<string | undefined>(undefined)

@@ -14,6 +14,9 @@ import { useTheme } from '../theme'
 import { LabDropOff, PlaceEdit } from './Editors'
 import { Confirm } from '../overlay'
 import { ManualRecord } from './ManualRecord'
+import { PressMenu } from '../PressMenu'
+import { SwipeRow } from '../SwipeRow'
+import { weatherText } from '../core/types'
 import { SettingsButton } from './Settings'
 
 export function Shooting() {
@@ -42,12 +45,18 @@ function LoadedCard({ roll }: { roll: Roll }) {
   const [placing, setPlacing] = useState(false)
   const [dropOff, setDropOff] = useState(false)
   const [meter, setMeter] = useState(false)
-  const places = sortedLocations(roll).map((l) => l.name).filter(Boolean).join(' → ')
+  const toggle = () => void db.rolls.update(roll.id, { favorite: !roll.favorite })
+  const locs = sortedLocations(roll)
+  const place = locs.map((l) => l.name).filter(Boolean).join(' → ')
+  const weather = locs.at(-1)?.weather
+  const places = place ? place + (weather ? ` · ${weatherText(weather)}` : '') : ''
   return (
-    <View style={{ backgroundColor: c.card, borderRadius: 22, overflow: 'hidden',
+    <View style={{ backgroundColor: c.cell, borderRadius: 26, overflow: 'hidden',
       boxShadow: c.shadow }}>
-      {/* 꾹 누르면 삭제 (웹·아이폰과 같음) */}
-      <Pressable onPress={() => nav.push({ type: 'roll', id: roll.id })} onLongPress={() => setDeleting(true)} delayLongPress={450} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, opacity: pressed ? 0.85 : 1 })}>
+      {/* 길게 누르면 메뉴, 밀면 즐겨찾기·삭제 (웹·아이폰과 같음) */}
+      <SwipeRow favorite={!!roll.favorite} onFavorite={toggle} onDelete={() => setDeleting(true)}>
+      <PressMenu items={[{ label: roll.favorite ? '즐겨찾기 해제' : '즐겨찾기', icon: 'star', onPress: toggle }, { label: '삭제', icon: 'trash', danger: true, onPress: () => setDeleting(true) }]}>{(onLongPress) => (
+      <Pressable onPress={() => nav.push({ type: 'roll', id: roll.id })} onLongPress={onLongPress} delayLongPress={450} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, opacity: pressed ? 0.85 : 1 })}>
         <View style={{ width: 96 }}>
           {camera ? <CameraCover camera={camera} height={72} /> : <View style={{ height: 72 }} />}
           <View style={{ position: 'absolute', right: 2, bottom: -8 }}><Canister film={rollFilm(roll)} format={rollCameraFormat(camera, roll)} size={44} /></View>
@@ -60,7 +69,9 @@ function LoadedCard({ roll }: { roll: Roll }) {
         </View>
         <Icon name="chev" size={18} color={c.faint} />
       </Pressable>
-      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 16 }}>
+      )}</PressMenu>
+      </SwipeRow>
+      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 12, paddingTop: 4 }}>
         {roll.locations.length === 0 ? <View style={{ flex: 1 }}><Btn label="장소 추가" icon="pin" kind="soft" block onPress={() => setPlacing(true)} /></View> : null}
         {/* 상세 기록: 다이얼로 컷마다 기록 (웹·아이폰과 같음) */}
         <View style={{ flex: 1 }}><Btn label="상세 기록" kind="soft" block onPress={() => setMeter(true)} /></View>

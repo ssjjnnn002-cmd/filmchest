@@ -110,18 +110,14 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
     </>
   )
 
-  // 삼성 등에서 Modal을 겹치면 바로 종료되는 경우가 있어, 맨 위 시트만 연다.
-  if (cloud) {
-    return (
+  // 설정 위에 옆으로 밀려 들어온다 (Modal이 아니라 한 화면 안의 층이라 겹쳐도 된다)
+  const cloudView = cloud ? (
       <>
         <CloudBackup onClose={() => setCloud(false)} />
-        {dialogs}
       </>
-    )
-  }
+  ) : null
 
-  if (saveChoice) {
-    return (
+  const saveChoiceView = saveChoice ? (
       <>
         <Sheet title="백업 파일로 저장" onClose={() => setSaveChoice(false)}>
           <Section foot="사진까지 저장한 zip을 불러오면 사진도 롤에 다시 붙어요.">
@@ -138,22 +134,16 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
             </Group>
           </Section>
         </Sheet>
-        {dialogs}
       </>
-    )
-  }
+  ) : null
 
-  if (spending) {
-    return (
+  const spendingView = spending ? (
       <>
         <Stats onClose={() => setSpending(false)} />
-        {dialogs}
       </>
-    )
-  }
+  ) : null
 
-  if (backupOpen) {
-    return (
+  const backupOpenView = backupOpen ? (
       <>
         <Sheet title="백업 및 복구" onClose={() => setBackupOpen(false)} left={null} right={<SheetBtn label="완료" accent onPress={() => setBackupOpen(false)} />}>
           <Section title="백업" foot={`${lastBackupText()} 장비·필름·롤 기록을 파일 하나로 저장해요. 스캔 사진은 빠져요. 웹앱 백업 파일도 불러올 수 있어요.`}>
@@ -209,10 +199,8 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
             </Group>
           </Section>
         </Sheet>
-        {dialogs}
       </>
-    )
-  }
+  ) : null
 
   return (
     <>
@@ -238,12 +226,12 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         </Section>
 
         <Section title="화면">
-          <Segmented value={theme} options={themes} onChange={choose} />
+          <Group><View style={{ paddingVertical: 10, paddingHorizontal: 16 }}><Segmented value={theme} options={themes} onChange={choose} /></View></Group>
         </Section>
 
         <Section title="정보" foot="앱 버전은 아이폰, 갤럭시, 웹이 같습니다.">
           <Group>
-            <Row onPress={() => setPrivacy(true)}>개인정보 처리방침</Row>
+            <Row chev onPress={() => setPrivacy(true)}>개인정보 처리방침</Row>
             <Row static value={APP_VERSION}><RowText>앱 버전</RowText></Row>
             <Row chev value={update} onPress={() => { void withWork(async () => {
               try {
@@ -260,6 +248,10 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         </Group>
 
       </Sheet>
+      {backupOpenView}
+      {spendingView}
+      {cloudView}
+      {saveChoiceView}
       {dialogs}
     </>
   )

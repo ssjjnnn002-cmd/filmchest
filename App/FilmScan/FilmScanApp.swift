@@ -136,7 +136,7 @@ final class Router {
                 return copy
             } catch { return nil }
         }
-        guard !copies.isEmpty else { return }
+        guard !copies.isEmpty else { if !urls.isEmpty { openFailed = true }; return }
         incoming = IncomingZips(urls: copies)
     }
 
@@ -190,6 +190,8 @@ final class Router {
     }
     /// 공유한 사진을 사진 앱에서 하나도 찾지 못함
     var photoMissingAlert = false
+    /// 고른 zip·폴더를 복사하지 못함 (아이클라우드에서 못 받은 파일 등)
+    var openFailed = false
 
     /// 여러 zip을 기존 롤 대기열에 넣고 현상 스캔으로 간다
     func enqueueArchive(_ urls: [URL]) {
@@ -211,6 +213,7 @@ final class Router {
             importRequest = ImportRequest(zipURL: copy, roll: roll)
         } catch {
             importRequest = nil
+            openFailed = true
         }
     }
 }

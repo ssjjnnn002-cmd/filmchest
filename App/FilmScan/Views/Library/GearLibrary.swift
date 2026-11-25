@@ -105,20 +105,8 @@ struct PurchaseFields: View {
     var body: some View {
         Section("구입") {
             // 처음부터 달력으로 고른다. 고르면 기록되고, 지우기로 비운다.
-            HStack {
-                DatePicker(selection: Binding(get: { date }, set: { date = $0; hasDate = true }), displayedComponents: .date) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("구입 날짜")
-                        if !hasDate { Text("기록 안 함").font(.caption).foregroundStyle(.secondary) }
-                    }
-                }
-                if hasDate {
-                    Button { hasDate = false } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel("구입 날짜 지우기")
-                }
-            }
-            TextField("구입 금액", text: $price)
+            OptionalDateRow(label: "구입 날짜", isSet: $hasDate, date: $date)
+            LabeledField("구입 금액", text: $price)
                 #if os(iOS)
                 .keyboardType(.numberPad)
                 #endif
@@ -126,7 +114,7 @@ struct PurchaseFields: View {
                     let next = PriceText.grouped(new)
                     if next != new { price = next }
                 }
-            TextField("구입처", text: $seller)
+            LabeledField("구입처", text: $seller)
             let hits = Array(suggestions.prefix(8))
             if !hits.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -858,7 +846,7 @@ struct FilmLotEditView: View {
                         ForEach(FilmStorage.allCases) { Text($0.displayName).tag($0) }
                     }
                     if storage == .custom {
-                        TextField("보관 장소 (예: 카메라 가방)", text: $storagePlace)
+                        LabeledField("보관 장소", text: $storagePlace)
                     }
                     Toggle("유통기한", isOn: $hasExpiry)
                     if hasExpiry {

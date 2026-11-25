@@ -13,4 +13,4 @@ export function lotToUse(lots: FilmLot[], filmId: string, format?: FilmFormat): 
 export const stockCount = (lots: FilmLot[], filmId: string) => lots.filter((l) => l.filmId === filmId).reduce((n, l) => n + Math.max(0, l.count), 0)
 
 /** 재고에 유통기한이 지난 이 필름이 있는지 */
-export const hasExpiredLot = (lots: FilmLot[], filmId: string, now = Date.now()) => lots.some((l) => l.filmId === filmId && !!l.expiresAt && l.expiresAt < now)
+export const hasExpiredLot = (lots: FilmLot[], filmId: string, now = Date.now()) => lots.some((l) => l.filmId === filmId && l.count > 0 && !!l.expiresAt && l.expiresAt < now)
