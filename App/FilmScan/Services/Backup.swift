@@ -22,6 +22,40 @@ enum Trash {
             context.delete(camera)
         }
     }
+
+    /// '장착'을 여러 번 눌러 생긴 같은 롤을 정리한다 (웹·갤럭시 removeDoubleLoads와 같음).
+    /// 같은 카메라·같은 필름을 1분 안에 장착한 롤이 여럿이면, 지금 장착된 롤(없으면 가장 먼저 장착한 롤)을 남기고
+    /// 사진·컷 기록이 없는 나머지를 삭제한 롤로 옮긴다. 아이폰은 두 번째 장착이 첫 롤을 '촬영 완료'로 바꾸므로 그것도 함께 본다.
+    @discardableResult
+    static func removeDoubleLoads(in context: ModelContext) -> Int {
+        let rolls = ((try? context.fetch(FetchDescriptor<RollItem>())) ?? [])
+            .filter { $0.deletedAt == nil && !$0.isArchive && ($0.status == .loaded || $0.status == .finished) }
+            .sorted { $0.loadedAt < $1.loadedAt }
+        var groups: [[RollItem]] = []
+        for roll in rolls {
+            if let i = groups.firstIndex(where: { g in
+                let first = g[0]
+                return first.camera?.id == roll.camera?.id && first.camera != nil && first.filmStockID == roll.filmStockID
+                    && roll.loadedAt.timeIntervalSince(first.loadedAt) < 60
+            }) {
+                groups[i].append(roll)
+            } else {
+                groups.append([roll])
+            }
+        }
+        var removed = 0
+        for group in groups where group.count > 1 {
+            let keep = group.last { $0.status == .loaded } ?? group[0]
+            for roll in group where roll !== keep {
+                // 끝낸 롤은 다음 롤 장착과 거의 같은 때(1분 안)에 끝난 것만 중복으로 본다
+                if roll.status == .finished, (roll.finishedAt.map { abs($0.timeIntervalSince(keep.loadedAt)) } ?? .infinity) > 60 { continue }
+                guard (roll.frames ?? []).isEmpty, roll.meterShots.isEmpty else { continue }
+                roll.deletedAt = Date()
+                removed += 1
+            }
+        }
+        return removed
+    }
 }
 
 struct GearDocument: FileDocument {

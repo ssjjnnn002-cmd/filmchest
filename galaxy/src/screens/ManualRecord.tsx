@@ -18,6 +18,7 @@ import { currentPlace } from '../platform'
 import { Canister as FilmBox, Chip, Chips, DateInput, Group, Row, RowText } from '../kit'
 import { FullModal, Confirm, Sheet, SheetBtn } from '../overlay'
 import { PlacePicker } from './Editors'
+import { canDetailRecord, detailLockText } from '../core/premium'
 import { useTheme } from '../theme'
 
 type Lens = { id: string; name: string; min: number; max: number; open: number; close: number; fixed?: boolean }
@@ -108,7 +109,13 @@ function useTween(target: number, ms = 280) {
   return v
 }
 
+/** 상세 기록(다이얼 화면)은 프리미엄 기능. 잠겨 있으면 안내만 (이미 남긴 기록은 롤 화면에서 그대로 보이고 고칠 수 있다, 웹과 같음) */
 export function ManualRecord({ roll, onClose }: { roll: Roll; onClose: () => void }) {
+  if (!canDetailRecord()) return <Confirm message={detailLockText} action="확인" safe onCancel={onClose} onConfirm={onClose} />
+  return <ManualRecordScreen roll={roll} onClose={onClose} />
+}
+
+function ManualRecordScreen({ roll, onClose }: { roll: Roll; onClose: () => void }) {
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId], null)
   const allLenses = useLiveQuery(() => db.lenses.toArray(), [], null)
   const ready = (camera !== null || !roll.cameraId) && allLenses !== null

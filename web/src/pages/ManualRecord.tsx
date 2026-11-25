@@ -11,6 +11,7 @@ import { exposureText, formatAperture, formatComp, formatShutter, meterFrameTitl
 import { cameraName, rollCameraFormat, rollFilm, Confirm, Sheet, Canister as UiCanister } from '../ui/common'
 import { currentPlace } from '../platform'
 import { PlacePicker } from './Editors'
+import { canDetailRecord, detailLockText } from '../core/premium'
 import { fixedLens, meterLens } from './Meter'
 
 // 상세 기록 (노출계 없이): 카메라 윗면 다이얼로 셔터 · 노출 보정 · 조리개(맨 끝 ⚡)를 맞추고,
@@ -92,7 +93,13 @@ const sound = (fn: () => void) => { try { fn() } catch { /* 소리 없음 */ } }
 const shutterSound = (t: number) => { const gap = Math.min(Math.max(t, 0.012), 8); noise(0.01, 0.028, 2600, 1.6); noise(0.012, 0.05, 900, 0.7); noise(0.01 + gap, 0.03, 2100, 1.5); noise(0.012 + gap, 0.06, 700, 0.8) }
 const ratchetSound = () => { for (let i = 0; i < 7; i++) noise(i * 0.045, 0.012, 5200, 0.35) }
 
+/** 상세 기록(다이얼 화면)은 프리미엄 기능. 잠겨 있으면 안내만 (이미 남긴 기록은 롤 화면에서 그대로 보이고 고칠 수 있다) */
 export function ManualRecord({ roll, onClose }: { roll: Roll; onClose: () => void }) {
+  if (!canDetailRecord()) return <Confirm message={detailLockText} action="확인" safe only onCancel={onClose} onConfirm={onClose} />
+  return <ManualRecordScreen roll={roll} onClose={onClose} />
+}
+
+function ManualRecordScreen({ roll, onClose }: { roll: Roll; onClose: () => void }) {
   const camera = useLiveQuery(() => (roll.cameraId ? db.cameras.get(roll.cameraId) : undefined), [roll.cameraId])
   const allLenses = useLiveQuery(() => db.lenses.toArray(), [])
   if (camera === undefined && roll.cameraId) return null

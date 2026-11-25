@@ -15,6 +15,9 @@ struct SettingsView: View {
     @State private var confirmWipe = false
     /// 개발자 모드: 관리자 코드를 넣으면 아직 모두에게 열지 않은 기능(노출계)이 열린다 (웹과 같음)
     @AppStorage("devMode") private var devMode = false
+    /// 개발자 모드: 무료/프리미엄 구분을 이 기기에서만 켜 보기 (Premium과 같은 값)
+    @AppStorage("premiumTest", store: AppSettings.defaults) private var premiumTest = false
+    @AppStorage("premiumDev", store: AppSettings.defaults) private var premiumDev = false
     @State private var askDevCode = false
     @State private var confirmDevOff = false
     @State private var devCode = ""
@@ -115,6 +118,10 @@ struct SettingsView: View {
 
                 Section {
                     NavigationLink("개인정보 처리방침") { PrivacyPolicyView() }
+                    // 함께 만든 분들 (텀블벅 후원자). 목록이 비어 있으면 줄을 숨긴다
+                    if !Supporters.names.isEmpty {
+                        NavigationLink("함께 만든 분들") { SupportersView(names: Supporters.names) }
+                    }
                     // 개발자 모드는 숨겨 둔다: 앱 버전을 5초 누르면 나타난다. 켜져 있으면 끌 때까지 늘 보인다
                     LabeledContent("앱 버전", value: Self.appVersion)
                         .contentShape(Rectangle())
@@ -129,6 +136,11 @@ struct SettingsView: View {
                     }
                     if devMode {
                         NavigationLink("노출계 시험") { MeterLabView() }
+                        Toggle("무료/프리미엄 구분 시험", isOn: $premiumTest)
+                        if premiumTest {
+                            Toggle("프리미엄 이용 중 (시험)", isOn: $premiumDev)
+                            LabeledContent("이번 달 장착", value: "\(Premium.loadsThisMonth(in: context))/\(Premium.freeRollsPerMonth)")
+                        }
                     }
                 } header: {
                     Text("정보")
@@ -189,7 +201,7 @@ struct SettingsView: View {
             }
             .alert("코드가 맞지 않아요.", isPresented: $devWrong) { Button("확인", role: .cancel) {} }
             .confirmationDialog("개발자 모드를 끌까요?", isPresented: $confirmDevOff, titleVisibility: .visible) {
-                Button("끄기", role: .destructive) { devMode = false }
+                Button("끄기", role: .destructive) { Premium.clearTest(); premiumTest = false; premiumDev = false; devMode = false }
             }
             .alert("복구", isPresented: Binding(get: { note != nil }, set: { if !$0 { note = nil } })) {
                 Button("확인", role: .cancel) { note = nil }
@@ -252,5 +264,35 @@ struct SettingsView: View {
         } footer: {
             Text("0.0이 가운데예요. 아이폰 기본은 −0.2 EV예요.")
         }
+    }
+}
+
+/// 함께 만든 분들: 고마운 후원자 이름을 한 줄씩 (텀블벅 선물 이미지와 같은 모양, 웹·갤럭시와 같음)
+private struct SupportersView: View {
+    let names: [String]
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(Array(names.enumerated()), id: \.offset) { _, name in
+                    HStack(spacing: 14) {
+                        Circle().fill(Theme.safelight.opacity(0.28)).frame(width: 26, height: 26)
+                        Text(name)
+                    }
+                    .padding(.vertical, 2)
+                }
+            } header: {
+                Text("고마운 후원자")
+                    .font(.title2.bold())
+                    .foregroundStyle(.primary)
+                    .textCase(nil)
+                    .padding(.bottom, 4)
+            }
+        }
+        .filmForm()
+        .navigationTitle("함께 만든 분들")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }

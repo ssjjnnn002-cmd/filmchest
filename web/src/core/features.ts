@@ -7,4 +7,6 @@ export const features = {
   frameShift: false,
   /** 프레임 만들기 (다듬는 동안 잠시 숨김) */
   framePrint: false,
+  /** 무료/프리미엄 구분 (월 4롤·컷별 상세 기록 잠금). 펀딩이 끝나고 결제를 붙이기 전까지 꺼 둔다. 꺼져 있으면 모두 무료 */
+  premium: false,
 }

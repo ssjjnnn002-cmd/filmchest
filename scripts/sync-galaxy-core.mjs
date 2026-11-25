@@ -10,7 +10,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const from = join(root, 'web/src/core'), to = join(root, 'galaxy/src/core')
 mkdirSync(to, { recursive: true })
 // 브라우저 기능을 쓰지 않는 파일만 (그 밖의 파일은 갤럭시 쪽에서 같은 동작으로 따로 맞춘다)
-const files = ['features', 'filmData', 'films', 'cameras', 'cameraData', 'lenses', 'lensData', 'timeline', 'profiles', 'exif', 'meter', 'frameCaption', 'framePrint', 'driveApi', 'backupMerge', 'syncMerge', 'gearGroup', 'backupNudge', 'filmStock', 'stats', 'filterLook', 'searchAlias', 'nameHints', 'rangeEdit', 'rollMatch']
+const files = ['features', 'filmData', 'films', 'cameras', 'cameraData', 'lenses', 'lensData', 'timeline', 'profiles', 'exif', 'meter', 'frameCaption', 'framePrint', 'driveApi', 'backupMerge', 'syncMerge', 'gearGroup', 'backupNudge', 'filmStock', 'stats', 'filterLook', 'searchAlias', 'nameHints', 'rangeEdit', 'rollMatch', 'supporters', 'premium']
 for (const f of files) {
   // 설정 값(getPref/setPref)은 갤럭시에선 store에 있다
   const src = readFileSync(join(from, `${f}.ts`), 'utf8').replace("import { getPref, setPref } from '../platform'", "import { getPref, setPref } from '../store'")
@@ -31,6 +31,33 @@ for (const f of files) {
   }
   writeFileSync(join(to, 'types.ts'), `// 자동 복사: web/src/core/types.ts (Blob → 파일 경로만 바꿈). 여기서 고치지 말 것.\nimport { randomUUID } from 'expo-crypto'\n${src}`)
   files.push('types')
+}
+// 함께 만든 분들: 아이폰도 같은 목록을 쓰도록 Swift 배열로 만든다
+{
+  const src = readFileSync(join(from, 'supporters.ts'), 'utf8')
+  const m = src.match(/export const supporters: string\[\] = \[([\s\S]*?)\n\]/)
+  if (!m) throw new Error('supporters.ts에서 목록을 찾지 못함')
+  const names = JSON.parse(`[${m[1].replace(/\/\/.*$/gm, '').trim().replace(/,\s*$/, '')}]`)
+  if (!Array.isArray(names) || names.some((n) => typeof n !== 'string')) throw new Error('supporters.ts 이름은 큰따옴표 글자로')
+  const lines = names.map((n) => `        ${JSON.stringify(n)},`).join('\n')
+  writeFileSync(join(root, 'App/Shared/Model/Supporters.swift'), `// 자동 생성: web/src/core/supporters.ts (node scripts/sync-galaxy-core.mjs). 여기서 고치지 말 것.
+import Foundation
+
+/// 함께 만든 분들 (텀블벅 후원자). 비어 있으면 설정에 줄이 보이지 않는다
+enum Supporters {
+    static let list: [String] = ${names.length ? `[\n${lines}\n    ]` : '[]'}
+
+    /// 화면에 올릴 이름 (앞뒤 공백 정리, 빈 이름·중복 제외, 넣은 순서 그대로)
+    static var names: [String] {
+        var seen = Set<String>()
+        return list.compactMap { raw in
+            let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, seen.insert(name).inserted else { return nil }
+            return name
+        }
+    }
+}
+`)
 }
 // 아이콘: 웹 ui/common.tsx의 아이콘 정의를 그대로 가져와 react-native-svg로 그린다
 {

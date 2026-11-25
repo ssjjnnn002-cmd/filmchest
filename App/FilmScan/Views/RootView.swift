@@ -116,6 +116,7 @@ struct RootView: View {
         }
         .task {
             Trash.purge(in: context)
+            Trash.removeDoubleLoads(in: context)
             await splitMergedAlbums()
             if Subscriptions.subscriptionEnabled { await Subscriptions.shared.listen() }
         }

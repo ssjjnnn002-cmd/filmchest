@@ -19,6 +19,7 @@ import { formatDate, formatDateTime } from '../core/types'
 import { withWork } from '../core/work'
 import { bytesText } from '../core/display'
 import { sections } from '../core/privacyText'
+import { supporterNames } from '../core/supporters'
 import { APP_VERSION } from '../core/version'
 import { Btn, Footnote, Group, Row, RowText, Section, Segmented, Sub } from '../kit'
 import { Confirm, Sheet, SheetBtn } from '../overlay'
@@ -39,6 +40,8 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   const [usage, setUsage] = useState<{ used: number; quota: number }>()
   const [confirm, setConfirm] = useState(false)
   const [privacy, setPrivacy] = useState(false)
+  const [thanks, setThanks] = useState(false)
+  const supporters = supporterNames()
   const [note, setNote] = useState<string>()
   const [cloud, setCloud] = useState(false)
   const [backupOpen, setBackupOpen] = useState(openBackup)
@@ -77,6 +80,20 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
               </View>
             ))}
           </View>
+        </Sheet>
+      ) : null}
+      {/* 함께 만든 분들: 고마운 후원자 이름을 한 줄씩 (텀블벅 선물 이미지와 같은 모양, 웹·아이폰과 같음) */}
+      {thanks ? (
+        <Sheet title="함께 만든 분들" onClose={() => setThanks(false)}>
+          <Text style={{ fontSize: 22, fontWeight: '700', color: c.ink, marginHorizontal: 16, marginTop: 4, marginBottom: 10 }}>고마운 후원자</Text>
+          <Group>
+            {supporters.map((n, i) => (
+              <Row key={`${i}-${n}`} static>
+                <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: c.safelight, opacity: 0.28 }} />
+                <RowText>{n}</RowText>
+              </Row>
+            ))}
+          </Group>
         </Sheet>
       ) : null}
       {note ? <Confirm message={note} action="확인" onCancel={() => setNote(undefined)} onConfirm={() => setNote(undefined)} /> : null}
@@ -232,6 +249,7 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         <Section title="정보" foot="앱 버전은 아이폰, 갤럭시, 웹이 같습니다.">
           <Group>
             <Row chev onPress={() => setPrivacy(true)}>개인정보 처리방침</Row>
+            {supporters.length > 0 ? <Row chev onPress={() => setThanks(true)}><RowText>함께 만든 분들</RowText></Row> : null}
             <Row static value={APP_VERSION}><RowText>앱 버전</RowText></Row>
             <Row chev value={update} onPress={() => { void withWork(async () => {
               try {

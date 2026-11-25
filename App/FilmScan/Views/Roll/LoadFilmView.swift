@@ -15,6 +15,7 @@ struct LoadFilmView: View {
     @Query private var lots: [FilmLotItem]
     @State private var loading = false
     @State private var confirmExpired = false
+    @State private var rollLimit = false
     @State private var addingCamera = false
 
     @State private var cameraID: UUID?
@@ -112,8 +113,8 @@ struct LoadFilmView: View {
                         }
                     } footer: {
                         VStack(alignment: .leading, spacing: 4) {
-                            if Subscriptions.subscriptionEnabled, !Subscriptions.shared.isSubscribed {
-                                Text("무료 롤 \(RollQuota.used(in: context))/\(RollQuota.freeLimit)")
+                            if Premium.gateOn, !Premium.isPremium {
+                                Text("이번 달 무료 롤 \(min(Premium.loadsThisMonth(in: context), Premium.freeRollsPerMonth))/\(Premium.freeRollsPerMonth)")
                             }
                             if startToday && Calendar.current.isDateInToday(startDate) { Text("지금 시각과 현재 위치를 첫 촬영일로 기록해요.") }
                         }
@@ -123,10 +124,10 @@ struct LoadFilmView: View {
             }
             .filmForm()
             .filmKeyboard()
-            .rollPaywall()
             .navigationTitle("필름 장착하기")
+            .alert(Premium.rollLimitText, isPresented: $rollLimit) { Button("확인", role: .cancel) {} }
             .confirmationDialog("유통기한이 지난 필름이에요.", isPresented: $confirmExpired, titleVisibility: .visible) {
-                Button("그래도 장착") { Task { await load() } }
+                Button("그래도 장착") { load() }
                 Button("취소", role: .cancel) {}
             }
             .toolbar {
@@ -136,12 +137,11 @@ struct LoadFilmView: View {
                         if let film, lots.contains(where: { $0.filmStockID == film.id && $0.count > 0 && $0.expired }) {
                             confirmExpired = true
                         } else {
-                            Task { await load() }
+                            load()
                         }
                     }.disabled(camera == nil || film == nil || !lensReady || loading)
                 }
             }
-            .task { await Subscriptions.shared.refreshEntitlement() }
             .onAppear {
                 cameraID = initialCamera?.id ?? pickOrder.first?.id
                 selectLastLens()
@@ -188,13 +188,18 @@ struct LoadFilmView: View {
         lots.filter { $0.filmStockID == filmID }.reduce(0) { $0 + max(0, $1.count) }
     }
 
-    private func load() async {
-        // '장착'을 빠르게 여러 번 눌러도 롤은 하나만 (구독 확인을 기다리는 동안 다시 눌리는 것 막기)
+    private func load() {
+        // '장착'을 빠르게 여러 번 눌러도 롤은 하나만 (웹·갤럭시와 같음).
+        // 장착하면 화면이 닫힐 때까지 loading을 풀지 않는다 (닫히는 동안 다시 눌려도 두 번째 롤이 생기지 않게)
         guard !loading, let camera, let film else { return }
         loading = true
-        defer { loading = false }
-        await Subscriptions.shared.refreshEntitlement()
-        guard Subscriptions.shared.allowNewRoll(in: context) else { return }
+        // 무료는 달마다 4롤 (무료/프리미엄 구분이 꺼져 있으면 늘 통과)
+        guard Premium.canLoadRoll(in: context) else {
+            loading = false
+            rollLimit = true
+            return
+        }
+        Premium.noteRollLoaded(before: Premium.loadsThisMonth(in: context))
         if let old = camera.loadedRoll {
             old.status = .finished
             old.finishedAt = Date()
@@ -219,7 +224,6 @@ struct LoadFilmView: View {
             // 빈티지 필름: 그 재고의 유통기한을 롤에 남긴다
             roll.filmExpiresAt = lot.expiresAt
         }
-        Subscriptions.shared.noteRollCreated(in: context)
 
         if startToday {
             let today = Calendar.current.isDateInToday(startDate)

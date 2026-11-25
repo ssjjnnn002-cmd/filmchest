@@ -853,10 +853,19 @@ struct RollManualRecordView: View {
     @Query private var lenses: [LensItem]
 
     var body: some View {
-        ManualRecordView(gear: .from(roll: roll, lenses: lenses), shots: roll.meterShots, rollPrewind: roll.meterPrewind,
-                         iso: roll.shotISO.map(Double.init) ?? roll.film.map { Double($0.iso) },
-                         onSave: { shots, prewind in roll.meterShots = shots; roll.meterPrewind = roll.meterPrewind ?? prewind },
-                         onClose: { dismiss() })
+        // 상세 기록(다이얼 화면)은 프리미엄 기능. 잠겨 있으면 안내만 (이미 남긴 기록은 롤 화면에서 그대로 보이고 고칠 수 있다, 웹·갤럭시와 같음)
+        if Premium.canDetailRecord {
+            ManualRecordView(gear: .from(roll: roll, lenses: lenses), shots: roll.meterShots, rollPrewind: roll.meterPrewind,
+                             iso: roll.shotISO.map(Double.init) ?? roll.film.map { Double($0.iso) },
+                             onSave: { shots, prewind in roll.meterShots = shots; roll.meterPrewind = roll.meterPrewind ?? prewind },
+                             onClose: { dismiss() })
+        } else {
+            Color.clear
+                .presentationBackground(.clear)
+                .alert(Premium.detailLockText, isPresented: .constant(true)) {
+                    Button("확인", role: .cancel) { dismiss() }
+                }
+        }
     }
 }
 

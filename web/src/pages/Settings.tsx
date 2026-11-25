@@ -18,6 +18,8 @@ import { withWork } from '../core/work'
 import { Confirm, Icon, Sheet, bytesText } from '../ui/common'
 import { PrivacyPolicy } from './Privacy'
 import { lockDevMode, unlockDevMode, useDevMode } from '../core/devMode'
+import { supporterNames } from '../core/supporters'
+import { FREE_ROLLS_PER_MONTH, clearPremiumTest, devPremiumOn, loadsThisMonth, premiumTestOn, setDevPremium, setPremiumTest } from '../core/premium'
 import { applyTheme, getPref, inClaudeHost, refreshApp, saveFileNow, setPref } from '../platform'
 
 const themes: [string, string][] = [['system', '기기 설정'], ['light', '라이트'], ['dark', '다크']]
@@ -33,6 +35,8 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
   const [usage, setUsage] = useState<{ used: number; quota: number }>()
   const [confirm, setConfirm] = useState(false)
   const [privacy, setPrivacy] = useState(false)
+  const [thanks, setThanks] = useState(false)
+  const supporters = supporterNames()
   const [note, setNote] = useState<string>()
   const [cloud, setCloud] = useState(false)
   const [backupOpen, setBackupOpen] = useState(openBackup)
@@ -119,6 +123,8 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
         <h2>정보</h2>
         <div className="group">
           <button className="row" onClick={() => setPrivacy(true)}><span className="grow">개인정보 처리방침</span><Icon name="chev" size={18} /></button>
+          {/* 함께 만든 분들 (텀블벅 후원자). 목록이 비어 있으면 줄을 숨긴다 */}
+          {supporters.length > 0 && <button className="row" onClick={() => setThanks(true)}><span className="grow">함께 만든 분들</span><Icon name="chev" size={18} /></button>}
           {/* 개발자 모드는 숨겨 둔다: 앱 버전을 5초 누르면 나타난다. 켜져 있으면 끌 때까지 늘 보인다 */}
           <div className="row static" style={{ userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }} onContextMenu={(e) => e.preventDefault()}
             onPointerDown={() => { window.clearTimeout(devPress.current); devPress.current = window.setTimeout(() => { tick(15); setShowDev(true) }, 5000) }}
@@ -144,6 +150,11 @@ export function Settings({ onClose, openBackup = false }: { onClose: () => void;
       {privacy && (
         <Sheet title="개인정보 처리방침" onClose={() => setPrivacy(false)}>
           <PrivacyPolicy />
+        </Sheet>
+      )}
+      {thanks && (
+        <Sheet title="함께 만든 분들" onClose={() => setThanks(false)}>
+          <Supporters names={supporters} />
         </Sheet>
       )}
 
@@ -299,6 +310,7 @@ function DevModeRow({ shown }: { shown: boolean }) {
         {on && <span className="value">켜짐</span>}
       </button>}
       {on && <a className="row" href={`${import.meta.env.BASE_URL}meter-lab.html`}><span className="grow">노출계 시험</span><Icon name="chev" size={18} /></a>}
+      {on && <PremiumTestRows />}
       {asking && (
         <Sheet title="개발자 모드" onClose={close}
           left={<button className="btn ghost" onClick={close}>취소</button>}
@@ -316,7 +328,42 @@ function DevModeRow({ shown }: { shown: boolean }) {
           </div>
         </Sheet>
       )}
-      {offAsk && <Confirm message="개발자 모드를 끌까요?" action="끄기" onCancel={() => setOffAsk(false)} onConfirm={() => { lockDevMode(); setOffAsk(false) }} />}
+      {offAsk && <Confirm message="개발자 모드를 끌까요?" action="끄기" onCancel={() => setOffAsk(false)} onConfirm={() => { clearPremiumTest(); lockDevMode(); setOffAsk(false) }} />}
+    </>
+  )
+}
+
+/** 함께 만든 분들: 고마운 후원자 이름을 한 줄씩 (텀블벅 선물 이미지와 같은 모양) */
+function Supporters({ names }: { names: string[] }) {
+  return (
+    <div className="section">
+      <h2 style={{ fontSize: 22, fontWeight: 700, textTransform: 'none', letterSpacing: 0, color: 'var(--ink)', margin: '4px 0 10px' }}>고마운 후원자</h2>
+      <div className="group">
+        {names.map((n, i) => (
+          <div key={`${i}-${n}`} className="row static" style={{ gap: 14 }}>
+            <span aria-hidden style={{ width: 26, height: 26, borderRadius: '50%', flex: 'none', background: 'color-mix(in srgb, var(--safelight) 28%, transparent)' }} />
+            <span className="grow">{n}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** 개발자 모드: 무료/프리미엄 구분을 이 기기에서만 켜 보고, 프리미엄 이용 중인 것처럼 바꿔 본다 (결제 없음) */
+function PremiumTestRows() {
+  const [test, setTest] = useState(premiumTestOn)
+  const [dev, setDev] = useState(devPremiumOn)
+  const rolls = useLiveQuery(() => db.rolls.toArray(), []) ?? []
+  return (
+    <>
+      <button className="row" onClick={() => { setPremiumTest(!test); setTest(!test) }}>
+        <span className="grow">무료/프리미엄 구분 시험</span><span className="value">{test ? '켜짐' : '꺼짐'}</span>
+      </button>
+      {test && <button className="row" onClick={() => { setDevPremium(!dev); setDev(!dev) }}>
+        <span className="grow">프리미엄 이용 중 (시험)</span><span className="value">{dev ? '예' : '아니요'}</span>
+      </button>}
+      {test && <div className="row static"><span className="grow">이번 달 장착</span><span className="value">{loadsThisMonth(rolls)}/{FREE_ROLLS_PER_MONTH}</span></div>}
     </>
   )
 }

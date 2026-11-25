@@ -7,6 +7,8 @@ enum Features {
     static let meter = false
     /// 스캔 가져올 때 노출계 기록을 앞뒤로 몇 칸 미루는 '번호 맞추기'
     static let frameShift = false
+    /// 무료/프리미엄 구분 (월 4롤·컷별 상세 기록 잠금). 펀딩이 끝나고 결제를 붙이기 전까지 꺼 둔다. 꺼져 있으면 모두 무료 (웹 features.premium과 같음)
+    static let premium = false
 }
 
 /// 앱 설정. 공유 확장도 같은 값을 보도록 App Group 저장소를 쓴다.

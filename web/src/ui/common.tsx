@@ -499,8 +499,10 @@ export function Sheet({ title, onClose, left, right, children, wide, page, shiel
 }
 
 /** 페이지 안 확인 창 (브라우저 confirm()은 쓸 수 없는 환경이 있어서) */
-export function Confirm({ message, action = '삭제', safe, extra, onConfirm, onCancel }: {
+export function Confirm({ message, action = '삭제', safe, extra, only, onConfirm, onCancel }: {
   message: string; action?: string; safe?: boolean; onConfirm: () => void; onCancel: () => void
+  /** 알림만: 취소 버튼 없이 action 하나 */
+  only?: boolean
   /** 아래 버튼 하나 더 */
   extra?: { label: string; onPress: () => void }
 }) {
@@ -529,7 +531,7 @@ export function Confirm({ message, action = '삭제', safe, extra, onConfirm, on
       <div ref={box} className="alert bubble" role="alertdialog" aria-label={message}>
         <p>{message}</p>
         <div className="actions">
-          <button className="btn sr" onClick={onCancel}>취소</button>
+          {!only && <button className="btn sr" onClick={onCancel}>취소</button>}
           <button className="btn" style={{ color: safe ? 'var(--safelight)' : 'var(--danger)', fontWeight: 600 }} onClick={onConfirm}>{action}</button>
           {extra && <button className="btn" style={{ color: 'var(--safelight)', fontWeight: 500 }} onClick={extra.onPress}>{extra.label}</button>}
         </div>

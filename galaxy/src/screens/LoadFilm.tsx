@@ -17,6 +17,7 @@ import { useTheme } from '../theme'
 import { Icon } from '../icons'
 import { CameraEdit } from './CameraEdit'
 import { CustomFilmEdit } from './CustomFilmEdit'
+import { FREE_ROLLS_PER_MONTH, canLoadRoll, isPremium, loadsThisMonth, noteRollLoaded, premiumGateOn, rollLimitText } from '../core/premium'
 
 export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: string; onClose: (loaded?: Roll) => void }) {
   const c = useTheme()
@@ -80,8 +81,15 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
   const load = async () => {
     if (!camera || !film || loading.current) return
     loading.current = true
-    try { await doLoad() } catch (e) { loading.current = false; throw e } // 실패하면 다시 누를 수 있게
+    try {
+      // 무료는 달마다 4롤 (무료/프리미엄 구분이 꺼져 있으면 늘 통과, 웹과 같음)
+      const all = await db.rolls.toArray()
+      if (!canLoadRoll(all)) { loading.current = false; setLimit(true); return }
+      noteRollLoaded(loadsThisMonth(all))
+      await doLoad()
+    } catch (e) { loading.current = false; throw e } // 실패하면 다시 누를 수 있게
   }
+  const [limit, setLimit] = useState(false)
   const doLoad = async () => {
     if (!camera || !film) return
     let lens = mountLenses.find((l) => l.id === lensId)
@@ -167,7 +175,10 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
 
       {/* 필름을 고르기 전에도 보인다 (감도는 '선택 안 됨') */}
       {true ? (
-        <Section foot={today && isToday ? (locationAvailable() ? '지금 시각과 현재 위치를 첫 촬영일로 기록해요.' : '지금 시각을 첫 촬영일로 기록해요. 장소는 롤 화면에서 넣을 수 있어요.') : undefined}>
+        <Section foot={[
+          premiumGateOn() && !isPremium() ? `이번 달 무료 롤 ${Math.min(loadsThisMonth(rolls), FREE_ROLLS_PER_MONTH)}/${FREE_ROLLS_PER_MONTH}` : '',
+          today && isToday ? (locationAvailable() ? '지금 시각과 현재 위치를 첫 촬영일로 기록해요.' : '지금 시각을 첫 촬영일로 기록해요. 장소는 롤 화면에서 넣을 수 있어요.') : '',
+        ].filter(Boolean).join('\n') || undefined}>
           <Group>
             <View style={{ minHeight: 52, paddingVertical: 10, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <Text style={{ fontSize: 17, color: c.ink }}>감도</Text>
@@ -185,6 +196,7 @@ export function LoadFilm({ initialCameraId, onClose }: { initialCameraId?: strin
         </Section>
       ) : null}
       {addingCamera ? <CameraEdit onClose={() => setAddingCamera(false)} /> : null}
+      {limit ? <Confirm message={rollLimitText} action="확인" safe onCancel={() => setLimit(false)} onConfirm={() => setLimit(false)} /> : null}
       {confirmExpired ? <Confirm message="유통기한이 지난 필름이에요." action="그래도 장착" safe onCancel={() => setConfirmExpired(false)} onConfirm={() => { setConfirmExpired(false); void load() }} /> : null}
       {customEdit ? (
         <CustomFilmEdit row={customEdit === 'new' ? undefined : customRows.find((r) => r.id === customEdit)}

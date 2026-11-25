@@ -214,3 +214,31 @@ describe('syncMerge', () => {
     expect(out).toEqual({ id: 'a', title: '새', thumb: 'blob' })
   })
 })
+
+describe('프리미엄 틀 · 함께 만든 분들', () => {
+  it('구분이 꺼져 있으면 모두 쓸 수 있다', async () => {
+    const { isPremium, canLoadRoll, canDetailRecord, premiumGateOn } = await import('./premium')
+    expect(premiumGateOn()).toBe(false)
+    expect(isPremium()).toBe(true)
+    expect(canDetailRecord()).toBe(true)
+    const now = new Date(2027, 0, 20).getTime()
+    const many = Array.from({ length: 9 }, () => ({ loadedAt: now, isArchive: false }))
+    expect(canLoadRoll(many, now)).toBe(true)
+  })
+  it('이번 달 장착 수는 그 달 롤만, 가져온 롤은 빼고 센다', async () => {
+    const { loadsThisMonth, monthKey } = await import('./premium')
+    const now = new Date(2027, 0, 31, 23, 0).getTime()
+    expect(monthKey(now)).toBe('2027-01')
+    const rolls = [
+      { loadedAt: new Date(2027, 0, 1, 0, 1).getTime(), isArchive: false },
+      { loadedAt: new Date(2027, 0, 15).getTime(), isArchive: true },
+      { loadedAt: new Date(2026, 11, 31, 23, 59).getTime(), isArchive: false },
+    ]
+    expect(loadsThisMonth(rolls, now)).toBe(1)
+  })
+  it('후원자 이름은 공백·빈 이름·중복을 뺀다', async () => {
+    const { supporterNames, supporters } = await import('./supporters')
+    expect(supporterNames([' 필름좋아 ', '', '  ', 'Portra400', '필름좋아'])).toEqual(['필름좋아', 'Portra400'])
+    expect(Array.isArray(supporters)).toBe(true)
+  })
+})
