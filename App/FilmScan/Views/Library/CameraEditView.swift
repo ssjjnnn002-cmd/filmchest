@@ -36,6 +36,8 @@ struct CameraEditView: View {
     @State private var lifting = false
     @State private var liftFailed = false
     @State private var canLift = false
+    @State private var cut: CutoutSource?
+    @State private var editingCut: CutoutSource?
     @State private var showCamera = false
     @State private var cameraUnavailable = false
     @State private var photoScale: Double = 1
@@ -116,15 +118,22 @@ struct CameraEditView: View {
                         Button("배경 지우기", systemImage: "wand.and.stars") {
                             Task {
                                 lifting = true
-                                if let lifted = await SubjectLifter.lift(current) { photo = lifted; canLift = false } else { liftFailed = true }
+                                if let c = await SubjectLifter.cutout(current), let lifted = await SubjectLifter.compose(c) { cut = c; photo = lifted; canLift = false } else { liftFailed = true }
                                 lifting = false
                             }
                         }
                         .disabled(lifting)
                     }
+                    #if os(iOS)
+                    if photo != nil {
+                        Button("배경 다듬기", systemImage: "paintbrush.pointed") { Task { await openCutout() } }
+                            .disabled(lifting)
+                    }
+                    #endif
                     if photo != nil || !spin.isEmpty {
                         Button("사진 지우기", systemImage: "trash", role: .destructive) {
                             photo = nil
+                            cut = nil
                             spin = []
                             liftFailed = false
                         }
@@ -133,7 +142,7 @@ struct CameraEditView: View {
                     Text("외관")
                 } footer: {
                     if liftFailed {
-                        Text("카메라를 찾지 못해 배경을 지우지 못했어요. 단색 배경에서 찍은 사진으로 다시 해 보세요.")
+                        Text("카메라를 찾지 못했어요. 배경 다듬기로 직접 지울 수 있어요.")
                     } else if photo == nil && spin.isEmpty {
                         Text("사진이 없으면 고른 형태의 기본 모형으로 보여요.")
                     }
@@ -208,6 +217,17 @@ struct CameraEditView: View {
             } message: {
                 Text("맥의 iPhone 미러링 중에는 카메라가 열리지 않아요. 휴대폰에서 직접 눌러 주세요.")
             }
+            #if os(iOS)
+            .fullScreenCover(item: $editingCut) { cut in
+                CutoutEditorView(source: cut) { edited in
+                    editingCut = nil
+                    guard let edited else { return }
+                    Task {
+                        if let data = await SubjectLifter.compose(edited) { self.cut = edited; photo = data; canLift = false; liftFailed = false }
+                    }
+                }
+            }
+            #endif
             .fullScreenCover(isPresented: $showCamera) {
                 SystemCameraPicker { data in
                     showCamera = false
@@ -373,10 +393,17 @@ struct CameraEditView: View {
         focus = nil
     }
 
+    /// 배경 다듬기: 지운 적이 없으면 지금 사진(투명한 곳은 지운 곳)으로 시작
+    private func openCutout() async {
+        if cut == nil, let photo { cut = await SubjectLifter.source(from: photo) }
+        editingCut = cut
+    }
+
     private func usePhoto(_ data: Data?) async {
         guard let data else { return }
         lifting = true
         liftFailed = false
+        cut = nil
         photoScale = 1
         photoOffset = .zero
         // 배경이 이미 투명한 PNG는 그대로, 그냥 사진은 사진 그대로 (배경 지우기는 버튼으로 고를 때만)

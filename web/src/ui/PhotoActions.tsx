@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { CameraCapture } from './CameraCapture'
 import { Icon } from './common'
 
-/** 사진 고르기 줄 메뉴 (아이폰 앱과 같은 모양): 사진 찍기 · 앨범에서 사진 고르기 · 사진 지우기. 카메라·렌즈·액세서리 공통 */
-export function PhotoActions({ onFile, onClear }: { onFile: (f: File) => void; onClear?: () => void }) {
+/** 사진 고르기 줄 메뉴 (아이폰 앱과 같은 모양): 사진 찍기 · 앨범에서 사진 고르기 · (배경 지우기 · 배경 다듬기) · 사진 지우기. 카메라·렌즈·액세서리 공통 */
+export function PhotoActions({ onFile, onClear, children }: { onFile: (f: File) => void; onClear?: () => void; children?: ReactNode }) {
   const [shooting, setShooting] = useState(false)
   return (
     <div className="photo-actions">
@@ -12,6 +12,7 @@ export function PhotoActions({ onFile, onClear }: { onFile: (f: File) => void; o
         <Icon name="photos" /> 앨범에서 사진 고르기
         <input type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onFile(f) }} />
       </label>
+      {children}
       {onClear && <button type="button" className="row danger" onClick={onClear}><Icon name="trash" /> 사진 지우기</button>}
       {shooting && <CameraCapture onShot={onFile} onClose={() => setShooting(false)} />}
     </div>

@@ -38,3 +38,6 @@ web/public/apk/
 .dev.vars*
 !.dev.vars.example
 !.env.example
+
+# 웹 배경 지우기 모델 (scripts/fetch-bg-model.sh로 받는다)
+web/public/bg-model/

@@ -9,7 +9,7 @@ self.addEventListener('install', (e) => e.waitUntil((async () => {
 })()))
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url)
-  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/apk') || url.pathname.endsWith('.apk')) return
+  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/apk') || url.pathname.startsWith('/bg-model/') || url.pathname.endsWith('.apk')) return
   e.respondWith((async () => {
     const page = e.request.mode === 'navigate'
     const key = page ? './' : e.request

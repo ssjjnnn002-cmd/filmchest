@@ -1,4 +1,5 @@
-import { prepareCameraPhoto } from '../core/cutout'
+import { isCutoutBlob, prepareCameraPhoto } from '../core/cutout'
+import { useBackgroundTools } from '../ui/BackgroundTools'
 import { getPref, setPref } from '../platform'
 import { groupSections, styleKey } from '../core/gearGroup'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -38,11 +39,8 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
     })
     return () => { live = false }
   }, [camera?.id, camera?.hasPhoto, camera?.photo])
-  // 새로 고른 사진 원본 (배경 지우기를 켜고 끌 때 다시 만든다)
+  // 새로 고른 사진 원본 (배경 지우기는 이 사진으로)
   const [original, setOriginal] = useState<Blob>()
-  // 그냥 사진은 그대로 (배경 지우기는 켤 때만)
-  const [removeBg, setRemoveBg] = useState(false)
-  const [bgRemoved, setBgRemoved] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [photoScale, setPhotoScale] = useState(camera?.photoScale ?? 1)
   const [offset, setOffset] = useState({ x: camera?.photoOffsetX ?? 0, y: camera?.photoOffsetY ?? 0 })
@@ -75,24 +73,25 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
     gesture.current = null
   }
   const useFile = (f: File) => {
-    setOriginal(f)
     setPhotoScale(1)
-    void applyPhoto(f, removeBg)
+    void applyPhoto(f)
   }
-  const applyPhoto = async (file: Blob, remove: boolean) => {
+  // 배경이 이미 투명한 PNG는 그대로, 그냥 사진은 사진 그대로 (배경 지우기는 버튼으로 고를 때만. 아이폰과 같음)
+  const applyPhoto = async (file: Blob) => {
     setProcessing(true)
     setOffset({ x: 0, y: 0 })
     try {
-      const r = await prepareCameraPhoto(file, remove)
+      const r = await prepareCameraPhoto(file, false)
       setPhoto(r.blob)
-      setBgRemoved(r.removed)
+      setOriginal(await isCutoutBlob(r.blob).catch(() => false) ? undefined : r.blob)
     } catch {
       setPhoto(file)
-      setBgRemoved(false)
+      setOriginal(file)
     } finally {
       setProcessing(false)
     }
   }
+  const bg = useBackgroundTools({ picked: original, current: async () => photo, onResult: (b) => setPhoto(b) })
   const [battery, setBattery] = useState(camera?.battery ?? '')
   const [batteryAt, setBatteryAt] = useState<number | undefined>(camera?.batteryAt)
   const [prewind, setPrewind] = useState<boolean | undefined>(camera?.prewind)
@@ -241,6 +240,7 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
                 onWheel={(e) => setPhotoScale((s) => Math.min(3, Math.max(0.3, s * (e.deltaY < 0 ? 1.05 : 0.95))))}>
                 <img src={photoURL} alt="" draggable={false} style={{ transform: `translate(${offset.x * 100}%, ${offset.y * 100}%) scale(${photoScale})`, transition: 'none', pointerEvents: 'none' }} />
                 {processing && <div className="photo-busy"><div className="spinner" /></div>}
+                {bg.busy}
               </div>
             )
             : <Model3D profile={profile} color={BODY_COLOR} height={220} />}
@@ -266,21 +266,10 @@ export function CameraEdit({ camera, onClose }: { camera?: Camera; onClose: () =
             </div>
           )}
 
-          {photo && (
-            <div className="group inner-group">
-              <label className="toggle">
-                <span>
-                  배경 지우기
-                  {original && !processing && removeBg && !bgRemoved && <span className="sub" style={{ display: 'block' }}>단색 배경이 아니라 그대로 두었어요</span>}
-                </span>
-                <input type="checkbox" className="switch" checked={removeBg} disabled={!original || processing}
-                  onChange={(e) => { setRemoveBg(e.target.checked); if (original) void applyPhoto(original, e.target.checked) }} />
-              </label>
-            </div>
-          )}
-          <PhotoActions onFile={useFile} onClear={photo ? () => { setPhoto(undefined); setOriginal(undefined) } : undefined} />
+          <PhotoActions onFile={useFile} onClear={photo ? () => { setPhoto(undefined); setOriginal(undefined); bg.clear() } : undefined}>{bg.rows(!!photo)}</PhotoActions>
+          {bg.editor}
         </div>
-        <p className="footnote">{photo ? '사진은 그대로 써요. 배경을 지우려면 배경 지우기를 켜 주세요.' : '사진이 없으면 고른 형태의 기본 모형으로 보여요.'}</p>
+        {bg.note ? <p className="footnote">{bg.note}</p> : !photo && <p className="footnote">사진이 없으면 고른 형태의 기본 모형으로 보여요.</p>}
       </div>
 
       <TagField tags={tags} setTags={setTags} />

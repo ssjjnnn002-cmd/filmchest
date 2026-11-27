@@ -20,6 +20,8 @@ import { Canister, Confirm, Icon, Sheet } from '../ui/common'
 import { CustomFilmEdit } from './CustomFilmEdit'
 import { FilmPicker } from '../ui/FilmPicker'
 import { PhotoActions } from '../ui/PhotoActions'
+import { useBackgroundTools } from '../ui/BackgroundTools'
+import { isCutoutBlob } from '../core/cutout'
 import { OptionalDate, TagField, TagLine, accessoryKinds, addAccessoryKind, tagSections } from '../ui/gearExtras'
 import { searchMatch } from '../core/searchAlias'
 
@@ -120,19 +122,30 @@ function PhotoField({ id, hasPhoto, blob, setBlob, cleared, setCleared, placehol
     return () => URL.revokeObjectURL(url)
   }, [blob])
   const src = local || saved
+  // 새로 고른 그냥 사진 (배경 지우기는 이 사진으로. 이미 투명한 PNG는 그대로)
+  const [picked, setPicked] = useState<Blob>()
   const take = (file?: File) => {
     if (!file) return
     setCleared(false)
     setBlob(file)
+    setPicked(undefined)
+    void isCutoutBlob(file).then((cut) => setPicked(cut ? undefined : file)).catch(() => setPicked(file))
   }
+  const bg = useBackgroundTools({
+    picked,
+    current: async () => blob ?? (saved ? await fetch(saved).then((r) => r.blob()) : undefined),
+    onResult: (b) => { setCleared(false); setBlob(b) },
+  })
   // 카메라 탭의 외관 칸과 같은 모양: 넓은 미리보기 + 작은 버튼 한 줄
   return (
     <div className="section">
       <h2>사진</h2>
       <div className="group" style={{ padding: 12, display: 'grid', gap: 12 }}>
-        {src ? <div className="photo-preview"><img src={src} alt="" /></div> : <div className="photo-empty">{placeholder ?? <Icon name="camera" size={42} />}</div>}
-        <PhotoActions onFile={take} onClear={src ? () => { setBlob(undefined); setCleared(true) } : undefined} />
+        {src ? <div className="photo-preview"><img src={src} alt="" />{bg.busy}</div> : <div className="photo-empty">{placeholder ?? <Icon name="camera" size={42} />}</div>}
+        <PhotoActions onFile={take} onClear={src ? () => { setBlob(undefined); setCleared(true); setPicked(undefined); bg.clear() } : undefined}>{bg.rows(!!src)}</PhotoActions>
+        {bg.editor}
       </div>
+      {bg.note && <p className="footnote">{bg.note}</p>}
     </div>
   )
 }

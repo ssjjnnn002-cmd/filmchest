@@ -49,6 +49,17 @@ else
   ENT_APP="App/Config/Free.entitlements"; ENT_SHARE="App/Config/Free.entitlements"
 fi
 
+# 무료 계정 프로필은 7일짜리인데, Xcode는 아직 남은 프로필을 그대로 다시 쓴다.
+# 6일 안에 끝나는 이 앱 프로필은 치워서 새로 받게 한다 (안 그러면 설치 다음 날 만료될 수 있다)
+PROFILES=~/Library/Developer/Xcode/UserData/Provisioning\ Profiles
+SOON=$(( $(date +%s) + 6 * 86400 ))
+for f in $PROFILES/*.mobileprovision(N); do
+  P=$(security cms -D -i "$f" 2>/dev/null) || continue
+  [[ "$(plutil -extract Name raw -o - - <<< "$P")" == *"$PREFIX"* ]] || continue
+  END=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$(plutil -extract ExpirationDate raw -o - - <<< "$P")" +%s 2>/dev/null) || continue
+  (( END < SOON )) && rm -f "$f"
+done
+
 echo "→ $NAME 에 설치합니다 (팀 $TEAM, 번들 $PREFIX$( (( PAID )) || echo ', 무료 계정'))"
 xcodebuild -project FilmScan.xcodeproj -scheme FilmScan -configuration Release \
   -destination "id=$UDID" -derivedDataPath .build/device \

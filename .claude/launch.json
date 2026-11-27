@@ -13,6 +13,21 @@
       "port": 5199
     },
     {
+      "name": "filmchest-web-dist",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--prefix",
+        "web",
+        "vite",
+        "preview",
+        "web",
+        "--port",
+        "5198",
+        "--strictPort"
+      ],
+      "port": 5198
+    },
+    {
       "name": "meter-lab",
       "runtimeExecutable": "python3",
       "runtimeArgs": [

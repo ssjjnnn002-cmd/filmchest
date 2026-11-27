@@ -1113,3 +1113,11 @@ input[type="date"].input::-webkit-calendar-picker-indicator, input[type="datetim
 .date-clear { display: inline-flex; align-items: center; gap: 4px; justify-self: end; margin-left: auto; }
 .date-clear .chip-x { border: 0; background: none; cursor: pointer; font-size: 18px; }
 .alert.bubble:has(.actions > .btn:nth-child(3)) { width: min(350px, calc(100% - 32px)); }
+
+/* 배경 다듬기 */
+.cutout-editor { grid-template-rows: auto minmax(0, 1fr) auto; }
+.cutout-stage { position: relative; min-height: 0; overflow: hidden; touch-action: none; background: var(--fill); cursor: none; }
+.cutout-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cutout-tools { display: grid; gap: 12px; padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px)); background: var(--paper); border-top: 0.5px solid var(--line, rgb(0 0 0 / .08)); }
+.cutout-tools .btn.small { display: inline-flex; align-items: center; gap: 6px; color: var(--safelight); }
+.cutout-tools .btn.small:disabled { color: var(--muted); }

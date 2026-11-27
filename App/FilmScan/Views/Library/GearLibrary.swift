@@ -547,6 +547,8 @@ struct GearPhotoEditor: View {
     @State private var lifting = false
     @State private var liftFailed = false
     @State private var canLift = false
+    @State private var cut: CutoutSource?
+    @State private var editingCut: CutoutSource?
 
     var body: some View {
         Section {
@@ -584,15 +586,27 @@ struct GearPhotoEditor: View {
                 Button("배경 지우기", systemImage: "wand.and.stars") {
                     Task {
                         lifting = true
-                        if let lifted = await SubjectLifter.lift(current) { photo = lifted; canLift = false } else { liftFailed = true }
+                        if let c = await SubjectLifter.cutout(current), let lifted = await SubjectLifter.compose(c) { cut = c; photo = lifted; canLift = false } else { liftFailed = true }
                         lifting = false
                     }
                 }
                 .disabled(lifting)
             }
+            #if os(iOS)
+            if photo != nil {
+                Button("배경 다듬기", systemImage: "paintbrush.pointed") {
+                    Task {
+                        if cut == nil, let photo { cut = await SubjectLifter.source(from: photo) }
+                        editingCut = cut
+                    }
+                }
+                .disabled(lifting)
+            }
+            #endif
             if photo != nil {
                 Button("사진 지우기", systemImage: "trash", role: .destructive) {
                     photo = nil
+                    cut = nil
                     liftFailed = false
                 }
             }
@@ -600,7 +614,7 @@ struct GearPhotoEditor: View {
             Text("사진")
         } footer: {
             if liftFailed {
-                Text("배경을 지우지 못했어요. 사진은 그대로예요.")
+                Text("배경을 찾지 못했어요. 배경 다듬기로 직접 지울 수 있어요.")
             }
         }
         .onChange(of: pickerItem) { _, item in
@@ -620,6 +634,15 @@ struct GearPhotoEditor: View {
             }
             .ignoresSafeArea()
         }
+        .fullScreenCover(item: $editingCut) { cut in
+            CutoutEditorView(source: cut) { edited in
+                editingCut = nil
+                guard let edited else { return }
+                Task {
+                    if let data = await SubjectLifter.compose(edited) { self.cut = edited; photo = data; canLift = false; liftFailed = false }
+                }
+            }
+        }
         #endif
     }
 
@@ -627,6 +650,7 @@ struct GearPhotoEditor: View {
         guard let data else { return }
         lifting = true
         liftFailed = false
+        cut = nil
         // 배경이 이미 투명한 PNG는 그대로, 그냥 사진은 사진 그대로 (배경 지우기는 버튼으로 고를 때만)
         if let ready = await SubjectLifter.alreadyTransparent(data) {
             photo = ready
